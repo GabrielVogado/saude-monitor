@@ -39,3 +39,23 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# IDE/editor local config
+.idea/
+.vscode/
+*.iml
+
+# Android/Gradle local files
+android/.gradle/
+android/local.properties
+android/**/build/
+
+# React Native temporary and cache files
+.bundle/
+*.log
+
+# App signing / secret config
+*.keystore
+google-services.json
+GoogleService-Info.plist
+

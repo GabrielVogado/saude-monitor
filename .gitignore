@@ -2,12 +2,17 @@
 
 # dependencies
 node_modules/
+frontend/node_modules/
 
 # Expo
 .expo/
 dist/
 web-build/
 expo-env.d.ts
+frontend/.expo/
+frontend/dist/
+frontend/web-build/
+frontend/expo-env.d.ts
 
 # Native
 .kotlin/
@@ -25,6 +30,7 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
 
 # macOS
 .DS_Store
@@ -32,13 +38,17 @@ yarn-error.*
 
 # local env files
 .env*.local
+frontend/.env*.local
 
 # typescript
 *.tsbuildinfo
+frontend/*.tsbuildinfo
 
 # generated native folders
 /ios
 /android
+frontend/ios
+frontend/android
 
 # IDE/editor local config
 .idea/
@@ -46,16 +56,14 @@ yarn-error.*
 *.iml
 
 # Android/Gradle local files
-android/.gradle/
-android/local.properties
-android/**/build/
+frontend/android/.gradle/
+frontend/android/local.properties
+frontend/android/**/build/
 
 # React Native temporary and cache files
 .bundle/
-*.log
 
 # App signing / secret config
 *.keystore
 google-services.json
 GoogleService-Info.plist
-

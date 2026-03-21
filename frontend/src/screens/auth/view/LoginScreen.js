@@ -1,11 +1,25 @@
 import React, {useState} from "react";
-import {Image, StyleSheet, Text, TextInput, TouchableOpacity, View} from "react-native";
+import {Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View} from "react-native";
 import {SafeAreaView} from "react-native-safe-area-context";
+import LoginService from "../service/LoginService";
 
 export default function LoginScreen() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [rememberDevice, setRememberDevice] = useState(false);
+
+    const handleLogin = () => {
+        const loginData = LoginService.login({
+            email,
+            password,
+            rememberDevice,
+        });
+
+        Alert.alert(
+            "Dados do Login",
+            `E-mail/Usuário: ${loginData.email}\nSenha: ${loginData.password}\nLembrar dispositivo: ${loginData.rememberDevice ? "Sim" : "Não"}`
+        );
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -68,7 +82,7 @@ export default function LoginScreen() {
             </View>
 
             {/* Botão Entrar */}
-            <TouchableOpacity style={styles.loginButton}>
+            <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
                 <Text style={styles.loginButtonText}>Entrar no sistema ➜</Text>
             </TouchableOpacity>
 

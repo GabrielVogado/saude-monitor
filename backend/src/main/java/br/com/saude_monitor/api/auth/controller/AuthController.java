@@ -20,15 +20,9 @@ public class AuthController {
 	@PostMapping("/login")
 	public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
 		logger.info("[AuthController] Requisicao de login recebida do frontend para email={} rememberDevice={}",
-			request.email(),
-			request.rememberDevice());
+			request.email(), request.rememberDevice());
 
-		LoginResponse response = new LoginResponse(
-			true,
-			"login payload received",
-			request.email(),
-			request.rememberDevice()
-		);
+		var response = new LoginResponse(true, "login payload received", request.email(), request.rememberDevice());
 
 		logger.info("[AuthController] Resposta de login enviada com sucesso para email={}", request.email());
 		return ResponseEntity.ok(response);

@@ -9,24 +9,30 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+	private record ValidationErrorResponse(
+		boolean success,
+		String message,
+		Map<String, String> errors
+	) {}
+
 	@ExceptionHandler(MethodArgumentNotValidException.class)
-	public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException exception) {
-		Map<String, String> fieldErrors = new LinkedHashMap<>();
+	public ResponseEntity<ValidationErrorResponse> handleValidation(MethodArgumentNotValidException exception) {
+		var fieldErrors = exception.getBindingResult().getFieldErrors()
+			.stream()
+			.collect(Collectors.toMap(
+				FieldError::getField,
+				FieldError::getDefaultMessage,
+				(existing, _) -> existing,
+				LinkedHashMap::new
+			));
 
-		for (FieldError error : exception.getBindingResult().getFieldErrors()) {
-			fieldErrors.put(error.getField(), error.getDefaultMessage());
-		}
-
-		Map<String, Object> body = new LinkedHashMap<>();
-		body.put("success", false);
-		body.put("message", "validation failed");
-		body.put("errors", fieldErrors);
-
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+		return ResponseEntity
+			.status(HttpStatus.BAD_REQUEST)
+			.body(new ValidationErrorResponse(false, "validation failed", fieldErrors));
 	}
 }
-

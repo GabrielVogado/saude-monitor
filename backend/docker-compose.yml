@@ -1,0 +1,17 @@
+services:
+  percona-mongodb:
+    image: percona/percona-server-mongodb:7.0
+    container_name: saude-monitor-percona
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-saude_monitor_user}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-saude_monitor_pass}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-saude_monitor}
+    volumes:
+      - percona_data:/data/db
+
+volumes:
+  percona_data:
+

@@ -1,5 +1,7 @@
 package br.com.saude_monitor.api.auth.controller;
 
+import br.com.saude_monitor.api.auth.dto.LoginResponse;
+import br.com.saude_monitor.api.auth.service.AuthService;
 import br.com.saude_monitor.api.config.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -12,8 +14,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class AuthControllerTest {
 
+	private final AuthService authService = request -> new LoginResponse(
+		true,
+		"login payload received",
+		request.email(),
+		request.rememberDevice()
+	);
+
 	private final MockMvc mockMvc = MockMvcBuilders
-		.standaloneSetup(new AuthController())
+		.standaloneSetup(new AuthController(authService))
 		.setControllerAdvice(new GlobalExceptionHandler())
 		.build();
 

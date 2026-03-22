@@ -7,18 +7,32 @@ export default function LoginScreen() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [rememberDevice, setRememberDevice] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    const handleLogin = () => {
-        const loginData = LoginService.login({
-            email,
-            password,
-            rememberDevice,
-        });
+    const handleLogin = async () => {
+        if (!email.trim() || !password.trim()) {
+            Alert.alert("Atencao", "Preencha e-mail/usuario e senha.");
+            return;
+        }
 
-        Alert.alert(
-            "Dados do Login",
-            `E-mail/Usuário: ${loginData.email}\nSenha: ${loginData.password}\nLembrar dispositivo: ${loginData.rememberDevice ? "Sim" : "Não"}`
-        );
+        setLoading(true);
+
+        try {
+            const response = await LoginService.login({
+                email,
+                password,
+                rememberDevice,
+            });
+
+            Alert.alert(
+                "Login realizado",
+                `Mensagem: ${response.message}\nE-mail: ${response.email}\nLembrar dispositivo: ${response.rememberDevice ? "Sim" : "Nao"}`
+            );
+        } catch (error) {
+            Alert.alert("Erro no login", error.message || "Erro inesperado.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -82,8 +96,14 @@ export default function LoginScreen() {
             </View>
 
             {/* Botão Entrar */}
-            <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-                <Text style={styles.loginButtonText}>Entrar no sistema ➜</Text>
+            <TouchableOpacity
+                style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+                onPress={handleLogin}
+                disabled={loading}
+            >
+                <Text style={styles.loginButtonText}>
+                    {loading ? "Entrando..." : "Entrar no sistema ➜"}
+                </Text>
             </TouchableOpacity>
 
             {/* Aviso LGPD */}
@@ -174,6 +194,9 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         alignItems: "center",
         marginBottom: 20,
+    },
+    loginButtonDisabled: {
+        opacity: 0.6,
     },
     loginButtonText: {
         color: "#fff",

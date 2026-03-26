@@ -2,7 +2,7 @@ package br.com.saude_monitor.api.auth.controller;
 
 import br.com.saude_monitor.api.auth.dto.LoginResponse;
 import br.com.saude_monitor.api.auth.service.AuthService;
-import br.com.saude_monitor.api.config.GlobalExceptionHandler;
+import br.com.saude_monitor.api.config.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;

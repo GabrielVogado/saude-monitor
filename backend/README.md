@@ -8,7 +8,6 @@ API REST em Spring Boot 4 com Java 25, responsavel por receber e persistir dados
 
 | Ferramenta | Versao minima |
 |---|---|
-| Java | 25 |
 | Docker Desktop | 4.x |
 | Docker Compose | v2 |
 
@@ -38,31 +37,44 @@ Variaveis disponiveis em `.env`:
 
 ---
 
-## Subindo o ambiente
+## Subindo o ambiente com Docker (backend + banco)
 
-### 2. Banco de dados (Percona MongoDB)
-
-```powershell
-cd D:\saude-monitor\backend
-docker compose --env-file .env up -d
-```
-
-Validar que o banco esta pronto:
-
-```powershell
-docker exec saude-monitor-percona mongosh --quiet `
-  -u saude_monitor_user -p saude_monitor_pass `
-  --authenticationDatabase admin `
-  --eval "db.runCommand({ ping: 1 }).ok"
-# Esperado: 1
-```
-
-### 3. Aplicacao
-
-Carrega as variaveis do `.env` e inicia o backend na porta `8080`:
+### 2. Subir tudo com um comando
 
 ```powershell
 cd D:\saude-monitor\backend
+docker compose --env-file .env up -d --build
+```
+
+Ver containers e status:
+
+```powershell
+docker compose ps
+```
+
+Ver logs do backend:
+
+```powershell
+docker compose logs -f backend
+```
+
+### 3. Validacao rapida da API
+
+```powershell
+$headers = @{"Content-Type"="application/json"}
+$body    = '{"email":"usuario@teste.com","password":"senha123","rememberDevice":true}'
+Invoke-WebRequest -Uri "http://localhost:8080/api/auth/login" `
+  -Method POST -Headers $headers -Body $body -UseBasicParsing |
+  Select-Object -ExpandProperty Content
+```
+
+### 4. Opcional: executar backend local sem Docker
+
+Se quiser rodar apenas o banco no Docker e o backend pela IDE/Gradle, voce precisa do Java 25 instalado:
+
+```powershell
+cd D:\saude-monitor\backend
+docker compose --env-file .env up -d percona-mongodb
 Get-Content .env | ForEach-Object {
   if ($_ -match '^(?<k>[^#=]+)=(?<v>.*)$') {
     [System.Environment]::SetEnvironmentVariable($matches['k'], $matches['v'], 'Process')

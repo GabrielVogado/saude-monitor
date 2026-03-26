@@ -1,4 +1,4 @@
-package br.com.saude_monitor.api.config;
+package br.com.saude_monitor.api.config.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

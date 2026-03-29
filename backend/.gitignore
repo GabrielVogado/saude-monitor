@@ -1,0 +1,67 @@
+HELP.md
+.gradle/
+**/.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### Gradle (local) ###
+# Configuracoes locais da maquina (nao devem ir para o remoto)
+local.properties
+gradle-local.properties
+!gradle.properties.example
+
+# Arquivos essenciais do projeto Gradle (devem continuar versionados)
+!build.gradle
+!settings.gradle
+!gradlew
+!gradlew.bat
+!gradle/wrapper/gradle-wrapper.properties
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Configuracoes locais / segredos ###
+# Mantem o application.properties base no repositório
+
+
+# Variaveis de ambiente locais
+.env
+.env.*
+!.env.example
+
+# Segredos e certificados locais
+*.key
+*.pem
+*.p12
+*.jks
+

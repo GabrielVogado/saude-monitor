@@ -1,0 +1,41 @@
+services:
+  percona-mongodb:
+    image: percona/percona-server-mongodb:7.0
+    container_name: saude-monitor-percona
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-saude_monitor_user}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-saude_monitor_pass}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-saude_monitor}
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "-u", "${MONGO_USER:-saude_monitor_user}", "-p", "${MONGO_PASSWORD:-saude_monitor_pass}", "--authenticationDatabase", "${MONGO_AUTH_DB:-admin}", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - percona_data:/data/db
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: saude-monitor-backend
+    restart: unless-stopped
+    depends_on:
+      percona-mongodb:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      MONGO_HOST: percona-mongodb
+      MONGO_PORT: 27017
+      MONGO_DATABASE: ${MONGO_DATABASE:-saude_monitor}
+      MONGO_AUTH_DB: ${MONGO_AUTH_DB:-admin}
+      MONGO_USER: ${MONGO_USER:-saude_monitor_user}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:-saude_monitor_pass}
+
+volumes:
+  percona_data:
+

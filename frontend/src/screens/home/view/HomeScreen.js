@@ -1,8 +1,9 @@
 import React from "react";
-import {Image, StyleSheet, Text, View} from "react-native";
+import {Image, Text, View} from "react-native";
 import {SafeAreaView} from "react-native-safe-area-context";
+import styles from "./css/HomeStyle";
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
@@ -49,7 +50,6 @@ export default function HomeScreen({ navigation }) {
                                 source={require("../../../../assets/img/localizacao.png")}
                                 style={styles.topicIcon}
                             />
-                            {/* Ícone será adicionado futuramente */}
                             <Text style={styles.topicTitle}>Geolocalização Automática</Text>
                         </View>
                         <Text style={styles.topicDescription}>
@@ -64,7 +64,6 @@ export default function HomeScreen({ navigation }) {
                                 source={require("../../../../assets/img/bubble-chat.png")}
                                 style={styles.topicIcon}
                             />
-                            {/* Ícone será adicionado futuramente */}
                             <Text style={styles.topicTitle}>Feedback do Paciente</Text>
                         </View>
                         <Text style={styles.topicDescription}>
@@ -73,31 +72,13 @@ export default function HomeScreen({ navigation }) {
                     </View>
                 </View>
 
-                {/* Quadrado branco para imagem futura */}
                 <View style={styles.imagePlaceholder}>
-                    <Text style={styles.placeholderText}>Imagem aqui</Text>
+                    <Image
+                        source={require("../../../../assets/img/home_melhorado.png")}
+                        style={styles.homeImage}
+                    />
                 </View>
             </View>
         </SafeAreaView>
     );
 }
-
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#fff" },
-    content: { flex: 1, justifyContent: "flex-start", alignItems: "flex-start", paddingHorizontal: 20, paddingTop: 30 },
-    versionTag: { backgroundColor: "#e0f7fa", paddingVertical: 6, paddingHorizontal: 15, borderRadius: 20, marginBottom: 15 },
-    versionText: { color: "#007BFF", fontSize: 14, fontWeight: "600" },
-    headline: { fontSize: 22, fontWeight: "bold", color: "#333", textAlign: "left", marginBottom: 15, letterSpacing: 1 },
-    highlight: { color: "#3bdcf1", fontWeight: "bold" },
-    description: { fontSize: 14, color: "#555", textAlign: "left", marginBottom: 20, lineHeight: 20 },
-    topicsContainer: { marginBottom: 20, width: "100%" },
-    topicBlock: { marginBottom: 15 },
-    topicHeader: { flexDirection: "row", alignItems: "center", marginBottom: 5 },
-    topicIcon: { width: 20, height: 20, marginRight: 8, resizeMode: "contain" },
-    topicTitle: { fontSize: 15, fontWeight: "bold", color: "#333" },
-    topicDescription: { fontSize: 13, color: "#555", lineHeight: 18 },
-    imagePlaceholder: { width: "100%", height: 150, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ccc", borderRadius: 10, justifyContent: "center", alignItems: "center", marginBottom: 30 },
-    placeholderText: { color: "#aaa", fontSize: 14 },
-    loginButton: { backgroundColor: "#3bdcf1", paddingVertical: 15, paddingHorizontal: 30, borderRadius: 10, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, elevation: 3, alignSelf: "flex-start" },
-    loginButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-});

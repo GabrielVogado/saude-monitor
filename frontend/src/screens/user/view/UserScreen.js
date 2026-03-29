@@ -1,31 +1,31 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
-    StyleSheet,
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    SafeAreaView,
+    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
-    Alert,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import {
-    User,
-    Mail,
-    Phone,
-    Lock,
+    ArrowRight,
     Eye,
     EyeOff,
-    ArrowRight,
-    ShieldCheck,
     Globe,
-    Share2,
     HelpCircle,
+    Lock,
+    Mail,
+    Phone,
+    Share2,
+    ShieldCheck,
+    User,
     UserPlus
 } from 'lucide-react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import UserService from '../service/UserService';
+import styles from './css/UserStyle';
 
 const HospitalRegisterScreen = () => {
     const [fullName, setFullName] = useState('');
@@ -74,16 +74,16 @@ const HospitalRegisterScreen = () => {
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={{ flex: 1 }}
+                style={styles.keyboardAvoidingView}
             >
                 <ScrollView contentContainerStyle={styles.scrollContent}>
 
                     {/* Header with Back Button Placeholder */}
                     <View style={styles.header}>
                         <TouchableOpacity style={styles.backBtn}>
-                            <ArrowRight size={24} color="#075985" style={{ transform: [{ rotate: '180deg' }] }} />
+                            <ArrowRight size={24} color="#075985" style={styles.headerBackIcon} />
                         </TouchableOpacity>
-                        <View style={{ width: 40 }} />
+                        <View style={styles.headerSpacer} />
                     </View>
 
                     {/* Main Card */}
@@ -186,7 +186,7 @@ const HospitalRegisterScreen = () => {
                                 <Text style={styles.registerButtonText}>
                                     {isSubmitting ? 'Enviando...' : 'Cadastrar no sistema'}
                                 </Text>
-                                <ArrowRight size={20} color="#FFF" style={{ marginLeft: 8 }} />
+                                <ArrowRight size={20} color="#FFF" style={styles.registerButtonIcon} />
                             </TouchableOpacity>
                         </View>
 
@@ -196,7 +196,7 @@ const HospitalRegisterScreen = () => {
                                 <ShieldCheck size={18} color="#0085C7" />
                             </View>
                             <Text style={styles.complianceText}>
-                                Em conformidade com a <Text style={{ fontWeight: '700' }}>LGPD (Lei Geral de Proteção de Dados)</Text>. Suas informações são tratadas com sigilo absoluto e utilizadas exclusivamente para autenticação institucional.
+                                Em conformidade com a <Text style={styles.complianceHighlight}>LGPD (Lei Geral de Proteção de Dados)</Text>. Suas informações são tratadas com sigilo absoluto e utilizadas exclusivamente para autenticação institucional.
                             </Text>
                         </View>
                     </View>
@@ -244,234 +244,5 @@ const HospitalRegisterScreen = () => {
     );
 };
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F1F5F9',
-    },
-    scrollContent: {
-        paddingBottom: 40,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 20,
-    },
-    backBtn: {
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: '#075985',
-        letterSpacing: -0.5,
-    },
-    card: {
-        backgroundColor: '#FFFFFF',
-        marginHorizontal: 20,
-        borderRadius: 32,
-        padding: 24,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.08,
-        shadowRadius: 20,
-        elevation: 8,
-        alignItems: 'center',
-    },
-    iconCircle: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#EFF6FF',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    innerIcon: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#DBEAFE',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: '#0F172A',
-        textAlign: 'center',
-        marginBottom: 8,
-    },
-    subtitle: {
-        fontSize: 14,
-        color: '#64748B',
-        textAlign: 'center',
-        lineHeight: 20,
-        marginBottom: 32,
-        paddingHorizontal: 10,
-    },
-    form: {
-        width: '100%',
-    },
-    label: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#334155',
-        marginBottom: 8,
-        letterSpacing: 0.5,
-    },
-    inputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#F8FAFC',
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        height: 60,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: '#F1F5F9',
-    },
-    inputIcon: {
-        marginRight: 12,
-    },
-    input: {
-        flex: 1,
-        color: '#1E293B',
-        fontSize: 15,
-    },
-    termsContainer: {
-        flexDirection: 'row',
-        marginBottom: 32,
-        paddingRight: 10,
-    },
-    checkbox: {
-        width: 22,
-        height: 22,
-        borderRadius: 6,
-        borderWidth: 2,
-        borderColor: '#CBD5E1',
-        marginRight: 12,
-        marginTop: 2,
-    },
-    checkboxActive: {
-        backgroundColor: '#0085C7',
-        borderColor: '#0085C7',
-    },
-    termsText: {
-        flex: 1,
-        fontSize: 13,
-        color: '#475569',
-        lineHeight: 18,
-    },
-    linkText: {
-        fontWeight: '700',
-        color: '#0085C7',
-    },
-    registerButton: {
-        backgroundColor: '#0070A8',
-        height: 60,
-        borderRadius: 16,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#0085C7',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
-        elevation: 6,
-    },
-    registerButtonDisabled: {
-        opacity: 0.7,
-    },
-    registerButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '700',
-    },
-    complianceBox: {
-        flexDirection: 'row',
-        backgroundColor: '#F1F5F9',
-        borderRadius: 16,
-        padding: 16,
-        marginTop: 24,
-        gap: 12,
-    },
-    complianceIcon: {
-        marginTop: 2,
-    },
-    complianceText: {
-        flex: 1,
-        fontSize: 11,
-        color: '#475569',
-        lineHeight: 16,
-    },
-    securityBadges: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        gap: 20,
-        marginTop: 32,
-    },
-    badgeItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    badgeText: {
-        fontSize: 10,
-        fontWeight: '600',
-        color: '#94A3B8',
-    },
-    socialIcons: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        gap: 32,
-        marginTop: 40,
-    },
-    iconWrapper: {
-        alignItems: 'center',
-        gap: 8,
-    },
-    socialBtn: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: '#FFFFFF',
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    iconLabel: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: '#64748B',
-        letterSpacing: 0.5,
-    },
-    simpleFooter: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 32,
-        gap: 12,
-    },
-    simpleFooterLink: {
-        fontSize: 12,
-        color: '#64748B',
-    },
-    dot: {
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: '#CBD5E1',
-    }
-});
 
 export default HospitalRegisterScreen;

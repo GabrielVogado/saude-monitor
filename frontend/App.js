@@ -4,7 +4,7 @@ import {createDrawerNavigator} from "@react-navigation/drawer";
 import {NavigationContainer} from "@react-navigation/native";
 import {SafeAreaProvider} from "react-native-safe-area-context";
 import {Image, Text, TouchableOpacity, View} from "react-native";
-import {HomeScreen, LoginScreen} from "./src/screens/views";
+import {HomeScreen, LoginScreen, UserScreen} from "./src/screens/views";
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -70,8 +70,9 @@ export default function App() {
                         headerShown: false, // escondemos o header duplicado do Drawer
                     }}
                 >
-                    <Drawer.Screen name="Principal" component={MainStack} />
+                    <Drawer.Screen name="Home" component={MainStack} />
                     <Drawer.Screen name="Login" component={LoginScreen} />
+                    <Drawer.Screen name="Cadastro" component={UserScreen} />
                 </Drawer.Navigator>
             </NavigationContainer>
         </SafeAreaProvider>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Clinical Sanctuary - Cadastro Hospitalar</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-secondary-container": "#006e6e",
+              "on-background": "#191c1e",
+              "error-container": "#ffdad6",
+              "surface-bright": "#f7f9fb",
+              "surface-variant": "#e0e3e5",
+              "surface-dim": "#d8dadc",
+              "on-secondary-fixed": "#002020",
+              "error": "#ba1a1a",
+              "tertiary-fixed-dim": "#ffb873",
+              "on-tertiary-fixed": "#2d1600",
+              "primary": "#006193",
+              "outline": "#6f7881",
+              "on-secondary-fixed-variant": "#004f4f",
+              "on-tertiary": "#ffffff",
+              "tertiary-fixed": "#ffdcbf",
+              "secondary-container": "#90efef",
+              "surface": "#f7f9fb",
+              "inverse-primary": "#91ccff",
+              "surface-container-high": "#e6e8ea",
+              "primary-fixed": "#cce5ff",
+              "on-tertiary-container": "#fffbff",
+              "secondary": "#006a6a",
+              "surface-container": "#eceef0",
+              "tertiary-container": "#ab6300",
+              "tertiary": "#884e00",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-low": "#f2f4f6",
+              "on-tertiary-fixed-variant": "#6a3b00",
+              "background": "#f7f9fb",
+              "on-primary-fixed": "#001e31",
+              "on-error-container": "#93000a",
+              "inverse-on-surface": "#eff1f3",
+              "on-secondary": "#ffffff",
+              "secondary-fixed": "#93f2f2",
+              "on-error": "#ffffff",
+              "on-surface": "#191c1e",
+              "secondary-fixed-dim": "#76d6d5",
+              "surface-container-highest": "#e0e3e5",
+              "on-surface-variant": "#3f4850",
+              "on-primary-fixed-variant": "#004b73",
+              "primary-fixed-dim": "#91ccff",
+              "outline-variant": "#bfc7d2",
+              "primary-container": "#007bb8",
+              "on-primary-container": "#fcfcff",
+              "surface-tint": "#006496",
+              "on-primary": "#ffffff",
+              "inverse-surface": "#2d3133"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .bg-clinical-gradient {
+        background: radial-gradient(circle at top left, #f7f9fb 0%, #eef2f7 100%);
+      }
+      .btn-primary-gradient {
+        background: linear-gradient(135deg, #006193 0%, #007bb8 100%);
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-clinical-gradient min-h-screen font-body text-on-surface flex flex-col items-center justify-center p-4 md:p-8">
+<!-- Top Navigation Bar -->
+<header class="fixed top-0 w-full z-50 flex items-center justify-between px-6 h-16 w-full bg-slate-50/80 backdrop-blur-xl shadow-sm">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-blue-700 active:scale-95 transition-transform duration-200 cursor-pointer">arrow_back</span>
+<span class="font-manrope font-bold text-lg tracking-tight text-blue-800 font-extrabold tracking-tighter">Clinical Sanctuary</span>
+</div>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-slate-500 font-inter text-[11px] font-semibold uppercase tracking-wider hover:opacity-80 transition-opacity" href="#">Ajuda</a>
+<a class="text-slate-500 font-inter text-[11px] font-semibold uppercase tracking-wider hover:opacity-80 transition-opacity" href="#">Privacidade</a>
+</div>
+</header>
+<!-- Main Content Container -->
+<main class="w-full max-w-xl mt-20 mb-24 animate-in fade-in slide-in-from-bottom-4 duration-700">
+<!-- Registration Card -->
+<div class="bg-surface-container-lowest rounded-[2rem] shadow-[0_8px_48px_rgba(0,0,0,0.08)] overflow-hidden">
+<div class="p-8 md:p-12">
+<!-- Header Icon & Titles -->
+<div class="flex flex-col items-center text-center mb-10">
+<div class="w-16 h-16 bg-blue-50 flex items-center justify-center rounded-full mb-6">
+<span class="material-symbols-outlined text-primary text-3xl">person_add</span>
+</div>
+<h1 class="font-headline font-extrabold text-2xl md:text-3xl text-on-surface tracking-tight mb-2">Criar conta hospitalar</h1>
+<p class="text-on-surface-variant text-sm md:text-base max-w-xs">Preencha seus dados para solicitar acesso ao painel.</p>
+</div>
+<!-- Registration Form -->
+<form class="space-y-6">
+<!-- Name Field -->
+<div class="space-y-2">
+<label class="font-label text-[11px] font-bold tracking-widest text-on-surface-variant uppercase ml-1">NOME COMPLETO</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-outline text-xl">person</span>
+<input class="w-full bg-surface-container-low border-none rounded-xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-primary transition-all placeholder:text-outline/60 text-on-surface" placeholder="Ex: Dr. Alberto Ferreira" type="text"/>
+</div>
+</div>
+<!-- Email Field -->
+<div class="space-y-2">
+<label class="font-label text-[11px] font-bold tracking-widest text-on-surface-variant uppercase ml-1">E-MAIL INSTITUCIONAL</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-outline text-xl">mail</span>
+<input class="w-full bg-surface-container-low border-none rounded-xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-primary transition-all placeholder:text-outline/60 text-on-surface" placeholder="nome@hospital.com.br" type="email"/>
+</div>
+</div>
+<!-- Hospital Selection -->
+<div class="space-y-2">
+<label class="font-label text-[11px] font-bold tracking-widest text-on-surface-variant uppercase ml-1">UNIDADE / HOSPITAL</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-outline text-xl">local_hospital</span>
+<select class="w-full bg-surface-container-low border-none rounded-xl py-4 pl-12 pr-10 focus:ring-2 focus:ring-primary transition-all text-on-surface appearance-none">
+<option disabled="" selected="" value="">Selecione sua unidade</option>
+<option value="hps">Hospital de Pronto Socorro</option>
+<option value="hsc">Hospital Santa Casa</option>
+<option value="hcl">Hospital das Clínicas</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 text-outline pointer-events-none">expand_more</span>
+</div>
+</div>
+<!-- Password Field -->
+<div class="space-y-2">
+<label class="font-label text-[11px] font-bold tracking-widest text-on-surface-variant uppercase ml-1">SENHA</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-outline text-xl">lock</span>
+<input class="w-full bg-surface-container-low border-none rounded-xl py-4 pl-12 pr-12 focus:ring-2 focus:ring-primary transition-all placeholder:text-outline/60 text-on-surface" placeholder="••••••••" type="password"/>
+<span class="material-symbols-outlined absolute right-4 text-outline cursor-pointer hover:text-primary transition-colors">visibility</span>
+</div>
+</div>
+<!-- Terms Checkbox -->
+<div class="flex items-start gap-3 py-2">
+<input class="mt-1 w-5 h-5 rounded-md border-outline-variant text-secondary focus:ring-secondary cursor-pointer" id="terms" type="checkbox"/>
+<label class="text-xs text-on-surface-variant leading-relaxed cursor-pointer" for="terms">
+                            Concordo com os <span class="text-primary font-semibold hover:underline">Termos de Uso</span> e <span class="text-primary font-semibold hover:underline">Política de Privacidade</span> da plataforma Clinical Sanctuary.
+                        </label>
+</div>
+<!-- Action Button -->
+<button class="w-full btn-primary-gradient text-on-primary font-headline font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-[0.98] transition-all group mt-4" type="submit">
+                        Cadastrar no sistema
+                        <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</form>
+<!-- Compliance Banner -->
+<div class="mt-10 p-4 bg-surface-container rounded-xl flex gap-3 border border-outline-variant/10">
+<span class="material-symbols-outlined text-secondary text-xl">gavel</span>
+<p class="text-[11px] leading-relaxed text-on-surface-variant font-medium">
+                        Em conformidade com a <span class="font-bold">LGPD (Lei Geral de Proteção de Dados)</span>. Suas informações são tratadas com sigilo absoluto e utilizadas exclusivamente para autenticação institucional.
+                    </p>
+</div>
+</div>
+<!-- Card Footer: Badges -->
+<div class="bg-surface-container-low px-8 py-6 flex flex-wrap justify-center gap-6 border-t border-outline-variant/5">
+<div class="flex items-center gap-2 grayscale opacity-70">
+<span class="material-symbols-outlined text-sm">encrypted</span>
+<span class="text-[10px] font-bold tracking-tighter uppercase text-on-surface-variant">End-to-End Encrypted</span>
+</div>
+<div class="flex items-center gap-2 grayscale opacity-70">
+<span class="material-symbols-outlined text-sm">verified_user</span>
+<span class="text-[10px] font-bold tracking-tighter uppercase text-on-surface-variant">HIPAA Compliant</span>
+</div>
+</div>
+</div>
+<!-- External Footer -->
+<footer class="mt-8 flex flex-col items-center gap-6">
+<div class="flex items-center gap-8">
+<button class="flex flex-col items-center gap-1 group">
+<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm group-hover:bg-primary group-hover:text-white transition-all">
+<span class="material-symbols-outlined text-xl">language</span>
+</div>
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest">Global</span>
+</button>
+<button class="flex flex-col items-center gap-1 group">
+<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm group-hover:bg-primary group-hover:text-white transition-all">
+<span class="material-symbols-outlined text-xl">share</span>
+</div>
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest">Partilhar</span>
+</button>
+<button class="flex flex-col items-center gap-1 group">
+<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm group-hover:bg-primary group-hover:text-white transition-all">
+<span class="material-symbols-outlined text-xl">help</span>
+</div>
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest">Suporte</span>
+</button>
+</div>
+<div class="flex gap-4 text-[11px] text-outline font-medium tracking-wide">
+<a class="hover:text-primary transition-colors" href="#">Termos</a>
+<span>•</span>
+<a class="hover:text-primary transition-colors" href="#">Cookies</a>
+<span>•</span>
+<a class="hover:text-primary transition-colors" href="#">Privacidade</a>
+</div>
+</footer>
+</main>
+<!-- Bottom Navigation (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-2 bg-slate-50/80 backdrop-blur-xl border-t border-slate-200/20 shadow-[0_-8px_24px_rgba(0,0,0,0.06)] z-50">
+<a class="flex flex-col items-center justify-center text-slate-400 px-6 py-2 hover:bg-blue-50/50 transition-all active:scale-90" href="#">
+<span class="material-symbols-outlined">login</span>
+<span class="font-inter text-[11px] font-semibold uppercase tracking-wider">Login</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-blue-50 text-blue-700 rounded-2xl px-6 py-2 transition-all active:scale-90" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person_add</span>
+<span class="font-inter text-[11px] font-semibold uppercase tracking-wider">Register</span>
+</a>
+</nav>
+</body></html>

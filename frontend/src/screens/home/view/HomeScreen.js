@@ -2,7 +2,7 @@ import React from "react";
 import {Image, StyleSheet, Text, View} from "react-native";
 import {SafeAreaView} from "react-native-safe-area-context";
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
@@ -49,7 +49,6 @@ export default function HomeScreen({ navigation }) {
                                 source={require("../../../../assets/img/localizacao.png")}
                                 style={styles.topicIcon}
                             />
-                            {/* Ícone será adicionado futuramente */}
                             <Text style={styles.topicTitle}>Geolocalização Automática</Text>
                         </View>
                         <Text style={styles.topicDescription}>
@@ -64,7 +63,6 @@ export default function HomeScreen({ navigation }) {
                                 source={require("../../../../assets/img/bubble-chat.png")}
                                 style={styles.topicIcon}
                             />
-                            {/* Ícone será adicionado futuramente */}
                             <Text style={styles.topicTitle}>Feedback do Paciente</Text>
                         </View>
                         <Text style={styles.topicDescription}>
@@ -73,9 +71,11 @@ export default function HomeScreen({ navigation }) {
                     </View>
                 </View>
 
-                {/* Quadrado branco para imagem futura */}
                 <View style={styles.imagePlaceholder}>
-                    <Text style={styles.placeholderText}>Imagem aqui</Text>
+                    <Image
+                        source={require("../../../../assets/img/home_melhorado.png")}
+                        style={styles.homeImage}
+                    />
                 </View>
             </View>
         </SafeAreaView>
@@ -96,8 +96,8 @@ const styles = StyleSheet.create({
     topicIcon: { width: 20, height: 20, marginRight: 8, resizeMode: "contain" },
     topicTitle: { fontSize: 15, fontWeight: "bold", color: "#333" },
     topicDescription: { fontSize: 13, color: "#555", lineHeight: 18 },
-    imagePlaceholder: { width: "100%", height: 150, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ccc", borderRadius: 10, justifyContent: "center", alignItems: "center", marginBottom: 30 },
-    placeholderText: { color: "#aaa", fontSize: 14 },
+    imagePlaceholder: { width: "100%", height: 150, backgroundColor: "#fff", borderWidth: 1, borderColor: "#fff", borderRadius: 10, justifyContent: "center", alignItems: "center", marginBottom: 30, overflow: "hidden" },
+    homeImage: { width: "100%", height: "100%", resizeMode: "cover" },
     loginButton: { backgroundColor: "#3bdcf1", paddingVertical: 15, paddingHorizontal: 30, borderRadius: 10, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, elevation: 3, alignSelf: "flex-start" },
     loginButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 });

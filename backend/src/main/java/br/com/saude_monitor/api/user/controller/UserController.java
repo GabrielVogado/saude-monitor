@@ -1,8 +1,5 @@
 package br.com.saude_monitor.api.user.controller;
 
-import br.com.saude_monitor.api.auth.controller.AuthController;
-import br.com.saude_monitor.api.auth.dto.LoginRequest;
-import br.com.saude_monitor.api.auth.dto.LoginResponse;
 import br.com.saude_monitor.api.user.dto.UserRequest;
 import br.com.saude_monitor.api.user.dto.UserResponse;
 import br.com.saude_monitor.api.user.service.UserService;
@@ -26,7 +23,7 @@ public class UserController {
     private final UserService userService;
 
 
-    @PostMapping("/user")
+    @PostMapping("/cadastro")
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserRequest request) {
         logger.info("[UserController] Requisicao de cadastro de Usuario recebida do frontend para fullname={} email={}",
                 request.fullName(), request.email());

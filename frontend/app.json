@@ -21,6 +21,10 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
       "package": "com.gabrielvogado.saudemonitor"
     },
     "web": {
@@ -31,6 +35,14 @@
       "apiBaseUrlWeb": "http://localhost:8080",
       "apiBaseUrlAndroid": "http://10.0.2.2:8080",
       "apiBaseUrlIos": "http://localhost:8080"
-    }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Permita acesso a sua localizacao para exibir o mapa em tempo real."
+        }
+      ]
+    ]
   }
 }

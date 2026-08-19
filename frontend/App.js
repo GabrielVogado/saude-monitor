@@ -4,7 +4,10 @@ import {createDrawerNavigator} from "@react-navigation/drawer";
 import {NavigationContainer} from "@react-navigation/native";
 import {SafeAreaProvider} from "react-native-safe-area-context";
 import {Image, Text, TouchableOpacity, View} from "react-native";
-import {HomeScreen, LoginScreen, UserScreen} from "./src/screens/views";
+import HomeScreen from "./src/screens/home/view/HomeScreen.js";
+import LoginScreen from "./src/screens/auth/view/LoginScreen.js";
+import UserScreen from "./src/screens/user/view/UserScreen.js";
+import GeoLocalizacaoScreen from "./src/screens/geolocalizacao/view/GeoLocalizacaoScreen.js";
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -56,6 +59,15 @@ function MainStack({ navigation }) {
                     headerTintColor: "#333",
                 }}
             />
+            <Stack.Screen
+                name="Geolocalizacao"
+                component={GeoLocalizacaoScreen}
+                options={{
+                    headerStyle: { backgroundColor: "#fff" },
+                    headerTitle: () => <HeaderTitle />,
+                    headerTintColor: "#333",
+                }}
+            />
         </Stack.Navigator>
     );
 }
@@ -73,6 +85,13 @@ export default function App() {
                     <Drawer.Screen name="Home" component={MainStack} />
                     <Drawer.Screen name="Login" component={LoginScreen} />
                     <Drawer.Screen name="Cadastro" component={UserScreen} />
+                    <Drawer.Screen
+                        name="Geolocalizacao"
+                        component={GeoLocalizacaoScreen}
+                        options={{
+                            drawerItemStyle: { display: "none" },
+                        }}
+                    />
                 </Drawer.Navigator>
             </NavigationContainer>
         </SafeAreaProvider>

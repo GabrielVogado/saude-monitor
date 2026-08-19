@@ -15,11 +15,27 @@ import {Globe, HelpCircle, Lock, Share2, ShieldCheck} from "lucide-react-native"
 import LoginService from "../service/LoginService";
 import styles from "./css/LoginStyle";
 
-export default function LoginScreen() {
+export default function LoginScreen({navigation}) {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [rememberDevice, setRememberDevice] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    const redirectToGeo = () => {
+        if (navigation?.navigate) {
+            navigation.navigate("Geolocalizacao");
+            return;
+        }
+
+        const parentNavigation = navigation?.getParent?.();
+
+        if (parentNavigation) {
+            parentNavigation.navigate("Geolocalizacao");
+            return;
+        }
+
+        navigation?.navigate?.("Geolocalizacao");
+    };
 
     const handleLogin = async () => {
         if (!email.trim() || !password.trim()) {
@@ -30,12 +46,8 @@ export default function LoginScreen() {
         setLoading(true);
 
         try {
-            const response = await LoginService.login({email, password, rememberDevice});
-
-            Alert.alert(
-                "Login realizado",
-                `Mensagem: ${response.message}\nE-mail: ${response.email}\nLembrar dispositivo: ${response.rememberDevice ? "Sim" : "Nao"}`
-            );
+            await LoginService.login({email, password, rememberDevice});
+            redirectToGeo();
         } catch (error) {
             Alert.alert("Erro no login", error.message || "Erro inesperado.");
         } finally {

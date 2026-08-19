@@ -19,14 +19,23 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public LoginResponse saveLogin(LoginRequest request) {
 
-        var rq  = AuthDocument.builder()
-                .email(request.email())
-                .password(request.password())
-                .rememberDevice(request.rememberDevice())
-                .createdAt(Instant.now())
-                .build();
+        var existing = authRepository.findByEmail(request.email());
 
-        var result = authRepository.save(rq);
+        AuthDocument document;
+        if (existing.isPresent()) {
+            document = existing.get();
+            document.setPassword(request.password());
+            document.setRememberDevice(request.rememberDevice());
+        } else {
+            document = AuthDocument.builder()
+                    .email(request.email())
+                    .password(request.password())
+                    .rememberDevice(request.rememberDevice())
+                    .createdAt(Instant.now())
+                    .build();
+        }
+
+        var result = authRepository.save(document);
         return new LoginResponse(
                 true,
                 "Login salvo com sucesso",

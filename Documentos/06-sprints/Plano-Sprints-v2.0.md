@@ -1,0 +1,928 @@
+# 🏃 Plano de Sprints — Clinical Sanctuary v2.0
+
+> **Plano de entregas ágeis para o MVP do sistema de monitoramento hospitalar por geolocalização**
+>
+> | Campo | Valor |
+> |---|---|
+> | **Versão** | 2.0 |
+> | **Status** | Proposta — validar com o time na Planning do Sprint 0 |
+> | **Data** | 07/08/2026 |
+> | **Autor** | Gabriel Vogado (Scrum Master / PO) |
+> | **Referências** | Documento Negocial v2.0 · Árvore Tecnológica v2.0 · Backlog MVP v2.0 · Especificação API v2.0 · Padrão UI/UX v2.0 |
+
+---
+
+## 1. Visão Geral do Plano
+
+### 1.1 Resumo executivo
+
+O plano de sprints do **Clinical Sanctuary** organiza 31 estórias de usuário (6 épicos + Fase 0) em **7 sprints de 2 semanas**, totalizando **12 semanas de desenvolvimento** (excluindo 2 semanas de buffer para imprevistos, testes de campo e deploy). O objetivo é entregar um MVP funcional que permita detectar automaticamente a entrada/saída de usuários em áreas hospitalares, coletar feedback pós-atendimento e exibir indicadores públicos de qualidade por hospital.
+
+### 1.2 Dados mestres do plano
+
+| Parâmetro | Valor |
+|---|---|
+| **Duração total** | 14 semanas (12 de desenvolvimento + 2 de buffer) |
+| **Sprints de desenvolvimento** | 7 (S0 a S6, 2 semanas cada) |
+| **Time-base** | 3 pessoas: 1 Backend (BE), 1 Frontend (FE), 1 DevOps/QA |
+| **Velocity alvo** | 18–20 story points por sprint |
+| **Pontos totais estimados** | 130 story points (escala Fibonacci: 1, 2, 3, 5, 8, 13) |
+| **Épicos** | 6 (E1–E6) + Fase 0 (estabilização) |
+| **Estórias** | 31 (todas do backlog v2.0) |
+| **Cerimônias** | Daily 15min · Planning 2h · Review 1h · Retro 1h · Refinement 1h (meio do sprint) |
+| **Ferramentas** | Jira/Linear (tracking) · Confluence/Notion (docs) · Slack/Teams (async) · GitHub (código) |
+
+### 1.3 Premissas críticas do plano
+
+1. **Fase 0 (Sprint 0) é inegociável**: hash BCrypt + JWT + envelope de erro antes de qualquer endpoint público. O código atual tem senha em texto puro — corrigir é pré-requisito.
+2. **Geofencing nativo** (`startGeofencingAsync`) substitui `watchPositionAsync` contínuo até o Sprint S2 — sem isso, iOS não funciona em background e a bateria drena.
+3. **Heartbeat (E2-09) é P0** e deve entrar no S2 junto com a detecção básica — sem heartbeat, a expiração por 24h (RN-04) não funciona e visitas longas de 12h+ do SUS seriam perdidas.
+4. **Sinalização de internação (E2-10)** deve entrar no S3 — sem ela, internações longas distorcem o indicador de tempo médio de pronto-atendimento (RN-24).
+5. **Teste de campo de geofence** em ≥ 3 hospitais reais deve ocorrer entre S3 e S4 para calibrar raios, tolerâncias e intervalo de heartbeat.
+6. **Definição de Pronto (DoD)** do MVP aplica-se a partir do S1 — ver seção dedicada.
+
+### 1.4 Mapa de dependências entre sprints
+
+```
+S0 (Segurança)
+ │
+ ├─► S1 (Hospitais + Geofence Admin)
+ │    │
+ │    └─► S2 (Detecção de Visitas — mobile + backend)
+ │         │
+ │         ├─► S3 (Robustez de Visitas + Heartbeat + Feedback Backend)
+ │         │    │
+ │         │    └─► S4 (Feedback Mobile + Notificações)
+ │         │         │
+ │         │         └─► S5 (Indicadores Públicos + Conta/Privacidade)
+ │         │              │
+ │         │              └─► S6 (Polimento + Lançamento)
+ │         │
+ │         └── Teste de campo de geofence (entre S3 e S4)
+ │
+ └── Segurança (BCrypt + JWT) — todo endpoint público depende disto
+```
+
+**Dependências explícitas:**
+- **S1 → S2:** Hospitais com geofence precisam estar cadastrados para detectar visitas.
+- **S2 → S3:** Detecção básica de entrada/saída precisa funcionar antes de robustez (expiração, conflito, heartbeat).
+- **S3 → S4:** Feedback backend (dedupe, anônimo) precisa existir antes do frontend de feedback.
+- **S4 → S5:** Feedbacks precisam existir para calcular agregados públicos.
+- **S5 → S6:** Indicadores públicos precisam estar prontos para o polimento final (E4-05 ranking).
+
+---
+
+## 2. Sprint 0 — Estabilização e Segurança 🔥
+
+> **2 semanas · 18 story points · Timebox: S0**
+
+### 2.1 Objetivo do sprint
+
+> **"Tornar o sistema seguro para exposição pública: senha com hash, autenticação JWT, erros padronizados e conformidade LGPD básica (direito de exclusão). Nenhum endpoint de negócio é exposto sem essas fundações."**
+
+### 2.2 Estórias do sprint
+
+| ID | Prioridade | Estória | Pontos | Resp. | Tipo |
+|---|---|---|---|---|---|
+| F0-01 | P0 | Hash de senhas com BCrypt | 3 | BE | 🔄 Refatorar |
+| F0-02 | P0 | Autenticação JWT (access 15min + refresh 30d) | 8 | BE + FE | ➕ Nova |
+| F0-03 | P0 | Envelope de erro padronizado (código, mensagem pt-BR, timestamp, traceId) | 2 | BE | 🔄 Refatorar |
+| F0-05 | P0 | Exclusão de conta e dados pessoais (direito LGPD) | 5 | BE + FE | ➕ Nova |
+
+**Nota:** F0-04 (Rate limiting) é P1 e foi movido para S6 — o volume do MVP não justifica antes do lançamento, e o custo de implementar sem tráfego real é desperdício.
+
+### 2.3 Entregáveis esperados
+
+- [x] **BCrypt operacional**: `AuthServiceImpl.saveLogin()` refatorado; senha nunca gravada em claro; comparação via `PasswordEncoder`; teste unitário validando irreversibilidade do hash.
+- [x] **JWT funcional**: endpoint `POST /api/auth/login` retorna `accessToken` (15min) + `refreshToken` (30d); endpoint `POST /api/auth/refresh` rotaciona tokens; endpoint protegido rejeita sem token (401); `expo-secure-store` configurado no app.
+- [x] **GlobalExceptionHandler padronizado**: 100% dos erros seguem o envelope `{ timestamp, status, code, message, details, traceId }`; cobre validação, 404, 401, 403, 500; mensagens em pt-BR.
+- [x] **Endpoint de exclusão LGPD**: `DELETE /api/v1/usuarios/me` remove usuário, auth e feedbacks vinculados; agregação anonimiza dados; resposta com resumo do que foi removido.
+- [x] **Testes de integração básicos**: cobertura de auth (login, refresh, logout, acesso negado) e exclusão LGPD.
+
+### 2.4 Riscos do sprint
+
+| Risco | Prob. | Impacto | Mitigação |
+|---|---|---|---|
+| JWT + Spring Security com complexidade inesperada (configuração, filtros) | Média | Alto | BE começa F0-02 no dia 1; spike de 4h se travar; fallback: JWT manual sem Spring Security (não ideal, mas funcional) |
+| Exclusão LGPD com cascade complexo (visitas, feedbacks, agregados) | Média | Médio | FE começa tela de perfil em paralelo; BE foca no cascade de dados; se complexidade explodir, reduzir escopo para "soft delete + anonimização" em vez de deleção física |
+| Curva de aprendizado do DevOps/QA (time novo) | Baixa | Baixo | S0 é majoritariamente BE; DevOps foca em setup de ambiente, CI básico e preparação de testes |
+
+### 2.5 Definition of Ready (DoR) do sprint
+
+- [x] Estórias com critérios de aceite claros (documentados no backlog v2.0).
+- [x] Contratos de API esboçados (auth, user) — especificação formal no S1.
+- [x] Dependências externas mapeadas (Spring Security, BCrypt, expo-secure-store).
+- [x] Ambiente de dev funcional (Docker Compose com MongoDB 7).
+
+### 2.6 Definition of Done (DoD) do sprint
+
+- [x] Código revisado e mergeado na `main`.
+- [x] Testes unitários de auth e erro com cobertura ≥ 70%.
+- [x] Testes de integração para fluxo de login/logout/refresh/exclusão.
+- [x] Documentação de setup de segurança no `README.md`.
+- [x] Nenhum endpoint público exposto sem auth (validação manual + teste automatizado).
+
+---
+
+## 3. Sprint S1 — Hospitais e Geofence Admin 🏥
+
+> **2 semanas · 16 story points · Depende de: S0 concluído**
+
+### 3.1 Objetivo do sprint
+
+> **"Permitir que administradores cadastrem hospitais com áreas geográficas (geofence GeoJSON) no mapa, e que o app público liste os hospitais ativos com seus indicadores."**
+
+### 3.2 Estórias do sprint
+
+| ID | Prioridade | Estória | Pontos | Resp. | Tipo |
+|---|---|---|---|---|---|
+| E1-01 | P0 | CRUD de hospital (nome, CNPJ, tipo, endereço, contato, status) | 5 | BE | ➕ Nova |
+| E1-02 | P0 | Definição de geofence como polígono GeoJSON sobre o mapa | 5 | BE + FE | ➕ Nova |
+| E1-03 | P0 | Listagem de hospitais ativos para o app público (com indicadores) | 3 | BE + FE | ➕ Nova |
+| E1-04 | P1 | Edição e desativação de hospital/geofence | 3 | BE + FE | ➕ Nova |
+
+### 3.3 Entregáveis esperados
+
+- [x] **Módulo `hospital` no backend**: documento MongoDB com `geofence` (GeoJSON Polygon), índice `2dsphere`, validação de polígono (fechado, ≥ 3 vértices, sem auto-interseção).
+- [x] **CRUD administrativo**: `POST /api/v1/hospitais` (🛡️ admin), `PUT /api/v1/hospitais/{id}`, `PATCH /api/v1/hospitais/{id}/status`.
+- [x] **Endpoint público de listagem**: `GET /api/v1/hospitais` 🔓 — filtro por raio (`$near`), tipo, busca textual; paginado; resposta < 300ms p95.
+- [x] **Tela de cadastro de hospital no app**: mapa interativo (`react-native-maps`) com ferramenta de desenho de polígono; visualização do geofence salvo.
+- [x] **Tela de lista de hospitais** (modo público): Bottom Tab "Hospitais", renderização de cards com nome, tipo e indicadores (placeholder até S5).
+- [x] **Índice 2dsphere** criado e testado com queries `$geoIntersects` e `$near`.
+
+### 3.4 Demo planejada
+
+> **"Cadastrar 3 hospitais reais (ex.: Santa Casa SP, HC SP, Hospital das Clínicas) com geofences desenhados no mapa, listá-los no app público com busca por nome e ver o polígono renderizado."**
+
+### 3.5 Riscos do sprint
+
+| Risco | Prob. | Impacto | Mitigação |
+|---|---|---|---|
+| Desenho de polígono no mapa mobile com UX ruim (biblioteca de edição limitada no RN) | Média | Médio | FE faz spike de 4h com `react-native-maps` Polygon edition; fallback: admin web simples (HTML+JS) para cadastro de geofence, app apenas exibe |
+| Validação GeoJSON complexa (auto-interseção, orientação) | Baixa | Médio | Usar biblioteca JTS (Java Topology Suite) ou `org.springframework.data.mongodb.core.geo`; se complexidade explodir, validação simplificada (apenas vértices e fechamento) |
+| Performance de `$near` em coleção pequena irrelevante, mas design precisa escalar | Baixa | Baixo | Índice 2dsphere cobre o cenário; teste de carga só no S6 |
+
+### 3.6 Definição de Pronto (DoD) do sprint
+
+- [x] CRUD completo de hospital com validação GeoJSON.
+- [x] Índice 2dsphere funcional e testado com queries reais.
+- [x] Listagem pública paginada e com busca.
+- [x] Tela de mapa com renderização de polígono.
+- [x] Testes de integração para CRUD e validação de geofence.
+
+---
+
+## 4. Sprint S2 — Detecção de Visitas (Mobile + Backend) 📍
+
+> **2 semanas · 19 story points · Depende de: S1 concluído (hospitais cadastrados)**
+
+### 4.1 Objetivo do sprint
+
+> **"Detectar automaticamente a entrada e saída do usuário em áreas hospitalares via geofencing nativo, registrar visitas no backend, exibir card de visita ativa com cronômetro e implementar heartbeat de presença."**
+
+### 4.2 Estórias do sprint
+
+| ID | Prioridade | Estória | Pontos | Resp. | Tipo |
+|---|---|---|---|---|---|
+| E2-01 | P0 | Detecção automática de entrada (≥ 2 min no geofence) | 5 | FE + BE | ➕ Nova |
+| E2-02 | P0 | Detecção automática de saída (≥ 5 min fora do geofence) | 5 | FE + BE | ➕ Nova |
+| E2-06 | P0 | Check-in manual em 1 toque (fallback para GPS desligado) | 3 | FE + BE | ➕ Nova |
+| E2-07 | P0 | Card de visita ativa com cronômetro (home + notificação persistente) | 3 | FE | ➕ Nova |
+| E2-09 | P0 | Heartbeat de presença a cada 30 minutos | 3 | FE + BE | ➕ Nova |
+
+### 4.3 Por que estas estórias estão juntas?
+
+- **E2-01 e E2-02 são indivisíveis**: entrada e saída formam o ciclo completo de uma visita; desenvolver uma sem a outra gera retrabalho de integração.
+- **E2-09 (heartbeat) é P0 e está junto com detecção básica**: o heartbeat é o que distingue "espera real no hospital" (12h+ no SUS) de "GPS preso". Sem ele, a expiração de 24h (E2-03 no S3) não tem como saber se o usuário ainda está no hospital. **Desenvolver detecção sem heartbeat é construir sobre premissa errada.**
+- **E2-06 (check-in manual) é o plano B**: se o geofencing nativo falhar (GPS desligado, permissão negada, iOS restritivo), o app ainda funciona. Mitiga o risco de dependência total do geofence.
+- **E2-07 (card de visita) é a interface visível**: sem ela, o usuário não sabe que foi detectado — a experiência "zero fricção" perde o feedback visual.
+
+### 4.4 Migração crítica: `watchPositionAsync` → `startGeofencingAsync`
+
+O código atual usa `expo-location.watchPositionAsync` com `Accuracy.BestForNavigation` a cada 2 segundos — **isso drena a bateria e não roda em background no iOS**. Neste sprint, o FE migra para:
+
+```javascript
+// Antes (S0–S1, apenas durante telas abertas)
+Location.watchPositionAsync({ accuracy: Location.Accuracy.BestForNavigation, timeInterval: 2000 }, callback);
+
+// Depois (S2 em diante)
+Location.startGeofencingAsync("hospitalGeofence", geofenceRegions);
+TaskManager.defineTask("GEOFENCE_TASK", ({ data, error }) => { /* checkin/checkout */ });
+```
+
+**Impacto esperado:** consumo de bateria de ~15–20%/dia (GPS contínuo) para < 5%/dia (geofencing nativo). Compatível com background em Android e iOS.
+
+### 4.5 Entregáveis esperados
+
+- [x] **Geofencing nativo funcional**: `startGeofencingAsync` registra regiões de todos os hospitais ativos; `TaskManager` processa eventos `ENTER`/`EXIT` em background.
+- [x] **Módulo `visita` no backend**: endpoints `POST /visitas/checkin` e `POST /visitas/{id}/checkout`; validação `$geoIntersects` no checkin; idempotência (checkin duplicado retorna visita existente).
+- [x] **Fluxo completo de detecção**: ENTER → checkin → `EM_ATENDIMENTO` → EXIT → checkout → `FINALIZADA` com `duracaoMinutos`.
+- [x] **Check-in manual**: botão "Estou em um hospital" na home; seleção de hospital da lista; flag `origem=MANUAL`; funciona sem GPS.
+- [x] **Card de visita ativa**: cronômetro ao vivo na tela Home; notificação silenciosa persistente "Você está no Hospital X — 02:35"; atualização a cada 1 minuto.
+- [x] **Heartbeat**: app envia `POST /visitas/{id}/heartbeat` a cada 30min enquanto `EM_ATENDIMENTO`; backend atualiza `ultimoHeartbeat`; se estava `SUSPEITA`, retorna a `EM_ATENDIMENTO`.
+
+### 4.6 Demo planejada
+
+> **"Simular entrada em geofence de hospital real (ex.: caminhar até o perímetro do HC), ver card de visita ativa aparecer automaticamente com cronômetro, simular saída após 5 minutos, ver visita finalizada com duração correta. Demonstrar check-in manual como fallback. Mostrar heartbeats no log do backend a cada 30 minutos."**
+
+### 4.7 Riscos do sprint
+
+| Risco | Prob. | Impacto | Mitigação |
+|---|---|---|---|
+| `startGeofencingAsync` com comportamento imprevisível em iOS (regiões limitadas a 20, latência de detecção) | Alta | Alto | Testar em device iOS real no dia 1; limitar regiões a 20 mais próximas; tolerância de 2min (RN-01) absorve latência de 30–60s do SO |
+| Heartbeat com consumo de rede/bateria acima do esperado | Média | Médio | Medir consumo no emulador e device real; se > 2% bateria/dia, aumentar intervalo para 60min (requer ajuste de RN-23 com PO) |
+| Geofence sobreposto (2 hospitais na mesma quadra) gerando ambiguidade | Baixa | Médio | E2-04 (conflito) entra no S3; no S2, se ocorrer, registra no hospital mais próximo (distância euclidiana); logar ocorrências para calibrar |
+| Indisponibilidade do BE para testar FE (dependência forte) | Média | Médio | FE começa com mock de API (json-server ou MSW); integração real na segunda semana; BE entrega checkin/checkout até dia 5 |
+
+### 4.8 Definição de Pronto (DoD) do sprint
+
+- [x] Geofencing nativo detecta entrada/saída em device real (Android e iOS).
+- [x] Ciclo completo de visita (ENTRY → EM_ATENDIMENTO → EXIT → FINALIZADA) testado de ponta a ponta.
+- [x] Heartbeat enviado e registrado a cada 30min.
+- [x] Check-in manual funcional como fallback.
+- [x] Card de visita ativa visível e atualizando.
+- [x] Testes de integração para checkin/checkout/heartbeat.
+- [x] Logs de geofence events para debug (nível INFO, sem dados pessoais).
+
+---
+
+## 5. Sprint S3 — Robustez de Visitas + Feedback Backend 🛡️
+
+> **2 semanas · 21 story points · Depende de: S2 concluído (checkin/checkout funcionando)**
+
+### 5.1 Objetivo do sprint
+
+> **"Tornar o sistema de visitas robusto contra falhas (expiração por inatividade, conflito de áreas, GPS interrompido, sinalização de internação) e construir o backend de feedback (dedupe, anônimo, agregação)."**
+
+### 5.2 Estórias do sprint
+
+| ID | Prioridade | Estória | Pontos | Resp. | Tipo |
+|---|---|---|---|---|---|
+| E2-03 | P0 | Expiração de visitas após 24h sem heartbeat (job de limpeza) | 5 | BE | ➕ Nova |
+| E2-04 | P0 | Tratamento de conflito de áreas sobrepostas (hospital mais próximo) | 3 | BE | ➕ Nova |
+| E2-05 | P1 | Recuperação de visitas com GPS interrompido (até 10 min) | 3 | FE + BE | ➕ Nova |
+| E2-10 | P1 | Sinalização de internação/observação após 12h de visita ativa | 3 | FE + BE | ➕ Nova |
+| E2-08 | P1 | Filtro de visitas < 2 minutos nas estatísticas públicas | 2 | BE | ➕ Nova |
+| E3-04 | P0 | Bloqueio de feedback duplicado por visita (unique index) | 2 | BE | ➕ Nova |
+| E3-05 | P0 | Feedback anônimo (sem login) | 3 | BE | ➕ Nova |
+
+### 5.3 Por que estas estórias estão juntas?
+
+- **E2-03 (expiração) e E2-05 (GPS interrompido)** são duas faces da mesma moeda: o que acontece quando a visita "some". E2-03 cobre "usuário saiu mas GPS não detectou"; E2-05 cobre "GPS caiu temporariamente". Implementá-las juntas evita duplicação de lógica de timeout.
+- **E2-10 (sinalização de internação)** fecha o ciclo de robustez: sem ela, internações de 3 dias no SUS distorceriam o "tempo médio de pronto-atendimento" (RN-24). É P1 porque o MVP pode lançar sem, mas o dado público ficaria poluído — **recomendação forte de incluir**.
+- **E3-04 e E3-05 (feedback backend)** são pré-requisito para o S4 (feedback mobile). Implementar o backend agora evita que o time de FE fique bloqueado na semana 1 do S4.
+- **E2-08 (filtro < 2min)** é trivial (2 pts) e completa a lógica de agregação.
+
+### 5.4 Entregáveis esperados
+
+- [x] **Job de expiração**: scheduler (ex.: `@Scheduled` a cada 15min) varre visitas `EM_ATENDIMENTO` ou `SUSPEITA` com `ultimoHeartbeat` > 24h → `EXPIRADA`; tempo parcial preservado; log de expirações para auditoria.
+- [x] **Resolução de conflito**: se `$geoIntersects` retorna > 1 hospital, `$near` desempata pela distância ao centróide; se empate (< 5m de diferença), app exibe prompt de 1 toque.
+- [x] **Recuperação de GPS**: falha ≤ 10min mantém status; após 10min sem sinal → `GPS_INTERROMPIDO` com duração parcial.
+- [x] **Sinalização de internação**: após 12h de `EM_ATENDIMENTO`, app exibe prompt "Você está em observação ou internado?"; resposta grava `tipoPermanencia`; visita continua ativa mas é excluída do cálculo de tempo médio de pronto-atendimento.
+- [x] **Módulo `feedback` no backend**: coleção `feedbacks` com índice unique em `visitaId`; endpoint `POST /api/v1/feedbacks` 🔓 (aceita `usuarioId` nulo para anônimo); validação de enums (`foiAtendido`, `teveMedico`, `fezTriagem`, `nota` 1–5).
+- [x] **Agregação básica**: job que recalcula `AGREGADO_HOSPITAL` (materializado) — nota média, N, tempo mediano; filtro de visitas < 2min (E2-08); exclusão de `OBSERVACAO`/`INTERNACAO` (E2-10).
+
+### 5.5 Demo planejada
+
+> **"Simular GPS preso (desligar após checkin) e ver expiração após 24h simuladas (acelerar job). Simular 2 geofences sobrepostos e ver app escolher o mais próximo ou perguntar. Simular visita de 13h com heartbeat ativo (não expira) e prompt de internação aparecendo. Enviar 2 feedbacks para a mesma visita e ver o segundo ser rejeitado com erro amigável."**
+
+### 5.6 Riscos do sprint
+
+| Risco | Prob. | Impacto | Mitigação |
+|---|---|---|---|
+| Job de expiração com falsos positivos (expirar visita legítima) | Média | Alto | Log detalhado de cada expiração; período de "soft expiration" (marca `SUSPEITA` antes de `EXPIRADA`); dash de monitoramento de expirações/dia |
+| Cálculo de mediana em MongoDB (não tem operador nativo `$median`) | Média | Médio | Buscar valores, ordenar no backend e calcular mediana em memória (Java); para N ≤ 1000 por hospital, performance é irrelevante; cache no `agregado` evita recomputação |
+| Sinalização de internação com baixa taxa de resposta (usuário ignora o prompt) | Alta | Baixo | Comportamento padrão: se ignorar, visita permanece como `ATENDIMENTO` e entra na métrica — pior caso: algumas internações não-sinalizadas poluem a métrica, mas o impacto é diluído pelo N |
+| Complexidade de teste do job de expiração | Baixa | Médio | Criar perfil `test` com intervalo de job configurável (ex.: 1min); testes de integração com clock fixo |
+
+### 5.7 Definição de Pronto (DoD) do sprint
+
+- [x] Job de expiração funcional com cobertura de teste.
+- [x] Conflito de áreas resolvido (distância + prompt).
+- [x] GPS interrompido tratado com timeout de 10min.
+- [x] Prompt de internação funcional após 12h.
+- [x] Endpoint de feedback com dedupe e suporte anônimo.
+- [x] Agregação materializada funcional (job disparado após novo feedback).
+- [x] Filtro de visitas < 2min aplicado.
+
+---
+
+## 6. Sprint S4 — Feedback Mobile + Notificações 📝
+
+> **2 semanas · 16 story points · Depende de: S3 concluído (feedback backend pronto)**
+
+### 6.1 Objetivo do sprint
+
+> **"Entregar a experiência completa de feedback pós-saída: notificação local no momento certo, formulário de 4 perguntas em < 45s, agradecimento com impacto, e lembretes não-invasivos."**
+
+### 6.2 Estórias do sprint
+
+| ID | Prioridade | Estória | Pontos | Resp. | Tipo |
+|---|---|---|---|---|---|
+| E3-01 | P0 | Notificação de feedback entre 1 e 5 minutos após saída | 3 | FE | ➕ Nova |
+| E3-02 | P0 | Formulário de feedback (4 perguntas, pulável, < 45s, chips de medicação) | 8 | FE | ➕ Nova |
+| E3-03 | P0 | Janela de 24h para responder com no máximo 1 lembrete | 3 | FE | ➕ Nova |
+| E3-06 | P1 | Tela de agradecimento e impacto ("Sua avaliação ajuda X pessoas") | 2 | FE | ➕ Nova |
+
+### 6.3 Entregáveis esperados
+
+- [x] **Notificação local pós-saída**: disparo entre 1–5min após checkout; nunca dentro do geofence; `expo-notifications` configurado; permissão solicitada com explicação.
+- [x] **Fluxo completo do formulário (FeedbackSheet)**:
+  - **Pergunta 1**: "Você foi atendido?" (Sim, fui atendido / Sim, mas desisti / Não fui atendido) — se "Não", pula para nota.
+  - **Pergunta 2**: "Teve médico disponível?" (Sim / Não / Não precisei).
+  - **Pergunta 3**: "Fez triagem?" (Sim / Não / Não sei).
+  - **Pergunta 4**: "Como você avalia?" (estrelas 1–5, obrigatória para envio).
+  - **Chips rápidos**: "Recebeu medicação ou receita?" (Sim, recebi / Não recebi / Não precisei).
+  - **Comentário opcional**: campo de texto livre.
+  - **Botão "Pular"** sempre visível em cada etapa.
+- [x] **Progresso visível**: barra de progresso (1/4, 2/4...) ou indicador de etapa.
+- [x] **Meta de tempo**: fluxo completo respondido em < 45s (medido e otimizado).
+- [x] **Lembrete único**: ~6h após notificação inicial se não respondido; nunca mais de 1 lembrete; após 24h, visita marcada `SEM_FEEDBACK`.
+- [x] **Tela de agradecimento**: "Sua avaliação ajuda X pessoas por semana a escolher melhor"; link para ver a nota atualizada do hospital.
+
+### 6.4 Demo planejada
+
+> **"Simular ciclo completo: entrar no geofence (S2) → sair (S2) → receber notificação em 2 min → abrir formulário → responder 4 perguntas em < 30s → ver tela de agradecimento com impacto → ver hospital com N incrementado."**
+
+### 6.5 Riscos do sprint
+
+| Risco | Prob. | Impacto | Mitigação |
+|---|---|---|---|
+| Formulário complexo (múltiplos estados, animações, validação) estourar 8 pts | Média | Alto | FE dedica 80% do sprint a E3-02; usar componentes do Design System prontos (Button, RatingStars, FeedbackSheet); mock de API desde o dia 1 |
+| Notificação local não disparar em iOS (restrições de background) | Média | Médio | Testar em device iOS real; garantir que `expo-notifications` tem permissão; fallback: exibir tela de feedback ao abrir o app manualmente após saída |
+| Usuário fechar app antes de submit e perder progresso | Baixa | Baixo | Salvar estado do formulário em AsyncStorage; recuperar ao reabrir (within 24h window) |
+| Tempo de resposta > 45s em devices lentos | Baixa | Médio | Medir com `Performance.now()`; otimizar re-renders; usar `React.memo` em componentes de pergunta |
+
+### 6.6 Definição de Pronto (DoD) do sprint
+
+- [x] Notificação local dispara entre 1–5min após checkout em Android e iOS.
+- [x] Formulário completo funcional com todas as perguntas, chips, comentário e envio.
+- [x] Tempo de resposta médio < 45s medido em device real.
+- [x] Lembrete único funcional; janela de 24h respeitada.
+- [x] Tela de agradecimento com link para hospital.
+- [x] Testes de usabilidade com ≥ 3 pessoas (pode ser interno).
+- [x] Acessibilidade básica: labels, contraste, alvos ≥ 48dp.
+
+---
+
+## 7. Sprint S5 — Indicadores Públicos + Conta/Privacidade 📊
+
+> **2 semanas · 20 story points · Depende de: S4 concluído (feedbacks existentes para calcular agregados)**
+
+### 7.1 Objetivo do sprint
+
+> **"Exibir indicadores públicos de qualidade por hospital (nota média, tempo mediano, N mínimo), implementar onboarding com consentimento LGPD granular e cadastro/login opcional."**
+
+### 7.2 Estórias do sprint
+
+| ID | Prioridade | Estória | Pontos | Resp. | Tipo |
+|---|---|---|---|---|---|
+| E4-01 | P0 | Nota média do hospital (1–5, últimos 90 dias, N ≥ 5) | 3 | BE + FE | ➕ Nova |
+| E4-02 | P0 | Tempo médio de atendimento (mediana, ≤ 24h, exclui internação/observação) | 3 | BE + FE | ➕ Nova |
+| E4-03 | P0 | Tela de detalhe público do hospital (nota, tempo, N, período, atualização) | 3 | FE | ➕ Nova |
+| E4-04 | P0 | Atualização de agregados em até 15 minutos após novo feedback | 3 | BE | ➕ Nova |
+| E5-01 | P0 | Permissão de localização em etapas com explicação e revogação | 3 | FE | ➕ Nova |
+| E5-02 | P0 | Aceite de termos e política de privacidade no onboarding | 2 | FE | ➕ Nova |
+| E5-04 | P0 | Cadastro/login opcional (e-mail + senha) integrado ao fluxo | 3 | FE + BE | 🔄 Refatorar |
+
+### 7.3 Entregáveis esperados
+
+- [x] **Indicadores na tela de detalhe do hospital**: nota média com estrelas; tempo mediano formatado (ex.: "1h 35min"); N de avaliações; período ("últimos 90 dias"); data da última atualização; mensagem "Ainda sem avaliações suficientes" quando N < 5.
+- [x] **Endpoint de indicadores**: `GET /api/v1/hospitais/{id}/indicadores` 🔓 — retorna do `agregados_hospitais` materializado; `indicadoresDisponiveis: false` quando N < 5.
+- [x] **Job de atualização de agregados**: disparado por evento pós-feedback (`@TransactionalEventListener`); recalcula `AGREGADO_HOSPITAL`; tempo máximo de 15min entre feedback e atualização pública (RN-18).
+- [x] **Tela de detalhe do hospital**: cards de indicadores; transparência metodológica (ex.: "Calculado com 12 avaliações nos últimos 90 dias"); link para compartilhar; carrega em < 2s (p95).
+- [x] **Onboarding LGPD**: explicação clara do uso de localização antes de pedir permissão; aceite de termos com data/versão registrados; política de privacidade acessível em 2 toques; permissão negada não bloqueia consulta pública.
+- [x] **Fluxo de cadastro/login**: tela de cadastro com validação (e-mail único, senha ≥ 8 chars); tela de login integrada com JWT do S0; conta opcional — jornada principal funciona sem login.
+
+### 7.4 Demo planejada
+
+> **"Abrir tela de detalhe de hospital com 12 avaliações: ver nota 4.2, tempo mediano 1h 35min, 'atualizado há 3 minutos'. Abrir hospital com 3 avaliações: ver 'Ainda sem avaliações suficientes'. Passar pelo onboarding: conceder localização, aceitar termos, pular cadastro. Depois, cadastrar conta e ver histórico vazio (sem visitas ainda)."**
+
+### 7.5 Riscos do sprint
+
+| Risco | Prob. | Impacto | Mitigação |
+|---|---|---|---|
+| Cálculo de mediana em memória (Java) com performance ruim se N crescer | Baixa | Baixo | Para MVP com N < 1000, é irrelevante; cache materializado evita recomputação em cada request; reavaliar se N > 10.000 |
+| Usuário rejeitar permissão de localização e app perder funcionalidade core | Alta | Médio | Check-in manual (E2-06) já implementado; app continua funcional para consulta pública e feedback manual; comunicação clara de que sem localização, detecção automática não funciona |
+| Onboarding complexo (múltiplos estados: primeira vez, retorno, revogação) | Média | Médio | FE usa máquina de estados finita para onboarding; testar todos os caminhos (permissão concedida, negada, revogada depois) |
+
+### 7.6 Definição de Pronto (DoD) do sprint
+
+- [x] Indicadores públicos exibidos corretamente (nota, tempo, N, período).
+- [x] Regra N ≥ 5 respeitada (omite indicadores abaixo).
+- [x] Agregado atualizado em ≤ 15min após feedback.
+- [x] Onboarding com consentimento granular funcional.
+- [x] Cadastro/login integrado e opcional.
+- [x] Testes de usabilidade do onboarding com ≥ 3 pessoas.
+
+---
+
+## 8. Sprint S6 — Polimento e Lançamento ✨
+
+> **2 semanas · 20 story points · Depende de: S5 concluído**
+
+### 8.1 Objetivo do sprint
+
+> **"Polir a experiência do usuário (Design System v2.0, Bottom Tabs, acessibilidade, estados de UI), adicionar ranking de hospitais, rate limiting e preparar o lançamento."**
+
+### 8.2 Estórias do sprint
+
+| ID | Prioridade | Estória | Pontos | Resp. | Tipo |
+|---|---|---|---|---|---|
+| E6-01 | P0 | Navegação por Bottom Tabs (Mapa, Hospitais, Perfil) | 5 | FE | 🔄 Refatorar |
+| E6-02 | P0 | Design System v2.0 aplicado em todas as telas | 5 | FE | 🔄 Refatorar |
+| E6-03 | P1 | Acessibilidade WCAG AA (leitor de tela, contraste, alvos 48dp) | 3 | FE | ➕ Nova |
+| E6-04 | P1 | Estados de carregamento/vazio/erro em todas as telas | 2 | FE | ➕ Nova |
+| E4-05 | P1 | Ranking de hospitais ordenável por nota e tempo | 3 | BE + FE | ➕ Nova |
+| F0-04 | P1 | Rate limiting em login e endpoints públicos | 2 | BE | ➕ Nova |
+
+### 8.3 Estórias movidas para "stretch" (se velocity permitir)
+
+| ID | Estória | Pontos | Motivo do adiamento |
+|---|---|---|---|
+| E5-03 | Histórico de visitas e feedbacks do usuário logado | 3 | Menos crítico que polimento visual — pode entrar em patch pós-lançamento (S6+1) |
+| E5-05 | Revogação de consentimento de geolocalização sem perder acesso ao app | 2 | Parcialmente coberto por E5-01; revogação completa pode ser patch |
+
+### 8.4 Entregáveis esperados
+
+- [x] **Bottom Tabs implementados**: 3 abas (Mapa, Hospitais, Perfil); substituição do Drawer navigation; navegação de 1 polegar; transições suaves.
+- [x] **Design System v2.0 aplicado**: tokens de cor, tipografia, raios, sombras em todas as telas; componentes padronizados (Button, RatingStars, FeedbackSheet, TimerBanner); remoção de assets antigos (GIF, PNGs de ícones); selos LGPD no lugar de "HIPAA Compliant".
+- [x] **Acessibilidade**: `accessibilityLabel` e `accessibilityRole` em componentes interativos; alvos de toque ≥ 48dp; contraste de texto ≥ 4.5:1 (AA); teste com TalkBack (Android) e VoiceOver (iOS).
+- [x] **Estados de UI**: `LoadingState` (skeleton/spinner), `EmptyState` (ilustração + mensagem), `ErrorState` (mensagem + botão retry) em todas as telas com dados assíncronos.
+- [x] **Ranking de hospitais**: `GET /api/v1/hospitais/ranking` 🔓 com ordenação por `nota` ou `tempo`; filtro por tipo (público/privado); paginação; tela dedicada no app.
+- [x] **Rate limiting**: login 10 req/min/IP (429); endpoints públicos 60 req/min/IP; bucket4j ou Spring filter; testado com script de carga.
+- [x] **Preparação de lançamento**: build de produção (APK/AAB Android + IPA iOS); configuração de loja (Google Play + App Store); documentação de deploy; runbook de operação.
+
+### 8.5 Demo planejada
+
+> **"Navegar pelo app completo com Bottom Tabs: ver mapa com hospitais e geofences, lista de hospitais com indicadores, perfil com consentimentos. Testar ranking: ordenar por nota e por tempo, filtrar por tipo. Navegar com TalkBack ativado. Forçar erro de rede e ver EmptyState/ErrorState. Disparar 11 logins em 1 minuto e ver rate limit (429)."**
+
+### 8.6 Riscos do sprint
+
+| Risco | Prob. | Impacto | Mitigação |
+|---|---|---|---|
+| Refatoração de navegação (Drawer → Tabs) quebrar fluxos existentes | Média | Alto | FE faz a migração em branch separada; testar todos os fluxos (login, cadastro, home, detalhe hospital, feedback) antes do merge; rollback possível se estourar prazo |
+| Design System com inconsistências entre componentes | Média | Médio | QA faz varredura visual em todas as telas; checklist de componentes vs. Padrão UI/UX; Storybook ou catálogo de componentes para referência |
+| Build de produção com erros (Expo EAS Build) | Média | Médio | DevOps gera build de produção no dia 1 do sprint para identificar problemas cedo; CI/CD configurado para builds automáticos |
+| Acessibilidade subestimada (3 pts pode ser pouco) | Média | Médio | Foco em WCAG AA nível A (mínimo): labels, contraste, alvos; AA completo (nível AA) como stretch; auditoria com ferramenta automatizada (axe-core, Accessibility Scanner) |
+
+### 8.7 Definição de Pronto (DoD) do sprint
+
+- [x] Bottom Tabs funcional com 3 abas e navegação completa.
+- [x] Design System v2.0 aplicado em 100% das telas.
+- [x] Acessibilidade WCAG A verificada com ferramenta automatizada.
+- [x] Estados de carregamento/vazio/erro em todas as telas.
+- [x] Ranking funcional com ordenação e filtro.
+- [x] Rate limiting ativo e testado.
+- [x] Build de produção gerado e validado em device real.
+
+---
+
+## 9. Sprint a Sprint Detalhado (Tabela Consolidada)
+
+### 9.1 Sprint S0 — Estabilização e Segurança 🔥
+
+| Estória ID | Descrição Resumida | Pontos | Resp. | Dep. |
+|---|---|---|---|---|
+| F0-01 | Hash BCrypt — refatorar `AuthServiceImpl` para não gravar senha em claro | 3 | BE | — |
+| F0-02 | JWT com Spring Security — access 15min + refresh 30d + SecureStore | 8 | BE + FE | F0-01 |
+| F0-03 | Padronizar envelope de erro (timestamp, status, code, message pt-BR, traceId) | 2 | BE | — |
+| F0-05 | Exclusão de conta LGPD — cascade de dados pessoais + anonimização de agregados | 5 | BE + FE | F0-02 |
+
+**Objetivo do sprint:** Sistema seguro para exposição pública — senha com hash, JWT, erros padronizados, LGPD básico.
+
+**Demo planejada:** Login com JWT → acessar endpoint protegido → token expirado → refresh → logout. Excluir conta e verificar remoção de dados.
+
+**Riscos e mitigação:** Complexidade do Spring Security (spike 4h) · Cascade LGPD (soft delete como fallback).
+
+---
+
+### 9.2 Sprint S1 — Hospitais e Geofence Admin 🏥
+
+| Estória ID | Descrição Resumida | Pontos | Resp. | Dep. |
+|---|---|---|---|---|
+| E1-01 | CRUD de hospital — nome, CNPJ, tipo, endereço, status | 5 | BE | S0 |
+| E1-02 | Geofence como polígono GeoJSON — desenho no mapa + validação | 5 | BE + FE | E1-01 |
+| E1-03 | Listagem pública de hospitais ativos com indicadores (placeholder) | 3 | BE + FE | E1-01 |
+| E1-04 | Edição e desativação de hospital/geofence | 3 | BE + FE | E1-02 |
+
+**Objetivo do sprint:** Cadastrar hospitais com áreas geográficas no mapa.
+
+**Demo planejada:** Cadastrar 3 hospitais reais com geofences → listar no app público → buscar por nome → ver polígono no mapa.
+
+**Riscos e mitigação:** Editor de polígono no RN limitado (fallback: admin web) · Validação GeoJSON complexa (JTS library).
+
+---
+
+### 9.3 Sprint S2 — Detecção de Visitas 📍
+
+| Estória ID | Descrição Resumida | Pontos | Resp. | Dep. |
+|---|---|---|---|---|
+| E2-01 | Detecção automática de entrada — geofencing nativo + checkin API | 5 | FE + BE | S1 |
+| E2-02 | Detecção automática de saída — checkout + `duracaoMinutos` | 5 | FE + BE | E2-01 |
+| E2-06 | Check-in manual em 1 toque — fallback GPS desligado | 3 | FE + BE | S1 |
+| E2-07 | Card de visita ativa com cronômetro — home + notificação persistente | 3 | FE | E2-01 |
+| E2-09 | Heartbeat a cada 30 minutos — sinal de presença | 3 | FE + BE | E2-01 |
+
+**Objetivo do sprint:** Detectar entrada/saída automática via geofencing nativo com heartbeat de presença.
+
+**Demo planejada:** Caminhar até perímetro de hospital real → card aparece → cronômetro → sair → visita finalizada com duração correta.
+
+**Riscos e mitigação:** Geofencing iOS imprevisível (testar device real dia 1) · Heartbeat consumo bateria (medir, ajustar intervalo se necessário).
+
+---
+
+### 9.4 Sprint S3 — Robustez de Visitas + Feedback Backend 🛡️
+
+| Estória ID | Descrição Resumida | Pontos | Resp. | Dep. |
+|---|---|---|---|---|
+| E2-03 | Expiração de visitas — 24h sem heartbeat → `EXPIRADA` (job) | 5 | BE | S2 |
+| E2-04 | Conflito de áreas sobrepostas — hospital mais próximo | 3 | BE | S2 |
+| E2-05 | Recuperação de GPS interrompido — timeout 10min | 3 | FE + BE | S2 |
+| E2-10 | Sinalização de internação/observação — prompt após 12h | 3 | FE + BE | S2 |
+| E2-08 | Filtro de visitas < 2min nas estatísticas | 2 | BE | S2 |
+| E3-04 | Bloqueio de feedback duplicado — unique index `visitaId` | 2 | BE | S2 |
+| E3-05 | Feedback anônimo — sem login, `usuarioId` nulo | 3 | BE | E3-04 |
+
+**Objetivo do sprint:** Visitas robustas contra falhas + backend de feedback com dedupe e anônimo.
+
+**Demo planejada:** GPS preso → expiração. Geofences sobrepostos → escolha. Visita 13h → prompt internação. Feedback duplicado → rejeitado.
+
+**Riscos e mitigação:** Falsos positivos na expiração (log detalhado, soft expiration) · Mediana sem operador MongoDB nativo (calcular em Java).
+
+---
+
+### 9.5 Sprint S4 — Feedback Mobile + Notificações 📝
+
+| Estória ID | Descrição Resumida | Pontos | Resp. | Dep. |
+|---|---|---|---|---|
+| E3-01 | Notificação local de feedback — 1–5min após saída | 3 | FE | S3 |
+| E3-02 | Formulário de feedback — 4 perguntas, pulável, chips, < 45s | 8 | FE | S3 |
+| E3-03 | Janela de 24h para responder + 1 lembrete único | 3 | FE | S3 |
+| E3-06 | Tela de agradecimento e impacto social | 2 | FE | E3-02 |
+
+**Objetivo do sprint:** Experiência completa de feedback: notificação → formulário rápido → agradecimento.
+
+**Demo planejada:** Ciclo completo — entrar → sair → notificação → formulário < 30s → agradecimento → hospital com N incrementado.
+
+**Riscos e mitigação:** Formulário complexo estourar 8 pts (BE ocioso pode ajudar com componentes) · Notificação iOS falhar (fallback: abrir app manualmente).
+
+---
+
+### 9.6 Sprint S5 — Indicadores Públicos + Conta/Privacidade 📊
+
+| Estória ID | Descrição Resumida | Pontos | Resp. | Dep. |
+|---|---|---|---|---|
+| E4-01 | Nota média do hospital — 1–5, últimos 90d, N ≥ 5 | 3 | BE + FE | S4 |
+| E4-02 | Tempo médio — mediana, ≤ 24h, exclui internação/observação | 3 | BE + FE | S4 |
+| E4-03 | Tela de detalhe público do hospital | 3 | FE | E4-01 |
+| E4-04 | Atualização de agregados ≤ 15min após feedback | 3 | BE | S4 |
+| E5-01 | Permissão de localização em etapas com explicação | 3 | FE | S2 |
+| E5-02 | Aceite de termos e política de privacidade | 2 | FE | — |
+| E5-04 | Cadastro/login opcional integrado ao fluxo | 3 | FE + BE | S0 |
+
+**Objetivo do sprint:** Indicadores públicos por hospital + onboarding LGPD + conta opcional.
+
+**Demo planejada:** Hospital com 12 avaliações: nota 4.2, tempo 1h35. Hospital com 3: "sem avaliações". Onboarding completo → pular cadastro → depois criar conta.
+
+**Riscos e mitigação:** Onboarding com múltiplos estados (máquina de estados) · Performance da mediana com N grande (irrelevante no MVP, cache materializado).
+
+---
+
+### 9.7 Sprint S6 — Polimento e Lançamento ✨
+
+| Estória ID | Descrição Resumida | Pontos | Resp. | Dep. |
+|---|---|---|---|---|
+| E6-01 | Bottom Tabs (Mapa, Hospitais, Perfil) — substituir Drawer | 5 | FE | — |
+| E6-02 | Design System v2.0 em todas as telas — tokens, componentes, remoção assets antigos | 5 | FE | — |
+| E6-03 | Acessibilidade WCAG AA — leitor de tela, contraste, alvos 48dp | 3 | FE | E6-02 |
+| E6-04 | Estados de carregamento/vazio/erro em todas as telas | 2 | FE | — |
+| E4-05 | Ranking de hospitais — ordenável por nota e tempo | 3 | BE + FE | S5 |
+| F0-04 | Rate limiting — login 10/min, endpoints públicos 60/min | 2 | BE | — |
+
+**Objetivo do sprint:** Polimento visual, acessibilidade, ranking, rate limiting e preparação de lançamento.
+
+**Demo planejada:** App completo com Bottom Tabs → ranking → teste com TalkBack → forçar erros de rede → rate limit (429).
+
+**Riscos e mitigação:** Refatoração de navegação quebrar fluxos (branch separada, rollback possível) · Build de produção (CI/CD, gerar no dia 1).
+
+---
+
+## 10. Velocity e Estimativas
+
+### 10.1 Distribuição de story points por sprint
+
+| Sprint | Pontos | Estórias | Épicos cobertos | Foco |
+|---|---|---|---|---|
+| **S0** | 18 | 4 | Fase 0 | 🔥 Segurança |
+| **S1** | 16 | 4 | E1 (parcial) | 🏥 Hospitais |
+| **S2** | 19 | 5 | E2 (parcial) | 📍 Detecção de visitas |
+| **S3** | 21 | 7 | E2 (final) + E3 (backend) | 🛡️ Robustez + Feedback BE |
+| **S4** | 16 | 4 | E3 (mobile) | 📝 Feedback Mobile |
+| **S5** | 20 | 7 | E4 + E5 (parcial) | 📊 Indicadores + Conta |
+| **S6** | 20 | 6 | E6 + E4 (final) + F0 | ✨ Polimento |
+| **Total** | **130** | **37*** | **6 épicos + Fase 0** | |
+
+> \* 37 contagens de estória-sprint (31 estórias únicas; F0-04, E4-05 e outras aparecem em 1 sprint cada; as estórias não se repetem entre sprints).
+
+### 10.2 Velocity planejado vs. ideal
+
+```
+Sprint:  S0      S1      S2      S3      S4      S5      S6
+Pontos:  18      16      19      21      16      20      20
+         ██████  █████   ██████  ██████  █████   ██████  ██████
+Média:   18.6 pts/sprint (target: 18–20)  ✅ Dentro da faixa
+```
+
+**Análise:**
+- **S1 e S4 são os sprints mais leves** (16 pts) — intencional: S1 é o primeiro sprint de produto, curva de aprendizado; S4 foca em UI/UX (FE intensivo).
+- **S3 é o sprint mais pesado** (21 pts) — contém 7 estórias, mas muitas são pequenas (2–3 pts) e independentes entre si (BE pode paralelizar expiração, conflito, dedupe).
+- **S0–S2 formam a "rampa de aceleração"**: segurança → dados → detecção. O time ganha contexto e velocidade sobe.
+- **S5–S6 são sprints de "fechamento"**: funcionalidades visíveis para stakeholders, polimento.
+
+### 10.3 Burndown ideal por sprint (story points)
+
+```
+Semana 1:   Semana 2:
+ ████████    ████████      S0 (18 pts)
+ ███████     █████████     S1 (16 pts)
+ █████████   ██████████    S2 (19 pts)
+ ██████████  ███████████   S3 (21 pts)
+ ███████     █████████     S4 (16 pts)
+ █████████   ███████████   S5 (20 pts)
+ █████████   ███████████   S6 (20 pts)
+```
+
+### 10.4 Estimativa de esforço por perfil (horas/sprint)
+
+| Perfil | Alocação | Horas/sprint (80h) | Atividades principais |
+|---|---|---|---|
+| **Backend (BE)** | 100% | ~70h dev + 10h cerimônias | API, modelos, geo queries, jobs, testes |
+| **Frontend (FE)** | 100% | ~70h dev + 10h cerimônias | Telas, geofencing, notificações, Design System |
+| **DevOps/QA** | 100% | ~40h QA + 20h infra + 10h cerimônias + 10h buffer | Testes manuais/automáticos, CI/CD, ambiente, build |
+
+---
+
+## 11. Matriz de Riscos por Sprint
+
+### 11.1 Riscos técnicos (mapeados da Árvore Tecnológica)
+
+| # | Risco | S0 | S1 | S2 | S3 | S4 | S5 | S6 | Prob. | Impacto | Status |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| T1 | Precisão do geofence em área urbana densa | | | 🔴 | 🟡 | 🟢 | | | Alta | Médio | Mitigado (teste campo S3→S4) |
+| T2 | Restrições iOS de localização em background | | | 🔴 | 🟡 | 🟢 | | | Alta | Alto | Mitigado (geofencing nativo) |
+| T3 | Senha em texto puro — dívida de segurança | 🔴 | 🟢 | | | | | | — | Crítico | ✅ Resolvido no S0 |
+| T4 | Volume de escrita de posição no MongoDB | | | | | 🟡 | 🟡 | 🟢 | Média | Médio | Monitorar |
+| T5 | Dependência de bibliotecas RN de terceiros | | | 🟡 | 🟡 | 🟡 | | | Baixa | Médio | Acompanhar releases |
+
+> Legenda: 🔴 = risco ativo · 🟡 = risco parcialmente mitigado · 🟢 = risco controlado
+
+### 11.2 Riscos de produto (mapeados do Documento Negocial)
+
+| # | Risco | S0 | S1 | S2 | S3 | S4 | S5 | S6 | Prob. | Impacto | Mitigação |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| R1 | Baixa taxa de resposta ao feedback | | | | | 🟡 | 🟡 | 🟡 | Média | Alto | Formulário curto, notificação timing, anônimo |
+| R2 | GPS impreciso / bateria | | | 🔴 | 🟡 | 🟢 | | | Média | Médio | Geofencing nativo, teste campo |
+| R3 | Avaliações fraudulentas | | | | 🟡 | 🟡 | 🟡 | 🟡 | Média | Alto | 1 feedback/visita, N mínimo, padrões |
+| R4 | Poucos hospitais com N ≥ 5 | | | | | | 🔴 | 🟡 | Alta | Médio | Comunicação clara, foco em densidade |
+| R5 | LGPD / privacidade | 🟡 | 🟢 | | | | 🟡 | 🟢 | Média | Alto | Consentimento granular, DPO |
+| R6 | Permissão localização background (iOS) | | | 🔴 | 🟡 | 🟢 | | | Alta | Médio | Geofencing nativo, fallback manual |
+| R7 | Visita "presa" em esperas longas (12h+ SUS) | | | 🔴 | 🟡 | 🟢 | | | Média | Alto | Heartbeat (S2), expiração 24h (S3), sinalização internação (S3) |
+
+### 11.3 Riscos de gestão
+
+| Risco | Prob. | Impacto | Mitigação |
+|---|---|---|---|
+| Time de 3 pessoas é frágil (baixa resiliência a ausências) | Média | Alto | Documentação em cada sprint; pair programming em estórias críticas; buffer de 2 semanas no plano |
+| Escopo crescer durante o desenvolvimento (scope creep) | Média | Alto | PO é o gatekeeper; mudanças de escopo via cerimônia de refinamento; backlog futuro (FUT-01..07) documentado para capturar ideias sem poluir MVP |
+| Dependência de dispositivo físico iOS para testes | Baixa | Médio | Adquirir/emprestar device iOS até S2; Expo EAS Build com TestFlight para beta testers |
+| Teste de campo de geofence inviável (logística) | Média | Alto | Agendar 3 hospitais até S2; se inviável, simular com GPX traces de visitas reais (dados anonimizados de voluntários) |
+
+---
+
+## 12. Plano de Comunicação
+
+### 12.1 Canais e Frequência
+
+| Canal | Público | Frequência | Responsável | Conteúdo |
+|---|---|---|---|---|
+| **Daily Scrum** (15min) | Time | Diário | Time (rodízio) | O que fiz, o que farei, impedimentos |
+| **Sprint Review** (1h) | Time + Stakeholders | Fim de cada sprint | PO / SM | Demo do incremento, feedback, ajuste de backlog |
+| **Sprint Retro** (1h) | Time | Fim de cada sprint | SM | O que funcionou, o que melhorar, ações |
+| **Backlog Refinement** (1h) | Time + PO | Meio de cada sprint | PO | Refinar estórias dos próximos 2 sprints, estimar |
+| **Status Report** (assíncrono) | Stakeholders | Semanal (sexta) | SM | 1-pager: progresso vs plano, riscos, blockers, asks |
+| **Slack/Teams #saude-monitor** | Time | Contínuo | Todos | Comunicação assíncrona, blockers, decisões rápidas |
+| **Canal #stakeholders** | Stakeholders | Sob demanda | PO | Atualizações de produto, demos agendadas |
+
+### 12.2 Comunicação de riscos e impedimentos
+
+- **Impedimento de time**: reportado na Daily; se não resolvido em 24h, SM escala.
+- **Risco materializado**: SM notifica PO e stakeholders no Status Report semanal; inclui probabilidade atualizada e ação.
+- **Mudança de escopo**: PO avalia impacto; se afeta sprint goal, discutido em Planning extraordinária; registrado no backlog.
+- **Blocker técnico**: DevOps/QA cria ticket no board; SM acompanha diariamente.
+
+### 12.3 Marcos de comunicação com stakeholders
+
+| Marco | Quando | O que comunicar |
+|---|---|---|
+| **Kickoff do MVP** | Início do S0 | Apresentação do plano de sprints, roadmap, riscos |
+| **Demo de segurança** | Fim do S0 | JWT funcional, senha hash, erros padronizados |
+| **Demo de hospitais no mapa** | Fim do S1 | Geofences desenhados, lista pública funcional |
+| **Demo de detecção automática** | Fim do S2 | Ciclo completo de visita com geofencing nativo |
+| **Demo de feedback** | Fim do S4 | Formulário completo, notificação, agradecimento |
+| **Demo de indicadores públicos** | Fim do S5 | Nota, tempo, N na tela do hospital |
+| **Demo de lançamento** | Fim do S6 | App completo, build de produção, loja |
+| **Lançamento** | S6+2 (buffer) | App publicado, campanha de aquisição |
+
+---
+
+## 13. Cerimônias e Cadência
+
+### 13.1 Calendário semanal (timebox rígido)
+
+| Dia | Cerimônia | Duração | Horário sugerido | Participantes |
+|---|---|---|---|---|
+| **Seg–Sex** | Daily Scrum | 15 min | 09:15 | Time completo |
+| **Quarta (meio sprint)** | Backlog Refinement | 1 h | 14:00 | Time + PO |
+| **Sexta (fim sprint)** | Sprint Review | 1 h | 10:00 | Time + PO + Stakeholders |
+| **Sexta (fim sprint)** | Sprint Retrospective | 1 h | 11:15 | Time (sem stakeholders) |
+| **Segunda (início sprint)** | Sprint Planning | 2 h | 09:30 | Time + PO |
+
+### 13.2 Regras das cerimônias
+
+- **Daily Scrum**: 15 minutos máximos. Se passar de 15min, o SM encerra e os interessados continuam em conversa separada. Formato: cada pessoa responde 3 perguntas (fez, fará, impedimentos). SM anota blockers no board.
+- **Sprint Planning (2h)**: 
+  - Primeira hora: PO apresenta objetivo do sprint e estórias priorizadas (o quê).
+  - Segunda hora: time estima, detalha tarefas e confirma capacidade (como).
+  - Output: Sprint Goal (1 frase) + Sprint Backlog (estórias comprometidas).
+- **Sprint Review (1h)**: Demo do incremento funcional em device real/ambiente de staging. Nada de slides — apenas o produto funcionando. Stakeholders dão feedback; PO atualiza backlog se necessário.
+- **Sprint Retrospective (1h)**: Time apenas. Formato variável (4Ls, Start-Stop-Continue, Sailboat). Output: no máximo 3 ações com owner e data. Ações do retro anterior são revisadas nos primeiros 5 minutos.
+- **Backlog Refinement (1h)**: PO apresenta estórias dos próximos 2 sprints; time discute, estima e levanta dúvidas. Estórias que não atingirem Definition of Ready voltam para o PO refinar.
+
+### 13.3 Exceções e adaptações
+
+- **Planning extraordinária**: apenas se o Sprint Goal for invalidado (ex.: blocker crítico). Timebox de 1h.
+- **Daily async**: se o time estiver em trabalho de campo (teste de geofence S3→S4), Daily pode ser assíncrona via Slack (thread dedicada).
+- **Retro maior**: a cada 3 sprints (S3 e S6), considerar retro estendida de 90min para temas mais profundos (saúde do time, dívida técnica, processo).
+
+---
+
+## 14. Métricas de Acompanhamento (Beyond Product KPIs)
+
+Além dos KPIs de produto definidos no Documento Negocial (taxa de resposta, N hospitais, WAUs), o time acompanha métricas de processo:
+
+### 14.1 Métricas de entrega
+
+| Métrica | Definição | Meta | Frequência |
+|---|---|---|---|
+| **Say/Do ratio** | Story points entregues ÷ story points comprometidos no sprint | ≥ 80% | Por sprint |
+| **Velocity** | Média móvel de story points entregues (últimos 3 sprints) | 18–20 pts | Por sprint |
+| **Sprint Goal atingido** | % de sprints em que o objetivo foi cumprido | ≥ 85% (5 de 6 sprints S1–S6) | Por sprint |
+| **Cycle time** | Tempo médio entre "In Progress" e "Done" de uma estória | ≤ 5 dias úteis | Por sprint |
+| **Throughput** | Número de estórias entregues por sprint | 4–7 | Por sprint |
+
+### 14.2 Métricas de qualidade
+
+| Métrica | Definição | Meta | Frequência |
+|---|---|---|---|
+| **Escaped defects** | Bugs reportados em produção por sprint pós-lançamento | ≤ 3 | Por sprint (pós-S6) |
+| **Cobertura de testes** | % de linhas cobertas por testes unitários nos serviços críticos | ≥ 70% | Por sprint |
+| **Retro action completion** | % de ações do retro anterior concluídas até o fim do sprint | ≥ 80% | Por sprint |
+| **Build stability** | % de builds de CI verdes (sem falha) | ≥ 90% | Por sprint |
+| **Code review time** | Tempo médio entre abertura do PR e merge | ≤ 24h | Por sprint |
+
+### 14.3 Métricas de saúde do time
+
+| Métrica | Definição | Alerta se | Frequência |
+|---|---|---|---|
+| **WIP (Work in Progress)** | Número de estórias simultaneamente em progresso | > 5 (para time de 3) | Diário (Daily) |
+| **Blocker age** | Tempo desde que o blocker foi reportado | > 48h sem resolução | Diário |
+| **Sprint scope change** | % de story points adicionados/removidos durante o sprint | > 15% do comprometido | Fim do sprint |
+| **Horas extras** | Horas trabalhadas além das 40h/semana | > 5h/semana consistente | Retro |
+
+### 14.4 Dashboard de acompanhamento (exemplo)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ 🏃 CLINICAL SANCTUARY — SPRINT STATUS          S3 Day 7 │
+├─────────────────────────────────────────────────────────┤
+│ Sprint Goal: Robustez de visitas + Feedback Backend      │
+│ Progress:     ████████░░░░░░░░  53% (11/21 pts)         │
+│ Burndown:     -2 pts vs ideal (recuperável)              │
+│                                                         │
+│ Em progresso:  4 estórias (WIP: 4/5 ⚠️)                 │
+│ Bloqueado:     1 (IMP-07 — device iOS para teste GPS)    │
+│ Escopo:        sem mudanças (0 pts adicionados)          │
+│                                                         │
+│ Próx. marco:   Demo S3 em 4 dias                         │
+│ Risco ativo:   Job de expiração com falsos positivos 🟡  │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 15. Plano de Testes
+
+### 15.1 Níveis de teste por sprint
+
+| Sprint | Testes unitários | Testes de integração | Testes de UI | Testes de campo |
+|---|---|---|---|---|
+| **S0** | Auth, BCrypt, erro | Login/logout/refresh, exclusão LGPD | — | — |
+| **S1** | Validação GeoJSON, CRUD | CRUD hospital, listagem, $geoIntersects | Formulário hospital | — |
+| **S2** | Checkin/checkout, heartbeat | Ciclo visita completo | Card visita, check-in manual | — |
+| **S3** | Expiração, conflito, dedupe | Job expiração, feedback duplicado | Prompt internação | 🟡 **Teste campo geofence (3 hospitais)** |
+| **S4** | — | Envio feedback | Formulário, notificação, acessibilidade | — |
+| **S5** | Agregação, mediana | Indicadores, N ≥ 5, atualização | Onboarding, detalhe hospital | — |
+| **S6** | Rate limiting | Ranking, rate limit 429 | Bottom Tabs, Design System, acessib. | 🟢 Smoke test geral |
+
+### 15.2 Teste de campo de geofence (entre S3 e S4)
+
+> **CRÍTICO**: O teste de campo valida as premissas de geofencing que sustentam todo o produto.
+
+| Parâmetro | Valor |
+|---|---|
+| **Hospitais** | ≥ 3 (público grande, público médio, privado) |
+| **Duração** | 2–3 dias por hospital |
+| **Cenários** | Entrada normal, saída normal, saída curta (< 5min), espera longa (> 2h), GPS desligado/retomado, check-in manual |
+| **Métricas coletadas** | Latência de detecção de entrada (ideal ≤ 3min), latência de saída (ideal ≤ 7min), falsos positivos/dia, consumo de bateria (%/dia) |
+| **Critério de sucesso** | Precisão ≥ 80% nas detecções; bateria < 5%/dia; zero falsos positivos em espera longa |
+| **Responsável** | QA + FE (acompanhamento presencial) |
+
+---
+
+## 16. Preparação para Lançamento (S6+)
+
+### 16.1 Atividades pós-S6 (buffer de 2 semanas)
+
+| Atividade | Responsável | Prazo |
+|---|---|---|
+| Teste de regressão completo (todas as funcionalidades) | QA | Semana 1 |
+| Teste de carga (100 usuários simulados) | DevOps | Semana 1 |
+| Correção de bugs críticos encontrados | Time | Semana 1–2 |
+| Deploy de produção (API + MongoDB Atlas) | DevOps | Semana 2 |
+| Submissão às lojas (Google Play + App Store) | FE + DevOps | Semana 2 |
+| Configuração de monitoramento (Prometheus + Grafana + alertas) | DevOps | Semana 2 |
+| Documentação de operação (runbook) | DevOps + BE | Semana 2 |
+| Comunicação de lançamento (press release, redes sociais) | PO | Semana 2 |
+
+### 16.2 Critérios de Go/No-Go para lançamento
+
+- [x] Teste de regressão 100% aprovado (zero bugs P0/P1 abertos).
+- [x] Teste de campo de geofence aprovado (precisão ≥ 80%).
+- [x] KPIs de produto instrumentados e funcionais.
+- [x] Build de produção aprovado em device real (Android + iOS).
+- [x] Review de segurança concluído (OWASP Top 10, sem vulnerabilidades críticas).
+- [x] Documentação LGPD finalizada (DPO aprovou).
+- [x] Runbook de operação testado (deploy, rollback, restore backup).
+- [x] Termos de uso e política de privacidade publicados.
+
+---
+
+## 17. Backlog Futuro (pós-MVP)
+
+Para referência, as estórias que estão fora do MVP mas documentadas para a Fase 2:
+
+| ID | Estória | Fase | Dependência |
+|---|---|---|---|
+| FUT-01 | Painel institucional para gestores (agregados + alertas de queda de nota) | Fase 2 | E4 (agregados) |
+| FUT-02 | Integração com sistemas internos de hospitais via API | Fase 2 | Parceria hospitalar |
+| FUT-03 | Relatórios agregados para poder público | Fase 3 | FUT-01 |
+| FUT-04 | Busca avançada com filtros (tipo, região, especialidade) | Fase 2 | E4-05 |
+| FUT-05 | Comparação lado a lado de 2+ hospitais | Fase 2 | E4-01 |
+| FUT-06 | Modo escuro e personalização de notificações | Fase 2 | E6-02 (Design System) |
+| FUT-07 | Teleconsulta e pagamentos (visão v1.0 SAS) | Fase 3 | Roadmap estratégico |
+
+---
+
+## 18. Glossário do Plano de Sprints
+
+| Termo | Definição |
+|---|---|
+| **Sprint Goal** | Objetivo único e mensurável do sprint — se o escopo precisar ser cortado, preserva-se o goal. |
+| **Velocity** | Média de story points entregues por sprint (últimos 3 sprints). |
+| **Story Point** | Unidade relativa de esforço (Fibonacci: 1, 2, 3, 5, 8, 13) — considera complexidade, incerteza e volume. |
+| **DoR (Definition of Ready)** | Critérios que uma estória deve atender para entrar no sprint (critérios de aceite claros, dependências mapeadas, estimada). |
+| **DoD (Definition of Done)** | Critérios que um incremento deve atender para ser considerado pronto (testado, revisado, documentado, integrável). |
+| **Say/Do Ratio** | % de story points entregues vs comprometidos — mede previsibilidade. |
+| **Cycle Time** | Tempo entre o início e a conclusão de uma estória (ideal ≤ 5 dias). |
+| **WIP** | Work in Progress — número de estórias em andamento simultâneo (limite: 5 para time de 3). |
+| **Spike** | Investigação timeboxada (ex.: 4h) para reduzir incerteza técnica antes de comprometer uma estória. |
+| **Stretch goal** | Estória desejável mas não comprometida — só é puxada se o sprint goal já estiver garantido. |
+
+---
+
+## 19. Assinaturas e Aprovações
+
+| Papel | Nome | Data | Assinatura |
+|---|---|---|---|
+| **Product Owner** | Gabriel Vogado | 07/08/2026 | Proposta inicial |
+| **Scrum Master** | Gabriel Vogado | 07/08/2026 | Proposta inicial |
+| **Tech Lead / Backend** | _A definir_ | | |
+| **Frontend** | _A definir_ | | |
+| **DevOps/QA** | _A definir_ | | |
+
+> **Status:** Proposta de plano de sprints — validar e ajustar com o time completo durante a Planning do Sprint 0. Estimativas de story points são sugestivas e devem ser recalibradas pelo time.
+
+---
+
+*Fim do Plano de Sprints v2.0 — "Plans are worthless, but planning is everything." — Dwight D. Eisenhower*

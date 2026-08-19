@@ -27,9 +27,15 @@ class LoginService {
             throw error;
         }
 
-        const responseData = await response.json();
+        let responseData = {};
 
-        if (!response.ok) {
+        try {
+            responseData = await response.json();
+        } catch (parseError) {
+            responseData = {};
+        }
+
+        if (!response.ok || responseData?.success === false) {
             const message = responseData?.message || "Falha ao realizar login";
             const fieldErrors = responseData?.errors
                 ? `\n${Object.values(responseData.errors).join("\n")}`

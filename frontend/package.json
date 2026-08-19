@@ -4,9 +4,10 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@react-navigation/drawer": "^7.9.5",
@@ -15,16 +16,23 @@
     "@react-navigation/stack": "^7.8.6",
     "expo": "~55.0.2",
     "expo-constants": "~55.0.9",
+    "expo-location": "~19.0.7",
     "expo-status-bar": "~55.0.4",
     "lucide-react-native": "^1.7.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.2",
+    "react-native-geolocation-service": "^5.3.1",
     "react-native-gesture-handler": "^2.30.0",
+    "react-native-maps": "1.20.1",
     "react-native-reanimated": "^4.2.2",
     "react-native-safe-area-context": "^5.7.0",
     "react-native-screens": "^4.24.0",
     "react-native-web": "^0.21.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.10",
+    "typescript": "~5.9.2"
   },
   "private": true
 }

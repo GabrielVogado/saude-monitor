@@ -13,6 +13,13 @@ import org.springframework.data.mongodb.core.mapping.DocumentReference;
 
 import java.time.Instant;
 
+/**
+ * Registro de autenticação (coleção {@code auth_logins}) — trilha de auditoria de login.
+ *
+ * <p><strong>Segurança (F0-01):</strong> este documento NÃO armazena senha. A senha vive
+ * apenas como hash BCrypt em {@link UserDocument#senhaHash}. Tokens JWT também nunca são
+ * persistidos (apenas no cliente).</p>
+ */
 @Document(collection = "auth_logins")
 @Getter
 @Setter
@@ -30,8 +37,8 @@ public class AuthDocument {
 
 	@Indexed(unique = true)
 	private String email;
-	private String password;
-	private boolean rememberDevice;
-	private Instant createdAt;
 
+	private boolean rememberDevice;
+
+	private Instant createdAt;
 }

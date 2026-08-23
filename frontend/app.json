@@ -37,6 +37,7 @@
       "apiBaseUrlIos": "http://localhost:8080"
     },
     "plugins": [
+      "@maplibre/maplibre-react-native",
       [
         "expo-location",
         {

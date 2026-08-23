@@ -1,0 +1,372 @@
+package br.com.saude_monitor.api.hospital.service.impl;
+
+import br.com.saude_monitor.api.config.exception.ConflitoException;
+import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
+import br.com.saude_monitor.api.hospital.document.ContatoDocument;
+import br.com.saude_monitor.api.hospital.document.EnderecoDocument;
+import br.com.saude_monitor.api.hospital.document.HospitalDocument;
+import br.com.saude_monitor.api.hospital.document.StatusSugestao;
+import br.com.saude_monitor.api.hospital.document.SugestaoHospitalDocument;
+import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
+import br.com.saude_monitor.api.hospital.dto.ContatoDto;
+import br.com.saude_monitor.api.hospital.dto.EnderecoDto;
+import br.com.saude_monitor.api.hospital.dto.GeoJsonPolygonDto;
+import br.com.saude_monitor.api.hospital.dto.HospitalRequest;
+import br.com.saude_monitor.api.hospital.dto.HospitalResumoResponse;
+import br.com.saude_monitor.api.hospital.dto.HospitalResponse;
+import br.com.saude_monitor.api.hospital.dto.IndicadoresResponse;
+import br.com.saude_monitor.api.hospital.dto.PageResponse;
+import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalRequest;
+import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalResponse;
+import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
+import br.com.saude_monitor.api.hospital.repository.SugestaoHospitalRepository;
+import br.com.saude_monitor.api.hospital.service.GeofenceFactory;
+import br.com.saude_monitor.api.hospital.service.GeofenceValidator;
+import br.com.saude_monitor.api.hospital.service.HospitalService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.geo.Distance;
+import org.springframework.data.geo.GeoResult;
+import org.springframework.data.geo.Metrics;
+import org.springframework.data.geo.Point;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.geo.GeoJsonPolygon;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.NearQuery;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.stereotype.Service;
+
+import java.text.Normalizer;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Implementação do serviço de hospitais.
+ *
+ * <p>Responsabilidades: validação de unicidade (nome/CNPJ), validação geométrica do
+ * geofence, cálculo do centroide ({@code localizacao}), CRUD e listagem pública com
+ * filtro geoespacial por raio.</p>
+ */
+@Service
+@RequiredArgsConstructor
+public class HospitalServiceImpl implements HospitalService {
+
+    private static final double RAIO_KM_PADRAO = 10.0;
+    private static final int CAP_PROXIMOS = 1000;
+
+    private final HospitalRepository hospitalRepository;
+    private final SugestaoHospitalRepository sugestaoHospitalRepository;
+    private final MongoTemplate mongoTemplate;
+    private final GeofenceValidator geofenceValidator;
+    private final GeofenceFactory geofenceFactory;
+
+    @Override
+    public HospitalResponse criar(HospitalRequest request) {
+        geofenceValidator.validar(request.geofence());
+        validarUnicidade(request.nome(), request.cnpj(), null);
+
+        Instant agora = Instant.now();
+        GeoJsonPolygon geofence = geofenceFactory.toPolygon(request.geofence());
+
+        HospitalDocument document = HospitalDocument.builder()
+                .nome(normalizarNome(request.nome()))
+                .cnpj(normalizarCnpj(request.cnpj()))
+                .tipo(request.tipo())
+                .categoria(request.categoria())
+                .endereco(toEndereco(request.endereco()))
+                .contato(toContato(request.contato()))
+                .geofence(geofence)
+                .localizacao(geofenceFactory.calcularCentroide(geofence))
+                .ativo(true)
+                .fonte("CADASTRO")
+                .criadoEm(agora)
+                .atualizadoEm(agora)
+                .build();
+
+        return toResponse(hospitalRepository.save(document));
+    }
+
+    @Override
+    public HospitalResponse atualizar(String id, HospitalRequest request) {
+        HospitalDocument existente = obterOu404(id);
+        geofenceValidator.validar(request.geofence());
+        validarUnicidade(request.nome(), request.cnpj(), id);
+
+        GeoJsonPolygon geofence = geofenceFactory.toPolygon(request.geofence());
+        existente.setNome(normalizarNome(request.nome()));
+        existente.setCnpj(normalizarCnpj(request.cnpj()));
+        existente.setTipo(request.tipo());
+        existente.setCategoria(request.categoria());
+        existente.setEndereco(toEndereco(request.endereco()));
+        existente.setContato(toContato(request.contato()));
+        existente.setGeofence(geofence);
+        existente.setLocalizacao(geofenceFactory.calcularCentroide(geofence));
+        existente.setAtualizadoEm(Instant.now());
+
+        return toResponse(hospitalRepository.save(existente));
+    }
+
+    @Override
+    public HospitalResponse buscarPorId(String id) {
+        return toResponse(obterOu404(id));
+    }
+
+    @Override
+    public GeoJsonPolygonDto buscarGeofence(String id) {
+        HospitalDocument document = obterOu404(id);
+        return geofenceFactory.toDto(document.getGeofence());
+    }
+
+    @Override
+    public PageResponse<HospitalResumoResponse> listar(Double latitude, Double longitude, Double raioKm,
+                                                       TipoEstabelecimento tipo, String busca, int page, int size) {
+        List<HospitalDocument> documentos;
+        long total;
+
+        if (latitude != null && longitude != null) {
+            double raio = raioKm == null ? RAIO_KM_PADRAO : raioKm;
+            documentos = buscarProximos(latitude, longitude, raio, tipo);
+            documentos = filtrarPorBusca(documentos, busca);
+            total = documentos.size();
+            documentos = paginarEmMemoria(documentos, page, size);
+        } else {
+            Page<HospitalDocument> resultado = buscarPaginado(tipo, busca, page, size);
+            documentos = resultado.getContent();
+            total = resultado.getTotalElements();
+        }
+
+        List<HospitalResumoResponse> content = documentos.stream()
+                .map(this::toResumo)
+                .toList();
+        return PageResponse.of(content, page, size, total);
+    }
+
+    @Override
+    public HospitalResponse alterarStatus(String id, boolean ativo) {
+        HospitalDocument document = obterOu404(id);
+        document.setAtivo(ativo);
+        document.setAtualizadoEm(Instant.now());
+        return toResponse(hospitalRepository.save(document));
+    }
+
+    @Override
+    public SugestaoHospitalResponse sugerir(SugestaoHospitalRequest request) {
+        Instant agora = Instant.now();
+        SugestaoHospitalDocument sugestao = SugestaoHospitalDocument.builder()
+                .nome(normalizarNome(request.nome()))
+                .endereco(toEndereco(request.endereco()))
+                .observacao(blankToNull(request.observacao()))
+                .status(StatusSugestao.PENDENTE)
+                .criadoEm(agora)
+                .atualizadoEm(agora)
+                .build();
+
+        return toSugestaoResponse(sugestaoHospitalRepository.save(sugestao));
+    }
+
+    // ------------------------------------------------------------------
+    // Consultas
+    // ------------------------------------------------------------------
+
+    /**
+     * Lista hospitais ativos ordenados por distância ao ponto informado, usando
+     * {@code $near} sobre o campo {@code localizacao} (centroide) com índice 2dsphere.
+     */
+    private List<HospitalDocument> buscarProximos(double latitude, double longitude, double raioKm,
+                                                  TipoEstabelecimento tipo) {
+        Query filtro = new Query(Criteria.where("ativo").is(true));
+        if (tipo != null) {
+            filtro.addCriteria(Criteria.where("tipo").is(tipo));
+        }
+
+        NearQuery near = NearQuery.near(new Point(longitude, latitude))
+                .maxDistance(new Distance(raioKm, Metrics.KILOMETERS))
+                .query(filtro)
+                .limit(CAP_PROXIMOS);
+
+        return mongoTemplate.geoNear(near, HospitalDocument.class)
+                .getContent().stream()
+                .map(GeoResult::getContent)
+                .toList();
+    }
+
+    /** Busca paginada sem filtro geoespacial, com critérios opcionais de tipo e nome. */
+    private Page<HospitalDocument> buscarPaginado(TipoEstabelecimento tipo, String busca, int page, int size) {
+        Query query = new Query(Criteria.where("ativo").is(true));
+        if (tipo != null) {
+            query.addCriteria(Criteria.where("tipo").is(tipo));
+        }
+        // A filtragem por nome é feita em memória (e não via regex no MongoDB) para
+        // suportar busca insensível a acentos/caixa de forma consistente nas duas rotas
+        // de listagem. O volume de registros (~340) torna essa abordagem segura.
+        List<HospitalDocument> todos = mongoTemplate.find(query, HospitalDocument.class);
+        List<HospitalDocument> filtrados = filtrarPorBusca(todos, busca);
+        List<HospitalDocument> content = paginarEmMemoria(filtrados, page, size);
+        return new org.springframework.data.domain.PageImpl<>(content, PageRequest.of(page, size), filtrados.size());
+    }
+
+    private List<HospitalDocument> filtrarPorBusca(List<HospitalDocument> docs, String busca) {
+        if (busca == null || busca.isBlank()) {
+            return docs;
+        }
+        String termo = normalizarBusca(busca);
+        return docs.stream()
+                .filter(d -> d.getNome() != null && normalizarBusca(d.getNome()).contains(termo))
+                .toList();
+    }
+
+    private List<HospitalDocument> paginarEmMemoria(List<HospitalDocument> docs, int page, int size) {
+        int from = Math.min(page * size, docs.size());
+        int to = Math.min(from + size, docs.size());
+        if (from >= to) {
+            return List.of();
+        }
+        return new ArrayList<>(docs.subList(from, to));
+    }
+
+    // ------------------------------------------------------------------
+    // Validações e normalização
+    // ------------------------------------------------------------------
+
+    private void validarUnicidade(String nome, String cnpj, String idAtual) {
+        String nomeNormalizado = normalizarNome(nome);
+        if (nomeNormalizado != null) {
+            boolean nomeEmUso = hospitalRepository.findAllByNomeIgnoreCase(nomeNormalizado).stream()
+                    .anyMatch(d -> !d.getId().equals(idAtual));
+            if (nomeEmUso) {
+                throw new ConflitoException("Já existe um hospital com o nome informado.");
+            }
+        }
+
+        String cnpjNormalizado = normalizarCnpj(cnpj);
+        if (cnpjNormalizado != null) {
+            hospitalRepository.findByCnpj(cnpjNormalizado).ifPresent(d -> {
+                if (!d.getId().equals(idAtual)) {
+                    throw new ConflitoException("Já existe um hospital com o CNPJ informado.");
+                }
+            });
+        }
+    }
+
+    private HospitalDocument obterOu404(String id) {
+        return hospitalRepository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException(
+                        "Hospital não encontrado para o id informado."));
+    }
+
+    private String normalizarNome(String nome) {
+        return nome == null ? null : nome.trim();
+    }
+
+    /**
+     * Normaliza texto para busca: remove acentos (diacríticos) via decomposição NFD
+     * e converte para minúsculas. Torna a busca por nome insensível a acentos e caixa
+     * (ex.: "policlinica" encontra "Policlínica").
+     */
+    private String normalizarBusca(String valor) {
+        if (valor == null) {
+            return "";
+        }
+        String semAcentos = Normalizer.normalize(valor, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return semAcentos.toLowerCase(Locale.ROOT).trim();
+    }
+
+    private String normalizarCnpj(String cnpj) {
+        return cnpj == null || cnpj.isBlank() ? null : cnpj.trim();
+    }
+
+    // ------------------------------------------------------------------
+    // Mapeamentos documento ⇄ DTO
+    // ------------------------------------------------------------------
+
+    private HospitalResponse toResponse(HospitalDocument d) {
+        return new HospitalResponse(
+                d.getId(),
+                d.getNome(),
+                d.getCnpj(),
+                d.getTipo(),
+                d.getCategoria(),
+                d.getHorarioFuncionamento(),
+                d.getSalaVacina(),
+                d.getFarmacia(),
+                d.getColetaMaterial(),
+                d.getTipoUnidade(),
+                d.getEndereco() == null ? null : toEnderecoDto(d.getEndereco()),
+                d.getContato() == null ? null : toContatoDto(d.getContato()),
+                d.getGeofence() == null ? null : geofenceFactory.toDto(d.getGeofence()),
+                d.isAtivo(),
+                IndicadoresResponse.indisponivel(),
+                d.getCriadoEm(),
+                d.getAtualizadoEm()
+        );
+    }
+
+    private HospitalResumoResponse toResumo(HospitalDocument d) {
+        return new HospitalResumoResponse(
+                d.getId(),
+                d.getNome(),
+                d.getTipo(),
+                d.getCategoria(),
+                d.getTipoUnidade(),
+                d.getEndereco() == null ? null : toEnderecoDto(d.getEndereco()),
+                d.getGeofence() == null ? null : geofenceFactory.toDto(d.getGeofence()),
+                d.isAtivo(),
+                IndicadoresResponse.indisponivel()
+        );
+    }
+
+    private EnderecoDocument toEndereco(EnderecoDto dto) {
+        if (dto == null) {
+            return null;
+        }
+        return EnderecoDocument.builder()
+                .logradouro(dto.logradouro())
+                .numero(dto.numero())
+                .complemento(dto.complemento())
+                .bairro(dto.bairro())
+                .cidade(dto.cidade())
+                .uf(dto.uf())
+                .cep(dto.cep())
+                .build();
+    }
+
+    private ContatoDocument toContato(ContatoDto dto) {
+        if (dto == null) {
+            return null;
+        }
+        return ContatoDocument.builder()
+                .telefone(dto.telefone())
+                .email(dto.email())
+                .build();
+    }
+
+    private EnderecoDto toEnderecoDto(EnderecoDocument e) {
+        return new EnderecoDto(
+                e.getLogradouro(), e.getNumero(), e.getComplemento(),
+                e.getBairro(), e.getCidade(), e.getUf(), e.getCep());
+    }
+
+    private ContatoDto toContatoDto(ContatoDocument c) {
+        return new ContatoDto(c.getTelefone(), c.getEmail());
+    }
+
+    private SugestaoHospitalResponse toSugestaoResponse(SugestaoHospitalDocument s) {
+        return new SugestaoHospitalResponse(
+                s.getId(),
+                s.getNome(),
+                s.getEndereco() == null ? null : toEnderecoDto(s.getEndereco()),
+                s.getObservacao(),
+                s.getStatus(),
+                s.getCriadoEm()
+        );
+    }
+
+    /** Converte string vazia/espaços em {@code null}. */
+    private String blankToNull(String valor) {
+        return valor == null || valor.isBlank() ? null : valor.trim();
+    }
+}

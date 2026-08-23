@@ -26,11 +26,24 @@ repositories {
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	// JSON (ObjectMapper + JavaTimeModule p/ Instant): auto-config Jackson + serialização de respostas
+	implementation 'org.springframework.boot:spring-boot-starter-json'
+	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+	implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-csv'
+	// Leitura de arquivos .dbf (atributos do seed de estabelecimentos — Épico 01).
+	// Grupo com.github.albfernandez (fork mantido do JavaDBF original com.linuxense).
+	implementation 'com.github.albfernandez:javadbf:1.14.1'
+	// JWT (F0-01): access + refresh tokens assinados HS256
+	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 	compileOnly 'org.projectlombok:lombok'
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	annotationProcessor 'org.projectlombok:lombok'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

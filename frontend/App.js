@@ -8,6 +8,10 @@ import HomeScreen from "./src/screens/home/view/HomeScreen.js";
 import LoginScreen from "./src/screens/auth/view/LoginScreen.js";
 import UserScreen from "./src/screens/user/view/UserScreen.js";
 import GeoLocalizacaoScreen from "./src/screens/geolocalizacao/view/GeoLocalizacaoScreen.js";
+import HospitaisScreen from "./src/screens/hospitais/view/HospitaisScreen.js";
+import HospitalDetalheScreen from "./src/screens/hospitais/view/HospitalDetalheScreen.js";
+import HospitalFormScreen from "./src/screens/hospitais/view/HospitalFormScreen.js";
+import SugerirHospitalScreen from "./src/screens/hospitais/view/SugerirHospitalScreen.js";
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -25,12 +29,13 @@ const HeaderTitle = () => (
     </View>
 );
 
-// Stack principal (Home + Login)
+// Stack principal (Home) — apenas a tela inicial, com header e hambúrguer.
+// Login e Geolocalizacao ficam direto no Drawer (sem duplicação de rota).
 function MainStack({ navigation }) {
     return (
         <Stack.Navigator>
             <Stack.Screen
-                name="Home"
+                name="HomeScreen"
                 component={HomeScreen}
                 options={{
                     headerStyle: { backgroundColor: "#fff" },
@@ -50,24 +55,18 @@ function MainStack({ navigation }) {
                     ),
                 }}
             />
-            <Stack.Screen
-                name="Login"
-                component={LoginScreen}
-                options={{
-                    headerStyle: { backgroundColor: "#fff" },
-                    headerTitle: () => <HeaderTitle />,
-                    headerTintColor: "#333",
-                }}
-            />
-            <Stack.Screen
-                name="Geolocalizacao"
-                component={GeoLocalizacaoScreen}
-                options={{
-                    headerStyle: { backgroundColor: "#fff" },
-                    headerTitle: () => <HeaderTitle />,
-                    headerTintColor: "#333",
-                }}
-            />
+        </Stack.Navigator>
+    );
+}
+
+// Stack do Épico 01 — Cadastro de Hospitais e Geofences
+function HospitaisStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="HospitaisLista" component={HospitaisScreen} />
+            <Stack.Screen name="HospitalDetalhe" component={HospitalDetalheScreen} />
+            <Stack.Screen name="HospitalForm" component={HospitalFormScreen} />
+            <Stack.Screen name="SugerirHospital" component={SugerirHospitalScreen} />
         </Stack.Navigator>
     );
 }
@@ -83,6 +82,7 @@ export default function App() {
                     }}
                 >
                     <Drawer.Screen name="Home" component={MainStack} />
+                    <Drawer.Screen name="Hospitais" component={HospitaisStack} />
                     <Drawer.Screen name="Login" component={LoginScreen} />
                     <Drawer.Screen name="Cadastro" component={UserScreen} />
                     <Drawer.Screen

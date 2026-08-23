@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView, { Marker } from "react-native-maps";
+import { Camera, Map, Marker } from "@maplibre/maplibre-react-native";
 import {
   GeolocalizacaoProvider,
   useGeolocalizacao,
 } from "../service/GeoLocalizacaoService";
+import { getInitialViewState, OSM_RASTER_STYLE } from "../../../utils/mapStyle";
 
 const BRASIL_REGION = {
   latitude: -14.235,
@@ -15,7 +16,7 @@ const BRASIL_REGION = {
 };
 
 function GeolocalizacaoContent() {
-  const mapRef = useRef(null);
+  const cameraRef = useRef(null);
   const {
     coordenadas,
     carregando,
@@ -38,6 +39,15 @@ function GeolocalizacaoContent() {
     };
   }, [coordenadas]);
 
+  const centralizar = () => {
+    const alvo = getInitialViewState(regionAtual);
+    cameraRef.current?.easeTo({
+      center: alvo.center,
+      zoom: alvo.zoom,
+      duration: 500,
+    });
+  };
+
   useEffect(() => {
     iniciarMonitoramento();
     return () => {
@@ -47,7 +57,7 @@ function GeolocalizacaoContent() {
 
   useEffect(() => {
     if (coordenadas) {
-      mapRef.current?.animateToRegion(regionAtual, 500);
+      centralizar();
     }
   }, [coordenadas, regionAtual]);
 
@@ -57,29 +67,21 @@ function GeolocalizacaoContent() {
         <Text style={styles.screenHeaderTitle}>Mapa de Geolocalizacao</Text>
       </View>
 
-      <MapView ref={mapRef} style={styles.map} initialRegion={BRASIL_REGION}>
+      <Map style={styles.map} mapStyle={OSM_RASTER_STYLE}>
+        <Camera ref={cameraRef} initialViewState={getInitialViewState(BRASIL_REGION)} />
+
         {!coordenadas && (
-          <Marker
-            coordinate={{
-              latitude: BRASIL_REGION.latitude,
-              longitude: BRASIL_REGION.longitude,
-            }}
-            title="Brasil"
-            description="Aguardando sua localizacao atual"
-          />
+          <Marker lngLat={[BRASIL_REGION.longitude, BRASIL_REGION.latitude]}>
+            <View style={styles.markerDot} />
+          </Marker>
         )}
 
         {coordenadas && (
-          <Marker
-            coordinate={{
-              latitude: coordenadas.latitude,
-              longitude: coordenadas.longitude,
-            }}
-            title="Sua posicao"
-            description="Posicao atual em tempo real"
-          />
+          <Marker lngLat={[coordenadas.longitude, coordenadas.latitude]}>
+            <View style={styles.userDot} />
+          </Marker>
         )}
-      </MapView>
+      </Map>
 
       <View style={styles.infoBox}>
         {carregando && (
@@ -113,12 +115,7 @@ function GeolocalizacaoContent() {
         )}
 
         {!!coordenadas && (
-          <TouchableOpacity
-            style={styles.centerButton}
-            onPress={() => {
-              mapRef.current?.animateToRegion(regionAtual, 500);
-            }}
-          >
+          <TouchableOpacity style={styles.centerButton} onPress={centralizar}>
             <Text style={styles.centerText}>Centralizar no meu GPS</Text>
           </TouchableOpacity>
         )}
@@ -150,5 +147,20 @@ const styles = StyleSheet.create({
   retryText: { color: "#FFFFFF", fontWeight: "600" },
   centerButton: { marginTop: 10, alignSelf: "flex-start", backgroundColor: "#0C4A6E", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
   centerText: { color: "#FFFFFF", fontWeight: "600" },
+  markerDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#64748B",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  userDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#0C4A6E",
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+  },
 });
-

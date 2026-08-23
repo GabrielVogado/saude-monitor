@@ -48,7 +48,6 @@ frontend/*.tsbuildinfo
 /ios
 /android
 frontend/ios
-frontend/android
 
 # IDE/editor local config
 .idea/
@@ -67,3 +66,13 @@ frontend/android/**/build/
 *.keystore
 google-services.json
 GoogleService-Info.plist
+
+# Epico 01 - dados e scripts de ETL ja executados (nao versionar)
+etl/
+multiplas_camadas_saude_14/
+multiplas_camadas_saude_14_csv/
+__pycache__/
+*.pyc
+
+# Backup local (mongodump) - nao versionar
+backup-hospitais/

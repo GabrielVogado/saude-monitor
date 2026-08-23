@@ -55,6 +55,23 @@ npx expo run:android
 
 > Se nao tiver conta, crie em https://expo.dev/signup e depois rode `npx expo login`.
 
+### Fluxo diario recomendado (sem tela branca)
+
+O `npx expo run:android` so e necessario quando houver mudanca em **codigo nativo**
+(ex.: novos modulos ou alteracoes em `android/`). Para o dia a dia, use o script que
+garante a conexao correta do Metro e evita a **tela branca**:
+
+```powershell
+Set-Location "D:\saude-monitor\frontend"
+.\start-dev.ps1               # normal
+.\start-dev.ps1 -ClearCache   # limpa o cache do Metro (apos erro de bundle)
+```
+
+> O script configura `adb reverse tcp:8081 tcp:8081` e o app passa a usar
+> `localhost:8081` por padrao (fix nativo em `MainApplication.kt`), evitando a
+> corrupcao de resposta do NAT `10.0.2.2` do emulador (causa de
+> `Compiling JS failed` / tela branca).
+
 Se quiser apenas abrir o Metro/Expo sem build nativo:
 
 ```powershell
@@ -173,6 +190,12 @@ docker compose up -d --build backend
 ```
 
 - `Network request failed` no app: normalmente URL/porta incorreta para a plataforma (ex.: Android emulator deve usar `10.0.2.2`).
+
+- **Tela branca / `Compiling JS failed` / `ProtocolException: Expected leading [0-9a-fA-F] character but was 0xd`**:
+  e a corrupcao de resposta chunked/gzip do Metro pelo NAT `10.0.2.2` do emulador.
+  Correcao permanente ja aplicada: o app usa `localhost:8081` via `adb reverse`
+  (ver `frontend/android/.../MainApplication.kt`). Para resolver na hora, rode
+  `.\start-dev.ps1` na pasta `frontend` (ele reconfigura o `adb reverse` e abre o app).
 
 
 

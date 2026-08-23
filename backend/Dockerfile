@@ -14,6 +14,9 @@ WORKDIR /app
 
 COPY --from=builder /app/build/libs/*.jar app.jar
 
+# Dados do seed de estabelecimentos (DBF + SHP) lidos no startup (app.seed.path=data/).
+COPY data data
+
 EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

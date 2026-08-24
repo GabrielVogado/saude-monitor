@@ -36,10 +36,11 @@ docker compose logs -f backend
 Teste rapido da API:
 
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:8080/api/auth/login" `
+Invoke-RestMethod -Uri "http://localhost:8080/api/v1/auth/login" `
   -Method Post `
   -ContentType "application/json" `
   -Body '{"email":"usuario@teste.com","password":"senha123","rememberDevice":true}'
+# Obs: O retorno será um Erro 401 caso o usuário não tenha sido previamente cadastrado/semeado na base local.
 ```
 
 ## 2) Subir o frontend
@@ -196,9 +197,3 @@ docker compose up -d --build backend
   Correcao permanente ja aplicada: o app usa `localhost:8081` via `adb reverse`
   (ver `frontend/android/.../MainApplication.kt`). Para resolver na hora, rode
   `.\start-dev.ps1` na pasta `frontend` (ele reconfigura o `adb reverse` e abre o app).
-
-
-
-
-
-

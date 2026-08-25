@@ -14,6 +14,7 @@ import {
 } from "../../../components";
 import { colors, radii, spacing, typography } from "../../../theme/tokens";
 import HospitalService from "../service/HospitalService";
+import TokenStorage from "../../../services/TokenStorage";
 import {
   calcularCentroide,
   coordenadasParaGeoJson,
@@ -51,6 +52,7 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   const [hospital, setHospital] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const carregar = async () => {
     setCarregando(true);
@@ -142,12 +144,14 @@ export default function HospitalDetalheScreen({ navigation, route }) {
         title={hospital.nome}
         onBack={() => navigation.goBack()}
         rightAction={
-          <CSIconButton
-            icon={Pencil}
-            color={colors.primary}
-            accessibilityLabel="Editar hospital"
-            onPress={() => navigation.navigate("HospitalForm", { mode: "edit", hospital })}
-          />
+          isAdmin ? (
+            <CSIconButton
+              icon={Pencil}
+              color={colors.primary}
+              accessibilityLabel="Editar hospital"
+              onPress={() => navigation.navigate("HospitalForm", { mode: "edit", hospital })}
+            />
+          ) : null
         }
       />
 

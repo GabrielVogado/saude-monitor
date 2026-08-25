@@ -13,6 +13,7 @@ import {
 } from "../../../components";
 import { colors, spacing } from "../../../theme/tokens";
 import HospitalService from "../service/HospitalService";
+import TokenStorage from "../../../services/TokenStorage";
 import { normalizeText } from "../../../utils/normalize";
 
 const TIPO_FILTROS = [
@@ -32,6 +33,7 @@ export default function HospitaisScreen({ navigation }) {
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro, setErro] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const debounceRef = useRef(null);
 
@@ -66,6 +68,10 @@ export default function HospitaisScreen({ navigation }) {
     debounceRef.current = setTimeout(() => carregar(), 400);
     return () => clearTimeout(debounceRef.current);
   }, [carregar]);
+
+  useEffect(() => {
+    TokenStorage.isAdmin().then(setIsAdmin).catch(() => setIsAdmin(false));
+  }, []);
 
   const abrirDetalhe = (hospital) => {
     navigation.navigate("HospitalDetalhe", { id: hospital.id });
@@ -112,12 +118,14 @@ export default function HospitaisScreen({ navigation }) {
       <CSHeader
         title="Hospitais"
         rightAction={
-          <CSIconButton
-            icon={Plus}
-            color={colors.primary}
-            accessibilityLabel="Cadastrar hospital"
-            onPress={() => navigation.navigate("HospitalForm", { mode: "create" })}
-          />
+          isAdmin ? (
+            <CSIconButton
+              icon={Plus}
+              color={colors.primary}
+              accessibilityLabel="Cadastrar hospital"
+              onPress={() => navigation.navigate("HospitalForm", { mode: "create" })}
+            />
+          ) : null
         }
       />
 

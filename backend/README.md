@@ -63,7 +63,7 @@ docker compose logs -f backend
 ```powershell
 $headers = @{"Content-Type"="application/json"}
 $body    = '{"email":"usuario@teste.com","password":"senha123","rememberDevice":true}'
-Invoke-WebRequest -Uri "http://localhost:8080/api/auth/login" `
+Invoke-WebRequest -Uri "http://localhost:8080/api/v1/auth/login" `
   -Method POST -Headers $headers -Body $body -UseBasicParsing |
   Select-Object -ExpandProperty Content
 ```
@@ -87,7 +87,7 @@ Get-Content .env | ForEach-Object {
 
 ## Endpoints
 
-### POST `/api/auth/login`
+### POST `/api/v1/auth/login`
 
 Recebe o payload de login, valida os campos e persiste na colecao `auth_logins`.
 
@@ -100,7 +100,7 @@ Recebe o payload de login, valida os campos e persiste na colecao `auth_logins`.
 }
 ```
 
-**Resposta 200 OK:**
+**Resposta 200 OK (se o usuário estiver cadastrado na base):**
 ```json
 {
   "success": true,
@@ -126,9 +126,10 @@ Recebe o payload de login, valida os campos e persiste na colecao `auth_logins`.
 ```powershell
 $headers = @{"Content-Type"="application/json"}
 $body    = '{"email":"usuario@teste.com","password":"senha123","rememberDevice":true}'
-Invoke-WebRequest -Uri "http://localhost:8080/api/auth/login" `
+Invoke-WebRequest -Uri "http://localhost:8080/api/v1/auth/login" `
   -Method POST -Headers $headers -Body $body -UseBasicParsing |
   Select-Object -ExpandProperty Content
+# Obs: Espera-se um erro 401 caso esse usuário não tenha sido previamente adicionado no banco
 ```
 
 ---

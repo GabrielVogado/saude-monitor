@@ -54,6 +54,12 @@ class TokenStorage {
     }
   }
 
+  /** Retorna true se o usuário persistido tem papel ADMIN (gating de UI). */
+  static async isAdmin() {
+    const usuario = await this.getUsuario();
+    return usuario?.papel === "ADMIN";
+  }
+
   /** Remove os tokens e o usuário persistidos (logout). */
   static async limparTokens() {
     await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USUARIO_KEY]);

@@ -6,6 +6,8 @@ import HospitaisScreen from "../hospitais/view/HospitaisScreen.js";
 import HospitalDetalheScreen from "../hospitais/view/HospitalDetalheScreen.js";
 import HospitalFormScreen from "../hospitais/view/HospitalFormScreen.js";
 import SugerirHospitalScreen from "../hospitais/view/SugerirHospitalScreen.js";
+import SugestoesPendentesScreen from "../hospitais/view/SugestoesPendentesScreen.js";
+import RevisarSugestaoScreen from "../hospitais/view/RevisarSugestaoScreen.js";
 
 // Compatibility barrel for any legacy imports still pointing to src/screens/views.
 export {
@@ -17,4 +19,6 @@ export {
     HospitalDetalheScreen,
     HospitalFormScreen,
     SugerirHospitalScreen,
+    SugestoesPendentesScreen,
+    RevisarSugestaoScreen,
 };

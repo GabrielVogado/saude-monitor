@@ -151,6 +151,35 @@ class HospitalService {
   static sugerir(payload) {
     return request(`${BASE_PATH}/sugestoes`, { method: "POST", body: payload });
   }
+
+  /**
+   * Lista sugestões públicas de hospitais, filtráveis por status (E1-06).
+   * Requer papel ADMIN.
+   */
+  static listarSugestoes({ status, page = 0, size = 20 } = {}) {
+    return request(`${BASE_PATH}/sugestoes${buildQuery({ status, page, size })}`);
+  }
+
+  /** Busca sugestão pública por id (E1-06). Requer papel ADMIN. */
+  static buscarSugestaoPorId(id) {
+    return request(`${BASE_PATH}/sugestoes/${id}`);
+  }
+
+  /** Aprova uma sugestão pendente, vinculando-a a um hospital oficial (E1-06). Requer papel ADMIN. */
+  static aprovarSugestao(id, hospitalId) {
+    return request(`${BASE_PATH}/sugestoes/${id}/aprovar`, {
+      method: "POST",
+      body: { hospitalId },
+    });
+  }
+
+  /** Rejeita uma sugestão pendente, exigindo motivo (E1-06). Requer papel ADMIN. */
+  static rejeitarSugestao(id, motivo) {
+    return request(`${BASE_PATH}/sugestoes/${id}/rejeitar`, {
+      method: "POST",
+      body: { motivo },
+    });
+  }
 }
 
 export default HospitalService;

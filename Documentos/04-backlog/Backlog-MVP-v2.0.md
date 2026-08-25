@@ -51,7 +51,8 @@
 | E1-02 | P0 | Como administrador, devo **definir a área geográfica (geofence) de um hospital** como polígono GeoJSON sobre o mapa. | CA: polígono válido (fechado, ≥ 3 vértices, sem auto-interseção); renderizado no mapa; salvo como `geofence` no documento. | RF-08, RN-01 |
 | E1-03 | P0 | Como administrador, devo **listar hospitais ativos** para o app público (id, nome, tipo, geofence, indicadores). | CA: endpoint público retorna apenas hospitais ativos; geofence incluído para renderização; resposta < 300ms p95. | RF-05, RNF-02 |
 | E1-04 | P1 | Como administrador, devo **editar/desativar** um hospital e seu geofence. | CA: edição valida polígono novamente; desativar remove do app público imediatamente. | RF-08 |
-| E1-05 | P2 | Como usuário, devo **sugerir a inclusão de um hospital** não cadastrado (endpoint público de sugestão). | CA: sugestão cria registro pendente de aprovação; sem custo para o usuário anônimo. | RF-05 |
+| E1-05 | P1 | Como usuário, devo **sugerir a inclusão de um hospital** não cadastrado (endpoint público de sugestão). | CA: sugestão cria registro pendente de aprovação; sem custo para o usuário anônimo. | RF-05 |
+| **E1-06** | P1 | Como administrador, devo **revisar, aprovar e rejeitar sugestões públicas** de hospitais para manter a qualidade e confiabilidade do cadastro oficial. | CA: listagem paginada filtrável por status (`PENDENTE`, `APROVADA`, `RECUSADA`); detalhe da sugestão; aprovação vincula a um hospital criado; rejeição exige motivo; transições apenas `PENDENTE → APROVADA` e `PENDENTE → RECUSADA`; endpoints protegidos para `ADMIN`; tela de fila de moderação no app; audit trail de quem decidiu e quando. | E1-05 |
 
 ---
 
@@ -129,7 +130,7 @@
 | Sprint | Foco | Estórias |
 |---|---|---|
 | **S0 (pré)** | Segurança e fundações | F0-01, F0-02, F0-03, F0-05 |
-| **S1** | Hospitais + geofence admin | E1-01, E1-02, E1-03, E1-04 |
+| **S1** | Hospitais + geofence admin + moderação de sugestões | E1-01, E1-02, E1-03, E1-04, E1-05, E1-06 |
 | **S2** | Detecção de visitas (mobile + backend) | E2-01, E2-02, E2-06, E2-07, E2-09 |
 | **S3** | Robustez de visitas + feedback backend | E2-03, E2-04, E2-05, E2-10, E3-04, E3-05 |
 | **S4** | Feedback mobile + notificações | E3-01, E3-02, E3-03, E3-06 |

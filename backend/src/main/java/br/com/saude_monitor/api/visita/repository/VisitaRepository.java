@@ -26,4 +26,6 @@ public interface VisitaRepository extends MongoRepository<VisitaDocument, String
     List<VisitaDocument> findByStatusAndUltimoHeartbeatBefore(StatusVisita status, Instant limite);
 
     List<VisitaDocument> findByStatusInAndUltimoHeartbeatBefore(List<StatusVisita> status, Instant limite);
+
+    List<VisitaDocument> findByStatusInAndUltimaPosicaoEmBefore(List<StatusVisita> status, Instant limite);
 }

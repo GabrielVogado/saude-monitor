@@ -7,7 +7,9 @@ import br.com.saude_monitor.api.visita.dto.CheckinRequest;
 import br.com.saude_monitor.api.visita.dto.CheckinResponse;
 import br.com.saude_monitor.api.visita.dto.CheckoutRequest;
 import br.com.saude_monitor.api.visita.dto.CheckoutResponse;
+import br.com.saude_monitor.api.visita.dto.HeartbeatRequest;
 import br.com.saude_monitor.api.visita.dto.HeartbeatResponse;
+import br.com.saude_monitor.api.visita.dto.PosicaoDto;
 import br.com.saude_monitor.api.visita.dto.TipoPermanenciaRequest;
 import br.com.saude_monitor.api.visita.dto.TipoPermanenciaResponse;
 import br.com.saude_monitor.api.visita.dto.VisitaAtivaResponse;
@@ -46,7 +48,10 @@ public class VisitaController {
     @PostMapping("/api/v1/visitas/checkin")
     public ResponseEntity<CheckinResponse> checkin(@Valid @RequestBody CheckinRequest request) {
         String usuarioId = autenticacaoHelper.usuarioIdAtual().orElse(null);
-        return ResponseEntity.status(HttpStatus.CREATED).body(visitaService.checkin(request, usuarioId));
+        CheckinResponse resposta = visitaService.checkin(request, usuarioId);
+        // 201 para visita nova; 200 para retorno idempotente de visita ativa já existente (RN-03/§3.3).
+        HttpStatus status = resposta.criado() ? HttpStatus.CREATED : HttpStatus.OK;
+        return ResponseEntity.status(status).body(resposta);
     }
 
     /** 🔓/🔒 Registra saída (E2-02/E2-05). */
@@ -57,11 +62,13 @@ public class VisitaController {
         return ResponseEntity.ok(visitaService.checkout(id, request, usuarioId));
     }
 
-    /** 🔓/🔒 Sinal de vida da visita ativa (E2-09). */
+    /** 🔓/🔒 Sinal de vida da visita ativa (E2-09); posição opcional também renova o sinal de GPS (E2-05). */
     @PostMapping("/api/v1/visitas/{id}/heartbeat")
-    public ResponseEntity<HeartbeatResponse> heartbeat(@PathVariable String id) {
+    public ResponseEntity<HeartbeatResponse> heartbeat(@PathVariable String id,
+                                                       @Valid @RequestBody(required = false) HeartbeatRequest request) {
         String usuarioId = autenticacaoHelper.usuarioIdAtual().orElse(null);
-        return ResponseEntity.ok(visitaService.heartbeat(id, usuarioId));
+        PosicaoDto posicao = request == null ? null : request.posicao();
+        return ResponseEntity.ok(visitaService.heartbeat(id, usuarioId, posicao));
     }
 
     /** 🔒 Sinaliza observação/internação após 12h de visita ativa (E2-10). */

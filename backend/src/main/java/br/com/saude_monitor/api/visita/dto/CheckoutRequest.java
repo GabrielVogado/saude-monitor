@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
  */
 public record CheckoutRequest(
         @Valid PosicaoDto posicao,
-        Boolean gpsIndisponivel
+        Boolean gpsIndisponivel,
+        Boolean encerramentoManual
 ) {
 }

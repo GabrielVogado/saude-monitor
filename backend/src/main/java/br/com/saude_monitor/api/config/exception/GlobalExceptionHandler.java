@@ -1,5 +1,7 @@
 package br.com.saude_monitor.api.config.exception;
 
+import br.com.saude_monitor.api.visita.dto.ConflitoGeofenceResponse;
+import br.com.saude_monitor.api.visita.service.ConflitoGeofenceException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +35,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> handleApiException(ApiException ex) {
         return build(ex.getStatus(), ex.getCode(), ex.getMessage(), ex.getDetails());
+    }
+
+    /** Empate de geofences sobrepostos no check-in (E2-04/RN-05) — 409 com candidatos para o app perguntar. */
+    @ExceptionHandler(ConflitoGeofenceException.class)
+    public ResponseEntity<ConflitoGeofenceResponse> handleConflitoGeofence(ConflitoGeofenceException ex) {
+        ConflitoGeofenceResponse body = new ConflitoGeofenceResponse(
+                Instant.now(),
+                HttpStatus.CONFLICT.value(),
+                "CONFLITO_GEOFENCE",
+                ex.getMessage(),
+                ex.getCandidatos(),
+                UUID.randomUUID().toString().replace("-", "")
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 
     /** Falha de validação de corpo (@Valid) — detalha cada campo inválido. */

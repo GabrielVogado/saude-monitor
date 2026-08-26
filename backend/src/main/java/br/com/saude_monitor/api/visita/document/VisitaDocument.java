@@ -64,6 +64,13 @@ public class VisitaDocument {
     @Indexed
     private Instant ultimoHeartbeat;
 
+    /** Último evento de posição recebido (checkin/checkout/heartbeat com posição) — usado pelo job de GPS interrompido (E2-05/RN-06). */
+    @Indexed
+    private Instant ultimaPosicaoEm;
+
+    /** {@code true} quando a visita foi encerrada manualmente pelo usuário (botão "Não estou aqui", E2-07/F-04 CA#3). */
+    private Boolean encerramentoManual;
+
     private OrigemVisita origem;
 
     @Builder.Default

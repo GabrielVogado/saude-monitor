@@ -6,7 +6,11 @@ import br.com.saude_monitor.api.visita.document.TipoPermanencia;
 
 import java.time.Instant;
 
-/** Representação completa de uma visita, usada no card de visita ativa e no histórico (§3.3). */
+/**
+ * Representação completa de uma visita, usada no card de visita ativa e no histórico (§3.3).
+ * {@code curta} indica visita com {@code duracaoMinutos < 2} (RN-07/E2-08): permanece no
+ * histórico do usuário, mas é excluída das estatísticas públicas (agregação, Épico 04).
+ */
 public record VisitaResponse(
         String id,
         String usuarioId,
@@ -18,6 +22,8 @@ public record VisitaResponse(
         TipoPermanencia tipoPermanencia,
         Instant ultimoHeartbeat,
         OrigemVisita origem,
-        Instant criadoEm
+        Instant criadoEm,
+        boolean curta
 ) {
 }
+

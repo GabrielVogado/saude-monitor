@@ -12,6 +12,7 @@ import br.com.saude_monitor.api.visita.document.PontoAmostralDocument;
 import br.com.saude_monitor.api.visita.document.StatusVisita;
 import br.com.saude_monitor.api.visita.document.TipoPermanencia;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
+import br.com.saude_monitor.api.visita.dto.CandidatoGeofence;
 import br.com.saude_monitor.api.visita.dto.CheckinRequest;
 import br.com.saude_monitor.api.visita.dto.CheckinResponse;
 import br.com.saude_monitor.api.visita.dto.CheckoutRequest;
@@ -23,6 +24,7 @@ import br.com.saude_monitor.api.visita.dto.TipoPermanenciaResponse;
 import br.com.saude_monitor.api.visita.dto.VisitaAtivaResponse;
 import br.com.saude_monitor.api.visita.dto.VisitaResponse;
 import br.com.saude_monitor.api.visita.repository.VisitaRepository;
+import br.com.saude_monitor.api.visita.service.ConflitoGeofenceException;
 import br.com.saude_monitor.api.visita.service.VisitaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -35,6 +37,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -54,6 +57,10 @@ public class VisitaServiceImpl implements VisitaService {
     private static final Duration LIMITE_EXPIRACAO = Duration.ofHours(24);
     /** Duração mínima de visita ativa para habilitar a sinalização de tipo de permanência (RN-24). */
     private static final Duration LIMITE_TIPO_PERMANENCIA = Duration.ofHours(12);
+    /** Diferença de distância (m) abaixo da qual dois geofences sobrepostos são considerados empate (E2-04/RN-05). */
+    private static final double LIMITE_EMPATE_METROS = 10.0;
+    /** Janela sem sinal de posição a partir da qual a visita é encerrada como GPS_INTERROMPIDO (RN-06/E2-05). */
+    private static final Duration LIMITE_GPS_INTERROMPIDO = Duration.ofMinutes(10);
 
     private static final List<StatusVisita> STATUS_ATIVOS = List.of(StatusVisita.EM_ATENDIMENTO, StatusVisita.SUSPEITA);
 
@@ -79,10 +86,10 @@ public class VisitaServiceImpl implements VisitaService {
                 : visitaRepository.findFirstByDispositivoIdAndHospitalIdAndStatusInOrderByEntradaDesc(
                         request.dispositivoId(), hospitalId, STATUS_ATIVOS).orElse(null);
 
-        // Idempotência (RN-03/§3.3): já existe visita ativa no mesmo hospital, retorna a existente.
+        // Idempotência (RN-03/§3.3): já existe visita ativa no mesmo hospital, retorna a existente (HTTP 200).
         if (existente != null) {
             return new CheckinResponse(existente.getId(), existente.getHospitalId(),
-                    existente.getEntrada(), existente.getStatus());
+                    existente.getEntrada(), existente.getStatus(), false);
         }
 
         Instant agora = Instant.now();
@@ -99,10 +106,11 @@ public class VisitaServiceImpl implements VisitaService {
 
         if (request.posicao() != null) {
             builder.pontosAmostrais(List.of(toPontoAmostral(request.posicao(), agora)));
+            builder.ultimaPosicaoEm(agora);
         }
 
         VisitaDocument salva = visitaRepository.save(builder.build());
-        return new CheckinResponse(salva.getId(), salva.getHospitalId(), salva.getEntrada(), salva.getStatus());
+        return new CheckinResponse(salva.getId(), salva.getHospitalId(), salva.getEntrada(), salva.getStatus(), true);
     }
 
     @Override
@@ -115,8 +123,12 @@ public class VisitaServiceImpl implements VisitaService {
         visita.setSaida(agora);
         visita.setDuracaoMinutos((int) Duration.between(visita.getEntrada(), agora).toMinutes());
         visita.setStatus(gpsIndisponivel ? StatusVisita.GPS_INTERROMPIDO : StatusVisita.FINALIZADA);
+        if (Boolean.TRUE.equals(request.encerramentoManual())) {
+            visita.setEncerramentoManual(true);
+        }
         if (request.posicao() != null) {
             visita.getPontosAmostrais().add(toPontoAmostral(request.posicao(), agora));
+            visita.setUltimaPosicaoEm(agora);
         }
 
         VisitaDocument salva = visitaRepository.save(visita);
@@ -124,11 +136,15 @@ public class VisitaServiceImpl implements VisitaService {
     }
 
     @Override
-    public HeartbeatResponse heartbeat(String id, String usuarioId) {
+    public HeartbeatResponse heartbeat(String id, String usuarioId, PosicaoDto posicao) {
         VisitaDocument visita = obterAtivaOu409(id, usuarioId);
 
         Instant agora = Instant.now();
         visita.setUltimoHeartbeat(agora);
+        if (posicao != null) {
+            visita.getPontosAmostrais().add(toPontoAmostral(posicao, agora));
+            visita.setUltimaPosicaoEm(agora);
+        }
         if (visita.getStatus() == StatusVisita.SUSPEITA) {
             visita.setStatus(StatusVisita.EM_ATENDIMENTO);
         }
@@ -190,6 +206,19 @@ public class VisitaServiceImpl implements VisitaService {
         visitaRepository.saveAll(expiradas);
     }
 
+    @Override
+    public void processarGpsInterrompido() {
+        Instant agora = Instant.now();
+        List<VisitaDocument> semSinal = visitaRepository.findByStatusInAndUltimaPosicaoEmBefore(
+                STATUS_ATIVOS, agora.minus(LIMITE_GPS_INTERROMPIDO));
+        semSinal.forEach(v -> {
+            v.setStatus(StatusVisita.GPS_INTERROMPIDO);
+            v.setSaida(agora);
+            v.setDuracaoMinutos((int) Duration.between(v.getEntrada(), agora).toMinutes());
+        });
+        visitaRepository.saveAll(semSinal);
+    }
+
     // ------------------------------------------------------------------
     // Resolução de geofence / conflito (E2-01, E2-04)
     // ------------------------------------------------------------------
@@ -215,13 +244,28 @@ public class VisitaServiceImpl implements VisitaService {
             return candidatos.get(0).getId();
         }
 
-        // Sobreposição de geofences: escolhe o hospital de centroide mais próximo do ponto.
-        return candidatos.stream()
-                .min((a, b) -> Double.compare(
-                        distanciaMetros(ponto, a.getLocalizacao()),
-                        distanciaMetros(ponto, b.getLocalizacao())))
-                .map(HospitalDocument::getId)
-                .orElse(hospitalIdSugerido);
+        // Sobreposição de geofences (E2-04/RN-05): ordena por distância ao centroide.
+        List<HospitalDocument> ordenados = candidatos.stream()
+                .sorted(Comparator.comparingDouble(h -> distanciaMetros(ponto, h.getLocalizacao())))
+                .toList();
+
+        HospitalDocument maisProximo = ordenados.get(0);
+        HospitalDocument segundo = ordenados.get(1);
+        double d1 = distanciaMetros(ponto, maisProximo.getLocalizacao());
+        double d2 = distanciaMetros(ponto, segundo.getLocalizacao());
+
+        // Empate (diferença ≤ 10m): não cria a visita; devolve candidatos para o app perguntar em 1 toque.
+        if (Math.abs(d1 - d2) <= LIMITE_EMPATE_METROS) {
+            List<CandidatoGeofence> candidatosResposta = ordenados.stream()
+                    .map(h -> new CandidatoGeofence(h.getId(), h.getNome(),
+                            distanciaMetros(ponto, h.getLocalizacao())))
+                    .toList();
+            throw new ConflitoGeofenceException(
+                    "A posição está dentro de mais de um geofence com distâncias equivalentes. Escolha o hospital.",
+                    candidatosResposta);
+        }
+
+        return maisProximo.getId();
     }
 
     private String exigirHospitalAtivo(String hospitalId) {
@@ -279,9 +323,10 @@ public class VisitaServiceImpl implements VisitaService {
     }
 
     private VisitaResponse toResponse(VisitaDocument v) {
+        boolean curta = v.getDuracaoMinutos() != null && v.getDuracaoMinutos() < 2;
         return new VisitaResponse(
                 v.getId(), v.getUsuarioId(), v.getHospitalId(), v.getEntrada(), v.getSaida(),
                 v.getDuracaoMinutos(), v.getStatus(), v.getTipoPermanencia(), v.getUltimoHeartbeat(),
-                v.getOrigem(), v.getCriadoEm());
+                v.getOrigem(), v.getCriadoEm(), curta);
     }
 }

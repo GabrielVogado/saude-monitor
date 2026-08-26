@@ -2,18 +2,43 @@ name: CD - Backend (Render)
 
 on:
   push:
-    branches: [main]
+    branches: [develop, main]
     paths:
       - 'backend/**'
       - '.github/workflows/cd-backend.yml'
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}-backend
 
 jobs:
+  # Mapeia a branch/tag para o ambiente de destino.
+  #   develop -> dev (desenvolvimento)
+  #   main    -> hom (homologação)
+  #   tag v*  -> prod (produção)
+  resolve-env:
+    runs-on: ubuntu-latest
+    outputs:
+      env: ${{ steps.resolve.outputs.env }}
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - id: resolve
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "env=prod" >> "$GITHUB_OUTPUT"
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "env=hom" >> "$GITHUB_OUTPUT"
+            echo "tag=hom" >> "$GITHUB_OUTPUT"
+          else
+            echo "env=dev" >> "$GITHUB_OUTPUT"
+            echo "tag=dev" >> "$GITHUB_OUTPUT"
+          fi
+
   build-and-deploy:
-    name: Build imagem e deploy no Render
+    name: Build e deploy (${{ needs.resolve-env.outputs.env }})
+    needs: resolve-env
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -35,14 +60,14 @@ jobs:
           context: ./backend
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.resolve-env.outputs.tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
-      - name: Disparar deploy no Render
+      - name: Disparar deploy no Render (${{ needs.resolve-env.outputs.env }})
         run: |
           curl -fsS -X POST \
-            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets[format('RENDER_API_KEY_{0}', needs.resolve-env.outputs.env)] }}" \
             -H "Accept: application/json" \
             -H "Content-Type: application/json" \
             --data '{"clearCache":false}' \
-            "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys"
+            "https://api.render.com/v1/services/${{ secrets[format('RENDER_SERVICE_ID_{0}', needs.resolve-env.outputs.env)] }}/deploys"

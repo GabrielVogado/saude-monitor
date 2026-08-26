@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MapPinOff, Plus, Search } from "lucide-react-native";
+import { Gavel, MapPinOff, Plus, Search } from "lucide-react-native";
 import {
   CSHeader,
   CSHospitalCard,
@@ -119,12 +119,20 @@ export default function HospitaisScreen({ navigation }) {
         title="Hospitais"
         rightAction={
           isAdmin ? (
-            <CSIconButton
-              icon={Plus}
-              color={colors.primary}
-              accessibilityLabel="Cadastrar hospital"
-              onPress={() => navigation.navigate("HospitalForm", { mode: "create" })}
-            />
+            <View style={styles.headerActions}>
+              <CSIconButton
+                icon={Gavel}
+                color={colors.primary}
+                accessibilityLabel="Moderação de sugestões"
+                onPress={() => navigation.navigate("SugestoesPendentes")}
+              />
+              <CSIconButton
+                icon={Plus}
+                color={colors.primary}
+                accessibilityLabel="Cadastrar hospital"
+                onPress={() => navigation.navigate("HospitalForm", { mode: "create" })}
+              />
+            </View>
           ) : null
         }
       />
@@ -175,6 +183,11 @@ export default function HospitaisScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.surface },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.s1,
+  },
   searchArea: {
     padding: spacing.s4,
     gap: spacing.s3,

@@ -9,6 +9,10 @@ import br.com.saude_monitor.api.hospital.dto.HospitalResumoResponse;
 import br.com.saude_monitor.api.hospital.dto.HospitalResponse;
 import br.com.saude_monitor.api.hospital.dto.IndicadoresResponse;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
+import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
+import br.com.saude_monitor.api.hospital.dto.AprovarSugestaoRequest;
+import br.com.saude_monitor.api.hospital.dto.RejeitarSugestaoRequest;
+import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalDetalheResponse;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalResponse;
 import br.com.saude_monitor.api.hospital.service.HospitalService;
@@ -40,11 +44,17 @@ class HospitalControllerTest {
     @BeforeEach
     void setup() {
         HospitalService service = new StubService();
+        AutenticacaoHelper authHelper = new AutenticacaoHelper(null) {
+            @Override
+            public java.util.Optional<String> usuarioIdAtual() {
+                return java.util.Optional.of("admin-123");
+            }
+        };
 
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 
-        mockMvc = MockMvcBuilders.standaloneSetup(new HospitalController(service))
+        mockMvc = MockMvcBuilders.standaloneSetup(new HospitalController(service, authHelper))
                 .setValidator(validator)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -99,6 +109,44 @@ class HospitalControllerTest {
                 .andExpect(jsonPath("$.traceId").exists());
     }
 
+    @Test
+    void deveListarSugestoesAdmin() throws Exception {
+        mockMvc.perform(get("/api/v1/hospitais/sugestoes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void deveRejeitarSugestaoComMotivoCurtoRetornar400() throws Exception {
+        String body = """
+                {
+                  "motivo": "ok"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/hospitais/sugestoes/1/rejeitar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value("CAMPOS_INVALIDOS"));
+    }
+
+    @Test
+    void deveAprovarSugestaoComHospitalId() throws Exception {
+        String body = """
+                {
+                  "hospitalId": "hosp-123"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/hospitais/sugestoes/1/aprovar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+    }
+
     /** Stub manual do serviço, evita dependência de Mockito/MongoDB. */
     private static class StubService implements HospitalService {
 
@@ -141,6 +189,26 @@ class HospitalControllerTest {
             return new SugestaoHospitalResponse(
                     "1", request.nome(), request.endereco(), request.observacao(),
                     StatusSugestao.PENDENTE, Instant.now());
+        }
+
+        @Override
+        public PageResponse<SugestaoHospitalDetalheResponse> listarSugestoes(StatusSugestao status, int page, int size) {
+            return PageResponse.of(List.of(), page, size, 0);
+        }
+
+        @Override
+        public SugestaoHospitalDetalheResponse buscarSugestaoPorId(String id) {
+            return null;
+        }
+
+        @Override
+        public SugestaoHospitalDetalheResponse aprovarSugestao(String id, AprovarSugestaoRequest request, String adminId) {
+            return null;
+        }
+
+        @Override
+        public SugestaoHospitalDetalheResponse rejeitarSugestao(String id, RejeitarSugestaoRequest request, String adminId) {
+            return null;
         }
     }
 }

@@ -36,13 +36,19 @@ const TIPO_OPTIONS = [
 export default function HospitalFormScreen({ navigation, route }) {
   const isEdit = route?.params?.mode === "edit";
   const initial = route?.params?.hospital || null;
+  const sugestao = route?.params?.sugestao || null;
+  const isFromSuggestion = Boolean(sugestao);
 
-  const [nome, setNome] = useState(initial?.nome || "");
+  const [nome, setNome] = useState(initial?.nome || sugestao?.nome || "");
   const [cnpj, setCnpj] = useState(initial?.cnpj || "");
   const [tipo, setTipo] = useState(initial?.tipo || "");
-  const [logradouro, setLogradouro] = useState(initial?.endereco?.logradouro || "");
-  const [cidade, setCidade] = useState(initial?.endereco?.cidade || "");
-  const [uf, setUf] = useState(initial?.endereco?.uf || "");
+  const [logradouro, setLogradouro] = useState(
+    initial?.endereco?.logradouro || sugestao?.endereco?.logradouro || ""
+  );
+  const [cidade, setCidade] = useState(
+    initial?.endereco?.cidade || sugestao?.endereco?.cidade || ""
+  );
+  const [uf, setUf] = useState(initial?.endereco?.uf || sugestao?.endereco?.uf || "");
   const [cep, setCep] = useState(initial?.endereco?.cep || "");
   const [telefone, setTelefone] = useState(initial?.contato?.telefone || "");
   const [email, setEmail] = useState(initial?.contato?.email || "");
@@ -99,8 +105,14 @@ export default function HospitalFormScreen({ navigation, route }) {
         await HospitalService.atualizar(initial.id, montarPayload());
         Alert.alert("Sucesso", "Hospital atualizado com sucesso.");
       } else {
-        await HospitalService.cadastrar(montarPayload());
-        Alert.alert("Sucesso", "Hospital cadastrado com sucesso.");
+        const hospitalCriado = await HospitalService.cadastrar(montarPayload());
+
+        if (isFromSuggestion && sugestao?.id && hospitalCriado?.id) {
+          await HospitalService.aprovarSugestao(sugestao.id, hospitalCriado.id);
+          Alert.alert("Sucesso", "Hospital cadastrado e sugestão aprovada com sucesso.");
+        } else {
+          Alert.alert("Sucesso", "Hospital cadastrado com sucesso.");
+        }
       }
       navigation.goBack();
     } catch (error) {
@@ -127,7 +139,9 @@ export default function HospitalFormScreen({ navigation, route }) {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <CSHeader
-        title={isEdit ? "Editar hospital" : "Cadastrar hospital"}
+        title={
+          isEdit ? "Editar hospital" : isFromSuggestion ? "Aprovar sugestão" : "Cadastrar hospital"
+        }
         onBack={() => navigation.goBack()}
         rightAction={
           isEdit ? (

@@ -12,6 +12,8 @@ import HospitaisScreen from "./src/screens/hospitais/view/HospitaisScreen.js";
 import HospitalDetalheScreen from "./src/screens/hospitais/view/HospitalDetalheScreen.js";
 import HospitalFormScreen from "./src/screens/hospitais/view/HospitalFormScreen.js";
 import SugerirHospitalScreen from "./src/screens/hospitais/view/SugerirHospitalScreen.js";
+import SugestoesPendentesScreen from "./src/screens/hospitais/view/SugestoesPendentesScreen.js";
+import RevisarSugestaoScreen from "./src/screens/hospitais/view/RevisarSugestaoScreen.js";
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -67,6 +69,8 @@ function HospitaisStack() {
             <Stack.Screen name="HospitalDetalhe" component={HospitalDetalheScreen} />
             <Stack.Screen name="HospitalForm" component={HospitalFormScreen} />
             <Stack.Screen name="SugerirHospital" component={SugerirHospitalScreen} />
+            <Stack.Screen name="SugestoesPendentes" component={SugestoesPendentesScreen} />
+            <Stack.Screen name="RevisarSugestao" component={RevisarSugestaoScreen} />
         </Stack.Navigator>
     );
 }

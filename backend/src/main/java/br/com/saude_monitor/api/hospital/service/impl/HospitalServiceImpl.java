@@ -2,6 +2,7 @@ package br.com.saude_monitor.api.hospital.service.impl;
 
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
+import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
 import br.com.saude_monitor.api.hospital.document.ContatoDocument;
 import br.com.saude_monitor.api.hospital.document.EnderecoDocument;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
@@ -10,12 +11,15 @@ import br.com.saude_monitor.api.hospital.document.SugestaoHospitalDocument;
 import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
 import br.com.saude_monitor.api.hospital.dto.ContatoDto;
 import br.com.saude_monitor.api.hospital.dto.EnderecoDto;
+import br.com.saude_monitor.api.hospital.dto.AprovarSugestaoRequest;
 import br.com.saude_monitor.api.hospital.dto.GeoJsonPolygonDto;
 import br.com.saude_monitor.api.hospital.dto.HospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.HospitalResumoResponse;
 import br.com.saude_monitor.api.hospital.dto.HospitalResponse;
 import br.com.saude_monitor.api.hospital.dto.IndicadoresResponse;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
+import br.com.saude_monitor.api.hospital.dto.RejeitarSugestaoRequest;
+import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalDetalheResponse;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalResponse;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
@@ -26,6 +30,7 @@ import br.com.saude_monitor.api.hospital.service.HospitalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.Metrics;
@@ -62,6 +67,7 @@ public class HospitalServiceImpl implements HospitalService {
     private final MongoTemplate mongoTemplate;
     private final GeofenceValidator geofenceValidator;
     private final GeofenceFactory geofenceFactory;
+    private final AutenticacaoHelper autenticacaoHelper;
 
     @Override
     public HospitalResponse criar(HospitalRequest request) {
@@ -165,6 +171,64 @@ public class HospitalServiceImpl implements HospitalService {
                 .build();
 
         return toSugestaoResponse(sugestaoHospitalRepository.save(sugestao));
+    }
+
+    @Override
+    public PageResponse<SugestaoHospitalDetalheResponse> listarSugestoes(StatusSugestao status, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<SugestaoHospitalDocument> resultado = status == null
+                ? sugestaoHospitalRepository.findAll(pageable)
+                : sugestaoHospitalRepository.findByStatusOrderByCriadoEmDesc(status, pageable);
+        List<SugestaoHospitalDetalheResponse> content = resultado.getContent().stream()
+                .map(this::toSugestaoDetalheResponse)
+                .toList();
+        return PageResponse.of(content, page, size, resultado.getTotalElements());
+    }
+
+    @Override
+    public SugestaoHospitalDetalheResponse buscarSugestaoPorId(String id) {
+        SugestaoHospitalDocument sugestao = sugestaoHospitalRepository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException(
+                        "Sugestão de hospital não encontrada para o id informado."));
+        return toSugestaoDetalheResponse(sugestao);
+    }
+
+    @Override
+    public SugestaoHospitalDetalheResponse aprovarSugestao(String id, AprovarSugestaoRequest request, String adminId) {
+        SugestaoHospitalDocument sugestao = obterSugestaoPendente(id);
+        HospitalDocument hospital = hospitalRepository.findById(request.hospitalId())
+                .orElseThrow(() -> new RecursoNaoEncontradoException(
+                        "Hospital não encontrado para o id informado."));
+
+        Instant agora = Instant.now();
+        sugestao.setStatus(StatusSugestao.APROVADA);
+        sugestao.setHospitalId(hospital.getId());
+        sugestao.setRevisadoPor(adminId);
+        sugestao.setRevisadoEm(agora);
+        sugestao.setAtualizadoEm(agora);
+
+        return toSugestaoDetalheResponse(sugestaoHospitalRepository.save(sugestao));
+    }
+
+    @Override
+    public SugestaoHospitalDetalheResponse rejeitarSugestao(String id, RejeitarSugestaoRequest request, String adminId) {
+        SugestaoHospitalDocument sugestao = obterSugestaoPendente(id);
+
+        Instant agora = Instant.now();
+        sugestao.setStatus(StatusSugestao.RECUSADA);
+        sugestao.setMotivoRecusa(request.motivo().trim());
+        sugestao.setRevisadoPor(adminId);
+        sugestao.setRevisadoEm(agora);
+        sugestao.setAtualizadoEm(agora);
+
+        return toSugestaoDetalheResponse(sugestaoHospitalRepository.save(sugestao));
+    }
+
+    private SugestaoHospitalDocument obterSugestaoPendente(String id) {
+        return sugestaoHospitalRepository.findById(id)
+                .filter(s -> s.getStatus() == StatusSugestao.PENDENTE)
+                .orElseThrow(() -> new ConflitoException(
+                        "Sugestão não está pendente de aprovação."));
     }
 
     // ------------------------------------------------------------------
@@ -362,6 +426,22 @@ public class HospitalServiceImpl implements HospitalService {
                 s.getObservacao(),
                 s.getStatus(),
                 s.getCriadoEm()
+        );
+    }
+
+    private SugestaoHospitalDetalheResponse toSugestaoDetalheResponse(SugestaoHospitalDocument s) {
+        return new SugestaoHospitalDetalheResponse(
+                s.getId(),
+                s.getNome(),
+                s.getEndereco() == null ? null : toEnderecoDto(s.getEndereco()),
+                s.getObservacao(),
+                s.getStatus(),
+                s.getHospitalId(),
+                s.getRevisadoPor(),
+                s.getRevisadoEm(),
+                s.getMotivoRecusa(),
+                s.getCriadoEm(),
+                s.getAtualizadoEm()
         );
     }
 

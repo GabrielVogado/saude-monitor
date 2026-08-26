@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -43,7 +44,20 @@ public class SugestaoHospitalDocument {
 
     /** Ciclo de vida da sugestão. Default: PENDENTE. */
     @Builder.Default
+    @Indexed
     private StatusSugestao status = StatusSugestao.PENDENTE;
+
+    /** Id do hospital oficial criado a partir da sugestão (quando aprovada). */
+    private String hospitalId;
+
+    /** Identificador do administrador que aprovou/rejeitou a sugestão. */
+    private String revisadoPor;
+
+    /** Timestamp da decisão administrativa. */
+    private Instant revisadoEm;
+
+    /** Motivo da rejeição (obrigatório quando status = RECUSADA). */
+    private String motivoRecusa;
 
     private Instant criadoEm;
 

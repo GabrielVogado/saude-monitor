@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Gavel, MapPinOff, Plus, Search } from "lucide-react-native";
+import { MapPinOff, Search } from "lucide-react-native";
 import {
   CSHeader,
   CSHospitalCard,
@@ -9,11 +9,9 @@ import {
   CSLoadingList,
   CSChip,
   CSTextField,
-  CSIconButton,
 } from "../../../components";
 import { colors, spacing } from "../../../theme/tokens";
 import HospitalService from "../service/HospitalService";
-import TokenStorage from "../../../services/TokenStorage";
 import { normalizeText } from "../../../utils/normalize";
 
 const TIPO_FILTROS = [
@@ -33,7 +31,6 @@ export default function HospitaisScreen({ navigation }) {
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro, setErro] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   const debounceRef = useRef(null);
 
@@ -68,10 +65,6 @@ export default function HospitaisScreen({ navigation }) {
     debounceRef.current = setTimeout(() => carregar(), 400);
     return () => clearTimeout(debounceRef.current);
   }, [carregar]);
-
-  useEffect(() => {
-    TokenStorage.isAdmin().then(setIsAdmin).catch(() => setIsAdmin(false));
-  }, []);
 
   const abrirDetalhe = (hospital) => {
     navigation.navigate("HospitalDetalhe", { id: hospital.id });
@@ -115,27 +108,7 @@ export default function HospitaisScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <CSHeader
-        title="Hospitais"
-        rightAction={
-          isAdmin ? (
-            <View style={styles.headerActions}>
-              <CSIconButton
-                icon={Gavel}
-                color={colors.primary}
-                accessibilityLabel="Moderação de sugestões"
-                onPress={() => navigation.navigate("SugestoesPendentes")}
-              />
-              <CSIconButton
-                icon={Plus}
-                color={colors.primary}
-                accessibilityLabel="Cadastrar hospital"
-                onPress={() => navigation.navigate("HospitalForm", { mode: "create" })}
-              />
-            </View>
-          ) : null
-        }
-      />
+      <CSHeader title="Hospitais" />
 
       <View style={styles.searchArea}>
         <CSTextField
@@ -183,11 +156,6 @@ export default function HospitaisScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.surface },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.s1,
-  },
   searchArea: {
     padding: spacing.s4,
     gap: spacing.s3,

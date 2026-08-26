@@ -61,6 +61,12 @@ class LoginService {
 
     const response = await post(`${BASE_PATH}/login`, payload);
 
+    if (response.usuario?.papel === "ADMIN") {
+      throw new Error(
+        "Acesso administrativo disponível apenas pelo Painel Administrativo Web. Utilize um usuário do aplicativo."
+      );
+    }
+
     await TokenStorage.salvarTokens({
       accessToken: response.accessToken,
       refreshToken: response.refreshToken,

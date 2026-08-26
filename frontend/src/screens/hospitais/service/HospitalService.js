@@ -129,23 +129,11 @@ class HospitalService {
     return request(`${BASE_PATH}/${id}/geofence`);
   }
 
-  /** Cadastro de hospital + geofence (admin) — E1-01/E1-02. */
-  static cadastrar(payload) {
-    return request(BASE_PATH, { method: "POST", body: payload });
-  }
-
-  /** Atualização de hospital/geofence (admin) — E1-04. */
-  static atualizar(id, payload) {
-    return request(`${BASE_PATH}/${id}`, { method: "PUT", body: payload });
-  }
-
-  /** Ativa/desativa hospital (admin) — E1-04. */
-  static alterarStatus(id, ativo) {
-    return request(`${BASE_PATH}/${id}/status`, {
-      method: "PATCH",
-      body: { ativo: Boolean(ativo) },
-    });
-  }
+  /**
+   * Cadastro, atualização e ativação/desativação de hospital (E1-01/E1-02/E1-04)
+   * são operações administrativas — migradas para o Painel Administrativo Web
+   * (F-11). Este cliente mobile expõe apenas as operações públicas abaixo.
+   */
 
   /** Sugestão pública de hospital ainda não cadastrado (E1-05, P2). */
   static sugerir(payload) {

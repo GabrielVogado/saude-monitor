@@ -4,7 +4,6 @@ import UserScreen from "../user/view/UserScreen.js";
 import GeoLocalizacaoScreen from "../geolocalizacao/view/GeoLocalizacaoScreen.js";
 import HospitaisScreen from "../hospitais/view/HospitaisScreen.js";
 import HospitalDetalheScreen from "../hospitais/view/HospitalDetalheScreen.js";
-import HospitalFormScreen from "../hospitais/view/HospitalFormScreen.js";
 import SugerirHospitalScreen from "../hospitais/view/SugerirHospitalScreen.js";
 import SugestoesPendentesScreen from "../hospitais/view/SugestoesPendentesScreen.js";
 import RevisarSugestaoScreen from "../hospitais/view/RevisarSugestaoScreen.js";
@@ -17,7 +16,6 @@ export {
     GeoLocalizacaoScreen,
     HospitaisScreen,
     HospitalDetalheScreen,
-    HospitalFormScreen,
     SugerirHospitalScreen,
     SugestoesPendentesScreen,
     RevisarSugestaoScreen,

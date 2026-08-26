@@ -123,6 +123,24 @@
 
 ---
 
+### Épico 7 — Painel Administrativo Web 🖥️
+
+> **Contexto:** por ser um aplicativo comunitário direcionado à população, o acesso administrativo **não fica no app mobile**. Toda a gestão (hospitais, sugestões, georreferenciamento) passa a ser feita por uma **aplicação web** dedicada ao administrador, consumindo os mesmos endpoints REST do backend (E1, E1-06). O app mobile permanece exclusivamente para o cidadão.
+
+| ID | Prioridade | Estória | Critérios de aceite (CA) | Ref. |
+|---|---|---|---|---|
+| E7-01 | P0 | Como administrador, devo **acessar uma aplicação web dedicada** com login administrativo (papel `ADMIN`), para gerenciar o sistema sem depender do app mobile da população. | CA: tela de login web autentica via `POST /auth/login` e exige papel `ADMIN`; usuário sem papel `ADMIN` é rejeitado; sessão mantém JWT (access + refresh). | RF-08, RNF-05 |
+| E7-02 | P0 | Como administrador, devo **listar todos os hospitais cadastrados** (ativos e inativos), para ter visão completa da rede. | CA: listagem paginada consome `GET /hospitais` (incluindo inativos, exclusivo para admin); exibe nome, tipo, status, região administrativa; ordenável. | E1-03, RF-08 |
+| E7-03 | P0 | Como administrador, devo **filtrar os hospitais** por nome, tipo, status (ativo/inativo) e por Região Administrativa, Região de Saúde ou Macrorregião de Saúde, para localizar rapidamente uma unidade. | CA: filtros combináveis; resultado atualiza lista e mapa; filtro por região usa o dado georreferenciado da camada correspondente. | RF-08 |
+| E7-04 | P0 | Como administrador, devo **visualizar os hospitais em um mapa** com camadas sobrepostas de **Região Administrativa**, **Região Integrada de Desenvolvimento**, **Regiões de Saúde** e **Macrorregiões de Saúde**, para entender a distribuição geográfica da rede. | CA: mapa renderiza os 4 polígonos de divisão administrativa/saúde como camadas independentes (toggle liga/desliga cada camada); pins de hospitais sobrepostos; dados de origem: `D:\saude-monitor\multiplas_camadas_saude_14` (convertidos para GeoJSON). | RF-08 |
+| E7-05 | P0 | Como administrador, devo **tocar/clicar no ícone de um hospital no mapa** e ser redirecionado à tela de detalhe daquela unidade, para consultar todos os seus dados cadastrais. | CA: clique no pin abre a tela de detalhe do hospital (`GET /hospitais/{id}`) com todos os campos cadastrais; hospitais inativos aparecem no mapa com **ícone cinza**. | E1-01, RF-08 |
+| E7-06 | P0 | Como administrador, devo **editar os dados cadastrais de um hospital** (nome, endereço, tipo, contato, geofence), para manter o cadastro atualizado. | CA: formulário de edição consome `PUT /hospitais/{id}`; revalida geofence (polígono fechado, ≥ 3 vértices); **não expõe nem permite alterar dados de feedback** dos usuários (somente leitura, se exibido, ou não exibido nesta tela). | E1-04, RF-08 |
+| E7-07 | P0 | Como administrador, devo **desativar um hospital**, para que ele deixe de aparecer no app público e passe a ser sinalizado no mapa administrativo com **ícone cinza** indicando inatividade. | CA: ação consome `PATCH /hospitais/{id}/status`; hospital desativado some do app público (E1-04) e some do app da população; no painel web, permanece visível no mapa/lista com marcador cinza distinto do marcador ativo (colorido). | E1-04, RF-08 |
+| E7-08 | P0 | Como administrador, **não devo poder alterar dados de feedback** dos usuários em nenhuma tela do painel, para preservar a integridade e a imparcialidade das avaliações públicas. | CA: nenhum endpoint de escrita de feedback (`PUT /feedbacks/{id}`) é exposto ao papel `ADMIN`; tela de detalhe do hospital, se exibir indicadores/feedbacks, apresenta-os apenas como leitura (somente exibição agregada). | RN-19, RN-22 |
+| E7-09 | P1 | Como administrador, devo **navegar por um menu** com as opções "Hospitais" (lista) e "Mapa", além do acesso à fila de moderação de sugestões (E1-06), para alternar entre as visões administrativas. | CA: menu lateral/topo fixo em todas as telas autenticadas; opção "Mapa" abre a visualização georreferenciada (E7-04); opção "Hospitais" abre a listagem (E7-02); item "Sugestões pendentes" reaproveita os endpoints de E1-06. | E1-06, RF-08 |
+
+---
+
 ## 4. Sequência de entrega sugerida (sprints)
 
 > Sugestão de 6 sprints de 2 semanas (12 semanas). Recalibrar com a equipe.
@@ -136,6 +154,9 @@
 | **S4** | Feedback mobile + notificações | E3-01, E3-02, E3-03, E3-06 |
 | **S5** | Indicadores públicos + conta/privacy | E4-01..E4-04, E5-01, E5-02, E5-04 |
 | **S6** | Polimento + lançamento | E6-01..E6-04, E4-05, F0-04, E5-03, E5-05 |
+| **S7 (frente paralela)** | Painel Administrativo Web | E7-01..E7-09 |
+
+> **Observação sobre S7:** por ser uma **aplicação separada** (web, não mobile) consumindo a mesma API já madura a partir de S1, o Épico 7 pode ser conduzido **em paralelo** por outra frente/desenvolvedor a partir do fim de S1 (quando `hospitais` e `hospitais/sugestoes` já existem no backend), sem bloquear o cronograma do app mobile. Está listado como S7 apenas para fins de estimativa de esforço; não é sequencial obrigatório em relação a S2–S6.
 
 ---
 
@@ -173,6 +194,7 @@
 4. **E3 antes de E4 (agregados)** — agregado depende de feedbacks válidos.
 5. **E2-09 (heartbeat) antes de E2-03 (expiração)** — a expiração por 24h sem sinal só faz sentido com heartbeat implementado; ambos no mesmo sprint.
 6. **Teste de campo de geofence** antes de fechar o S2/S3 — calibra RN-01/RN-03, intervalo de heartbeat (RN-23) e o raio (proposta 100–150m), incluindo cenário de espera longa (visita ativa > 12h).
+7. **E1/E1-06 (backend de hospitais e sugestões) antes do Épico 7** — o painel administrativo web é somente consumidor da mesma API; não introduz endpoints novos além dos já previstos em E1.
 
 ---
 

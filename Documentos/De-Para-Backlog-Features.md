@@ -72,3 +72,16 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **E6-03** | Acessibilidade AA | **F-08** |
 | **E6-04** | Loading/Empty/Error states | **F-08** |
 | **E6-05** | Notificações opt-in | **F-08** |
+
+## Épico 7 — Painel Administrativo Web
+| ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |
+|---|---|---|---|
+| **E7-01** | Login web administrativo | **F-11** | 🔴 Inexistente |
+| **E7-02** | Listar todos os hospitais (Admin) | **F-11** | 🔴 Inexistente |
+| **E7-03** | Filtrar hospitais (nome/tipo/status/região) | **F-11** | 🔴 Inexistente |
+| **E7-04** | Mapa com camadas georreferenciadas | **F-11** | 🔴 Inexistente |
+| **E7-05** | Ir ao detalhe do hospital via mapa | **F-11** | 🔴 Inexistente |
+| **E7-06** | Editar dados do hospital (Admin) | **F-11** | 🔴 Inexistente |
+| **E7-07** | Desativar hospital (ícone cinza) | **F-11** | 🔴 Inexistente |
+| **E7-08** | Bloqueio de escrita sobre feedback | **F-11** | 🔴 Inexistente |
+| **E7-09** | Menu Hospitais/Mapa/Sugestões | **F-11** | 🔴 Inexistente |

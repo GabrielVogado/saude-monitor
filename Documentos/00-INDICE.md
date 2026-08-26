@@ -38,7 +38,8 @@ Documentos/
 │
 ├── 02-arquitetura-tecnica/                   ← visão técnica e de engenharia
 │   ├── Arvore-Tecnologica-v2.0.md            ← stack atual vs. proposta, manter/refatorar, ADRs, roadmap
-│   └── Especificacao-API-v2.0.md             ← contratos REST (OpenAPI), modelo de dados MongoDB, fluxos
+│   ├── Especificacao-API-v2.0.md             ← contratos REST (OpenAPI), modelo de dados MongoDB, fluxos
+│   └── Plano-Tecnico-Painel-Administrativo-Web-v1.0.md  ← stack, estrutura de pastas e consumo de API do painel web (F-11)
 │
 ├── 03-ui-ux/                                 ← padrão de experiência e interface
 │   └── Padrao-UI-UX-v2.0.md                  ← princípios, personas, jornada, design system, acessibilidade, LGPD
@@ -69,6 +70,7 @@ Documentos/
 | 1 | [Documento Negocial](./01-negocio/Documento-Negocial-v2.0.md) | 2.0 | ✅ Ativo | Problema, proposta de valor, público, jornada do usuário, regras de negócio do geofence/feedback, modelo de dados conceitual, KPIs, roadmap e conformidade LGPD. |
 | 2 | [Árvore Tecnológica](./02-arquitetura-tecnica/Arvore-Tecnologica-v2.0.md) | 2.0 | ✅ Ativo | Mapa da stack atual (Spring Boot 4 + MongoDB + Expo 55), decisões manter/refatorar/adicionar, matriz comparativa, ADRs e plano de evolução. |
 | 3 | [Especificação da API](./02-arquitetura-tecnica/Especificacao-API-v2.0.md) | 2.0 | ✅ Ativo | Contratos REST de todos os endpoints (auth, hospitais, visitas, feedbacks, agregados), coleções MongoDB com índices/GeoJSON e fluxo geofence → API. |
+| 3b | [Plano Técnico — Painel Administrativo Web](./02-arquitetura-tecnica/Plano-Tecnico-Painel-Administrativo-Web-v1.0.md) | 1.0 | 🟡 Proposta | Stack (React + Vite + Leaflet), estrutura de pastas de `web-admin/` e estratégia de consumo da API existente para o painel administrativo (F-11). |
 | 4 | [Padrão UI/UX](./03-ui-ux/Padrao-UI-UX-v2.0.md) | 2.0 | ✅ Ativo | Princípios de UX, personas, jornada ponta a ponta, arquitetura de informação, design system completo (tokens, componentes), acessibilidade WCAG AA, LGPD por design e protótipos ASCII. |
 | 5 | [Backlog do MVP](./04-backlog/Backlog-MVP-v2.0.md) | 2.0 | ✅ Ativo | Backlog priorizado (Fase 0 + 6 épicos), estórias com critérios de aceite e referências às RN, sequência de sprints, DoD e backlog futuro. |
 | 6 | [Plano de Sprints](./06-sprints/Plano-Sprints-v2.0.md) | 2.0 | ✅ Ativo | Plano detalhado de 7 sprints (S0–S6), estimativas em story points (Fibonacci), velocity, riscos por sprint, cerimônias, métricas de acompanhamento e plano de testes de campo. |

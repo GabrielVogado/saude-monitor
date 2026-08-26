@@ -936,4 +936,51 @@ Para referência, as estórias que estão fora do MVP mas documentadas para a Fa
 
 ---
 
+## 20. Sprint S7 — Painel Administrativo Web (Frente Paralela) 🖥️
+
+> **2 sprints (~4 semanas) · 25 story points · Depende de: S1 concluído (backend de `hospitais` e `hospitais/sugestoes` disponível) · Conduzida em paralelo às sprints S2–S6, por não impactar o cronograma do app mobile**
+
+### 20.1 Objetivo do sprint
+
+> **"Entregar uma aplicação web dedicada ao administrador — fora do app mobile da população — para listar, filtrar, visualizar em mapa multi-camada (Regiões Administrativas, RIDE, Regiões de Saúde, Macrorregiões de Saúde) e gerenciar (editar/desativar) hospitais, reaproveitando a API já construída em S1, sem qualquer acesso de escrita a dados de feedback."**
+
+### 20.2 Estórias do sprint (Épico 7)
+
+| ID | Prioridade | Estória | Pontos | Resp. | Tipo |
+|---|---|---|---|---|---|
+| E7-01 | P0 | Login web administrativo (papel `ADMIN`) | 3 | FE Web | ➕ Nova |
+| E7-02 | P0 | Listar todos os hospitais (ativos e inativos) | 3 | FE Web | ➕ Nova |
+| E7-03 | P0 | Filtrar hospitais (nome, tipo, status, região) | 3 | FE Web | ➕ Nova |
+| E7-04 | P0 | Mapa com 4 camadas georreferenciadas | 8 | FE Web + BE | ➕ Nova |
+| E7-05 | P0 | Detalhe do hospital ao clicar no pin/lista | 2 | FE Web | ➕ Nova |
+| E7-06 | P0 | Editar hospital (reaproveita contrato de E1-04) | 2 | FE Web | ➕ Nova |
+| E7-07 | P0 | Desativar hospital com ícone cinza | 2 | FE Web | ➕ Nova |
+| E7-08 | P0 | Bloqueio de escrita sobre feedback | 1 | BE + FE Web | ➕ Nova |
+| E7-09 | P1 | Menu Hospitais / Mapa / Sugestões pendentes | 1 | FE Web | ➕ Nova |
+
+### 20.3 Entregáveis esperados
+
+- [ ] Aplicação web nova, publicada em ambiente próprio, autenticando via papel `ADMIN`.
+- [ ] Shapefiles de `D:\saude-monitor\multiplas_camadas_saude_14` convertidos para GeoJSON e servidos pelo backend como 4 camadas independentes.
+- [ ] Listagem e mapa de hospitais com filtros combináveis (nome, tipo, status, região).
+- [ ] Fluxo completo de detalhe → editar/desativar, com ícone cinza para inativo.
+- [ ] Fila de moderação de sugestões (E1-06/F-10) migrada do app mobile para este painel.
+- [ ] Nenhuma tela ou endpoint do painel permite escrever em dados de feedback.
+
+### 20.4 Riscos do sprint
+
+| Risco | Prob. | Impacto | Mitigação |
+|---|---|---|---|
+| Peso dos GeoJSON de macrorregiões degradar performance do mapa | Média | Médio | Simplificação de geometria (mapshaper/topojson) antes de servir; cache no backend |
+| Divergência de nomenclatura de região entre camadas | Média | Baixo | Normalização no processo de importação, com relatório de auditoria (padrão de `07-dados/`) |
+| Equipe também alocada nas sprints S2–S6 (contenção de recurso) | Média | Médio | Tratado como frente paralela com recurso dedicado (ex.: FE Web) para não competir com o time mobile |
+
+### 20.5 Referências
+
+- Backlog: `04-backlog/Backlog-MVP-v2.0.md` — Épico 7 (E7-01..E7-09)
+- Feature: `05-features/Features-MVP-v2.0.md` — F-11
+- Plano técnico (stack, pastas, consumo de API): `02-arquitetura-tecnica/Plano-Tecnico-Painel-Administrativo-Web-v1.0.md`
+
+---
+
 *Fim do Plano de Sprints v2.0 — "Plans are worthless, but planning is everything." — Dwight D. Eisenhower*

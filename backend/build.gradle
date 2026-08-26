@@ -49,8 +49,9 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-	// MongoDB embutido para testes de contexto (não exige infraestrutura externa no CI).
-	testImplementation 'de.flapdoodle.embed:de.flapdoodle.embed.mongo:4.20.0'
+	// Testcontainers MongoDB para testes de contexto (usa Docker, disponível no CI).
+	testImplementation 'org.testcontainers:mongodb:1.20.4'
+	testImplementation 'org.testcontainers:junit-jupiter:1.20.4'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 

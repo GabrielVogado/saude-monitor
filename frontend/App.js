@@ -10,7 +10,6 @@ import UserScreen from "./src/screens/user/view/UserScreen.js";
 import GeoLocalizacaoScreen from "./src/screens/geolocalizacao/view/GeoLocalizacaoScreen.js";
 import HospitaisScreen from "./src/screens/hospitais/view/HospitaisScreen.js";
 import HospitalDetalheScreen from "./src/screens/hospitais/view/HospitalDetalheScreen.js";
-import HospitalFormScreen from "./src/screens/hospitais/view/HospitalFormScreen.js";
 import SugerirHospitalScreen from "./src/screens/hospitais/view/SugerirHospitalScreen.js";
 
 const Stack = createStackNavigator();
@@ -65,7 +64,6 @@ function HospitaisStack() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="HospitaisLista" component={HospitaisScreen} />
             <Stack.Screen name="HospitalDetalhe" component={HospitalDetalheScreen} />
-            <Stack.Screen name="HospitalForm" component={HospitalFormScreen} />
             <Stack.Screen name="SugerirHospital" component={SugerirHospitalScreen} />
         </Stack.Navigator>
     );

@@ -2,19 +2,17 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Camera, GeoJSONSource, Layer, Map, Marker } from "@maplibre/maplibre-react-native";
-import { Building2, Clock, Mail, MapPin, Pencil, Phone } from "lucide-react-native";
+import { Building2, Clock, Mail, MapPin, Phone } from "lucide-react-native";
 import {
   CSBadge,
   CSCard,
   CSHeader,
   CSEmptyState,
-  CSIconButton,
   CSLoading,
   CSRatingStars,
 } from "../../../components";
 import { colors, radii, spacing, typography } from "../../../theme/tokens";
 import HospitalService from "../service/HospitalService";
-import TokenStorage from "../../../services/TokenStorage";
 import {
   calcularCentroide,
   coordenadasParaGeoJson,
@@ -52,7 +50,6 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   const [hospital, setHospital] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   const carregar = async () => {
     setCarregando(true);
@@ -140,20 +137,7 @@ export default function HospitalDetalheScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <CSHeader
-        title={hospital.nome}
-        onBack={() => navigation.goBack()}
-        rightAction={
-          isAdmin ? (
-            <CSIconButton
-              icon={Pencil}
-              color={colors.primary}
-              accessibilityLabel="Editar hospital"
-              onPress={() => navigation.navigate("HospitalForm", { mode: "edit", hospital })}
-            />
-          ) : null
-        }
-      />
+      <CSHeader title={hospital.nome} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {coordenadas.length > 0 ? (

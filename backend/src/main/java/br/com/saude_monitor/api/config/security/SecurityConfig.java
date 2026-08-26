@@ -40,10 +40,13 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**", "/api/user/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/hospitais/**").permitAll()
-                        // Exceção PÚBLICA (spec §3.2 / E1-05): sugestão anônima de hospital
-                        // deve vir ANTES da regra genérica de POST admin (a ordem importa).
+                        // Exceção PÚBLICA (spec §3.2 / E1-05): sugestão anônima de hospital.
+                        // Deve vir ANTES da regra genérica de POST admin (a ordem importa).
                         .requestMatchers(HttpMethod.POST, "/api/v1/hospitais/sugestoes").permitAll()
+                        // Moderação de sugestões (E1-06): endpoints admin específicos.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/hospitais/sugestoes", "/api/v1/hospitais/sugestoes/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/hospitais/sugestoes/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/hospitais/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/hospitais/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/hospitais/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/hospitais/**").hasRole("ADMIN")

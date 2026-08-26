@@ -35,6 +35,7 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 | **F-07** | Mapa e busca de hospitais | Épico 1 + Épico 6 | P0 | 🟡 Parcial | E1-03, E1-05, E6-01 | — | S (8) |
 | **F-08** | Polimento e acessibilidade | Épico 6 | P1 | 🟡 Parcial | E6-02, E6-03, E6-04, E6-05 | — | M (20) |
 | **F-09** | Segurança e privacidade | Fase 0 + Épico 5 | P0 | 🔴 Não conforme | F0-03, F0-04, E5-01, E5-02, E5-05 | RN-21, RNF-05, RNF-06 | M (18) |
+| **F-10** | Moderação de sugestões de hospitais | Épico 1 | P1 | 🔴 Inexistente | E1-06 | — | S (5) |
 
 > **Legenda de status:** ✅ Existente (funcional) · 🟡 Parcial (precisa refatoração) · 🔴 Inexistente/Inexistente (construir do zero) · 🔴 Não conforme (violação de segurança/LGPD — corrigir antes de qualquer deploy). Verificação completa: `Relatorio-Aderencia-Codigo-vs-Features.md`.
 
@@ -391,12 +392,53 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 
 ---
 
+### Feature F-10: Moderação de Sugestões de Hospitais
+
+- **ID:** F-10
+- **Épico:** Épico 1 — Cadastro de Hospitais e Geofences
+- **Prioridade:** P1 — sem moderação, as sugestões públicas acumulam-se como `PENDENTE` e não geram valor; com ela, o mapa cresce de forma confiável
+- **Status de implementação:** 🔴 **Inexistente** — zero endpoints admin de revisão, zero tela de fila de moderação, nenhuma transição de status além do armazenamento `PENDENTE` inicial.
+- **Descrição:** Esta feature permite que administradores revisem as sugestões de novos hospitais enviadas por usuários anônimos ou logados (E1-05). Ao aprovar, o admin vincula a sugestão a um hospital oficial completo, com geofence validado. Ao rejeitar, deve informar um motivo. Toda decisão é auditada (`revisadoPor`, `revisadoEm`, `motivoRecusa`) e a transição de status é irreversível.
+
+  O fluxo de aprovação reutiliza o formulário de hospital existente (F-01), pré-preenchendo nome e endereço a partir da sugestão. O admin completa ou corrige os dados (CNPJ, tipo, contato, geofence) e, ao salvar, o sistema cria o hospital e marca a sugestão como `APROVADA` com o `hospitalId` vinculado. A rejeição é uma ação mais simples, feita via modal com campo de motivo.
+
+- **User Stories vinculadas:** E1-06
+- **Critérios de aceite:**
+  1. Endpoint admin `GET /api/v1/hospitais/sugestoes` retorna sugestões filtráveis por `status` (`PENDENTE`, `APROVADA`, `RECUSADA`), ordenadas por `criadoEm` decrescente, paginadas; resposta `< 300 ms` (p95)
+  2. Endpoint admin `GET /api/v1/hospitais/sugestoes/{id}` retorna detalhe completo da sugestão, incluindo audit quando `APROVADA`/`RECUSADA`
+  3. Endpoint admin `POST /api/v1/hospitais/sugestoes/{id}/aprovar` recebe `{ hospitalId }` e vincula a sugestão a um hospital existente; atualiza `status = APROVADA`, `revisadoPor`, `revisadoEm`, `hospitalId`
+  4. Endpoint admin `POST /api/v1/hospitais/sugestoes/{id}/rejeitar` recebe `{ motivo }` (`@Size(min=5, max=500)`), atualiza `status = RECUSADA`, `revisadoPor`, `revisadoEm`, `motivoRecusa`
+  5. Transições permitidas apenas `PENDENTE → APROVADA` e `PENDENTE → RECUSADA`; tentativa de reaprovar/rejeitar uma sugestão já decidida retorna `409 CONFLITO` com mensagem pt-BR
+  6. Todos os endpoints de moderação exigem papel `ADMIN`; usuários comuns recebem `403 ACESSO_NEGADO`
+  7. Tela de fila de moderação no app lista sugestões pendentes com badge de status, nome, cidade/UF e data; inclui pull-to-refresh e `CSEmptyState`
+  8. Tela de revisão exibe detalhes da sugestão, botão "Aprovar e cadastrar hospital" (pré-preenche `HospitalFormScreen`) e "Rejeitar" (modal com motivo)
+  9. Feedback visual: toast/snackbar confirma ação e lista é atualizada automaticamente
+  10. Audit trail: todo evento de aprovação/rejeição registra id do admin, timestamp e motivo (no caso de rejeição)
+- **Regras de negócio aplicáveis:** N/A (infraestrutura de cadastro — habilita RN-01, RN-03, RN-05)
+- **Dependências:** F-01 (Cadastro e Gestão de Hospitais) fornece o formulário e a validação de geofence. F-07 (Mapa e Busca) contém E1-05 (sugestão pública), que gera os registros a serem moderados. F-10 depende de F-02 (Autenticação) apenas para identificar o admin via token JWT.
+- **Esforço estimado:** **S** (1 sprint). Justificativa: endpoints admin são CRUD simples com duas transições de status; frontend reutiliza telas e componentes existentes (`CSHospitalCard`, `CSButton`, `CSModal`, `HospitalFormScreen`). A maior atenção é na validação de transições de status e no audit trail. Estórias: 1.
+- **Riscos:**
+  - **Aprovação sem geofence criar hospital inválido:** mitigação — o fluxo de aprovação obriga o admin a passar pelo `HospitalFormScreen` completo (com validação de geofence) antes de vincular a sugestão.
+  - **Spam de sugestões falsas:** mitigação — rate limiting no endpoint público `POST /sugestoes`; moderação manual no MVP; futuro: reCAPTCHA/device fingerprinting.
+  - **Admin aprovar duplicata:** mitigação — verificar nome + endereço normalizado antes de criar hospital; exibir alerta de possível duplicata quando similaridade > threshold.
+  - **UI mobile de moderação ruim:** mitigação — reutilizar componentes do design system; se volume de sugestões for alto, evoluir para painel web na Fase 2.
+- **Critério de pronto (DoD específico):**
+  - Endpoints admin testados com usuário `ADMIN` (sucesso) e `USER` (403)
+  - Teste de transição de status: aprovar e rejeitar sugestões pendentes; tentar reaprovar retorna 409
+  - Tela de fila de moderação funcional no app, acessível apenas para admin
+  - Rejeição exige motivo e persiste audit
+  - Aprovação cria hospital com geofence válido e vincula `hospitalId` na sugestão
+  - Cobertura de testes unitários ≥ 70% nos novos métodos de serviço
+
+---
+
 ## 4. Mapa de Dependências entre Features
 
 ```mermaid
 graph TD
     F01["F-01: Cadastro e Gestão de Hospitais"] --> F03["F-03: Detecção Automática Entrada/Saída"]
     F01 --> F07["F-07: Mapa e Busca de Hospitais"]
+    F01 --> F10["F-10: Moderação de Sugestões de Hospitais"]
     F02["F-02: Autenticação e Conta do Usuário"] --> F04["F-04: Visita Ativa e Cronômetro"]
     F02 --> F05["F-05: Feedback Pós-Saída"]
     F02 --> F06["F-06: Indicadores Públicos"]
@@ -407,6 +449,7 @@ graph TD
     F05 --> F06
     F01 --> F04
     F07 --> F06
+    F07 --> F10
     F09 --> F05
     F09 --> F07
 
@@ -697,6 +740,7 @@ Antes de declarar o MVP pronto para lançamento público, as seguintes validaç�
 | F-07 | `MapaScreen`, `HospitalListScreen`, `BottomNav` | `CSBottomNav`, `CSMapScreen`, `CSHospitalList`, `CSFloatingActionButton`, `CSEmptyState` | `react-native-maps` |
 | F-08 | Todas as telas (cross-cutting) | Design System completo (seção 5 Padrão UI/UX), `CSEmptyState`, `CSLoading`, `CSOfflineBanner`, `CSToast` | `lucide-react-native` |
 | F-09 | `OnboardingScreen` (3 etapas), `PrivacidadeScreen`, `TermosScreen` | `CSOnboarding`, `CSCheckbox`, `CSButtonPrimary`, `CSButtonSecondary` | `expo-location` (permissões) |
+| F-10 | `SugestoesPendentesScreen`, `RevisarSugestaoScreen`, `HospitalFormScreen` (pré-preenchido) | `CSHeader`, `CSHospitalCard`, `CSButtonPrimary`, `CSButtonSecondary`, `CSModal`, `CSEmptyState`, `CSToast` | — |
 
 ### 12.3 Sequência de implementação técnica por sprint
 
@@ -705,7 +749,7 @@ Com base na Árvore Tecnológica (Fase 0 → 1 → 2) e nas dependências do roa
 | Sprint | Duração | Foco | Features | Backend | Frontend | Infra |
 |---|---|---|---|---|---|---|
 | **S0** | 2 sem | Fundações | F-02, F-09 (segurança) | Hash BCrypt, JWT, GlobalExceptionHandler, rate limit, testes auth | — | CI/CD setup básico |
-| **S1** | 2 sem | Hospitais + Mapa | F-01, F-07 | CRUD hospital, GeoJSON validation, índice 2dsphere, endpoint público | Bottom Tabs, Mapa com pins, lista de hospitais | Seed de 10 hospitais mock |
+| **S1** | 2 sem | Hospitais + Mapa + Moderação de sugestões | F-01, F-07, F-10 | CRUD hospital, GeoJSON validation, índice 2dsphere, endpoint público, endpoints admin de sugestões | Bottom Tabs, Mapa com pins, lista de hospitais, tela de fila de moderação | Seed de 10 hospitais mock |
 | **S2** | 2 sem | Geofence core | F-03 (início) | Endpoints entrada/saída/heartbeat, `$geoIntersects`, job de expiração | `startGeofencingAsync`, `TaskManager`, card de geofence | Mock de geofences para teste |
 | **S3** | 2 sem | Geofence robustez + Visita UX | F-03 (conclusão), F-04 | Conflito de áreas, GPS interrompido, check-in manual, tipo permanência | `CSGeoStatusCard`, timer, prompt 12h, modo manual | Teste de campo ≥ 3 hospitais |
 | **S4** | 2 sem | Feedback | F-05 | Endpoint feedback, dedupe, validação | `CSFeedbackForm`, notificação local, lembrete, agradecimento | Teste de usabilidade feedback |
@@ -727,6 +771,7 @@ Com base na Árvore Tecnológica (Fase 0 → 1 → 2) e nas dependências do roa
 | F-07 | Buscas realizadas, hospitais visualizados | Analytics (`busca_hospital`, `detalhe_hospital_aberto`) | ≥ 500 buscas/semana |
 | F-08 | Nota WCAG, tempo de carregamento, crashes | Lighthouse/axe + Crashlytics | WCAG AA 100%; p95 carregamento < 2s; crash-free ≥ 99.5% |
 | F-09 | Permissões concedidas, termos aceitos, rate limits disparados | Analytics + logs | ≥ 60% concedem localização; 100% aceitam termos; ≤ 1% de req bloqueadas por rate limit |
+| F-10 | Sugestões moderadas (tempo médio de fila), taxa de aprovação, rejeições com motivo | Query no banco + analytics | 100% das sugestões pendentes > 7 dias moderadas; taxa de aprovação acompanha; 0 rejeições sem motivo |
 
 ---
 
@@ -748,6 +793,20 @@ sequenceDiagram
         API->>DB: find({ ativo: true })
         DB-->>API: [hospitais com geofence]
         API-->>App: JSON (nome, tipo, coordenadas, geofence)
+    end
+
+    rect rgb(0, 97, 147, 0.1)
+        Note over App,DB,User: F-10: Moderação de sugestões (ADMIN)
+        User->>App: Sugere hospital anônimo/logado
+        App->>API: POST /hospitais/sugestoes
+        API->>DB: insertOne(SUGESTAO { status: PENDENTE })
+        DB-->>API: OK
+        API-->>App: { sugestao_id }
+        AdminApp->>API: GET /hospitais/sugestoes?status=PENDENTE
+        API->>DB: find({ status: PENDENTE })
+        DB-->>API: [sugestões]
+        AdminApp->>API: POST /hospitais/sugestoes/{id}/aprovar (hospitalId)
+        API->>DB: updateOne(SUGESTAO { status: APROVADA, hospitalId, revisadoPor, revisadoEm })
     end
 
     rect rgb(0, 106, 106, 0.1)
@@ -823,7 +882,7 @@ sequenceDiagram
 - [ ] Endpoint de exclusão de conta (`DELETE /usuarios/me`) funcional
 - [ ] Cadastro + login via API funcionais com validação
 
-### Sprint 1 — Hospitais e Mapa (Features: F-01, F-07)
+### Sprint 1 — Hospitais e Mapa (Features: F-01, F-07, F-10)
 
 - [ ] CRUD de hospital com validação de polígono GeoJSON
 - [ ] Índice `2dsphere` criado e verificado
@@ -832,6 +891,9 @@ sequenceDiagram
 - [ ] Mapa funcional com pins de hospitais + FAB de GPS
 - [ ] Lista de hospitais com busca por nome
 - [ ] 10 hospitais seedados para desenvolvimento
+- [ ] Endpoints admin de moderação de sugestões (`GET /hospitais/sugestoes`, `POST /hospitais/sugestoes/{id}/aprovar`, `POST /hospitais/sugestoes/{id}/rejeitar`)
+- [ ] Tela de fila de moderação de sugestões no app (apenas admin)
+- [ ] Fluxo de aprovação pré-preenche formulário de hospital e vincula sugestão a hospital criado
 
 ### Sprint 2 — Geofence Core (Features: F-03 início)
 
@@ -903,6 +965,7 @@ sequenceDiagram
 | F-07 | 0.5 | 1 (pleno) | 0.25 | 0.25 | Baixa | 1 sprint |
 | F-08 | 0 | 1 (pleno) + 1 (design) | 1 | 1 | Média (volume) | 1-2 sprints |
 | F-09 | 0.5 | 0.5 | 0.5 | 0.25 | Média | 1 sprint |
+| F-10 | 0.5 | 0.5 (pleno) | 0.25 | 0.25 | Baixa | 1 sprint |
 
 > **Time sugerido total:** 2 backend (1 sênior + 1 pleno), 2 mobile (1 sênior + 1 pleno), 1 QA, 1 designer de produto. Total: 6 pessoas em dedicação parcial (50-100% conforme sprint).
 

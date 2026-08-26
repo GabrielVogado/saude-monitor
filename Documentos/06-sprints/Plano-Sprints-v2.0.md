@@ -26,9 +26,9 @@ O plano de sprints do **Clinical Sanctuary** organiza 31 estórias de usuário (
 | **Sprints de desenvolvimento** | 7 (S0 a S6, 2 semanas cada) |
 | **Time-base** | 3 pessoas: 1 Backend (BE), 1 Frontend (FE), 1 DevOps/QA |
 | **Velocity alvo** | 18–20 story points por sprint |
-| **Pontos totais estimados** | 130 story points (escala Fibonacci: 1, 2, 3, 5, 8, 13) |
+| **Pontos totais estimados** | 135 story points (escala Fibonacci: 1, 2, 3, 5, 8, 13) |
 | **Épicos** | 6 (E1–E6) + Fase 0 (estabilização) |
-| **Estórias** | 31 (todas do backlog v2.0) |
+| **Estórias** | 32 (todas do backlog v2.0) |
 | **Cerimônias** | Daily 15min · Planning 2h · Review 1h · Retro 1h · Refinement 1h (meio do sprint) |
 | **Ferramentas** | Jira/Linear (tracking) · Confluence/Notion (docs) · Slack/Teams (async) · GitHub (código) |
 
@@ -124,13 +124,13 @@ S0 (Segurança)
 
 ---
 
-## 3. Sprint S1 — Hospitais e Geofence Admin 🏥
+## 3. Sprint S1 — Hospitais, Geofence Admin e Moderação de Sugestões 🏥
 
-> **2 semanas · 16 story points · Depende de: S0 concluído**
+> **2 semanas · 21 story points · Depende de: S0 concluído**
 
 ### 3.1 Objetivo do sprint
 
-> **"Permitir que administradores cadastrem hospitais com áreas geográficas (geofence GeoJSON) no mapa, e que o app público liste os hospitais ativos com seus indicadores."**
+> **"Permitir que administradores cadastrem hospitais com áreas geográficas (geofence GeoJSON) no mapa, que o app público liste os hospitais ativos com seus indicadores, e que administradores revisem, aprovem e rejeitem sugestões públicas de novos hospitais."**
 
 ### 3.2 Estórias do sprint
 
@@ -140,6 +140,8 @@ S0 (Segurança)
 | E1-02 | P0 | Definição de geofence como polígono GeoJSON sobre o mapa | 5 | BE + FE | ➕ Nova |
 | E1-03 | P0 | Listagem de hospitais ativos para o app público (com indicadores) | 3 | BE + FE | ➕ Nova |
 | E1-04 | P1 | Edição e desativação de hospital/geofence | 3 | BE + FE | ➕ Nova |
+| E1-05 | P1 | Sugestão pública de hospital (endpoint + tela anônima) | 2 | BE + FE | ➕ Nova |
+| E1-06 | P1 | Moderação de sugestões: aprovar/rejeitar com audit trail | 5 | BE + FE | ➕ Nova |
 
 ### 3.3 Entregáveis esperados
 
@@ -149,10 +151,12 @@ S0 (Segurança)
 - [x] **Tela de cadastro de hospital no app**: mapa interativo (`react-native-maps`) com ferramenta de desenho de polígono; visualização do geofence salvo.
 - [x] **Tela de lista de hospitais** (modo público): Bottom Tab "Hospitais", renderização de cards com nome, tipo e indicadores (placeholder até S5).
 - [x] **Índice 2dsphere** criado e testado com queries `$geoIntersects` e `$near`.
+- [x] **Sugestão pública de hospital**: endpoint `POST /api/v1/hospitais/sugestoes` e tela no app para usuário anônimo/logado enviar proposta.
+- [x] **Moderação de sugestões**: endpoints admin `GET /api/v1/hospitais/sugestoes`, `POST /api/v1/hospitais/sugestoes/{id}/aprovar`, `POST /api/v1/hospitais/sugestoes/{id}/rejeitar`; tela de fila de moderação acessível apenas para admin; fluxo de aprovação pré-preenche formulário de hospital e vincula sugestão ao hospital criado; rejeição exige motivo e persiste audit trail.
 
 ### 3.4 Demo planejada
 
-> **"Cadastrar 3 hospitais reais (ex.: Santa Casa SP, HC SP, Hospital das Clínicas) com geofences desenhados no mapa, listá-los no app público com busca por nome e ver o polígono renderizado."**
+> **"Cadastrar 3 hospitais reais (ex.: Santa Casa SP, HC SP, Hospital das Clínicas) com geofences desenhados no mapa, listá-los no app público com busca por nome e ver o polígono renderizado; depois, enviar uma sugestão pública de novo hospital, acessar como admin, aprovar a sugestão preenchendo o formulário completo e ver o novo hospital ativo na lista pública."**
 
 ### 3.5 Riscos do sprint
 
@@ -161,6 +165,9 @@ S0 (Segurança)
 | Desenho de polígono no mapa mobile com UX ruim (biblioteca de edição limitada no RN) | Média | Médio | FE faz spike de 4h com `react-native-maps` Polygon edition; fallback: admin web simples (HTML+JS) para cadastro de geofence, app apenas exibe |
 | Validação GeoJSON complexa (auto-interseção, orientação) | Baixa | Médio | Usar biblioteca JTS (Java Topology Suite) ou `org.springframework.data.mongodb.core.geo`; se complexidade explodir, validação simplificada (apenas vértices e fechamento) |
 | Performance de `$near` em coleção pequena irrelevante, mas design precisa escalar | Baixa | Baixo | Índice 2dsphere cobre o cenário; teste de carga só no S6 |
+| Aprovação de sugestão sem geofence válido gera hospital inutilizável | Média | Alto | Fluxo de aprovação obriga passar pelo `HospitalFormScreen` completo com validação de geofence antes de vincular a sugestão |
+| Spam de sugestões falsas sobrecarrega moderação | Média | Médio | Rate limiting no endpoint público `POST /sugestoes`; moderação manual no MVP; futuro: reCAPTCHA/device fingerprinting |
+| UI mobile de moderação ruim para volume alto | Baixa | Médio | Reutilizar componentes do design system; se volume de sugestões for alto, evoluir para painel web na Fase 2 |
 
 ### 3.6 Definição de Pronto (DoD) do sprint
 
@@ -169,8 +176,12 @@ S0 (Segurança)
 - [x] Listagem pública paginada e com busca.
 - [x] Tela de mapa com renderização de polígono.
 - [x] Testes de integração para CRUD e validação de geofence.
+- [x] Sugestão pública funcional e criando registro `PENDENTE`.
+- [x] Moderação de sugestões: endpoints protegidos para admin, transições de status testadas, rejeição exige motivo, aprovação vincula hospital com geofence.
+- [x] Tela de fila de moderação no app, acessível apenas para admin, com atualização automática após aprovação/rejeição.
+- [x] Cobertura de testes unitários ≥ 70% nos métodos de moderação.
 
----
+----
 
 ## 4. Sprint S2 — Detecção de Visitas (Mobile + Backend) 📍
 

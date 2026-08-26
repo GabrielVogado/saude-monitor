@@ -1,12 +1,17 @@
 package br.com.saude_monitor.api.hospital.controller;
 
 import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
+import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
+import br.com.saude_monitor.api.hospital.document.StatusSugestao;
 import br.com.saude_monitor.api.hospital.dto.AlterarStatusRequest;
+import br.com.saude_monitor.api.hospital.dto.AprovarSugestaoRequest;
 import br.com.saude_monitor.api.hospital.dto.GeoJsonPolygonDto;
 import br.com.saude_monitor.api.hospital.dto.HospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.HospitalResumoResponse;
 import br.com.saude_monitor.api.hospital.dto.HospitalResponse;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
+import br.com.saude_monitor.api.hospital.dto.RejeitarSugestaoRequest;
+import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalDetalheResponse;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalResponse;
 import br.com.saude_monitor.api.hospital.service.HospitalService;
@@ -42,6 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class HospitalController {
 
     private final HospitalService hospitalService;
+    private final AutenticacaoHelper autenticacaoHelper;
 
     /** 🔓 Lista hospitais ativos, com filtro geoespacial (raio), tipo e busca textual. */
     @GetMapping
@@ -92,5 +98,42 @@ public class HospitalController {
     @PostMapping("/sugestoes")
     public ResponseEntity<SugestaoHospitalResponse> sugerir(@Valid @RequestBody SugestaoHospitalRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(hospitalService.sugerir(request));
+    }
+
+    /** 🛡️ Lista sugestões públicas, filtrável por status (E1-06). */
+    @GetMapping("/sugestoes")
+    public ResponseEntity<PageResponse<SugestaoHospitalDetalheResponse>> listarSugestoes(
+            @RequestParam(required = false) StatusSugestao status,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        return ResponseEntity.ok(hospitalService.listarSugestoes(status, page, size));
+    }
+
+    /** 🛡️ Detalhe de uma sugestão pública (E1-06). */
+    @GetMapping("/sugestoes/{id}")
+    public ResponseEntity<SugestaoHospitalDetalheResponse> buscarSugestaoPorId(@PathVariable String id) {
+        return ResponseEntity.ok(hospitalService.buscarSugestaoPorId(id));
+    }
+
+    /** 🛡️ Aprova uma sugestão pendente, vinculando-a a um hospital oficial (E1-06). */
+    @PostMapping("/sugestoes/{id}/aprovar")
+    public ResponseEntity<SugestaoHospitalDetalheResponse> aprovarSugestao(
+            @PathVariable String id,
+            @Valid @RequestBody AprovarSugestaoRequest request) {
+        String adminId = autenticacaoHelper.usuarioIdAtual()
+                .orElseThrow(() -> new br.com.saude_monitor.api.config.exception.NaoAutorizadoException(
+                        "Usuário não autenticado."));
+        return ResponseEntity.ok(hospitalService.aprovarSugestao(id, request, adminId));
+    }
+
+    /** 🛡️ Rejeita uma sugestão pendente, exigindo motivo (E1-06). */
+    @PostMapping("/sugestoes/{id}/rejeitar")
+    public ResponseEntity<SugestaoHospitalDetalheResponse> rejeitarSugestao(
+            @PathVariable String id,
+            @Valid @RequestBody RejeitarSugestaoRequest request) {
+        String adminId = autenticacaoHelper.usuarioIdAtual()
+                .orElseThrow(() -> new br.com.saude_monitor.api.config.exception.NaoAutorizadoException(
+                        "Usuário não autenticado."));
+        return ResponseEntity.ok(hospitalService.rejeitarSugestao(id, request, adminId));
     }
 }

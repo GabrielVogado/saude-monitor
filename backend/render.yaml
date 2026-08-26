@@ -5,7 +5,7 @@
 # Imagens por ambiente (geradas pelo cd-backend.yml):
 #   dev  -> ghcr.io/gabrielvogado/saude-monitor-backend:dev
 #   hom  -> ghcr.io/gabrielvogado/saude-monitor-backend:hom
-#   prod -> ghcr.io/gabrielvogado/saude-monitor-backend:v<versão>
+#   prod -> ghcr.io/gabrielvogado/saude-monitor-backend:<tag> (tag = nome após release/)
 
 services:
   - type: web
@@ -70,7 +70,7 @@ services:
     name: saude-monitor-backend-prod
     runtime: image
     image:
-      url: ghcr.io/gabrielvogado/saude-monitor-backend:v1.0.0
+      url: ghcr.io/gabrielvogado/saude-monitor-backend:1.0.0
     plan: free
     healthCheckPath: /actuator/health
     envVars:

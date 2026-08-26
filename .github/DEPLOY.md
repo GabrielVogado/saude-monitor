@@ -18,7 +18,7 @@ Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gr
 |----------|-----------|------------------|--------------------|---------------|
 | **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | site dev | `saude_monitor_dev` |
 | **hom** (homologação) | `main` | `saude-monitor-backend-hom` | site hom | `saude_monitor_hom` |
-| **prod** (produção) | tag `v*` | `saude-monitor-backend-prod` | site prod | `saude_monitor_prod` |
+| **prod** (produção) | `release/<tag>` | `saude-monitor-backend-prod` | site prod | `saude_monitor_prod` |
 
 ## Fluxo
 
@@ -26,7 +26,7 @@ Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gr
 push/PR → CI (build+teste backend e frontend)
 push em develop → CD dev (Docker → GHCR:dev → Render dev + Netlify dev)
 push em main    → CD hom (Docker → GHCR:hom → Render hom + Netlify hom)
-tag v* (da main) → CD prod (Docker → GHCR:v* → Render prod + Netlify prod)
+push em release/<tag> → CD prod (Docker → GHCR:<tag> → Render prod + Netlify prod)
 ```
 
 ## Passo a passo
@@ -72,8 +72,9 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 ### 6. Gerar release de produção
 1. Faça merge de `develop` → `main` (homologação é deployada automaticamente).
 2. Teste em homologação.
-3. No GitHub, **Actions → Release - Gerar tag de produção → Run workflow**, informando a versão (ex.: `1.0.0`).
-4. A tag `v1.0.0` é criada a partir da `main` e dispara o deploy de produção.
+3. No GitHub, **Actions → Release - Gerar branch de produção → Run workflow**, informando a versão (ex.: `1.0.0`).
+4. A branch `release/1.0.0` é criada a partir da `main` e dispara o deploy de produção.
+5. Após validar em produção, faça merge de `release/1.0.0` de volta em `main` (e `develop`).
 
 ## Workflows
 
@@ -82,7 +83,7 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 | `.github/workflows/ci.yml` | push/PR em develop/main | Build + testes backend e frontend |
 | `.github/workflows/cd-backend.yml` | push develop/main + tag v* | Docker → GHCR → deploy Render (dev/hom/prod) |
 | `.github/workflows/cd-frontend.yml` | push develop/main + tag v* | Build web → deploy Netlify (dev/hom/prod) |
-| `.github/workflows/release.yml` | manual (workflow_dispatch) | Cria tag `v*` a partir da main |
+| `.github/workflows/release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da main |
 
 ## Observações
 

@@ -1,4 +1,4 @@
-name: Release - Gerar tag de produção
+name: Release - Gerar branch de produção
 
 on:
   workflow_dispatch:
@@ -9,8 +9,8 @@ on:
         type: string
 
 jobs:
-  tag:
-    name: Criar tag v${{ inputs.version }} a partir da main
+  branch:
+    name: Criar branch release/${{ inputs.version }} a partir da main
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -28,9 +28,9 @@ jobs:
             exit 1
           fi
 
-      - name: Criar e enviar a tag
+      - name: Criar e enviar a branch release/${{ inputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
-          git push origin "v${{ inputs.version }}"
+          git checkout -b "release/${{ inputs.version }}"
+          git push origin "release/${{ inputs.version }}"

@@ -2,17 +2,17 @@ name: CD - Frontend (Netlify)
 
 on:
   push:
-    branches: [develop, main]
+    branches: [develop, main, 'release/**']
     paths:
       - 'frontend/**'
       - '.github/workflows/cd-frontend.yml'
   workflow_dispatch:
 
 jobs:
-  # Mapeia a branch/tag para o ambiente de destino.
-  #   develop -> dev (desenvolvimento)
-  #   main    -> hom (homologação)
-  #   tag v*  -> prod (produção)
+  # Mapeia a branch para o ambiente de destino.
+  #   develop     -> dev (desenvolvimento)
+  #   main        -> hom (homologação)
+  #   release/<tag> -> prod (produção)
   resolve-env:
     runs-on: ubuntu-latest
     outputs:
@@ -20,7 +20,7 @@ jobs:
     steps:
       - id: resolve
         run: |
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+          if [[ "${{ github.ref }}" == refs/heads/release/* ]]; then
             echo "env=prod" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "env=hom" >> "$GITHUB_OUTPUT"

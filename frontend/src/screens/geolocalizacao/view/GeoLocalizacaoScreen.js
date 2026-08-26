@@ -1,3 +1,8 @@
+// ADR-002 (Documentos/02-arquitetura-tecnica/Arvore-Tecnologica-v2.0.md): geofencing
+// nativo (expo-task-manager + startGeofencingAsync, ver `GeofencingTaskService.js`) é a
+// fonte de verdade do ciclo de vida das visitas (check-in/checkout automáticos, E2-01/02).
+// Esta tela permanece apenas como ferramenta de depuração/mapa com `watchPositionAsync`
+// em foreground — não dispara check-in/checkout e não deve ser alterada para isso.
 import React, { useEffect, useMemo, useRef } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";

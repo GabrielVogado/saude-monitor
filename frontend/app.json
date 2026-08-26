@@ -12,7 +12,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Permita acesso a sua localizacao em segundo plano para detectar automaticamente sua entrada e saida de hospitais."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +26,8 @@
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
       ],
       "package": "com.gabrielvogado.saudemonitor"
     },
@@ -41,9 +45,12 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Permita acesso a sua localizacao para exibir o mapa em tempo real."
+          "locationWhenInUsePermission": "Permita acesso a sua localizacao para exibir o mapa em tempo real.",
+          "locationAlwaysAndWhenInUsePermission": "Permita acesso a sua localizacao em segundo plano para detectar automaticamente sua entrada e saida de hospitais.",
+          "isAndroidBackgroundLocationEnabled": true
         }
-      ]
+      ],
+      "expo-notifications"
     ]
   }
 }

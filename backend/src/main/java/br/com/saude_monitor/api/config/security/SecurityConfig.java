@@ -40,6 +40,10 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**", "/api/user/**").permitAll()
+                        // Check-in/checkout/heartbeat de visitas (Épico 02) admitem uso anônimo via
+                        // dispositivoId (§3.3); a identificação obrigatória é validada em serviço.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/visitas/checkin",
+                                "/api/v1/visitas/*/checkout", "/api/v1/visitas/*/heartbeat").permitAll()
                         // Exceção PÚBLICA (spec §3.2 / E1-05): sugestão anônima de hospital.
                         // Deve vir ANTES da regra genérica de POST admin (a ordem importa).
                         .requestMatchers(HttpMethod.POST, "/api/v1/hospitais/sugestoes").permitAll()

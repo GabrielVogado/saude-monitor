@@ -70,7 +70,6 @@
 
 ## Fase 5 — UI / Telas mobile / Rotas (Mobile)
 
-- [x] [MOBILE] Step 24 `[E2-01/E2-02]`: `GeofencingTaskService.js`.
 - [x] [MOBILE] Step 24 `[E2-01/E2-02]`: `GeofencingTaskService.js` — `TaskManager.defineTask` +
   `startGeofencingAsync`/`stopGeofencingAsync` com regiões de ~120m a partir do centroide do
   geofence de cada hospital próximo; tolerâncias RN-01 (2min)/RN-03 (5min) aplicadas em memória

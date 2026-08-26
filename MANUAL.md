@@ -1,0 +1,171 @@
+# 📘 Manual de Funcionamento — Clinical Sanctuary
+
+Manual operacional do sistema de monitoramento hospitalar por geolocalização, cobrindo o fluxo de desenvolvimento, os ambientes, o CI/CD e o processo de release.
+
+---
+
+## 1. Visão Geral
+
+O **Clinical Sanctuary** detecta automaticamente a entrada e saída de usuários em áreas hospitalares (geofence), registra o tempo de permanência e coleta feedback pós-atendimento. O sistema é composto por:
+
+- **Backend:** Spring Boot 4 (Java 25) + MongoDB, empacotado em Docker.
+- **Frontend:** React Native / Expo 55 (web via `react-native-web` + APK mobile).
+- **CI/CD:** GitHub Actions + Render (backend) + Netlify (frontend) + MongoDB Atlas (banco).
+
+---
+
+## 2. Ambientes
+
+O projeto possui **3 ambientes isolados**, cada um com seu próprio backend, frontend e banco de dados.
+
+| Ambiente | Branch | Backend (Render) | Frontend (Netlify) | Banco (Atlas) |
+|----------|--------|------------------|--------------------|---------------|
+| **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | site dev | `saude_monitor_dev` |
+| **hom** (homologação) | `main` | `saude-monitor-backend-hom` | site hom | `saude_monitor_hom` |
+| **prod** (produção) | `release/<tag>` | `saude-monitor-backend-prod` | site prod | `saude_monitor_prod` |
+
+> **Regra de ouro:** cada ambiente usa **banco de dados separado** e **JWT_SECRET diferente**. Nunca compartilhe dados entre ambientes.
+
+---
+
+## 3. Fluxo de Desenvolvimento (Gitflow)
+
+```
+feature/* ──► develop ──► main ──► release/<tag>
+   (dev)        (dev)      (hom)      (prod)
+```
+
+### 3.1 Nova funcionalidade
+1. Crie a branch a partir de `develop`:
+   ```bash
+   git checkout develop
+   git pull origin develop
+   git checkout -b feature/<nome-da-feature>
+   ```
+2. Desenvolva e commite.
+3. Abra um **Pull Request** para `develop`.
+4. Após merge, o CI roda e o **ambiente dev** é atualizado automaticamente.
+
+### 3.2 Correção de bug em funcionalidade já entregue
+1. Crie a branch a partir de `develop`:
+   ```bash
+   git checkout -b hotfix/<nome-do-fix>
+   ```
+2. Desenvolva, commite e abra PR para `develop`.
+
+### 3.3 Promoção para homologação
+1. Abra um **Pull Request** de `develop` → `main`.
+2. Após merge, o **ambiente hom** é atualizado automaticamente.
+
+### 3.4 Release de produção
+1. Teste em **homologação**.
+2. No GitHub: **Actions → Release - Gerar branch de produção → Run workflow**, informando a versão (ex.: `1.0.0`).
+3. O workflow cria a branch **`release/1.0.0`** a partir da `main`.
+4. O push da branch `release/1.0.0` dispara o deploy do **ambiente prod**.
+5. Após validar em produção, faça merge de `release/1.0.0` de volta em `main` (e `develop`).
+
+---
+
+## 4. CI/CD
+
+### 4.1 Workflows
+
+| Workflow | Gatilho | Ação |
+|----------|---------|------|
+| `ci.yml` | push/PR em `develop`/`main` | Build + testes do backend e frontend |
+| `cd-backend.yml` | push em `develop`, `main`, `release/**` | Docker → GHCR → deploy Render (dev/hom/prod) |
+| `cd-frontend.yml` | push em `develop`, `main`, `release/**` | Build web → deploy Netlify (dev/hom/prod) |
+| `release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `main` |
+
+### 4.2 Mapeamento de ambiente (lógica do `resolve-env`)
+
+| Branch | Ambiente | Tag da imagem GHCR |
+|--------|----------|--------------------|
+| `develop` | `dev` | `dev` |
+| `main` | `hom` | `hom` |
+| `release/<tag>` | `prod` | `<tag>` (ex.: `1.0.0`) |
+
+### 4.3 Secrets do GitHub
+
+Cada secret tem sufixo por ambiente (`_DEV`, `_HOM`, `_PROD`):
+
+| Secret | Descrição |
+|--------|-----------|
+| `RENDER_API_KEY_DEV/HOM/PROD` | API Key do Render |
+| `RENDER_SERVICE_ID_DEV/HOM/PROD` | ID do serviço do backend no Render |
+| `NETLIFY_AUTH_TOKEN_DEV/HOM/PROD` | Token de acesso do Netlify |
+| `NETLIFY_SITE_ID_DEV/HOM/PROD` | ID do site no Netlify |
+
+---
+
+## 5. Deploy Manual (primeira configuração)
+
+### 5.1 MongoDB Atlas
+1. Crie um cluster **M0** (free tier).
+2. Crie um usuário com senha.
+3. Libere o IP `0.0.0.0/0` (ou o IP do Render).
+4. Crie 3 bancos: `saude_monitor_dev`, `saude_monitor_hom`, `saude_monitor_prod`.
+
+### 5.2 Render (backend)
+1. Crie 3 Web Services apontando para as imagens GHCR (`:dev`, `:hom`, `:<tag>`).
+2. Configure as variáveis de ambiente (ver `backend/.env.example`).
+3. Anote os **Service IDs**.
+
+### 5.3 Netlify (frontend)
+1. Crie 3 sites (dev, hom, prod).
+2. Anote os **Site IDs**.
+
+### 5.4 Variáveis de ambiente do backend
+
+| Variável | Descrição |
+|----------|-----------|
+| `MONGO_HOST` | Host do cluster Atlas |
+| `MONGO_PORT` | Porta (27017) |
+| `MONGO_DATABASE` | Banco do ambiente (ex.: `saude_monitor_prod`) |
+| `MONGO_AUTH_DB` | Banco de autenticação (admin) |
+| `MONGO_USER` | Usuário do Atlas |
+| `MONGO_PASSWORD` | Senha do Atlas |
+| `JWT_SECRET` | Chave aleatória ≥ 32 bytes (**diferente por ambiente**) |
+| `ADMIN_EMAIL` | E-mail do admin inicial |
+| `ADMIN_SENHA` | Senha do admin inicial |
+| `APP_SEED_ENABLED` | `false` em produção |
+
+---
+
+## 6. Testes
+
+### 6.1 Backend
+```bash
+cd backend
+./gradlew build
+```
+
+### 6.2 Frontend
+```bash
+cd frontend
+npm ci
+npm run typecheck
+npx expo export --platform web
+```
+
+### 6.3 Teste manual do Épico 2 (check-in/checkout)
+Com o backend de pé, use a API:
+```bash
+# Check-in (ponto dentro do geofence)
+curl -X POST http://localhost:8080/api/v1/visitas/checkin \
+  -H "Content-Type: application/json" \
+  -d '{"hospitalId":"<ID>","origem":"GEOFENCE","posicao":{"type":"Point","coordinates":[-48.1211,-15.8251]},"dispositivoId":"teste-001"}'
+
+# Checkout
+curl -X POST http://localhost:8080/api/v1/visitas/<ID>/checkout \
+  -H "Content-Type: application/json" \
+  -d '{"posicao":{"type":"Point","coordinates":[-48.1211,-15.8251]}}'
+```
+
+---
+
+## 7. Observações
+
+- O **Render free** "dorme" após ~15 min de inatividade e acorda na primeira requisição (~30s).
+- O **frontend web** é o build do Expo; o **APK mobile** é gerado localmente via `expo run:android`.
+- Para o frontend web apontar para o backend correto, configure `expo.extra.apiBaseUrlWeb` em `frontend/app.json` (o `api.js` já lê essa variável).

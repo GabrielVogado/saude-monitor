@@ -17,3 +17,7 @@ local.properties
 
 # Bundle artifacts
 *.jsbundle
+
+# Artefatos transitórios de build do Android (APKs versionadas são a exceção acima)
+app/build/outputs/apk/**/output-metadata.json
+app/build/outputs/apk/**/baselineProfiles/

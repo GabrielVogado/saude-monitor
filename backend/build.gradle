@@ -24,6 +24,9 @@ repositories {
 }
 
 dependencies {
+	// Carrega variáveis de ambiente do arquivo .env na raiz do projeto (desenvolvimento local).
+	implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
 	implementation 'org.springframework.boot:spring-boot-starter-security'

@@ -1,0 +1,36 @@
+name: Release - Gerar branch de produção
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versão da release (ex.: 1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  branch:
+    name: Criar branch release/${{ inputs.version }} a partir da main
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validar que está na main
+        run: |
+          if [[ "$(git rev-parse --abbrev-ref HEAD)" != "main" ]]; then
+            echo "A release só pode ser gerada a partir da main."
+            exit 1
+          fi
+
+      - name: Criar e enviar a branch release/${{ inputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "release/${{ inputs.version }}"
+          git push origin "release/${{ inputs.version }}"

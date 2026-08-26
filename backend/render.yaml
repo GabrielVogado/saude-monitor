@@ -1,0 +1,96 @@
+# Blueprint do Render para o backend (free tier) — 3 ambientes.
+# Uso: no painel do Render, "New +" > "Blueprint" > apontar para este repositório.
+# Ou criar 3 Web Services manualmente apontando para as imagens GHCR.
+#
+# Imagens por ambiente (geradas pelo cd-backend.yml):
+#   dev  -> ghcr.io/gabrielvogado/saude-monitor-backend:dev
+#   hom  -> ghcr.io/gabrielvogado/saude-monitor-backend:hom
+#   prod -> ghcr.io/gabrielvogado/saude-monitor-backend:<tag> (tag = nome após release/)
+
+services:
+  - type: web
+    name: saude-monitor-backend-dev
+    runtime: image
+    image:
+      url: ghcr.io/gabrielvogado/saude-monitor-backend:dev
+    plan: free
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MONGO_HOST
+        sync: false
+      - key: MONGO_PORT
+        value: "27017"
+      - key: MONGO_DATABASE
+        value: saude_monitor_dev
+      - key: MONGO_AUTH_DB
+        value: admin
+      - key: MONGO_USER
+        sync: false
+      - key: MONGO_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_EMAIL
+        value: admin@saude.com
+      - key: ADMIN_SENHA
+        sync: false
+      - key: APP_SEED_ENABLED
+        value: "false"
+
+  - type: web
+    name: saude-monitor-backend-hom
+    runtime: image
+    image:
+      url: ghcr.io/gabrielvogado/saude-monitor-backend:hom
+    plan: free
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MONGO_HOST
+        sync: false
+      - key: MONGO_PORT
+        value: "27017"
+      - key: MONGO_DATABASE
+        value: saude_monitor_hom
+      - key: MONGO_AUTH_DB
+        value: admin
+      - key: MONGO_USER
+        sync: false
+      - key: MONGO_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_EMAIL
+        value: admin@saude.com
+      - key: ADMIN_SENHA
+        sync: false
+      - key: APP_SEED_ENABLED
+        value: "false"
+
+  - type: web
+    name: saude-monitor-backend-prod
+    runtime: image
+    image:
+      url: ghcr.io/gabrielvogado/saude-monitor-backend:1.0.0
+    plan: free
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MONGO_HOST
+        sync: false
+      - key: MONGO_PORT
+        value: "27017"
+      - key: MONGO_DATABASE
+        value: saude_monitor_prod
+      - key: MONGO_AUTH_DB
+        value: admin
+      - key: MONGO_USER
+        sync: false
+      - key: MONGO_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_EMAIL
+        value: admin@saude.com
+      - key: ADMIN_SENHA
+        sync: false
+      - key: APP_SEED_ENABLED
+        value: "false"

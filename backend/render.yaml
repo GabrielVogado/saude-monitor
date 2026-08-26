@@ -1,0 +1,33 @@
+# Blueprint do Render para o backend (free tier).
+# Uso: no painel do Render, "New +" > "Blueprint" > apontar para este repositório.
+# Ou criar um Web Service manualmente apontando para a imagem GHCR.
+
+services:
+  - type: web
+    name: saude-monitor-backend
+    runtime: image
+    image:
+      url: ghcr.io/gabrielvogado/saude-monitor-backend:latest
+    plan: free
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MONGO_HOST
+        sync: false        # preencher no painel (Atlas cluster)
+      - key: MONGO_PORT
+        value: "27017"
+      - key: MONGO_DATABASE
+        value: saude_monitor
+      - key: MONGO_AUTH_DB
+        value: admin
+      - key: MONGO_USER
+        sync: false
+      - key: MONGO_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_EMAIL
+        value: admin@saude.com
+      - key: ADMIN_SENHA
+        sync: false
+      - key: APP_SEED_ENABLED
+        value: "false"

@@ -45,9 +45,7 @@ frontend/.env*.local
 frontend/*.tsbuildinfo
 
 # generated native folders
-/ios
-/android
-frontend/ios
+
 
 # IDE/editor local config
 .idea/
@@ -55,9 +53,7 @@ frontend/ios
 *.iml
 
 # Android/Gradle local files
-frontend/android/.gradle/
-frontend/android/local.properties
-frontend/android/**/build/
+
 
 # React Native temporary and cache files
 .bundle/

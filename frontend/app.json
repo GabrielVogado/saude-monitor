@@ -33,7 +33,7 @@
     "extra": {
       "apiBaseUrl": "http://localhost:8080",
       "apiBaseUrlWeb": "http://localhost:8080",
-      "apiBaseUrlAndroid": "http://10.0.2.2:8080",
+      "apiBaseUrlAndroid": "http://192.168.100.11:8080",
       "apiBaseUrlIos": "http://localhost:8080"
     },
     "plugins": [

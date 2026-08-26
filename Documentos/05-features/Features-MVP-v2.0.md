@@ -36,6 +36,7 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 | **F-08** | Polimento e acessibilidade | Épico 6 | P1 | 🟡 Parcial | E6-02, E6-03, E6-04, E6-05 | — | M (20) |
 | **F-09** | Segurança e privacidade | Fase 0 + Épico 5 | P0 | 🔴 Não conforme | F0-03, F0-04, E5-01, E5-02, E5-05 | RN-21, RNF-05, RNF-06 | M (18) |
 | **F-10** | Moderação de sugestões de hospitais | Épico 1 | P1 | 🔴 Inexistente | E1-06 | — | S (5) |
+| **F-11** | Painel Administrativo Web (hospitais + georreferenciamento) | Épico 7 | P0 | 🔴 Inexistente | E7-01..E7-09 | — | L (25) |
 
 > **Legenda de status:** ✅ Existente (funcional) · 🟡 Parcial (precisa refatoração) · 🔴 Inexistente/Inexistente (construir do zero) · 🔴 Não conforme (violação de segurança/LGPD — corrigir antes de qualquer deploy). Verificação completa: `Relatorio-Aderencia-Codigo-vs-Features.md`.
 
@@ -432,6 +433,48 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 
 ---
 
+### Feature F-11: Painel Administrativo Web (Hospitais + Georreferenciamento)
+
+- **ID:** F-11
+- **Épico:** Épico 7 — Painel Administrativo Web
+- **Prioridade:** P0 — a partir desta feature, **toda a gestão administrativa deixa de existir no app mobile** e passa a viver exclusivamente na aplicação web; sem ela, não há como operar o cadastro de hospitais e a moderação de sugestões (F-10) de forma apropriada ao perfil de uso (desktop, múltiplas camadas de mapa, formulários extensos).
+- **Status de implementação:** 🔴 **Inexistente** — nenhuma aplicação web existe hoje; o cadastro/edição de hospitais e a moderação (F-01, F-10) haviam sido desenhados para o app mobile e são **realocados** para este painel.
+- **Descrição:** Aplicação web separada do app mobile, destinada exclusivamente a administradores (papel `ADMIN`), consumindo a mesma API REST do backend (nenhum endpoint novo é criado por esta feature além dos já previstos em E1/E1-06). Oferece:
+  1. **Listagem de todos os hospitais** cadastrados (ativos e inativos), com filtros por nome, tipo, status e por divisão geográfica (Região Administrativa, Região de Saúde, Macrorregião de Saúde).
+  2. **Visualização em mapa** com 4 camadas geográficas sobrepostas e alternáveis: Região Administrativa, Região Integrada de Desenvolvimento, Regiões de Saúde e Macrorregiões de Saúde — construídas a partir dos shapefiles em `D:\saude-monitor\multiplas_camadas_saude_14` (convertidos para GeoJSON e servidos pelo backend).
+  3. **Detalhe do hospital** ao clicar no ícone no mapa (ou na linha da lista): exibe todos os dados cadastrais, permite editar ou desativar. Hospital desativado passa a ser exibido com **ícone de hospital em cor cinza** (tanto na lista quanto no mapa), diferenciando-o visualmente do ativo (ícone colorido).
+  4. **Bloqueio de escrita sobre feedbacks**: o painel nunca expõe ação de criar/editar/excluir feedback de usuário — apenas indicadores agregados de leitura (nota média, N), reaproveitando os endpoints públicos de indicadores.
+  5. **Menu de navegação** fixo com as opções "Hospitais" (lista), "Mapa" (visão georreferenciada) e "Sugestões pendentes" (reaproveita a fila de moderação de F-10).
+- **User Stories vinculadas:** E7-01, E7-02, E7-03, E7-04, E7-05, E7-06, E7-07, E7-08, E7-09
+- **Critérios de aceite:**
+  1. Login web autentica via `POST /auth/login`; acesso ao painel exige papel `ADMIN` (usuário sem esse papel é redirecionado/rejeitado)
+  2. Listagem de hospitais consome `GET /hospitais` (variante admin, incluindo inativos), paginada e ordenável
+  3. Filtros combináveis por nome, tipo, status e por Região Administrativa/Região de Saúde/Macrorregião de Saúde
+  4. Mapa renderiza as 4 camadas de divisão geográfica como GeoJSON independentes, com toggle de visibilidade por camada
+  5. Pins de hospitais sobrepostos ao mapa; clique no pin ou na linha da lista abre a tela de detalhe (`GET /hospitais/{id}`)
+  6. Tela de detalhe permite editar (`PUT /hospitais/{id}`) com revalidação de geofence, e desativar/reativar (`PATCH /hospitais/{id}/status`)
+  7. Hospital inativo é exibido com ícone cinza (lista e mapa); hospital ativo mantém o ícone colorido padrão
+  8. Nenhuma tela do painel expõe formulário de escrita sobre feedbacks; indicadores aparecem apenas como leitura agregada
+  9. Menu fixo com "Hospitais", "Mapa" e "Sugestões pendentes" (esta última reaproveitando as telas equivalentes de F-10, agora migradas para a web)
+  10. Responsivo o suficiente para uso em desktop (resolução mínima alvo: 1366×768); não é requisito rodar em mobile
+- **Regras de negócio aplicáveis:** RN-19 (transparência dos indicadores públicos), RN-22 (integridade e imparcialidade do feedback — admin não altera)
+- **Dependências:** depende do backend de F-01 (Cadastro e Gestão de Hospitais) e F-10 (Moderação de Sugestões) já existirem — reaproveita os mesmos endpoints, sem exigir novos contratos de API. Depende da conversão dos shapefiles de `multiplas_camadas_saude_14` para GeoJSON (nova responsabilidade desta feature, documentada no plano técnico correspondente). Ver `02-arquitetura-tecnica/Plano-Tecnico-Painel-Administrativo-Web-v1.0.md` para stack, estrutura de pastas e consumo da API.
+- **Esforço estimado:** **L** (2 sprints/1 frente dedicada). Justificativa: é uma aplicação nova (não reaproveita telas mobile), com mapa multi-camada, CRUD completo e autenticação própria; compensado por não precisar criar endpoints novos no backend. Estórias: 9.
+- **Riscos:**
+  - **Volume/peso dos GeoJSON das 4 camadas administrativas** (arquivos de Macrorregiões chegam a ~400KB de shapefile): mitigação — simplificação de geometria (`mapshaper`/`topojson`) antes de servir ao cliente, cache no backend.
+  - **Divergência de nomenclatura entre bases** (ex.: "Sudoeste/Octogonal" vs. "Sudoeste"): mitigação — normalizar nomes de região no processo de importação, com relatório de auditoria (mesmo padrão já usado para hospitais em `07-dados/`).
+  - **Confusão de escopo entre app mobile e painel web**: mitigação — nenhuma tela administrativa remanescente no app mobile (F-01/F-10 migram integralmente para F-11); reforçar via este documento e revisão de PR.
+  - **Acesso indevido de admin a dados de feedback**: mitigação — nenhum endpoint de escrita de feedback é exposto ao papel `ADMIN` no backend (Spring Security), reforçado por ausência de UI correspondente.
+- **Critério de pronto (DoD específico):**
+  - Login exige papel `ADMIN`; usuário `USER` não acessa o painel
+  - Mapa exibe corretamente as 4 camadas com toggle, sobre dados reais de `multiplas_camadas_saude_14`
+  - Clique no pin/linha da lista abre detalhe correto do hospital
+  - Edição e desativação funcionam ponta a ponta; hospital desativado aparece cinza em lista e mapa
+  - Nenhuma ação de escrita sobre feedback é alcançável pela UI ou pela API a partir do papel `ADMIN`
+  - Filtros combináveis testados (nome, tipo, status, região)
+
+---
+
 ## 4. Mapa de Dependências entre Features
 
 ```mermaid
@@ -439,6 +482,8 @@ graph TD
     F01["F-01: Cadastro e Gestão de Hospitais"] --> F03["F-03: Detecção Automática Entrada/Saída"]
     F01 --> F07["F-07: Mapa e Busca de Hospitais"]
     F01 --> F10["F-10: Moderação de Sugestões de Hospitais"]
+    F01 --> F11["F-11: Painel Administrativo Web"]
+    F10 --> F11
     F02["F-02: Autenticação e Conta do Usuário"] --> F04["F-04: Visita Ativa e Cronômetro"]
     F02 --> F05["F-05: Feedback Pós-Saída"]
     F02 --> F06["F-06: Indicadores Públicos"]
@@ -772,6 +817,7 @@ Com base na Árvore Tecnológica (Fase 0 → 1 → 2) e nas dependências do roa
 | F-08 | Nota WCAG, tempo de carregamento, crashes | Lighthouse/axe + Crashlytics | WCAG AA 100%; p95 carregamento < 2s; crash-free ≥ 99.5% |
 | F-09 | Permissões concedidas, termos aceitos, rate limits disparados | Analytics + logs | ≥ 60% concedem localização; 100% aceitam termos; ≤ 1% de req bloqueadas por rate limit |
 | F-10 | Sugestões moderadas (tempo médio de fila), taxa de aprovação, rejeições com motivo | Query no banco + analytics | 100% das sugestões pendentes > 7 dias moderadas; taxa de aprovação acompanha; 0 rejeições sem motivo |
+| F-11 | Hospitais editados/desativados via painel, uso por camada de mapa, tempo até localizar um hospital via filtro | Logs de auditoria + analytics do painel web | 100% das operações de CRUD feitas via painel (zero mais via mobile); 0 incidentes de acesso indevido a feedback |
 
 ---
 
@@ -873,25 +919,25 @@ sequenceDiagram
 
 ## 15. Entregáveis por Sprint (Checklist de Feature Sign-off)
 
-### Sprint 0 — Fundações (Features: F-02 parcial, F-09 parcial)
+### Sprint 0 — Fundações (Features: F-02 parcial, F-09 parcial) ✅ Concluído
 
-- [ ] Hash BCrypt implementado e testado (senha nunca em texto puro)
-- [ ] JWT access + refresh funcional com rotação
-- [ ] `GlobalExceptionHandler` padronizado com envelope pt-BR
-- [ ] Rate limiting configurado em `login` e endpoints públicos
-- [ ] Endpoint de exclusão de conta (`DELETE /usuarios/me`) funcional
-- [ ] Cadastro + login via API funcionais com validação
+- [x] Hash BCrypt implementado e testado (senha nunca em texto puro)
+- [x] JWT access + refresh funcional com rotação
+- [x] `GlobalExceptionHandler` padronizado com envelope pt-BR
+- [x] Rate limiting configurado em `login` e endpoints públicos
+- [x] Endpoint de exclusão de conta (`DELETE /usuarios/me`) funcional
+- [x] Cadastro + login via API funcionais com validação
 
-### Sprint 1 — Hospitais e Mapa (Features: F-01, F-07, F-10)
+### Sprint 1 — Hospitais, Mapa e Moderação de Sugestões (Features: F-01, F-07, F-10) ✅ Concluído
 
-- [ ] CRUD de hospital com validação de polígono GeoJSON
-- [ ] Índice `2dsphere` criado e verificado
-- [ ] Endpoint público `GET /hospitais` com filtro `?nome=`, `?lat=`, `?lon=`
-- [ ] Bottom Tabs implementados (Mapa, Hospitais, Perfil)
-- [ ] Mapa funcional com pins de hospitais + FAB de GPS
-- [ ] Lista de hospitais com busca por nome
-- [ ] 10 hospitais seedados para desenvolvimento
-- [ ] Endpoints admin de moderação de sugestões (`GET /hospitais/sugestoes`, `POST /hospitais/sugestoes/{id}/aprovar`, `POST /hospitais/sugestoes/{id}/rejeitar`)
+- [x] CRUD de hospital com validação de polígono GeoJSON
+- [x] Índice `2dsphere` criado e verificado
+- [x] Endpoint público `GET /hospitais` com filtro `?nome=`, `?lat=`, `?lon=`
+- [x] Bottom Tabs implementados (Mapa, Hospitais, Perfil)
+- [x] Mapa funcional com pins de hospitais + FAB de GPS
+- [x] Lista de hospitais com busca por nome
+- [x] 10 hospitais seedados para desenvolvimento
+- [x] Endpoints admin de moderação de sugestões (`GET /hospitais/sugestoes`, `POST /hospitais/sugestoes/{id}/aprovar`, `POST /hospitais/sugestoes/{id}/rejeitar`)
 - [ ] Tela de fila de moderação de sugestões no app (apenas admin)
 - [ ] Fluxo de aprovação pré-preenche formulário de hospital e vincula sugestão a hospital criado
 
@@ -966,6 +1012,7 @@ sequenceDiagram
 | F-08 | 0 | 1 (pleno) + 1 (design) | 1 | 1 | Média (volume) | 1-2 sprints |
 | F-09 | 0.5 | 0.5 | 0.5 | 0.25 | Média | 1 sprint |
 | F-10 | 0.5 | 0.5 (pleno) | 0.25 | 0.25 | Baixa | 1 sprint |
+| F-11 | 0.25 | 1 (pleno, web) | 0.5 | 0.5 | Média | 2 sprints |
 
 > **Time sugerido total:** 2 backend (1 sênior + 1 pleno), 2 mobile (1 sênior + 1 pleno), 1 QA, 1 designer de produto. Total: 6 pessoas em dedicação parcial (50-100% conforme sprint).
 

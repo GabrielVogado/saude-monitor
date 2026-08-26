@@ -5,6 +5,9 @@
 # Android/IntelliJ
 #
 build/
+# Exceção: APKs gerados (debug/release) são versionados propositalmente (Épico 02).
+!app/build/outputs/apk/
+!app/build/outputs/apk/**
 .idea
 .gradle
 local.properties

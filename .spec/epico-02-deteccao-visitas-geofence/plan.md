@@ -21,9 +21,9 @@
 ## Fase 0 — Pré-requisitos e dependências
 
 - [x] [BACKEND] Step 1: Confirmar `@EnableScheduling` disponível.
-- [ ] [MOBILE] Step 2: Adicionar dependências ao `frontend/package.json`: `expo-task-manager`,
+- [x] [MOBILE] Step 2: Adicionar dependências ao `frontend/package.json`: `expo-task-manager`,
   `expo-notifications`.
-- [ ] [MOBILE] Step 3: Atualizar `frontend/app.json`: permissão `ACCESS_BACKGROUND_LOCATION`,
+- [x] [MOBILE] Step 3: Atualizar `frontend/app.json`: permissão `ACCESS_BACKGROUND_LOCATION`,
   plugin `expo-location` com `locationAlwaysAndWhenInUsePermission`/`isAndroidBackgroundLocationEnabled`,
   `NSLocationAlwaysAndWhenInUseUsageDescription`, plugin `expo-notifications`.
 
@@ -70,17 +70,33 @@
 
 ## Fase 5 — UI / Telas mobile / Rotas (Mobile)
 
-- [ ] [MOBILE] Step 24 `[E2-01/E2-02]`: `GeofencingTaskService.js`.
-- [ ] [MOBILE] Step 24 `[E2-01/E2-02]`: `GeofencingTaskService.js` — ⚠️ pendente (geofencing nativo em background).
+- [x] [MOBILE] Step 24 `[E2-01/E2-02]`: `GeofencingTaskService.js`.
+- [x] [MOBILE] Step 24 `[E2-01/E2-02]`: `GeofencingTaskService.js` — `TaskManager.defineTask` +
+  `startGeofencingAsync`/`stopGeofencingAsync` com regiões de ~120m a partir do centroide do
+  geofence de cada hospital próximo; tolerâncias RN-01 (2min)/RN-03 (5min) aplicadas em memória
+  via `setTimeout` por hospital, já que os eventos nativos disparam uma única vez.
 - [x] [MOBILE] Step 25 `[E2-01/E2-02]`: `VisitaService.js` (cliente HTTP completo).
-- [ ] [MOBILE] Step 26 `[E2-09]`: heartbeat periódico (30 min) — ⚠️ pendente.
+- [x] [MOBILE] Step 26 `[E2-09]`: heartbeat periódico (30 min) — `HeartbeatService.js` com
+  `setInterval` em foreground (heartbeat nativo em background fica fora de escopo deste commit;
+  a ausência de sinal em background é coberta pelo job do backend + pelo `GeofencingTaskService`).
 - [x] [MOBILE] Step 27 `[E2-06]`: `CheckinManualScreen` (fallback sem GPS).
 - [x] [MOBILE] Step 28 `[E2-07]`: `CSGeoStatusCard` (cronômetro + "Não estou aqui"); notificação persistente ⚠️ pendente.
-- [ ] [MOBILE] Step 29 `[E2-04]`: tratamento de conflito 409 — ⚠️ pendente (backend pronto).
-- [ ] [MOBILE] Step 30 `[E2-05]`: estado "Recuperando localização..."/`GPS_INTERROMPIDO` — ⚠️ pendente.
-- [ ] [MOBILE] Step 31 `[E2-10]`: prompt de tipo de permanência (12h) — ⚠️ pendente.
+- [x] [MOBILE] Step 29 `[E2-04]`: tratamento de conflito 409 — `CheckinManualScreen` exibe
+  `Alert` com os `candidatos` e reenvia o check-in com o `hospitalId` escolhido; `VisitaService`
+  anexa `status`/`data` ao erro lançado para permitir esse tratamento; `GeofencingTaskService`
+  ignora silenciosamente o 409 (sem UI em background) e deixa o usuário resolver manualmente.
+- [x] [MOBILE] Step 30 `[E2-05]`: estado "Recuperando localização..."/`GPS_INTERROMPIDO` —
+  `CSGeoStatusCard` vira somente leitura ("Localização perdida - visita encerrada
+  automaticamente") quando `visita.status === "GPS_INTERROMPIDO"`.
+- [x] [MOBILE] Step 31 `[E2-10]`: prompt de tipo de permanência (12h) — implementado com
+  `Alert.alert` (Observação/Internação) ao focar a `HomeScreen`, quando a visita ativa já
+  passou de 12h e não tem `tipoPermanencia`; escolhido por consistência com o padrão de
+  confirmações já usado no app (`Alert.alert`), em vez de agendar notificação local via
+  `expo-notifications` (mais complexo e não coberto por outro fluxo do app).
 - [x] [MOBILE] Step 32: rotas em `App.js` (`VisitasStack`) + botão "Estou em um hospital" na `HomeScreen`.
-- [ ] [MOBILE] Step 33: avaliar substituição de `watchPositionAsync` (ADR-002, pode adiar).
+- [x] [MOBILE] Step 33: avaliada substituição de `watchPositionAsync` (ADR-002) — mantido como
+  ferramenta de depuração/mapa; ciclo de vida das visitas passou para `GeofencingTaskService`.
+  Comentário adicionado no topo de `GeoLocalizacaoScreen.js` referenciando a decisão.
 
 ## Fase 6 — Validação / DoD (transversal, após Fases 1–5)
 

@@ -80,7 +80,12 @@ async function request(path, { method = "GET", body, headers = {} } = {}) {
       data?.message ||
       data?.error ||
       `Falha na requisição (HTTP ${response.status}).`;
-    throw new Error(message);
+    const erro = new Error(message);
+    // Anexa status HTTP e corpo bruto para tratamentos específicos (ex.: 409 de
+    // conflito de geofence com `candidatos`, E2-04) sem quebrar quem só usa `.message`.
+    erro.status = response.status;
+    erro.data = data;
+    throw erro;
   }
 
   return data;

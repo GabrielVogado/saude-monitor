@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from "react";
-import {FlatList, Text, View} from "react-native";
+import {Alert, FlatList, Text, View} from "react-native";
 import {SafeAreaView} from "react-native-safe-area-context";
 import HospitalService from "../../hospitais/service/HospitalService";
 import VisitaService from "../service/VisitaService";
@@ -31,6 +31,45 @@ export default function CheckinManualScreen({ navigation }) {
     try {
       await VisitaService.checkin({
         hospitalId: hospital.id,
+        origem: "MANUAL",
+      });
+      navigation.goBack();
+    } catch (e) {
+      if (e.status === 409 && e.data?.candidatos?.length) {
+        tratarConflitoGeofence(e.data);
+        return;
+      }
+      setErro(e.message);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  /**
+   * Conflito de geofences sobrepostos (E2-04/RN-05): o backend não cria a visita e
+   * devolve `candidatos` (hospitais empatados em distância, ≤10m). Pergunta em 1 toque
+   * qual deles é o correto e reenvia o check-in com o `hospitalId` escolhido.
+   */
+  const tratarConflitoGeofence = (conflito) => {
+    Alert.alert(
+      "Qual hospital é este?",
+      conflito.message || "Encontramos mais de um hospital nesta localização.",
+      [
+        ...conflito.candidatos.map((candidato) => ({
+          text: candidato.nome,
+          onPress: () => reenviarCheckinComCandidato(candidato),
+        })),
+        { text: "Cancelar", style: "cancel", onPress: () => setEnviando(false) },
+      ]
+    );
+  };
+
+  const reenviarCheckinComCandidato = async (candidato) => {
+    setEnviando(true);
+    setErro(null);
+    try {
+      await VisitaService.checkin({
+        hospitalId: candidato.hospitalId,
         origem: "MANUAL",
       });
       navigation.goBack();

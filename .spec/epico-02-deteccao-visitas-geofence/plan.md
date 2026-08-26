@@ -70,14 +70,15 @@
 ## Fase 5 — UI / Telas mobile / Rotas (Mobile)
 
 - [ ] [MOBILE] Step 24 `[E2-01/E2-02]`: `GeofencingTaskService.js`.
-- [ ] [MOBILE] Step 25 `[E2-01/E2-02]`: `VisitaService.js`.
-- [ ] [MOBILE] Step 26 `[E2-09]`: heartbeat periódico (30 min).
-- [ ] [MOBILE] Step 27 `[E2-06]`: `CheckinManualScreen`.
-- [ ] [MOBILE] Step 28 `[E2-07]`: `CSGeoStatusCard` + notificação persistente.
-- [ ] [MOBILE] Step 29 `[E2-04]`: tratamento de conflito 409 (bloqueado até Step 16 do backend).
-- [ ] [MOBILE] Step 30 `[E2-05]`: estado "Recuperando localização..."/`GPS_INTERROMPIDO`.
-- [ ] [MOBILE] Step 31 `[E2-10]`: prompt de tipo de permanência (12h).
-- [ ] [MOBILE] Step 32: registrar rotas em `App.js` + botão na `HomeScreen`.
+- [ ] [MOBILE] Step 24 `[E2-01/E2-02]`: `GeofencingTaskService.js` — ⚠️ pendente (geofencing nativo em background).
+- [x] [MOBILE] Step 25 `[E2-01/E2-02]`: `VisitaService.js` (cliente HTTP completo).
+- [ ] [MOBILE] Step 26 `[E2-09]`: heartbeat periódico (30 min) — ⚠️ pendente.
+- [x] [MOBILE] Step 27 `[E2-06]`: `CheckinManualScreen` (fallback sem GPS).
+- [x] [MOBILE] Step 28 `[E2-07]`: `CSGeoStatusCard` (cronômetro + "Não estou aqui"); notificação persistente ⚠️ pendente.
+- [ ] [MOBILE] Step 29 `[E2-04]`: tratamento de conflito 409 — ⚠️ pendente (backend pronto).
+- [ ] [MOBILE] Step 30 `[E2-05]`: estado "Recuperando localização..."/`GPS_INTERROMPIDO` — ⚠️ pendente.
+- [ ] [MOBILE] Step 31 `[E2-10]`: prompt de tipo de permanência (12h) — ⚠️ pendente.
+- [x] [MOBILE] Step 32: rotas em `App.js` (`VisitasStack`) + botão "Estou em um hospital" na `HomeScreen`.
 - [ ] [MOBILE] Step 33: avaliar substituição de `watchPositionAsync` (ADR-002, pode adiar).
 
 ## Fase 6 — Validação / DoD (transversal, após Fases 1–5)

@@ -13,6 +13,7 @@ import HospitalDetalheScreen from "./src/screens/hospitais/view/HospitalDetalheS
 import SugerirHospitalScreen from "./src/screens/hospitais/view/SugerirHospitalScreen.js";
 import SugestoesPendentesScreen from "./src/screens/hospitais/view/SugestoesPendentesScreen.js";
 import RevisarSugestaoScreen from "./src/screens/hospitais/view/RevisarSugestaoScreen.js";
+import CheckinManualScreen from "./src/screens/visitas/view/CheckinManualScreen.js";
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -60,6 +61,15 @@ function MainStack({ navigation }) {
     );
 }
 
+// Stack do Épico 02 — Detecção de Visitas (Geofence)
+function VisitasStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="CheckinManual" component={CheckinManualScreen} />
+        </Stack.Navigator>
+    );
+}
+
 // Stack do Épico 01 — Cadastro de Hospitais e Geofences
 function HospitaisStack() {
     return (
@@ -85,6 +95,13 @@ export default function App() {
                 >
                     <Drawer.Screen name="Home" component={MainStack} />
                     <Drawer.Screen name="Hospitais" component={HospitaisStack} />
+                    <Drawer.Screen
+                        name="Visitas"
+                        component={VisitasStack}
+                        options={{
+                            drawerItemStyle: { display: "none" },
+                        }}
+                    />
                     <Drawer.Screen name="Login" component={LoginScreen} />
                     <Drawer.Screen name="Cadastro" component={UserScreen} />
                     <Drawer.Screen

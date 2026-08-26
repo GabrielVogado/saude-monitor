@@ -8,6 +8,7 @@ public record CheckoutResponse(
         String id,
         Instant saida,
         Integer duracaoMinutos,
-        StatusVisita status
+        StatusVisita status,
+        boolean encerramentoManual
 ) {
 }

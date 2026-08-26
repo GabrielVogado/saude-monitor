@@ -69,7 +69,8 @@ public class VisitaDocument {
     private Instant ultimaPosicaoEm;
 
     /** {@code true} quando a visita foi encerrada manualmente pelo usuário (botão "Não estou aqui", E2-07/F-04 CA#3). */
-    private Boolean encerramentoManual;
+    @Builder.Default
+    private boolean encerramentoManual = false;
 
     private OrigemVisita origem;
 

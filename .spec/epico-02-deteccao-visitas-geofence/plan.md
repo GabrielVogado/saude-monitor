@@ -57,8 +57,9 @@
   `checkin`/`checkout`/`heartbeat` (posição opcional); `VisitaGpsInterrompidoJob` encerra
   visitas ativas sem sinal de posição por 10min como `GPS_INTERROMPIDO`.
 - [x] [BACKEND] Step 18 `[E2-10]`: `definirTipoPermanencia` com validação de 12h.
-- [x] [BACKEND] Step 19 `[E2-08]`: flag `curta` (`duracaoMinutos < 2`) no `VisitaResponse`;
-  exclusão da agregação pública fica para o job do Épico 04 (F-06), conforme plano.
+- [x] [BACKEND] Step 19 `[E2-08]`: flag `visitaValida` (`true` quando `duracaoMinutos == null`
+  ou `>= 2`) no `VisitaResponse`; exclusão da agregação pública fica para o job do Épico 04
+  (F-06), conforme plano.
 
 ## Fase 4 — Controllers / Endpoints REST (Backend)
 

@@ -132,7 +132,8 @@ public class VisitaServiceImpl implements VisitaService {
         }
 
         VisitaDocument salva = visitaRepository.save(visita);
-        return new CheckoutResponse(salva.getId(), salva.getSaida(), salva.getDuracaoMinutos(), salva.getStatus());
+        return new CheckoutResponse(salva.getId(), salva.getSaida(), salva.getDuracaoMinutos(),
+                salva.getStatus(), salva.isEncerramentoManual());
     }
 
     @Override
@@ -209,14 +210,33 @@ public class VisitaServiceImpl implements VisitaService {
     @Override
     public void processarGpsInterrompido() {
         Instant agora = Instant.now();
-        List<VisitaDocument> semSinal = visitaRepository.findByStatusInAndUltimaPosicaoEmBefore(
-                STATUS_ATIVOS, agora.minus(LIMITE_GPS_INTERROMPIDO));
+
+        List<VisitaDocument> semSinal = visitaRepository.findByStatus(StatusVisita.EM_ATENDIMENTO).stream()
+                .filter(v -> Duration.between(ultimoSinalDe(v), agora).compareTo(LIMITE_GPS_INTERROMPIDO) > 0)
+                .toList();
+
         semSinal.forEach(v -> {
+            // Preserva a duração parcial calculada a partir do último sinal (heartbeat ou posição),
+            // e não do instante em que o job rodou (RN-06/E2-05).
+            Instant ultimoSinal = ultimoSinalDe(v);
             v.setStatus(StatusVisita.GPS_INTERROMPIDO);
-            v.setSaida(agora);
-            v.setDuracaoMinutos((int) Duration.between(v.getEntrada(), agora).toMinutes());
+            v.setSaida(ultimoSinal);
+            v.setDuracaoMinutos((int) Duration.between(v.getEntrada(), ultimoSinal).toMinutes());
         });
         visitaRepository.saveAll(semSinal);
+    }
+
+    /** Último sinal de vida da visita: o mais recente entre {@code ultimoHeartbeat} e {@code ultimaPosicaoEm} (RN-06/E2-05). */
+    private Instant ultimoSinalDe(VisitaDocument v) {
+        Instant heartbeat = v.getUltimoHeartbeat();
+        Instant posicao = v.getUltimaPosicaoEm();
+        if (heartbeat == null) {
+            return posicao != null ? posicao : v.getEntrada();
+        }
+        if (posicao == null) {
+            return heartbeat;
+        }
+        return heartbeat.isAfter(posicao) ? heartbeat : posicao;
     }
 
     // ------------------------------------------------------------------
@@ -323,10 +343,11 @@ public class VisitaServiceImpl implements VisitaService {
     }
 
     private VisitaResponse toResponse(VisitaDocument v) {
-        boolean curta = v.getDuracaoMinutos() != null && v.getDuracaoMinutos() < 2;
+        // RN-07/E2-08: visita "curta" (< 2min) permanece no histórico, mas não é estatisticamente válida.
+        boolean visitaValida = v.getDuracaoMinutos() == null || v.getDuracaoMinutos() >= 2;
         return new VisitaResponse(
                 v.getId(), v.getUsuarioId(), v.getHospitalId(), v.getEntrada(), v.getSaida(),
                 v.getDuracaoMinutos(), v.getStatus(), v.getTipoPermanencia(), v.getUltimoHeartbeat(),
-                v.getOrigem(), v.getCriadoEm(), curta);
+                v.getOrigem(), v.getCriadoEm(), visitaValida);
     }
 }

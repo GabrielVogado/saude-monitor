@@ -8,8 +8,8 @@ import java.time.Instant;
 
 /**
  * Representação completa de uma visita, usada no card de visita ativa e no histórico (§3.3).
- * {@code curta} indica visita com {@code duracaoMinutos < 2} (RN-07/E2-08): permanece no
- * histórico do usuário, mas é excluída das estatísticas públicas (agregação, Épico 04).
+ * {@code visitaValida} é {@code false} quando {@code duracaoMinutos < 2} (RN-07/E2-08): a visita
+ * permanece no histórico do usuário, mas é excluída das estatísticas públicas (agregação, Épico 04).
  */
 public record VisitaResponse(
         String id,
@@ -23,7 +23,7 @@ public record VisitaResponse(
         Instant ultimoHeartbeat,
         OrigemVisita origem,
         Instant criadoEm,
-        boolean curta
+        boolean visitaValida
 ) {
 }
 

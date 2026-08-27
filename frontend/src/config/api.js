@@ -38,6 +38,12 @@ const getPlatformDefaultApiBaseUrl = () => {
 const DEFAULT_API_BASE_URL = getPlatformDefaultApiBaseUrl();
 
 const getApiBaseUrl = () => {
+    const envApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+
+    if (envApiBaseUrl) {
+        return envApiBaseUrl.replace(/\/+$/, "");
+    }
+
     const extra = Constants.expoConfig?.extra || {};
     const configuredApiBaseUrl =
         (Platform.OS === "android" && extra.apiBaseUrlAndroid) ||

@@ -155,3 +155,6 @@ Para remover tambem o volume de dados:
 ```powershell
 docker compose down -v
 ```
+
+# Deploy
+O deploy do backend e disparado por push em backend/ (workflow cd-backend.yml).

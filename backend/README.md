@@ -158,3 +158,5 @@ docker compose down -v
 
 # Deploy
 O deploy do backend e disparado por push em backend/ (workflow cd-backend.yml).
+
+- Deploy validado em 2026-08-26 22:05.

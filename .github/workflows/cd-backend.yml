@@ -64,9 +64,15 @@ jobs:
 
       - name: Disparar deploy no Render (${{ needs.resolve-env.outputs.env }})
         run: |
-          curl -fsS -X POST \
+          HTTP_STATUS=$(curl -sS -o /tmp/render-deploy.json -w "%{http_code}" -X POST \
             -H "Authorization: Bearer ${{ secrets[format('RENDER_API_KEY_{0}', needs.resolve-env.outputs.env)] }}" \
             -H "Accept: application/json" \
             -H "Content-Type: application/json" \
             --data '{"clearCache":false}' \
-            "https://api.render.com/v1/services/${{ secrets[format('RENDER_SERVICE_ID_{0}', needs.resolve-env.outputs.env)] }}/deploys"
+            "https://api.render.com/v1/services/${{ secrets[format('RENDER_SERVICE_ID_{0}', needs.resolve-env.outputs.env)] }}/deploys")
+          echo "Render deploy HTTP status: $HTTP_STATUS"
+          cat /tmp/render-deploy.json
+          if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "201" ]; then
+            echo "Render deploy failed with status $HTTP_STATUS"
+            exit 1
+          fi

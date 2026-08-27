@@ -192,9 +192,56 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 - **Épico:** Épico 3 — Feedback Pós-Saída
 - **Prioridade:** P0 — o feedback é o dado que alimenta o valor público do produto. Sem feedback, não há indicadores.
 - **Status de implementação:** 🔴 **Inexistente** — zero arquivos. Nenhuma coleção `feedbacks`, nenhum endpoint, nenhum formulário no app, nenhuma notificação pós-saída (`expo-notifications` nem instalado). Depende de F-03 (saída detectada) e F-04 (visita finalizada). (Ver `Relatorio-Aderencia-Codigo-vs-Features.md` §F-05)
-- **Descrição:** Esta feature implementa o **formulário de feedback pós-saída** completo: notificação local, formulário de 4 perguntas respondível em < 45 segundos, envio ao backend, bloqueio de duplicatas, e tela de agradecimento. É o momento de verdade onde o app pede a opinião do usuário — e a regra de ouro é: **não ser cansativo**.
+- **Descrição:** Esta feature implementa o **formulário de feedback pós-saída** completo: notificação local, formulário ramificado de até 4 telas respondível em < 45 segundos, envio ao backend, bloqueio de duplicatas, e tela de agradecimento. É o momento de verdade onde o app pede a opinião do usuário — e a regra de ouro é: **não ser cansativo**.
 
-  O fluxo começa quando a visita é encerrada (F-03): o app aguarda de 1 a 5 minutos (configurável) e dispara uma notificação local. Essa espera é deliberada — evita pedir feedback com o usuário ainda no estacionamento ou dentro do transporte. O formulário tem 4 passos com barra de progresso visível e botão "Pular" sempre presente. O envio é possível com apenas a nota geral respondida.
+  O fluxo começa quando a visita é encerrada (F-03): o app aguarda de 1 a 5 minutos (configurável) e dispara uma notificação local. Essa espera é deliberada — evita pedir feedback com o usuário ainda no estacionamento ou dentro do transporte. O formulário tem **fluxo ramificado invisível** com até 4 telas (máx.) e barra de progresso visível + botão "Pular" sempre presente. O envio é possível com apenas a nota geral respondida (Tela 4).
+
+  **Estrutura do fluxo (RN-10) — 4 telas ramificadas, < 45s:**
+  - **Tela 1 — Triagem:** "Você passou pela triagem ao chegar na unidade?"
+    - ✅ Sim → **Tela 2**
+    - ❌ Não → **Tela 3** (pula especialidade)
+  
+  - **Tela 2 — Especialidade procurada + Atendimento** (só se triagem = Sim)
+    - "Qual especialidade você procurava?" → select searchable (lista CNES/DATASUS)
+    - "Conseguiu ser atendido por médico(a) desta especialidade?"
+      - ✅ Sim → **Tela 3**
+      - ❌ Não → **motivo** (radio obrigatório):
+        - 🔴 **LOTACAO** — Superlotação / espera excessiva
+        - 👨‍⚕️ **FALTA_MEDICO** — Falta de médico na especialidade
+        - ⚪ **CLASSIFICACAO_RISCO** — Prioridade a casos mais graves (Protocolo Manchester: Vermelho/Laranja)
+        - 🚪 **OUTRO** — campo curto opcional
+    - → **Tela 3**
+  
+  - **Tela 3 — Tratamento pela equipe** (sempre exibida)
+    - "Como foi o tratamento dos funcionários da unidade com você?"
+    - Escala 5 pontos + "Não interagi": Muito bem / Bem / Regular / Mal / Muito mal / Não interagi
+    - → **Tela 4**
+  
+  - **Tela 4 — Nota geral + Comentário** (sempre exibida)
+    - "De 1 a 5, como avalia sua experiência geral hoje?" → ★★★★★
+    - "Quer deixar algum comentário?" (opcional, max 500 chars)
+    - Botão "Enviar"
+
+  **Regras transversais do fluxo:**
+  - `especialidadeProcurada` **sempre capturada** se triagem = Sim (mesmo se não atendido) → permite indicador de "falta de médico por especialidade"
+  - `motivoNaoAtendido = CLASSIFICACAO_RISCO` **não é gap** — card "Fluxo Correto" no painel admin (verde)
+  - `motivoNaoAtendido = FALTA_MEDICO` → gap RH (vermelho no painel)
+  - `motivoNaoAtendido = LOTACAO` → gap Capacidade/Fluxo (laranja no painel)
+  - **Frontend mostra label amigável** `CASOS_MAIS_GRAVES_PRIORIDADE`; **backend normaliza para** `CLASSIFICACAO_RISCO`
+  - Comentário opcional único no final; zero caixas de texto obrigatórias
+  - Persistência local a cada tela; envio único no final (`POST /api/v1/feedback` com `visitaId`)
+  - **Tela 2 — Especialidade + Atendimento (só se triagem=Sim):** "Qual especialidade você procurava?" → select searchable (lista CNES/DATASUS) + "Conseguiu ser atendido por médico(a) desta especialidade?" → Sim → Tela 3 | Não → motivo (radio obrigatório: LOTACAO | FALTA_MEDICO | CLASSIFICACAO_RISCO | OUTRO) → Tela 3
+  - **Tela 3 — Tratamento pela equipe (sempre):** "Como foi o tratamento dos funcionários da unidade com você?" → Escala 5 pts + "Não interagi" (Muito bem / Bem / Regular / Mal / Muito mal / Não interagi) → Tela 4
+  - **Tela 4 — Nota geral + Comentário (sempre):** "De 1 a 5, como avalia sua experiência geral hoje?" → ★★★★★ + "Quer deixar algum comentário?" (opcional, max 500 chars) → Enviar
+
+  **Regras transversais (RN-10):**
+  - `especialidadeProcurada` **sempre capturada** se triagem = Sim (mesmo se não atendido) → permite indicador de "falta de médico por especialidade"
+  - `motivoNaoAtendido = CLASSIFICACAO_RISCO` **não é gap** — card "Fluxo Correto" no painel admin (verde)
+  - `motivoNaoAtendido = FALTA_MEDICO` → gap RH (vermelho no painel)
+  - `motivoNaoAtendido = LOTACAO` → gap Capacidade/Fluxo (laranja no painel)
+  - Frontend mostra label amigável `CASOS_MAIS_GRAVES_PRIORIDADE`; backend normaliza para `CLASSIFICACAO_RISCO`
+  - Comentário opcional único no final; zero caixas de texto obrigatórias
+  - Persistência local a cada tela; envio único no final (`POST /api/v1/feedback` com `visitaId`)
 
   A janela de resposta é de 24 horas, com no máximo 1 lembrete (aproximadamente 6h após a primeira notificação). Após 24h, a visita recebe status `SEM_FEEDBACK` e o usuário nunca mais é incomodado por aquela visita. O feedback é anônimo por padrão: `usuario_id` pode ser nulo.
 
@@ -204,12 +251,16 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 - **Critérios de aceite:**
   1. Notificação local é disparada entre 1 e 5 minutos após o registro de saída; delay é configurável; notificação nunca dispara enquanto o usuário está dentro de qualquer geofence hospitalar
   2. Toque na notificação (ou no card da home) abre o formulário `CSFeedbackForm` em tela cheia
-  3. Formulário tem 4 passos com barra de progresso (altura 4px, track `surface-container-high`, fill gradiente primário) + label "Passo X de 4" + botão "Pular" sempre visível
-  4. **Passo 1:** "Você foi atendido?" — 3 chips: "Sim, fui atendido" / "Sim, mas desisti" / "Não fui atendido". Se "Não fui atendido", pula direto para a nota geral
-  5. **Passo 2:** "Teve médico disponível?" — chips: Sim / Não / Não precisei
-  6. **Passo 3:** "Fez triagem?" — chips: Sim / Não / Não sei
-  7. **Passo 4:** "Como você avalia o atendimento?" — `CSRatingStars` 5 estrelas (32×32, área de toque 48) com labels âncora (1 "Péssimo" … 5 "Excelente") + chips de medicação/receita ("Recebi" / "Não recebi" / "Não precisei") + campo de comentário opcional (máx. 280 caracteres)
-  8. Todas as perguntas são puláveis; envio é possível com ao menos a nota geral (Passo 4) respondida; botão "Enviar avaliação" (`CSButtonPrimary`) envia em 1 toque
+  3. Formulário tem fluxo ramificado de até 4 telas com barra de progresso (altura 4px, track `surface-container-high`, fill gradiente primário) + label "Passo X de 4" + botão "Pular" sempre visível
+  4. **Tela 1 — Triagem:** "Você passou pela triagem ao chegar na unidade?" — 2 chips: "Sim" / "Não". Se "Não", pula direto para Tela 3 (Tratamento)
+  5. **Tela 2 — Especialidade + Atendimento** (apenas se Tela 1 = Sim): "Qual especialidade você procurava?" → select searchable (lista CNES/DATASUS) + "Conseguiu ser atendido por médico(a) desta especialidade?" → chips: Sim / Não. Se Não → radio obrigatório de motivo:
+     - 🔴 **LOTACAO** — Superlotação / espera excessiva
+     - 👨‍⚕️ **FALTA_MEDICO** — Falta de médico na especialidade
+     - ⚪ **CLASSIFICACAO_RISCO** — Prioridade a casos mais graves (Protocolo Manchester: Vermelho/Laranja)
+     - 🚪 **OUTRO** — campo curto opcional
+  6. **Tela 3 — Tratamento pela equipe** (sempre exibida): "Como foi o tratamento dos funcionários da unidade com você?" → chips: Muito bem / Bem / Regular / Mal / Muito mal / Não interagi
+  7. **Tela 4 — Nota geral + Comentário** (sempre exibida): `CSRatingStars` 5 estrelas (32×32, área de toque 48) com labels âncora (1 "Péssimo" … 5 "Excelente") + campo de comentário opcional (máx. 500 caracteres)
+  8. Todas as perguntas são puláveis; envio é possível com ao menos a nota geral (Tela 4) respondida; botão "Enviar avaliação" (`CSButtonPrimary`) envia em 1 toque
   9. Tempo total de resposta ≤ 45 segundos (medido em teste de usabilidade com usuários reais)
   10. Após envio: tela `CSFeedbackThanks` com ícone `HeartHandshake`, mensagem de agradecimento e link para ver avaliação pública do hospital
   11. Feedback armazenado no backend com `visita_id` único; tentativa de reenvio retorna mensagem amigável "Você já avaliou esta visita"
@@ -218,16 +269,18 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
   14. Em caso de erro de rede no envio: toast "Sem conexão — salvaremos e enviaremos depois"; respostas mantidas localmente; reenvio automático ao reconectar
 - **Regras de negócio aplicáveis:** RN-08, RN-09, RN-10, RN-11, RN-12, RN-13
 - **Dependências:** **F-03 (Detecção de saída)** — o feedback é consequência da visita encerrada. **F-01 (Hospitais)** — o feedback referencia `hospital_id`. Pode ser desenvolvida em paralelo com F-04 (ambas consomem F-03).
-- **Esforço estimado:** **M** (1-2 sprints). Justificativa: UI de formulário multi-step com animações e acessibilidade é trabalho médio de frontend; backend é essencialmente 1 endpoint `POST /feedback` + validação de dedupe. A complexidade está na UX do formulário (tempo < 45s, pulável, micro-interações) e na lógica de notificação (delay 1-5min + lembrete 6h + expiração 24h). Estórias: 6.
+- **Esforço estimado:** **M** (1-2 sprints). Justificativa: UI de formulário multi-step ramificado com animações e acessibilidade é trabalho médio de frontend; backend é essencialmente 1 endpoint `POST /feedback` + validação de dedupe. A complexidade está na UX do formulário (tempo < 45s, pulável, ramificação invisível, micro-interações) e na lógica de notificação (delay 1-5min + lembrete 6h + expiração 24h). Estórias: 6.
 - **Riscos:**
-  - **Baixa taxa de resposta:** se o formulário for percebido como cansativo, a taxa de resposta cai abaixo de 25%. Mitigação: 4 perguntas é o limite; botão "Pular" sempre visível reduz ansiedade; notificação no momento certo (1-5 min pós-saída); feedback anônimo remove barreira de login.
+  - **Baixa taxa de resposta:** se o formulário for percebido como cansativo, a taxa de resposta cai abaixo de 25%. Mitigação: 4 telas é o limite; botão "Pular" sempre visível reduz ansiedade; notificação no momento certo (1-5 min pós-saída); feedback anônimo remove barreira de login.
   - **Usuário ignora a notificação:** notificações locais têm baixa taxa de abertura em alguns perfis de usuário. Mitigação: além da notificação, um card na home do app ("Você visitou o Hospital X — quer avaliar?") serve como segundo canal; 1 lembrete máximo.
   - **Feedback malicioso:** usuários podem avaliar mal um hospital repetidamente. Mitigação: 1 feedback por visita (dedupe por `visita_id` único); visitas < 2 min não geram convite de feedback; para o MVP, moderação humana de outliers é suficiente (fase 2 implementa detecção automatizada).
+  - **Select CNES/DATASUS lento:** lista de especialidades pode ser grande. Mitigação: cache local da lista CNES/DATASUS; debounce no searchable select; carregamento preguiçoso.
 - **Critério de pronto (DoD específico):**
   - **Validação com usuário real:** teste de usabilidade com ≥ 10 pacientes/acompanhantes recém-saídos de hospital real — medir: (a) tempo médio de resposta ≤ 45s, (b) taxa de abandono no meio do formulário ≤ 20%, (c) compreensão das perguntas sem hesitação, (d) NPS do formulário ≥ 8
   - Teste de notificação: verificar que a notificação dispara no delay configurado e que o lembrete único aparece ~6h depois
   - Teste de dedupe: tentar enviar 2 feedbacks para a mesma visita — segundo retorna erro amigável
-  - Acessibilidade: formulário navegável por TalkBack/VoiceOver; estrelas respondem a swipe; chips são `role="checkbox"`
+  - Acessibilidade: formulário navegável por TalkBack/VoiceOver; estrelas respondem a swipe; chips são `role="checkbox"`; ramificação invisível não confunde leitores de tela
+  - **Enum backend:** `MotivoNaoAtendido` com valores `FALTA_MEDICO`, `LOTACAO`, `CLASSIFICACAO_RISCO`, `OUTRO` implementado e testado
 
 ---
 

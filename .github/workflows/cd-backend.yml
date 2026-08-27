@@ -10,8 +10,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/saude-monitor-backend
-
+  IMAGE_NAME: ${{ tolower(github.repository_owner) }}/saude-monitor-backend
 jobs:
   # Mapeia a branch para o ambiente de destino.
   #   develop     -> dev (desenvolvimento)

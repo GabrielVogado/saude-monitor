@@ -27,7 +27,12 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION"
+        "ACCESS_BACKGROUND_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
       "package": "com.gabrielvogado.saudemonitor"
     },
@@ -38,7 +43,10 @@
       "apiBaseUrl": "http://localhost:8080",
       "apiBaseUrlWeb": "http://localhost:8080",
       "apiBaseUrlAndroid": "https://saude-monitor.onrender.com",
-      "apiBaseUrlIos": "http://localhost:8080"
+      "apiBaseUrlIos": "http://localhost:8080",
+      "eas": {
+        "projectId": "79a251af-ec86-43d0-80d1-5fe06ae0ea0b"
+      }
     },
     "plugins": [
       "@maplibre/maplibre-react-native",
@@ -51,6 +59,7 @@
         }
       ],
       "expo-notifications"
-    ]
+    ],
+    "owner": "gabrielvogado"
   }
 }

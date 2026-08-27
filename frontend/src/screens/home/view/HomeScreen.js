@@ -1,18 +1,16 @@
 import React, {useCallback, useEffect, useRef, useState} from "react";
 import {Alert, Image, Text, View} from "react-native";
 import {SafeAreaView} from "react-native-safe-area-context";
-import {useFocusEffect, useNavigation} from "@react-navigation/native";
+import {useFocusEffect} from "@react-navigation/native";
 import styles from "./css/HomeStyle";
 import VisitaService from "../../visitas/service/VisitaService";
 import {iniciarGeofencing, sincronizarVisitaAtiva} from "../../visitas/service/GeofencingTaskService";
 import {iniciarHeartbeat, pararHeartbeat} from "../../visitas/service/HeartbeatService";
 import CSGeoStatusCard from "../../../components/CSGeoStatusCard";
-import CSButton from "../../../components/CSButton";
 
 const DOZE_HORAS_MS = 12 * 60 * 60 * 1000;
 
 export default function HomeScreen() {
-    const navigation = useNavigation();
     const [visitaAtiva, setVisitaAtiva] = useState(null);
     const promptTipoExibidoRef = useRef(false);
 
@@ -110,12 +108,6 @@ export default function HomeScreen() {
                     />
                 )}
 
-                <CSButton
-                    label="Estou em um hospital"
-                    onPress={() => navigation.navigate("Visitas", { screen: "CheckinManual" })}
-                    variant="secondary"
-                    style={{ marginBottom: 16 }}
-                />
                 {/* Tag da versão */}
                 {/*<View style={styles.versionTag}>
                     <Text style={styles.versionText}>Versão Enterprise 2.4</Text>

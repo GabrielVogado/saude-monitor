@@ -96,11 +96,8 @@ export default function App() {
                     <Drawer.Screen name="Home" component={MainStack} />
                     <Drawer.Screen name="Hospitais" component={HospitaisStack} />
                     <Drawer.Screen
-                        name="Visitas"
+                        name="Check-in manual"
                         component={VisitasStack}
-                        options={{
-                            drawerItemStyle: { display: "none" },
-                        }}
                     />
                     <Drawer.Screen name="Login" component={LoginScreen} />
                     <Drawer.Screen name="Cadastro" component={UserScreen} />

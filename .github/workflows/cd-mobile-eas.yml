@@ -47,6 +47,16 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Verificar EXPO_TOKEN
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "ERRO: secret EXPO_TOKEN nao configurado no GitHub"
+            exit 1
+          fi
+          echo "EXPO_TOKEN configurado (len=${#EXPO_TOKEN})"
+
       - name: Configurar EAS
         uses: expo/expo-github-action@v8
         with:

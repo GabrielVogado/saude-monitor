@@ -67,19 +67,26 @@ jobs:
           RENDER_API_KEY: ${{ secrets[format('RENDER_API_KEY_{0}', needs.resolve-env.outputs.env)] }}
           RENDER_SERVICE_ID: ${{ secrets[format('RENDER_SERVICE_ID_{0}', needs.resolve-env.outputs.env)] }}
         run: |
-          echo "SERVICE_ID length: ${#RENDER_SERVICE_ID}"
-          echo "API_KEY starts with: ${RENDER_API_KEY:0:7}"
-          RESPONSE=$(curl -sS --max-time 30 -w "\n%{http_code}" -X POST \
+          set +e
+          HTTP_CODE=$(curl -sS --max-time 60 -o /tmp/render_deploy.json -w '%{http_code}' -X POST \
             -H "Authorization: Bearer $RENDER_API_KEY" \
             -H "Accept: application/json" \
             -H "Content-Type: application/json" \
             --data '{}' \
-            "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" 2>&1)
-          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "Render deploy HTTP status: $HTTP_STATUS"
-          echo "Render deploy response: $BODY"
-          if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "201" ]; then
-            echo "Render deploy failed with status $HTTP_STATUS"
-            exit 1
+            "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" 2>/tmp/render_curl_err.txt)
+          CURL_EXIT=$?
+          set -e
+          echo "curl exit code: $CURL_EXIT"
+          echo "Render deploy HTTP status: $HTTP_CODE"
+          if [ -s /tmp/render_deploy.json ]; then
+            echo "Render deploy response: $(cat /tmp/render_deploy.json)"
           fi
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+            echo "Deploy no Render disparado com sucesso"
+            exit 0
+          fi
+          echo "Falha ao disparar deploy no Render (curl exit=$CURL_EXIT, http=$HTTP_CODE)"
+          if [ -s /tmp/render_curl_err.txt ]; then
+            echo "curl error: $(cat /tmp/render_curl_err.txt)"
+          fi
+          exit 1

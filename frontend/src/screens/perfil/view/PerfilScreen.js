@@ -11,6 +11,9 @@ import { useFocusEffect } from "@react-navigation/native";
 import { LogIn, MapPin, ShieldCheck, Trash2, UserPlus } from "lucide-react-native";
 import PerfilService from "../service/PerfilService";
 import LoginService from "../../auth/service/LoginService";
+import CSLoading, { CSLoadingList } from "../../../components/CSLoading";
+import CSEmptyState from "../../../components/CSEmptyState";
+import { colors } from "../../../theme";
 import styles from "./css/PerfilStyle";
 
 /**
@@ -21,27 +24,37 @@ import styles from "./css/PerfilStyle";
  * - E5-04: quando não há conta, orienta Cadastro/Login (conta é opcional).
  * - F0-05: botão de exclusão de conta (dados pessoais), com anonimização das
  *   estatísticas.
+ *
+ * E6-03/E6-04: acessibilidade (role/labels) e estados de loading/erro com retry.
  */
 export default function PerfilScreen({ navigation }) {
   const [usuario, setUsuario] = useState(null);
   const [permissao, setPermissao] = useState("undetermined");
   const [carregando, setCarregando] = useState(false);
+  const [carregandoInicial, setCarregandoInicial] = useState(true);
+  const [erroInicial, setErroInicial] = useState(null);
+
+  const carregar = useCallback(async () => {
+    setCarregandoInicial(true);
+    setErroInicial(null);
+    try {
+      const [u, p] = await Promise.all([
+        PerfilService.usuarioLogado(),
+        PerfilService.permissaoLocalizacao(),
+      ]);
+      setUsuario(u);
+      setPermissao(p);
+    } catch (e) {
+      setErroInicial(e?.message || "Não foi possível carregar seu perfil.");
+    } finally {
+      setCarregandoInicial(false);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      let ativo = true;
-      (async () => {
-        const u = await PerfilService.usuarioLogado();
-        const p = await PerfilService.permissaoLocalizacao();
-        if (ativo) {
-          setUsuario(u);
-          setPermissao(p);
-        }
-      })();
-      return () => {
-        ativo = false;
-      };
-    }, [])
+      carregar();
+    }, [carregar])
   );
 
   const permissaoConcedida = permissao === "granted";
@@ -133,87 +146,145 @@ export default function PerfilScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Minha conta</Text>
+        {carregandoInicial && <CSLoadingList count={2} />}
 
-          {usuario ? (
-            <>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {(usuario.nome || usuario.fullName || "U").charAt(0).toUpperCase()}
-                </Text>
+        {!carregandoInicial && erroInicial && (
+          <CSEmptyState
+            icon={ShieldCheck}
+            title="Não foi possível carregar"
+            message={erroInicial}
+            actionLabel="Tentar novamente"
+            onAction={carregar}
+          />
+        )}
+
+        {!carregandoInicial && !erroInicial && (
+          <>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Minha conta</Text>
+
+              {usuario ? (
+                <>
+                  <View
+                    style={styles.avatar}
+                    accessible={false}
+                    accessibilityElementsHidden
+                  >
+                    <Text style={styles.avatarText}>
+                      {(usuario.nome || usuario.fullName || "U").charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.userName}>{usuario.nome || usuario.fullName || "Usuário"}</Text>
+                  <Text style={styles.userEmail}>{usuario.email || ""}</Text>
+
+                  <TouchableOpacity
+                    style={styles.buttonSecondary}
+                    onPress={deslogar}
+                    accessibilityRole="button"
+                    accessibilityLabel="Sair da conta"
+                  >
+                    <Text style={styles.buttonTextSecondary}>Sair da conta</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={styles.semAcesso}>
+                  <ShieldCheck size={34} color={colors.outline} />
+                  <Text style={styles.semAcessoTitle}>Conta opcional</Text>
+                  <Text style={styles.semAcessoText}>
+                    Criar uma conta é opcional — você pode usar o aplicativo sem se cadastrar.
+                    Faça login para acessar seus dados e o histórico.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.button}
+                    onPress={() => irPara("Login")}
+                    accessibilityRole="button"
+                    accessibilityLabel="Entrar"
+                  >
+                    <LogIn size={18} color={colors.onPrimary} />
+                    <Text style={styles.buttonText}> Entrar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.buttonSecondary}
+                    onPress={() => irPara("Cadastro")}
+                    accessibilityRole="button"
+                    accessibilityLabel="Criar conta"
+                  >
+                    <UserPlus size={18} color={colors.onSurface} />
+                    <Text style={styles.buttonTextSecondary}> Criar conta</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Dados e Privacidade</Text>
+
+              <View style={styles.row}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <MapPin size={17} color={colors.primary} />
+                  <Text style={[styles.rowLabel, { marginLeft: 8 }]}>Localização</Text>
+                </View>
+                <View style={[styles.status, permissaoConcedida ? styles.statusAtivo : styles.statusInativo]}>
+                  <Text style={permissaoConcedida ? styles.statusAtivoText : styles.statusInativoText}>
+                    {permissaoConcedida ? "Ativa" : "Desativada"}
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.userName}>{usuario.nome || usuario.fullName || "Usuário"}</Text>
-              <Text style={styles.userEmail}>{usuario.email || ""}</Text>
 
-              <TouchableOpacity style={styles.buttonSecondary} onPress={deslogar}>
-                <Text style={styles.buttonTextSecondary}>Sair da conta</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <View style={styles.semAcesso}>
-              <ShieldCheck size={34} color="#94A3B8" />
-              <Text style={styles.semAcessoTitle}>Conta opcional</Text>
-              <Text style={styles.semAcessoText}>
-                Criar uma conta é opcional — você pode usar o aplicativo sem se cadastrar.
-                Faça login para acessar seus dados e o histórico.
-              </Text>
-              <TouchableOpacity style={styles.button} onPress={() => irPara("Login")}>
-                <LogIn size={18} color="#FFF" />
-                <Text style={styles.buttonText}> Entrar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.buttonSecondary} onPress={() => irPara("Cadastro")}>
-                <UserPlus size={18} color="#0F172A" />
-                <Text style={styles.buttonTextSecondary}> Criar conta</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
+              {!permissaoConcedida ? (
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={solicitarPermissao}
+                  disabled={carregando}
+                  accessibilityRole="button"
+                  accessibilityLabel="Permitir localização"
+                  accessibilityState={{ disabled: carregando }}
+                >
+                  <Text style={styles.buttonText}>Permitir localização</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.buttonSecondary}
+                  onPress={revogarPermissao}
+                  accessibilityRole="button"
+                  accessibilityLabel="Revogar permissão de localização"
+                >
+                  <Text style={styles.buttonTextSecondary}>Revogar permissão de localização</Text>
+                </TouchableOpacity>
+              )}
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Dados e Privacidade</Text>
-
-          <View style={styles.row}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <MapPin size={17} color="#0C4A6E" />
-              <Text style={[styles.rowLabel, { marginLeft: 8 }]}>Localização</Text>
-            </View>
-            <View style={[styles.status, permissaoConcedida ? styles.statusAtivo : styles.statusInativo]}>
-              <Text style={permissaoConcedida ? styles.statusAtivoText : styles.statusInativoText}>
-                {permissaoConcedida ? "Ativa" : "Desativada"}
+              <Text style={styles.footerNote}>
+                A permissão é usada apenas para detectar automaticamente suas visitas a hospitais
+                (geofencing). Negar ou revogar não bloqueia a consulta pública nem o restante do app.
               </Text>
             </View>
-          </View>
 
-          {!permissaoConcedida ? (
-            <TouchableOpacity style={styles.button} onPress={solicitarPermissao} disabled={carregando}>
-              <Text style={styles.buttonText}>Permitir localização</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={styles.buttonSecondary} onPress={revogarPermissao}>
-              <Text style={styles.buttonTextSecondary}>Revogar permissão de localização</Text>
-            </TouchableOpacity>
-          )}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Termos e dados pessoais</Text>
+              <TouchableOpacity
+                onPress={() => irPara("Privacidade")}
+                accessibilityRole="button"
+                accessibilityLabel="Ler Política de Privacidade e Termos de Uso"
+              >
+                <Text style={styles.link}>Ler Política de Privacidade e Termos de Uso</Text>
+              </TouchableOpacity>
 
-          <Text style={styles.footerNote}>
-            A permissão é usada apenas para detectar automaticamente suas visitas a hospitais
-            (geofencing). Negar ou revogar não bloqueia a consulta pública nem o restante do app.
-          </Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Termos e dados pessoais</Text>
-          <TouchableOpacity onPress={() => irPara("Privacidade")}>
-            <Text style={styles.link}>Ler Política de Privacidade e Termos de Uso</Text>
-          </TouchableOpacity>
-
-          {usuario && (
-            <TouchableOpacity style={styles.dangerButton} onPress={excluirConta} disabled={carregando}>
-              <Trash2 size={17} color="#B91C1C" />
-              <Text style={styles.dangerButtonText}> Excluir conta e dados pessoais</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+              {usuario && (
+                <TouchableOpacity
+                  style={styles.dangerButton}
+                  onPress={excluirConta}
+                  disabled={carregando}
+                  accessibilityRole="button"
+                  accessibilityLabel="Excluir conta e dados pessoais"
+                  accessibilityState={{ disabled: carregando }}
+                >
+                  <Trash2 size={17} color={colors.error} />
+                  <Text style={styles.dangerButtonText}> Excluir conta e dados pessoais</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

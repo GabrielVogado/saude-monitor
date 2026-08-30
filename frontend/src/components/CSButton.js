@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceContainerLow,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: "rgba(191,199,210,0.2)",
+    borderColor: colors.outlineVariant,
   },
   tertiary: {
     backgroundColor: "transparent",

@@ -1,16 +1,20 @@
 import React, {useEffect, useState} from "react";
-import {Alert, FlatList, Text, View} from "react-native";
+import {Alert, FlatList, StyleSheet, Text, View} from "react-native";
 import {SafeAreaView} from "react-native-safe-area-context";
 import HospitalService from "../../hospitais/service/HospitalService";
 import VisitaService from "../service/VisitaService";
 import CSButton from "../../../components/CSButton";
 import CSLoading from "../../../components/CSLoading";
 import CSCard from "../../../components/CSCard";
+import CSEmptyState from "../../../components/CSEmptyState";
+import {colors, typography, spacing, radii} from "../../../theme";
 
 /**
  * Check-in manual (E2-06): fallback quando o GPS está desligado ou a permissão de
  * localização foi negada. Lista hospitais ativos e registra a visita com
  * `origem = "MANUAL"` (sem validação de geofence no backend).
+ *
+ * E6-02/E6-03/E6-04: tokens do DS, acessibilidade e estados de erro/retry + empty.
  */
 export default function CheckinManualScreen({ navigation }) {
   const [hospitais, setHospitais] = useState([]);
@@ -18,11 +22,17 @@ export default function CheckinManualScreen({ navigation }) {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState(null);
 
-  useEffect(() => {
+  const carregar = () => {
+    setCarregando(true);
+    setErro(null);
     HospitalService.listar({ size: 50 })
       .then((data) => setHospitais(data?.content || data || []))
-      .catch((e) => setErro(e.message))
+      .catch((e) => setErro(e.message || "Não foi possível carregar os hospitais."))
       .finally(() => setCarregando(false));
+  };
+
+  useEffect(() => {
+    carregar();
   }, []);
 
   const fazerCheckin = async (hospital) => {
@@ -81,44 +91,86 @@ export default function CheckinManualScreen({ navigation }) {
   };
 
   if (carregando) {
-    return <CSLoading />;
+    return (
+      <View accessibilityRole="progressbar" accessibilityLabel="Carregando hospitais" style={{ flex: 1 }}>
+        <CSLoading />
+      </View>
+    );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, padding: 16 }}>
-      <Text style={{ fontSize: 20, fontWeight: "700", marginBottom: 4 }}>
-        Estou em um hospital
-      </Text>
-      <Text style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.title}>Estou em um hospital</Text>
+      <Text style={styles.subtitle}>
         Selecione o hospital em que você está. Use esta opção quando o GPS estiver
         desligado ou a permissão de localização não estiver disponível.
       </Text>
 
-      {erro && <Text style={{ color: "#b3261e", marginBottom: 12 }}>{erro}</Text>}
+      {erro && (
+        <CSEmptyState
+          title="Algo deu errado"
+          message={erro}
+          actionLabel="Tentar novamente"
+          onAction={carregar}
+        />
+      )}
 
-      <FlatList
-        data={hospitais}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <CSCard style={{ marginBottom: 8 }}>
-            <Text style={{ fontSize: 16, fontWeight: "600" }}>{item.nome}</Text>
-            <Text style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
-              {item.tipoUnidade || item.categoria || ""}
-            </Text>
-            <CSButton
-              label="Estou aqui"
-              onPress={() => fazerCheckin(item)}
-              loading={enviando}
-              variant="secondary"
+      {!erro && (
+        <FlatList
+          data={hospitais}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <CSCard style={styles.card}>
+              <Text style={styles.hospitalNome}>{item.nome}</Text>
+              <Text style={styles.hospitalInfo}>
+                {item.tipoUnidade || item.categoria || ""}
+              </Text>
+              <CSButton
+                label="Estou aqui"
+                onPress={() => fazerCheckin(item)}
+                loading={enviando}
+                variant="secondary"
+              />
+            </CSCard>
+          )}
+          ListEmptyComponent={
+            <CSEmptyState
+              title="Nenhum hospital cadastrado"
+              message="Não há hospitais ativos disponíveis para check-in manual no momento."
             />
-          </CSCard>
-        )}
-        ListEmptyComponent={
-          <Text style={{ textAlign: "center", color: "#666", marginTop: 24 }}>
-            Nenhum hospital cadastrado.
-          </Text>
-        }
-      />
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: spacing.s4,
+    backgroundColor: colors.surface,
+  },
+  title: {
+    ...typography.headlineSm,
+    color: colors.onSurface,
+    marginBottom: spacing.s1,
+  },
+  subtitle: {
+    ...typography.bodySm,
+    color: colors.onSurfaceVariant,
+    marginBottom: spacing.s4,
+  },
+  card: {
+    marginBottom: spacing.s2,
+  },
+  hospitalNome: {
+    ...typography.titleMd,
+    color: colors.onSurface,
+  },
+  hospitalInfo: {
+    ...typography.bodySm,
+    color: colors.onSurfaceVariant,
+    marginBottom: spacing.s2,
+  },
+});

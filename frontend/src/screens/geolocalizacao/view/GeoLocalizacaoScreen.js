@@ -12,6 +12,7 @@ import {
   useGeolocalizacao,
 } from "../service/GeoLocalizacaoService";
 import { getInitialViewState, OSM_RASTER_STYLE } from "../../../utils/mapStyle";
+import { colors, typography, spacing, radii } from "../../../theme";
 
 const BRASIL_REGION = {
   latitude: -14.235,
@@ -69,7 +70,7 @@ function GeolocalizacaoContent() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.screenHeader}>
-        <Text style={styles.screenHeaderTitle}>Mapa de Geolocalizacao</Text>
+        <Text style={styles.screenHeaderTitle}>Mapa de Geolocalização</Text>
       </View>
 
       <Map style={styles.map} mapStyle={OSM_RASTER_STYLE}>
@@ -91,18 +92,22 @@ function GeolocalizacaoContent() {
       <View style={styles.infoBox}>
         {carregando && (
           <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color="#0C4A6E" />
+            <ActivityIndicator
+              size="small"
+              color={colors.primary}
+              accessibilityLabel="Carregando localização"
+            />
             <Text style={styles.infoText}>Monitorando GPS em tempo real...</Text>
           </View>
         )}
 
         {!carregando && coordenadas && (
           <>
-            <Text style={styles.title}>Localizacao atual</Text>
+            <Text style={styles.title}>Localização atual</Text>
             <Text style={styles.infoText}>Latitude: {coordenadas.latitude.toFixed(6)}</Text>
             <Text style={styles.infoText}>Longitude: {coordenadas.longitude.toFixed(6)}</Text>
             <Text style={styles.infoSubText}>
-              Precisao: {coordenadas.accuracy ? `${Math.round(coordenadas.accuracy)}m` : "N/D"}
+              Precisão: {coordenadas.accuracy ? `${Math.round(coordenadas.accuracy)}m` : "N/D"}
             </Text>
           </>
         )}
@@ -111,16 +116,30 @@ function GeolocalizacaoContent() {
           <Text style={styles.infoText}>Aguardando primeira leitura do GPS...</Text>
         )}
 
-        {erro && <Text style={styles.errorText}>{erro}</Text>}
+        {erro && (
+          <Text style={styles.errorText} accessibilityLiveRegion="polite">
+            {erro}
+          </Text>
+        )}
 
         {!!erro && (
-          <TouchableOpacity style={styles.retryButton} onPress={iniciarMonitoramento}>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={iniciarMonitoramento}
+            accessibilityRole="button"
+            accessibilityLabel="Tentar novamente"
+          >
             <Text style={styles.retryText}>Tentar novamente</Text>
           </TouchableOpacity>
         )}
 
         {!!coordenadas && (
-          <TouchableOpacity style={styles.centerButton} onPress={centralizar}>
+          <TouchableOpacity
+            style={styles.centerButton}
+            onPress={centralizar}
+            accessibilityRole="button"
+            accessibilityLabel="Centralizar no meu GPS"
+          >
             <Text style={styles.centerText}>Centralizar no meu GPS</Text>
           </TouchableOpacity>
         )}
@@ -137,35 +156,65 @@ export default function GeoLocalizacaoScreen() {
   );
 }
 
+// E6-02: cores migradas para os tokens do Design System v2.0.
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
-  screenHeader: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8, backgroundColor: "#FFFFFF" },
-  screenHeaderTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
+  container: { flex: 1, backgroundColor: colors.surfaceContainerLowest },
+  screenHeader: {
+    paddingHorizontal: spacing.s4,
+    paddingTop: spacing.s3,
+    paddingBottom: spacing.s2,
+    backgroundColor: colors.surfaceContainerLowest,
+  },
+  screenHeaderTitle: { ...typography.titleMd, color: colors.onSurface },
   map: { flex: 1 },
-  infoBox: { backgroundColor: "#F8FAFC", borderTopWidth: 1, borderColor: "#E2E8F0", paddingHorizontal: 16, paddingVertical: 12 },
-  title: { fontSize: 16, fontWeight: "700", color: "#0F172A", marginBottom: 6 },
-  loadingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  infoText: { color: "#334155", fontSize: 14 },
-  infoSubText: { color: "#64748B", fontSize: 13, marginTop: 2 },
-  errorText: { color: "#B91C1C", marginTop: 10, fontSize: 13 },
-  retryButton: { marginTop: 10, alignSelf: "flex-start", backgroundColor: "#0EA5E9", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-  retryText: { color: "#FFFFFF", fontWeight: "600" },
-  centerButton: { marginTop: 10, alignSelf: "flex-start", backgroundColor: "#0C4A6E", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-  centerText: { color: "#FFFFFF", fontWeight: "600" },
+  infoBox: {
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderColor: colors.outlineVariant,
+    paddingHorizontal: spacing.s4,
+    paddingVertical: spacing.s3,
+  },
+  title: { ...typography.titleMd, color: colors.onSurface, marginBottom: spacing.s2 },
+  loadingRow: { flexDirection: "row", alignItems: "center", gap: spacing.s2 },
+  infoText: { color: colors.onSurfaceVariant, ...typography.bodyMd },
+  infoSubText: { color: colors.onSurfaceVariant, fontSize: 13, marginTop: 2 },
+  errorText: { color: colors.error, marginTop: spacing.s3, fontSize: 13 },
+  retryButton: {
+    marginTop: spacing.s3,
+    alignSelf: "flex-start",
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.s3,
+    paddingVertical: spacing.s2,
+    borderRadius: radii.sm,
+    minHeight: 48,
+    justifyContent: "center",
+  },
+  retryText: { color: colors.onPrimary, fontWeight: "600" },
+  centerButton: {
+    marginTop: spacing.s3,
+    alignSelf: "flex-start",
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.s3,
+    paddingVertical: spacing.s2,
+    borderRadius: radii.sm,
+    minHeight: 48,
+    justifyContent: "center",
+  },
+  centerText: { color: colors.onPrimary, fontWeight: "600" },
   markerDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#64748B",
+    backgroundColor: colors.outline,
     borderWidth: 2,
-    borderColor: "#FFFFFF",
+    borderColor: colors.surfaceContainerLowest,
   },
   userDot: {
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: "#0C4A6E",
+    backgroundColor: colors.primary,
     borderWidth: 3,
-    borderColor: "#FFFFFF",
+    borderColor: colors.surfaceContainerLowest,
   },
 });

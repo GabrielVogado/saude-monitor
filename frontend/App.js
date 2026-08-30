@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from "react";
 import {createStackNavigator} from "@react-navigation/stack";
-import {createDrawerNavigator} from "@react-navigation/drawer";
+import {createBottomTabNavigator} from "@react-navigation/bottom-tabs";
 import {NavigationContainer} from "@react-navigation/native";
 import {SafeAreaProvider} from "react-native-safe-area-context";
-import {Image, Text, TouchableOpacity, View} from "react-native";
+import {Text} from "react-native";
 import * as Notifications from "expo-notifications";
+import {Building2, Home as HomeIcon, User as UserIcon} from "lucide-react-native";
 import HomeScreen from "./src/screens/home/view/HomeScreen.js";
 import LoginScreen from "./src/screens/auth/view/LoginScreen.js";
 import UserScreen from "./src/screens/user/view/UserScreen.js";
@@ -18,64 +19,25 @@ import CheckinManualScreen from "./src/screens/visitas/view/CheckinManualScreen.
 import FeedbackFormScreen from "./src/screens/feedback/view/FeedbackFormScreen.js";
 import PerfilScreen from "./src/screens/perfil/view/PerfilScreen.js";
 import PrivacidadeScreen from "./src/screens/perfil/view/PrivacidadeScreen.js";
+import {colors, spacing} from "./src/theme";
 import { agendarLembrete, pendenciaAtual } from "./src/screens/feedback/service/FeedbackNotificationService";
 
 const Stack = createStackNavigator();
-const Drawer = createDrawerNavigator();
+const Tab = createBottomTabNavigator();
 
-// Componente customizado para o título do header
-const HeaderTitle = () => (
-    <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <Image
-            source={require("./assets/img/predio-do-hospital.png")}
-            style={{ width: 24, height: 24, marginRight: 8, resizeMode: "contain" }}
-        />
-        <Text style={{ fontSize: 18, fontWeight: "bold", color: "#333" }}>
-            Hospital App
-        </Text>
-    </View>
-);
-
-// Stack principal (Home) — apenas a tela inicial, com header e hambúrguer.
-// Login e Geolocalizacao ficam direto no Drawer (sem duplicação de rota).
-function MainStack({ navigation }) {
-    return (
-        <Stack.Navigator>
-            <Stack.Screen
-                name="HomeScreen"
-                component={HomeScreen}
-                options={{
-                    headerStyle: { backgroundColor: "#fff" },
-                    headerTitle: () => <HeaderTitle />,
-                    headerTintColor: "#333",
-                    // Ícone hambúrguer visível no lado direito
-                    headerRight: () => (
-                        <TouchableOpacity
-                            onPress={() => navigation.openDrawer()}
-                            style={{ marginRight: 15 }}
-                        >
-                            <Image
-                                source={require("./assets/img/menu-de-hamburguer.png")}
-                                style={{ width: 24, height: 24, resizeMode: "contain" }}
-                            />
-                        </TouchableOpacity>
-                    ),
-                }}
-            />
-        </Stack.Navigator>
-    );
-}
-
-// Stack do Épico 02 — Detecção de Visitas (Geofence)
-function VisitasStack() {
+// Stack da aba Início (E6-01): a Home é a âncora do geofencing/visita ativa (E2-07).
+// Check-in manual e Mapa são rotas internas (acesso pela própria Home).
+function HomeStack() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="CheckinManual" component={CheckinManualScreen} />
+            <Stack.Screen name="Geolocalizacao" component={GeoLocalizacaoScreen} />
         </Stack.Navigator>
     );
 }
 
-// Stack do Épico 01 — Cadastro de Hospitais e Geofences
+// Stack da aba Hospitais (Épico 01 — CRUD/geofence, listagem pública, sugestões).
 function HospitaisStack() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -88,13 +50,75 @@ function HospitaisStack() {
     );
 }
 
+// Stack da aba Perfil (Épico 05 — conta, consentimento, privacidade; F0-05).
+function PerfilStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Perfil" component={PerfilScreen} />
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Cadastro" component={UserScreen} />
+            <Stack.Screen name="Privacidade" component={PrivacidadeScreen} />
+        </Stack.Navigator>
+    );
+}
+
 // Stack do Épico 03 — Feedback Pós-Saída (F-05). Aberta via notificação local
-// pós-saída (E3-01) ou direto do app; item do drawer oculto (acesso por fluxo).
+// pós-saída (E3-01) ou direto do app; sem aba (acesso por fluxo/notificação).
 function FeedbackStack() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="FeedbackForm" component={FeedbackFormScreen} />
         </Stack.Navigator>
+    );
+}
+
+// Navegação por Bottom Tabs (E6-01): 3 abas de 1 polegar (Início, Hospitais, Perfil)
+// substituindo o antigo Drawer. Transições suaves via burst (<no animation> resolve).
+function Tabs() {
+    return (
+        <Tab.Navigator
+            screenOptions={{
+                headerShown: false,
+                tabBarActiveTintColor: colors.primary,
+                tabBarInactiveTintColor: colors.onSurfaceVariant,
+                tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
+                tabBarStyle: {
+                    backgroundColor: colors.surfaceContainerLowest,
+                    borderTopColor: colors.outlineVariant,
+                    height: 64,
+                    paddingBottom: 8,
+                    paddingTop: 8,
+                },
+            }}
+        >
+            <Tab.Screen
+                name="Inicio"
+                component={HomeStack}
+                options={{
+                    tabBarLabel: "Início",
+                    tabBarAccessibilityLabel: "Início — status da visita e mapa",
+                    tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} />,
+                }}
+            />
+            <Tab.Screen
+                name="Hospitais"
+                component={HospitaisStack}
+                options={{
+                    tabBarLabel: "Hospitais",
+                    tabBarAccessibilityLabel: "Hospitais — lista com indicadores",
+                    tabBarIcon: ({ color, size }) => <Building2 color={color} size={size} />,
+                }}
+            />
+            <Tab.Screen
+                name="Perfil"
+                component={PerfilStack}
+                options={{
+                    tabBarLabel: "Perfil",
+                    tabBarAccessibilityLabel: "Perfil — conta e privacidade",
+                    tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+                }}
+            />
+        </Tab.Navigator>
     );
 }
 
@@ -131,43 +155,10 @@ export default function App() {
     return (
         <SafeAreaProvider>
             <NavigationContainer ref={navigationRef}>
-                {/* Drawer com opção de Login */}
-                <Drawer.Navigator
-                    screenOptions={{
-                        headerShown: false, // escondemos o header duplicado do Drawer
-                    }}
-                >
-                    <Drawer.Screen name="Home" component={MainStack} />
-                    <Drawer.Screen name="Hospitais" component={HospitaisStack} />
-                    <Drawer.Screen
-                        name="Check-in manual"
-                        component={VisitasStack}
-                    />
-                    <Drawer.Screen
-                        name="Feedback"
-                        component={FeedbackStack}
-                        options={{
-                            drawerItemStyle: { display: "none" },
-                        }}
-                    />
-                    <Drawer.Screen name="Login" component={LoginScreen} />
-                    <Drawer.Screen name="Cadastro" component={UserScreen} />
-                    <Drawer.Screen name="Perfil" component={PerfilScreen} />
-                    <Drawer.Screen
-                        name="Privacidade"
-                        component={PrivacidadeScreen}
-                        options={{
-                            drawerItemStyle: { display: "none" },
-                        }}
-                    />
-                    <Drawer.Screen
-                        name="Geolocalizacao"
-                        component={GeoLocalizacaoScreen}
-                        options={{
-                            drawerItemStyle: { display: "none" },
-                        }}
-                    />
-                </Drawer.Navigator>
+                <Stack.Navigator screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="Tabs" component={Tabs} />
+                    <Stack.Screen name="Feedback" component={FeedbackStack} />
+                </Stack.Navigator>
             </NavigationContainer>
         </SafeAreaProvider>
     );

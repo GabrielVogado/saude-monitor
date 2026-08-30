@@ -13,6 +13,7 @@ import {
 import {SafeAreaView} from "react-native-safe-area-context";
 import {Globe, HelpCircle, Lock, Share2, ShieldCheck} from "lucide-react-native";
 import LoginService from "../service/LoginService";
+import {colors} from "../../../theme";
 import styles from "./css/LoginStyle";
 
 export default function LoginScreen({navigation}) {
@@ -21,20 +22,11 @@ export default function LoginScreen({navigation}) {
     const [rememberDevice, setRememberDevice] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    // Após o login bem-sucedido volta para a aba Início (Home), que é a âncora do app
+    // (E6-01: navegação por Bottom Tabs substituiu o Drawer). "Inicio" é a rota de
+    // tab no navigator pai; o navigate propaga até resolvê-la.
     const redirectToGeo = () => {
-        if (navigation?.navigate) {
-            navigation.navigate("Geolocalizacao");
-            return;
-        }
-
-        const parentNavigation = navigation?.getParent?.();
-
-        if (parentNavigation) {
-            parentNavigation.navigate("Geolocalizacao");
-            return;
-        }
-
-        navigation?.navigate?.("Geolocalizacao");
+        navigation?.navigate?.("Inicio");
     };
 
     const handleLogin = async () => {
@@ -127,12 +119,18 @@ export default function LoginScreen({navigation}) {
                                 <TouchableOpacity
                                     style={styles.checkboxContainer}
                                     onPress={() => setRememberDevice(!rememberDevice)}
+                                    accessibilityRole="checkbox"
+                                    accessibilityState={{checked: rememberDevice}}
+                                    accessibilityLabel="Lembrar este dispositivo"
                                 >
                                     <View style={[styles.checkbox, rememberDevice && styles.checkboxActive]} />
                                     <Text style={styles.optionText}>Lembrar este dispositivo</Text>
                                 </TouchableOpacity>
 
-                                <TouchableOpacity>
+                                <TouchableOpacity
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Esqueci minha senha"
+                                >
                                     <Text style={styles.link}>Esqueci minha senha</Text>
                                 </TouchableOpacity>
                             </View>
@@ -142,6 +140,9 @@ export default function LoginScreen({navigation}) {
                                 style={[styles.loginButton, loading && styles.loginButtonDisabled]}
                                 onPress={handleLogin}
                                 disabled={loading}
+                                accessibilityRole="button"
+                                accessibilityLabel={loading ? "Entrando no sistema" : "Entrar no sistema"}
+                                accessibilityState={{disabled: loading, busy: loading}}
                             >
                                 <Text style={styles.loginButtonText}>
                                     {loading ? "Entrando..." : "Entrar no sistema ➜"}
@@ -152,7 +153,7 @@ export default function LoginScreen({navigation}) {
                         {/* Compliance Info */}
                         <View style={styles.complianceBox}>
                             <View style={styles.complianceIcon}>
-                                <ShieldCheck size={18} color="#0085C7" />
+                                <ShieldCheck size={18} color={colors.primary} />
                             </View>
                             <Text style={styles.complianceText}>
                                 Este sistema utiliza geolocalização seguindo as diretrizes da{" "}
@@ -165,11 +166,11 @@ export default function LoginScreen({navigation}) {
                     {/* Security Badges */}
                     <View style={styles.securityBadges}>
                         <View style={styles.badgeItem}>
-                            <Lock size={14} color="#64748B" />
+                            <Lock size={14} color={colors.onSurfaceVariant} />
                             <Text style={styles.badgeText}>END-TO-END ENCRYPTED</Text>
                         </View>
                         <View style={styles.badgeItem}>
-                            <ShieldCheck size={14} color="#64748B" />
+                            <ShieldCheck size={14} color={colors.onSurfaceVariant} />
                             <Text style={styles.badgeText}>LGPD COMPLIANT</Text>
                         </View>
                     </View>
@@ -177,20 +178,20 @@ export default function LoginScreen({navigation}) {
                     {/* Social / Support Icons */}
                     <View style={styles.socialIcons}>
                         <View style={styles.iconWrapper}>
-                            <TouchableOpacity style={styles.socialBtn}>
-                                <Globe size={24} color="#1E293B" />
+                            <TouchableOpacity style={styles.socialBtn} accessibilityRole="button" accessibilityLabel="Site global">
+                                <Globe size={24} color={colors.onSurface} />
                             </TouchableOpacity>
                             <Text style={styles.iconLabel}>GLOBAL</Text>
                         </View>
                         <View style={styles.iconWrapper}>
-                            <TouchableOpacity style={styles.socialBtn}>
-                                <Share2 size={24} color="#1E293B" />
+                            <TouchableOpacity style={styles.socialBtn} accessibilityRole="button" accessibilityLabel="Partilhar">
+                                <Share2 size={24} color={colors.onSurface} />
                             </TouchableOpacity>
                             <Text style={styles.iconLabel}>PARTILHAR</Text>
                         </View>
                         <View style={styles.iconWrapper}>
-                            <TouchableOpacity style={styles.socialBtn}>
-                                <HelpCircle size={24} color="#1E293B" />
+                            <TouchableOpacity style={styles.socialBtn} accessibilityRole="button" accessibilityLabel="Suporte">
+                                <HelpCircle size={24} color={colors.onSurface} />
                             </TouchableOpacity>
                             <Text style={styles.iconLabel}>SUPORTE</Text>
                         </View>
@@ -202,7 +203,7 @@ export default function LoginScreen({navigation}) {
                         <View style={styles.dot} />
                         <Text style={styles.simpleFooterLink}>Cookies</Text>
                         <View style={styles.dot} />
-                        <TouchableOpacity onPress={() => navigation.navigate?.("Privacidade")}>
+                        <TouchableOpacity onPress={() => navigation.navigate?.("Privacidade")} accessibilityRole="link" accessibilityLabel="Política de Privacidade">
                             <Text style={styles.link}>Privacidade</Text>
                         </TouchableOpacity>
                     </View>

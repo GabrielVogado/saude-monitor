@@ -67,11 +67,11 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 ## Épico 6 — Experiência e Polimento (Cross)
 | ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |
 |---|---|---|---|
-| **E6-01** | Navegação Bottom Tabs | **F-07** | 🔴 Pendente (sprint S6) |
-| **E6-02** | Design System v2.0 | **F-08** | 🔴 Pendente (sprint S6) |
-| **E6-03** | Acessibilidade AA | **F-08** | 🔴 Pendente (sprint S6) |
-| **E6-04** | Loading/Empty/Error states | **F-08** | 🔴 Pendente (sprint S6) |
-| **E6-05** | Notificações opt-in | **F-08** | 🔴 Pendente (sprint S6) |
+| **E6-01** | Navegação Bottom Tabs | **F-07** | 🟢 Implementado (S6: 3 abas Início/Hospitais/Perfil substituindo o Drawer; rotas de fluxo preservadas) |
+| **E6-02** | Design System v2.0 | **F-08** | 🟢 Implementado (S6: tokens aplicados em Home/Perfil/Privacidade/GeoLocalização/Check-in; CSGeoStatusCard migrado; pacote Drawer removido) |
+| **E6-03** | Acessibilidade AA | **F-08** | 🟢 Implementado (S6: labels/roles/alvos 48dp nas telas + tab bar acessível) |
+| **E6-04** | Loading/Empty/Error states | **F-08** | 🟢 Implementado (S6: estados com retry na Home, Perfil e Check-in; tab bar testada em smoke test de UI) |
+| **E6-05** | Notificações opt-in | **F-08** | 🟡 Parcial (opt-in de notificações no fluxo de feedback E3; ajuste dedicado de permissões fica para patch pós-lançamento) |
 
 ## Épico 7 — Painel Administrativo Web
 | ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |

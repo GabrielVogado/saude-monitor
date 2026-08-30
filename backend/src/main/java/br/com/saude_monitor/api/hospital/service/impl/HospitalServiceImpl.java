@@ -18,6 +18,7 @@ import br.com.saude_monitor.api.hospital.dto.HospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.HospitalResumoResponse;
 import br.com.saude_monitor.api.hospital.dto.HospitalResponse;
 import br.com.saude_monitor.api.hospital.dto.IndicadoresResponse;
+import br.com.saude_monitor.api.hospital.dto.OrdemRanking;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
 import br.com.saude_monitor.api.hospital.dto.RejeitarSugestaoRequest;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalDetalheResponse;
@@ -153,6 +154,64 @@ public class HospitalServiceImpl implements HospitalService {
                 .map(d -> toResumo(d, porId.get(d.getId())))
                 .toList();
         return PageResponse.of(content, page, size, total);
+    }
+
+    @Override
+    public PageResponse<HospitalResumoResponse> ranking(OrdemRanking ordem, TipoEstabelecimento tipo, int page, int size) {
+        // Busca TODOS os hospitais ativos (filtro opcional por tipo), sem paginar ainda,
+        // para ordenar globalmente pelo indicador antes de fatiar a página (E4-05).
+        Query query = new Query(Criteria.where("ativo").is(true));
+        if (tipo != null) {
+            query.addCriteria(Criteria.where("tipo").is(tipo));
+        }
+        List<HospitalDocument> todos = mongoTemplate.find(query, HospitalDocument.class);
+
+        Map<String, IndicadoresResponse> porId = mapaIndicadores(todos);
+
+        // Ordena: hospitais com indicadores disponíveis primeiro (por nota desc ou
+        // tempo asc); sem indicadores ficam ao final, ordenados por nome.
+        List<HospitalDocument> ordenados = new ArrayList<>(todos);
+        OrdemRanking efetiva = ordem == null ? OrdemRanking.NOTA : ordem;
+        ordenados.sort((a, b) -> {
+            IndicadoresResponse ia = porId.get(a.getId());
+            IndicadoresResponse ib = porId.get(b.getId());
+            boolean da = ia != null && ia.indicadoresDisponiveis();
+            boolean db = ib != null && ib.indicadoresDisponiveis();
+            if (da != db) {
+                return da ? -1 : 1;
+            }
+            if (!da) {
+                return String.CASE_INSENSITIVE_ORDER.compare(
+                        nz(a.getNome()), nz(b.getNome()));
+            }
+            if (efetiva == OrdemRanking.NOTA) {
+                int cmp = Double.compare(nzNota(ib), nzNota(ia)); // maior nota primeiro
+                if (cmp != 0) return cmp;
+            } else {
+                int cmp = Integer.compare(nzTempo(ia), nzTempo(ib)); // menor tempo primeiro
+                if (cmp != 0) return cmp;
+            }
+            return String.CASE_INSENSITIVE_ORDER.compare(nz(a.getNome()), nz(b.getNome()));
+        });
+
+        int total = ordenados.size();
+        List<HospitalDocument> conteudo = paginarEmMemoria(ordenados, page, size);
+        List<HospitalResumoResponse> content = conteudo.stream()
+                .map(d -> toResumo(d, porId.get(d.getId())))
+                .toList();
+        return PageResponse.of(content, page, size, total);
+    }
+
+    private static double nzNota(IndicadoresResponse i) {
+        return i != null && i.notaMedia() != null ? i.notaMedia() : 0.0;
+    }
+
+    private static int nzTempo(IndicadoresResponse i) {
+        return i != null && i.tempoMedianoMinutos() != null ? i.tempoMedianoMinutos() : Integer.MAX_VALUE;
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
     }
 
     @Override

@@ -52,7 +52,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **E4-02** | Ver tempo médio do hospital | **F-06** | ✅ Existente (mediana) |
 | **E4-03** | Detalhe público hospital | **F-06** | ✅ Existente (`/hospitais/{id}/indicadores` + tela) |
 | **E4-04** | Atualizar agregados 15min | **F-06** | ✅ Existente (job + evento) |
-| **E4-05** | Ranking hospitais | **F-06** | 🔴 Pendente (sprint S6) |
+| **E4-05** | Ranking hospitais | **F-06** | 🟢 Implementado (BE: `GET /api/v1/hospitais/ranking` ordenado por NOTA/TEMPO + filtro tipo + paginação) |
 | **E4-06** | Tendência simples | **F-06** | 🔴 Pendente (não planejado no MVP atual) |
 
 ## Épico 5 — Conta, Consentimento e Privacidade

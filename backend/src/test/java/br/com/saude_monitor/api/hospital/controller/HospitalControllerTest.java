@@ -10,6 +10,7 @@ import br.com.saude_monitor.api.hospital.dto.HospitalResumoResponse;
 import br.com.saude_monitor.api.hospital.dto.HospitalResponse;
 import br.com.saude_monitor.api.hospital.dto.IndicadoresResponse;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
+import br.com.saude_monitor.api.hospital.dto.OrdemRanking;
 import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
 import br.com.saude_monitor.api.hospital.dto.AprovarSugestaoRequest;
 import br.com.saude_monitor.api.hospital.dto.RejeitarSugestaoRequest;
@@ -136,8 +137,7 @@ class HospitalControllerTest {
     }
 
     @Test
-    void deveAprovarSugestaoComHospitalId() throws Exception {
-        String body = """
+    void deveAprovarSugestaoComHospitalId() throws Exception {        String body = """
                 {
                   "hospitalId": "hosp-123"
                 }
@@ -147,6 +147,21 @@ class HospitalControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void deveRetornarRankingPublico() throws Exception {
+        mockMvc.perform(get("/api/v1/hospitais/ranking"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void deveRetornarRankingPorTempoComFiltroTipo() throws Exception {
+        mockMvc.perform(get("/api/v1/hospitais/ranking").param("ordem", "TEMPO").param("tipo", "PUBLICO"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
     }
 
     /** Stub manual do serviço, evita dependência de Mockito/MongoDB. */
@@ -178,6 +193,11 @@ class HospitalControllerTest {
         @Override
         public PageResponse<HospitalResumoResponse> listar(Double latitude, Double longitude, Double raioKm,
                                                            TipoEstabelecimento tipo, String busca, int page, int size) {
+            return PageResponse.of(List.of(), page, size, 0);
+        }
+
+        @Override
+        public PageResponse<HospitalResumoResponse> ranking(OrdemRanking ordem, TipoEstabelecimento tipo, int page, int size) {
             return PageResponse.of(List.of(), page, size, 0);
         }
 

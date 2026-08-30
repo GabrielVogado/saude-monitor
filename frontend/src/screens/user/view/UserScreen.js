@@ -27,7 +27,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import UserService from '../service/UserService';
 import styles from './css/UserStyle';
 
-const HospitalRegisterScreen = () => {
+const HospitalRegisterScreen = ({navigation}) => {
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
@@ -173,7 +173,21 @@ const HospitalRegisterScreen = () => {
                                     onPress={() => setAgreeTerms(!agreeTerms)}
                                 />
                                 <Text style={styles.termsText}>
-                                    Concordo com os <Text style={styles.linkText}>Termos de Uso</Text> e <Text style={styles.linkText}>Política de Privacidade</Text> da plataforma Clinical Sanctuary.
+                                    Concordo com os{" "}
+                                    <Text
+                                        style={styles.linkText}
+                                        onPress={() => navigation?.navigate?.("Privacidade")}
+                                    >
+                                        Termos de Uso
+                                    </Text>{" "}
+                                    e{" "}
+                                    <Text
+                                        style={styles.linkText}
+                                        onPress={() => navigation?.navigate?.("Privacidade")}
+                                    >
+                                        Política de Privacidade
+                                    </Text>{" "}
+                                    da plataforma Hospital Monitor.
                                 </Text>
                             </View>
 
@@ -209,7 +223,7 @@ const HospitalRegisterScreen = () => {
                         </View>
                         <View style={styles.badgeItem}>
                             <ShieldCheck size={14} color="#64748B" />
-                            <Text style={styles.badgeText}>HIPAA COMPLIANT</Text>
+                            <Text style={styles.badgeText}>LGPD COMPLIANT</Text>
                         </View>
                     </View>
 

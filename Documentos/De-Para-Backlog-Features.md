@@ -58,11 +58,11 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 ## Épico 5 — Conta, Consentimento e Privacidade
 | ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |
 |---|---|---|---|
-| **E5-01** | Permissão localização etapas | **F-09** | 🔴 Pendente |
-| **E5-02** | Termos de privacidade LGPD | **F-09** | 🔴 Pendente |
+| **E5-01** | Permissão localização etapas | **F-09** | 🟢 Implementado (FE: Perfil → Dados e Privacidade, consulta/solicita/revoga) |
+| **E5-02** | Termos de privacidade LGPD | **F-09** | 🟢 Implementado (FE: tela Privacidade/Termos acessível em 2 toques; selo HIPAA removido) |
 | **E5-03** | Histórico pessoal visitas/fb | **F-02** | 🔴 Pendente (stretch) |
-| **E5-04** | Cadastro/login opcional | **F-02** | 🔴 Pendente |
-| **E5-05** | Revogar consentimento LGPD | **F-09** | 🔴 Pendente (stretch) |
+| **E5-04** | Cadastro/login opcional | **F-02** | 🟢 Implementado (FE: conta opcional na jornada principal; Perfil orienta Login/Cadastro) |
+| **E5-05** | Revogar consentimento LGPD | **F-09** | 🟡 Parcial (revogação em Perfil; desligamento nativo via configurações do SO) |
 
 ## Épico 6 — Experiência e Polimento (Cross)
 | ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |

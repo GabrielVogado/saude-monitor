@@ -72,4 +72,31 @@ describe("LoginService (Fase 0)", () => {
       "Não foi possível conectar ao backend"
     );
   });
+
+  test("excluirConta envia DELETE autenticado em /api/v1/contas/exclusao e limpa a sessão", async () => {
+    TokenStorage.salvarTokens({ accessToken: "TOK", refreshToken: "RT", usuario: { id: "u1" } });
+    global.fetch = jest.fn().mockResolvedValue(
+      jsonResponse({ success: true, message: "Conta excluída com sucesso." })
+    );
+
+    const resp = await LoginService.excluirConta();
+
+    const [url, config] = global.fetch.mock.calls[0];
+    expect(url).toContain("/api/v1/contas/exclusao");
+    expect(config.method).toBe("DELETE");
+    expect(config.headers.Authorization).toBe("Bearer TOK");
+    expect(resp.success).toBe(true);
+    // após a exclusão a sessão local é removida (logout)
+    expect(await TokenStorage.getAccessToken()).toBeNull();
+  });
+
+  test("excluirConta sem sessão lança erro", async () => {
+    await expect(LoginService.excluirConta()).rejects.toThrow("Sessão expirada");
+  });
+
+  test("excluirConta propaga erro da API", async () => {
+    TokenStorage.salvarTokens({ accessToken: "TOK" });
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "Falha ao excluir a conta: erro interno" }, 500));
+    await expect(LoginService.excluirConta()).rejects.toThrow("Falha ao excluir a conta");
+  });
 });

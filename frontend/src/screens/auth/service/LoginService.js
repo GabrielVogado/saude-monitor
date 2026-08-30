@@ -102,6 +102,57 @@ class LoginService {
   static async logout() {
     await TokenStorage.limparTokens();
   }
+
+  /**
+   * Exclui a conta do usuário autenticado (F0-05/LGPD).
+   *
+   * Envia `DELETE /api/v1/contas/exclusao` com o access token e, em caso de
+   * sucesso, remove a sessão local (logout) já que a conta deixou de existir.
+   */
+  static async excluirConta() {
+    const accessToken = await TokenStorage.getAccessToken();
+
+    if (!accessToken) {
+      throw new Error("Sessão expirada. Faça login novamente.");
+    }
+
+    const url = buildApiUrl("/api/v1/contas/exclusao");
+
+    let response;
+    try {
+      response = await fetch(url, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+    } catch (error) {
+      if (error?.message === "Network request failed") {
+        throw new Error(
+          `Não foi possível conectar ao backend em ${url}. Verifique a API, a URL e a rede.`
+        );
+      }
+      throw error;
+    }
+
+    let data = null;
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+
+    if (!response.ok) {
+      const message =
+        data?.message ||
+        `Falha ao excluir a conta (HTTP ${response.status}).`;
+      throw new Error(message);
+    }
+
+    await TokenStorage.limparTokens();
+    return data;
+  }
 }
 
 export default LoginService;

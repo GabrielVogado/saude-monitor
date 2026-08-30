@@ -14,4 +14,6 @@ public interface AuthRepository extends MongoRepository<AuthDocument, String> {
 	Optional<AuthDocument> findByEmail(String email);
 
 	boolean existsByUser_Id(String userId);
+
+	void deleteByUser_Id(String userId);
 }

@@ -47,6 +47,9 @@ public class SecurityConfig {
                         // Exceção PÚBLICA (spec §3.2 / E1-05): sugestão anônima de hospital.
                         // Deve vir ANTES da regra genérica de POST admin (a ordem importa).
                         .requestMatchers(HttpMethod.POST, "/api/v1/hospitais/sugestoes").permitAll()
+                        // Feedback pós-saída (Épico 03 / F-05): criação é pública (anônimo, RN-20).
+                        // GET/PUT exigem autenticação do dono (🔒) — cobertos por anyRequest().
+                        .requestMatchers(HttpMethod.POST, "/api/v1/feedbacks").permitAll()
                         // Moderação de sugestões (E1-06): endpoints admin específicos.
                         .requestMatchers(HttpMethod.GET, "/api/v1/hospitais/sugestoes", "/api/v1/hospitais/sugestoes/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/hospitais/sugestoes/**").hasRole("ADMIN")

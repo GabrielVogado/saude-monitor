@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {createStackNavigator} from "@react-navigation/stack";
 import {createDrawerNavigator} from "@react-navigation/drawer";
 import {NavigationContainer} from "@react-navigation/native";
 import {SafeAreaProvider} from "react-native-safe-area-context";
 import {Image, Text, TouchableOpacity, View} from "react-native";
+import * as Notifications from "expo-notifications";
 import HomeScreen from "./src/screens/home/view/HomeScreen.js";
 import LoginScreen from "./src/screens/auth/view/LoginScreen.js";
 import UserScreen from "./src/screens/user/view/UserScreen.js";
@@ -14,6 +15,8 @@ import SugerirHospitalScreen from "./src/screens/hospitais/view/SugerirHospitalS
 import SugestoesPendentesScreen from "./src/screens/hospitais/view/SugestoesPendentesScreen.js";
 import RevisarSugestaoScreen from "./src/screens/hospitais/view/RevisarSugestaoScreen.js";
 import CheckinManualScreen from "./src/screens/visitas/view/CheckinManualScreen.js";
+import FeedbackFormScreen from "./src/screens/feedback/view/FeedbackFormScreen.js";
+import { agendarLembrete, pendenciaAtual } from "./src/screens/feedback/service/FeedbackNotificationService";
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -83,10 +86,49 @@ function HospitaisStack() {
     );
 }
 
+// Stack do Épico 03 — Feedback Pós-Saída (F-05). Aberta via notificação local
+// pós-saída (E3-01) ou direto do app; item do drawer oculto (acesso por fluxo).
+function FeedbackStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="FeedbackForm" component={FeedbackFormScreen} />
+        </Stack.Navigator>
+    );
+}
+
 export default function App() {
+    const navigationRef = useRef(null);
+
+    useEffect(() => {
+        // E3-01/E3-03: abre o formulário de feedback quando o usuário toca na
+        // notificação local de feedback pós-saída.
+        const tratarResposta = async (resposta) => {
+            const data = resposta?.notification?.request?.content?.data;
+            if (!data?.abrirFeedback || !data?.visitaId) {
+                return;
+            }
+            const pendencia = await pendenciaAtual();
+            if (pendencia?.visitaId === data.visitaId) {
+                // Pedido de feedback visualizado: agenda o lembrete único
+                // (RN-09/E3-03) caso ele não responda de imediato.
+                await agendarLembrete({ visitaId: data.visitaId, hospitalNome: pendencia.hospitalNome });
+            }
+            navigationRef.current?.navigate("Feedback", {
+                screen: "FeedbackForm",
+                params: {
+                    visitaId: data.visitaId,
+                    hospitalNome: pendencia?.hospitalNome || data.hospitalNome,
+                },
+            });
+        };
+
+        const subscricao = Notifications.addNotificationResponseReceivedListener(tratarResposta);
+        return () => subscricao.remove();
+    }, []);
+
     return (
         <SafeAreaProvider>
-            <NavigationContainer>
+            <NavigationContainer ref={navigationRef}>
                 {/* Drawer com opção de Login */}
                 <Drawer.Navigator
                     screenOptions={{
@@ -98,6 +140,13 @@ export default function App() {
                     <Drawer.Screen
                         name="Check-in manual"
                         component={VisitasStack}
+                    />
+                    <Drawer.Screen
+                        name="Feedback"
+                        component={FeedbackStack}
+                        options={{
+                            drawerItemStyle: { display: "none" },
+                        }}
                     />
                     <Drawer.Screen name="Login" component={LoginScreen} />
                     <Drawer.Screen name="Cadastro" component={UserScreen} />

@@ -28,4 +28,7 @@ public interface VisitaRepository extends MongoRepository<VisitaDocument, String
     List<VisitaDocument> findByStatusInAndUltimoHeartbeatBefore(List<StatusVisita> status, Instant limite);
 
     List<VisitaDocument> findByStatus(StatusVisita status);
+
+    /** Visitas finalizadas cuja saída ocorreu antes de {@code limite} — usada pelo job de feedback sem resposta (RN-09). */
+    List<VisitaDocument> findByStatusAndSaidaBefore(StatusVisita status, Instant limite);
 }

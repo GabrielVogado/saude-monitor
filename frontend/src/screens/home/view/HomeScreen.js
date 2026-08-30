@@ -6,6 +6,7 @@ import styles from "./css/HomeStyle";
 import VisitaService from "../../visitas/service/VisitaService";
 import {iniciarGeofencing, sincronizarVisitaAtiva} from "../../visitas/service/GeofencingTaskService";
 import {iniciarHeartbeat, pararHeartbeat} from "../../visitas/service/HeartbeatService";
+import {agendarFeedback} from "../../feedback/service/FeedbackNotificationService";
 import CSGeoStatusCard from "../../../components/CSGeoStatusCard";
 
 const DOZE_HORAS_MS = 12 * 60 * 60 * 1000;
@@ -91,6 +92,13 @@ export default function HomeScreen() {
         if (!visitaAtiva) return;
         try {
             await VisitaService.checkout(visitaAtiva.id, { encerramentoManual: true });
+            // Épico 03 — E3-01: agenda o pedido de feedback ~1–5 min após a saída.
+            agendarFeedback({
+                visitaId: visitaAtiva.id,
+                hospitalId: visitaAtiva.hospitalId,
+                hospitalNome: visitaAtiva.hospitalNome || visitaAtiva.hospital?.nome,
+                saidaEm: new Date().toISOString(),
+            });
             setVisitaAtiva(null);
         } catch {
             // mantém o card; erro é tratado pelo usuário ao tentar novamente

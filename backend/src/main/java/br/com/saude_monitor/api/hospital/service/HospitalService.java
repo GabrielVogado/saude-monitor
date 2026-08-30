@@ -6,6 +6,7 @@ import br.com.saude_monitor.api.hospital.dto.HospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.HospitalResumoResponse;
 import br.com.saude_monitor.api.hospital.dto.HospitalResponse;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
+import br.com.saude_monitor.api.hospital.dto.OrdemRanking;
 import br.com.saude_monitor.api.hospital.document.StatusSugestao;
 import br.com.saude_monitor.api.hospital.dto.AprovarSugestaoRequest;
 import br.com.saude_monitor.api.hospital.dto.RejeitarSugestaoRequest;
@@ -28,6 +29,13 @@ public interface HospitalService {
 
     PageResponse<HospitalResumoResponse> listar(Double latitude, Double longitude, Double raioKm,
                                                 TipoEstabelecimento tipo, String busca, int page, int size);
+
+    /**
+     * Ranking público de hospitais ordenável por nota média ou por tempo médio de
+     * atendimento (E4-05), com filtro opcional por tipo e paginação. Hospitais sem
+     * indicadores suficientes (RN-15) ficam ao final, ordenados por nome.
+     */
+    PageResponse<HospitalResumoResponse> ranking(OrdemRanking ordem, TipoEstabelecimento tipo, int page, int size);
 
     HospitalResponse alterarStatus(String id, boolean ativo);
 

@@ -12,6 +12,7 @@ import br.com.saude_monitor.api.hospital.dto.HospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.HospitalResumoResponse;
 import br.com.saude_monitor.api.hospital.dto.HospitalResponse;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
+import br.com.saude_monitor.api.hospital.dto.OrdemRanking;
 import br.com.saude_monitor.api.hospital.dto.RejeitarSugestaoRequest;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalDetalheResponse;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalRequest;
@@ -63,6 +64,19 @@ public class HospitalController {
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return ResponseEntity.ok(hospitalService.listar(latitude, longitude, raioKm, tipo, busca, page, size));
+    }
+
+    /**
+     * 🔓 Ranking público de hospitais ordenável por nota média ou por tempo médio de
+     * atendimento (E4-05), com filtro opcional por tipo e paginação.
+     */
+    @GetMapping("/ranking")
+    public ResponseEntity<PageResponse<HospitalResumoResponse>> ranking(
+            @RequestParam(required = false) OrdemRanking ordem,
+            @RequestParam(required = false) TipoEstabelecimento tipo,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        return ResponseEntity.ok(hospitalService.ranking(ordem, tipo, page, size));
     }
 
     /** 🔓 Detalhe público do hospital. */

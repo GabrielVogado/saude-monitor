@@ -18,8 +18,8 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **E1-02** | Definir geofence (Admin) | **F-01** | ✅ Existente (Via endpoints Admin) |
 | **E1-03** | Listar hospitais (Público) | **F-01**, **F-07** | ✅ Existente (340 importados) |
 | **E1-04** | Editar/Desativar hospital | **F-01** | ✅ Existente |
-| **E1-05** | Sugerir hospital | **F-07** | 🟡 Parcial (tela pública existe, endpoint público existe, mas sem moderação) |
-| **E1-06** | Revisar/aprovar/rejeitar sugestão | **F-10** | 🔴 Inexistente |
+| **E1-05** | Sugerir hospital | **F-07** | ✅ Existente (tela pública + endpoint público) |
+| **E1-06** | Revisar/aprovar/rejeitar sugestão | **F-10** | ✅ Existente (mobile: `SugestoesPendentesScreen`/`RevisarSugestaoScreen`; backend: endpoints aprovar/rejeitar) |
 
 ## Épico 2 — Detecção de Visitas (Geofence)
 | ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |

@@ -13,5 +13,8 @@ public enum StatusVisita {
     SUSPEITA,
     FINALIZADA,
     EXPIRADA,
-    GPS_INTERROMPIDO
+    GPS_INTERROMPIDO,
+
+    /** Visita encerrada cuja janela de resposta de feedback (24h) expirou sem resposta (RN-09). */
+    SEM_FEEDBACK
 }

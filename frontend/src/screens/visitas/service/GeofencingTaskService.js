@@ -2,6 +2,7 @@ import * as TaskManager from "expo-task-manager";
 import * as Location from "expo-location";
 import HospitalService from "../../hospitais/service/HospitalService";
 import VisitaService from "./VisitaService";
+import { agendarFeedback } from "../../feedback/service/FeedbackNotificationService";
 import { geojsonParaCoordenadas, calcularCentroide } from "../../../utils/geojson";
 
 /**
@@ -35,6 +36,9 @@ const timersSaida = new Map();
 // (ver `HomeScreen.js`), então não depende de o app continuar vivo em memória.
 let visitaAtivaId = null;
 
+// Hospital da visita ativa, para o feedback pós-saída (Épico 03 — E3-01).
+let visitaAtivaHospitalId = null;
+
 function limparTimer(mapa, hospitalId) {
   const timer = mapa.get(hospitalId);
   if (timer) {
@@ -58,6 +62,9 @@ async function confirmarEntrada(hospitalId, posicao) {
       posicao,
     });
     visitaAtivaId = resposta?.id || visitaAtivaId;
+    if (resposta?.id) {
+      visitaAtivaHospitalId = hospitalId;
+    }
   } catch (erro) {
     // Conflito de geofences sobrepostos (HTTP 409, E2-04): a tarefa de background não
     // tem UI para perguntar "qual hospital é este?" — o usuário resolve manualmente ao
@@ -77,7 +84,15 @@ async function confirmarSaida(hospitalId) {
 
   try {
     await VisitaService.checkout(visitaAtivaId, {});
+    // Épico 03 — E3-01: pede o feedback ~1–5 min após a saída automática por geofence.
+    agendarFeedback({
+      visitaId: visitaAtivaId,
+      hospitalId: visitaAtivaHospitalId,
+      hospitalNome: null,
+      saidaEm: new Date().toISOString(),
+    });
     visitaAtivaId = null;
+    visitaAtivaHospitalId = null;
   } catch (erro) {
     // eslint-disable-next-line no-console
     console.warn("GeofencingTaskService: falha ao confirmar saída", erro?.message);
@@ -186,6 +201,9 @@ export async function iniciarGeofencing() {
 /** Informa a este serviço qual visita está ativa (para confirmar o checkout automático). */
 export function sincronizarVisitaAtiva(visitaId) {
   visitaAtivaId = visitaId || null;
+  if (!visitaId) {
+    visitaAtivaHospitalId = null;
+  }
 }
 
 /** Encerra o geofencing nativo e limpa temporizadores pendentes (ex.: logout). */
@@ -195,6 +213,7 @@ export async function pararGeofencing() {
   timersEntrada.clear();
   timersSaida.clear();
   visitaAtivaId = null;
+  visitaAtivaHospitalId = null;
 
   const tarefaRegistrada = await TaskManager.isTaskRegisteredAsync(GEOFENCING_TASK);
   if (tarefaRegistrada) {

@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.hospital.service.impl;
 
+import br.com.saude_monitor.api.agregado.service.AgregadoService;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
 import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
@@ -47,6 +48,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Implementação do serviço de hospitais.
@@ -68,6 +70,7 @@ public class HospitalServiceImpl implements HospitalService {
     private final GeofenceValidator geofenceValidator;
     private final GeofenceFactory geofenceFactory;
     private final AutenticacaoHelper autenticacaoHelper;
+    private final AgregadoService agregadoService;
 
     @Override
     public HospitalResponse criar(HospitalRequest request) {
@@ -92,7 +95,7 @@ public class HospitalServiceImpl implements HospitalService {
                 .atualizadoEm(agora)
                 .build();
 
-        return toResponse(hospitalRepository.save(document));
+        return toResponse(hospitalRepository.save(document), indicadoresDe(document));
     }
 
     @Override
@@ -112,12 +115,13 @@ public class HospitalServiceImpl implements HospitalService {
         existente.setLocalizacao(geofenceFactory.calcularCentroide(geofence));
         existente.setAtualizadoEm(Instant.now());
 
-        return toResponse(hospitalRepository.save(existente));
+        return toResponse(hospitalRepository.save(existente), indicadoresDe(existente));
     }
 
     @Override
     public HospitalResponse buscarPorId(String id) {
-        return toResponse(obterOu404(id));
+        HospitalDocument documento = obterOu404(id);
+        return toResponse(documento, indicadoresDe(documento));
     }
 
     @Override
@@ -144,8 +148,9 @@ public class HospitalServiceImpl implements HospitalService {
             total = resultado.getTotalElements();
         }
 
+        Map<String, IndicadoresResponse> porId = mapaIndicadores(documentos);
         List<HospitalResumoResponse> content = documentos.stream()
-                .map(this::toResumo)
+                .map(d -> toResumo(d, porId.get(d.getId())))
                 .toList();
         return PageResponse.of(content, page, size, total);
     }
@@ -155,7 +160,7 @@ public class HospitalServiceImpl implements HospitalService {
         HospitalDocument document = obterOu404(id);
         document.setAtivo(ativo);
         document.setAtualizadoEm(Instant.now());
-        return toResponse(hospitalRepository.save(document));
+        return toResponse(hospitalRepository.save(document), indicadoresDe(document));
     }
 
     @Override
@@ -347,7 +352,23 @@ public class HospitalServiceImpl implements HospitalService {
     // Mapeamentos documento ⇄ DTO
     // ------------------------------------------------------------------
 
-    private HospitalResponse toResponse(HospitalDocument d) {
+    /** Indicadores embutidos de um único hospital (detalhe/escrita), com cache por chamada. */
+    private IndicadoresResponse indicadoresDe(HospitalDocument d) {
+        return agregadoService.mapaIndicadores(List.of(d.getId())).getFirst();
+    }
+
+    /** Mapa id do hospital → indicadores, calculado em lote para listagens (evita N+1). */
+    private Map<String, IndicadoresResponse> mapaIndicadores(List<HospitalDocument> documentos) {
+        List<String> ids = documentos.stream().map(HospitalDocument::getId).toList();
+        List<IndicadoresResponse> indicadores = agregadoService.mapaIndicadores(ids);
+        java.util.LinkedHashMap<String, IndicadoresResponse> mapa = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < documentos.size(); i++) {
+            mapa.put(documentos.get(i).getId(), indicadores.get(i));
+        }
+        return mapa;
+    }
+
+    private HospitalResponse toResponse(HospitalDocument d, IndicadoresResponse indicadores) {
         return new HospitalResponse(
                 d.getId(),
                 d.getNome(),
@@ -363,13 +384,13 @@ public class HospitalServiceImpl implements HospitalService {
                 d.getContato() == null ? null : toContatoDto(d.getContato()),
                 d.getGeofence() == null ? null : geofenceFactory.toDto(d.getGeofence()),
                 d.isAtivo(),
-                IndicadoresResponse.indisponivel(),
+                indicadores,
                 d.getCriadoEm(),
                 d.getAtualizadoEm()
         );
     }
 
-    private HospitalResumoResponse toResumo(HospitalDocument d) {
+    private HospitalResumoResponse toResumo(HospitalDocument d, IndicadoresResponse indicadores) {
         return new HospitalResumoResponse(
                 d.getId(),
                 d.getNome(),
@@ -379,7 +400,7 @@ public class HospitalServiceImpl implements HospitalService {
                 d.getEndereco() == null ? null : toEnderecoDto(d.getEndereco()),
                 d.getGeofence() == null ? null : geofenceFactory.toDto(d.getGeofence()),
                 d.isAtivo(),
-                IndicadoresResponse.indisponivel()
+                indicadores
         );
     }
 

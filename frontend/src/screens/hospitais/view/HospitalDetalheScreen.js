@@ -19,7 +19,12 @@ import {
   geojsonParaCoordenadas,
 } from "../../../utils/geojson";
 import { getInitialViewState, OSM_RASTER_STYLE } from "../../../utils/mapStyle";
-import { formatarDuracao, formatarNota } from "../../../utils/format";
+import {
+  formatarData,
+  formatarDuracao,
+  formatarNota,
+  formatarPeriodo,
+} from "../../../utils/format";
 
 const TIPO_LABEL = {
   PUBLICO: "Público",
@@ -48,6 +53,7 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   const { id } = route.params || {};
 
   const [hospital, setHospital] = useState(null);
+  const [indicadores, setIndicadores] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
 
@@ -57,6 +63,15 @@ export default function HospitalDetalheScreen({ navigation, route }) {
     try {
       const dados = await HospitalService.buscarPorId(id);
       setHospital(dados);
+
+      // Indicadores enriquecidos do endpoint dedicado (§3.5 / E4-01..E4-04).
+      // Se falhar (ex.: agregado ainda materializando), mantém os embutidos do detalhe.
+      try {
+        const ind = await HospitalService.buscarIndicadores(id);
+        setIndicadores(ind);
+      } catch {
+        setIndicadores(dados?.indicadores || null);
+      }
     } catch (e) {
       setErro(e.message || "Não foi possível carregar o hospital.");
     } finally {
@@ -118,11 +133,11 @@ export default function HospitalDetalheScreen({ navigation, route }) {
     );
   }
 
-  const indicadores = hospital.indicadores;
+  const dadosIndicadores = indicadores || hospital.indicadores;
   const temIndicadores =
-    indicadores?.indicadoresDisponiveis !== false &&
-    indicadores?.notaMedia !== null &&
-    indicadores?.notaMedia !== undefined;
+    dadosIndicadores?.indicadoresDisponiveis !== false &&
+    dadosIndicadores?.notaMedia !== null &&
+    dadosIndicadores?.notaMedia !== undefined;
 
   // Novos campos (opcionais) — tratados com segurança quando ausentes.
   const tipoUnidade =
@@ -226,26 +241,37 @@ export default function HospitalDetalheScreen({ navigation, route }) {
           {temIndicadores ? (
             <View style={styles.indicadores}>
               <View style={styles.notaBlock}>
-                <Text style={styles.notaValue}>{formatarNota(indicadores.notaMedia)}</Text>
-                <CSRatingStars nota={indicadores.notaMedia} size={20} />
+                <Text style={styles.notaValue}>{formatarNota(dadosIndicadores.notaMedia)}</Text>
+                <CSRatingStars nota={dadosIndicadores.notaMedia} size={20} />
                 <Text style={styles.notaCount}>
-                  {indicadores.nAvaliacoes} avaliações nos últimos 90 dias
+                  {dadosIndicadores.nAvaliacoes} avaliações
                 </Text>
               </View>
 
-              {indicadores.tempoMedianoMinutos != null ? (
+              {dadosIndicadores.tempoMedianoMinutos != null ? (
                 <View style={styles.metricRow}>
                   <Text style={styles.metricLabel}>Tempo médio de atendimento</Text>
                   <Text style={styles.metricValue}>
-                    {formatarDuracao(indicadores.tempoMedianoMinutos)}
+                    {formatarDuracao(dadosIndicadores.tempoMedianoMinutos)}
                   </Text>
                 </View>
               ) : null}
 
-              {indicadores.atualizadoEm ? (
+              {dadosIndicadores.nVisitas != null ? (
+                <Text style={styles.transparencia}>
+                  com base em {dadosIndicadores.nVisitas} atendimentos no período
+                </Text>
+              ) : null}
+
+              {formatarPeriodo(dadosIndicadores.periodo) ? (
+                <Text style={styles.transparencia}>
+                  Período: {formatarPeriodo(dadosIndicadores.periodo)}
+                </Text>
+              ) : null}
+
+              {dadosIndicadores.atualizadoEm ? (
                 <Text style={styles.atualizado}>
-                  Atualizado em{" "}
-                  {new Date(indicadores.atualizadoEm).toLocaleDateString("pt-BR")}
+                  Atualizado em {formatarData(dadosIndicadores.atualizadoEm)}
                 </Text>
               ) : null}
             </View>
@@ -350,6 +376,10 @@ const styles = StyleSheet.create({
   atualizado: {
     ...typography.bodySm,
     color: colors.outline,
+  },
+  transparencia: {
+    ...typography.bodySm,
+    color: colors.onSurfaceVariant,
   },
   semIndicadores: {
     ...typography.bodyMd,

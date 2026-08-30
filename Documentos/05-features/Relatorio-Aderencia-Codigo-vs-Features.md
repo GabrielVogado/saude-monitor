@@ -1,9 +1,9 @@
-# 🔍 Relatório de Aderência — Features × Código Real (v2.0)
+# 🔍 Relatório de Aderência — Features × Código Real (v3.0)
 
 > **Verificação do que existe implementado vs. o que as Features propõem**
 >
-> Data: Atualizada — v2.0
-> Alterações desta versão: Reflete a verificação E2E comprovando a funcionalidade real da Fase 0 (JWT/BCrypt) e Épico 1 (Hospitais).
+> Data: Atualizada — v3.0
+> Alterações desta versão: Reflete a verificação E2E comprovando a funcionalidade real da Fase 0 (JWT/BCrypt) e dos Épicos 1 a 4 (Hospitais, Visitas/Geofence, Feedback e Indicadores Públicos por Hospital).
 
 ---
 
@@ -11,11 +11,11 @@
 
 | Categoria | Quantidade | % das Features |
 |---|---|---|
-| ✅ Existente (funcional) | 3/9 | 33% |
-| 🟡 Parcial (precisa refatoração) | 1/9 | 11% |
-| 🔴 Inexistente (precisa construir) | 5/9 | 56% |
+| ✅ Existente (funcional) | 7/9 | 78% |
+| 🟡 Parcial (precisa refatoração) | 2/9 | 22% |
+| 🔴 Inexistente (precisa construir) | 0/9 | 0% |
 
-**Conclusão:** O código atual já cobre os alicerces críticos de forma madura. O backend **possui** autenticação JWT segura, hash BCrypt, importação e endpoint de Listagem de Hospitais (com Geofence via GeoJSON e índices geográficos no Mongo). Os módulos ainda ausentes são as detecções automáticas de visita (Épico 2), o módulo de Feedback (Épico 3) e as agregações estatísticas (Épico 4).
+**Conclusão:** O código atual já cobre a Fase 0 e os Épicos 1 a 4 de forma madura e testada. O backend **possui** autenticação JWT segura (BCrypt), CRUD/geofence de Hospitais, módulo de Visitas com detecção automática via geofencing nativo + heartbeat, módulo de Feedback pós-saída com dedupe e anônimo, e o módulo de agregações estatísticas (Indicadores Públicos por Hospital) com job de atualização a cada 15min. Os pontos ainda **parciais** são: integração visual de listagem no Mapa do app (F-07) e o polimento/design system consolidado (F-08). Permanecem **pendentes** os módulos de sugestão/moderação de hospitais (F-10), os itens de Conta/Privacidade do Épico 5, o ranking de hospitais (E4-05) e o Painel Admin Web (Épico 7 / F-11).
 
 ---
 
@@ -31,7 +31,7 @@
 | `HospitalService.java` | ✅ (Lista os 340 hospitais já importados) |
 | Índice 2dsphere no MongoDB | ✅ |
 | Tela de cadastro de hospital com mapa | 🔴 (Não focaremos, gestão será primariamente API/Admin) |
-| Tela de listagem de hospitais no app | 🟡 (Backend pronto, Falta Frontend mostrar em lista) |
+| Tela de listagem de hospitais no app | ✅ (Lista de hospitais com indicadores no app — Épico 4) |
 | Endpoint `POST/GET/PUT /api/v1/hospitais` | ✅ |
 
 ---
@@ -54,35 +54,59 @@
 
 ---
 
-### 🔴 F-03 — Detecção Automática de Entrada/Saída
-**Status: INEXISTENTE — 0 arquivos backend para visita · frontend só tem GPS contínuo**
+### ✅ F-03 — Detecção Automática de Entrada/Saída
+**Status: FUNCIONAL (Épico 2)**
 
-| O que falta |
-|---|
-| Substituir `watchPositionAsync` por `startGeofencingAsync` + `expo-task-manager` (ADR-002) |
-| Módulo `visita` no backend (checkin/checkout) |
-| Evento de entrada/saída do geofence nativo → API |
-
----
-
-### 🔴 F-04 — Visita Ativa e Cronômetro
-**Status: INEXISTENTE — 0 arquivos backend, 0 arquivos frontend**
-
-| O que falta |
-|---|
-| `VisitaDocument.java` (MongoDB) — entrada, saída, duração, status |
-| `VisitaController.java` — endpoints checkin/checkout/heartbeat |
-| Card de visita ativa na Home |
+| O que a feature precisa | O que existe |
+|---|---|
+| Geofencing nativo (`startGeofencingAsync` + `expo-task-manager`) | ✅ Frontend com geofencing nativo + heartbeat periódico |
+| Módulo `visita` no backend (checkin/checkout) | ✅ `VisitaDocument`, `VisitaController` (checkin/checkout/heartbeat) |
+| Evento de entrada/saída do geofence nativo → API | ✅ Detecção automática de entrada/saída |
+| Expiração de visita > 24h (job) | ✅ `EXPIRADA` (E2-03) |
+| Conflito de geofences sobrepostos | ✅ Hospital mais próximo (E2-04) |
+| Recuperação de GPS interrompido | ✅ Timeout 10min (E2-05) |
+| Prompt de internação/observação | ✅ Após 12h (E2-10) |
+| Ignorar visitas < 2min | ✅ Filtro nas estatísticas (E2-08) |
 
 ---
 
-### 🔴 F-05 — Feedback Pós-Saída
-**Status: INEXISTENTE**
+### ✅ F-04 — Visita Ativa e Cronômetro
+**Status: FUNCIONAL (Épico 2)**
+
+| O que a feature precisa | O que existe |
+|---|---|
+| `VisitaDocument.java` (MongoDB) — entrada, saída, duração, status | ✅ |
+| `VisitaController.java` — endpoints checkin/checkout/heartbeat | ✅ |
+| Card de visita ativa na Home | ✅ Card com cronômetro (E2-07) |
+| Check-in manual em 1 toque | ✅ Fallback GPS desligado (E2-06) |
 
 ---
 
-### 🔴 F-06 — Indicadores Públicos por Hospital
-**Status: INEXISTENTE**
+### ✅ F-05 — Feedback Pós-Saída
+**Status: FUNCIONAL (Épico 3)**
+
+| O que a feature precisa | O que existe |
+|---|---|
+| Notificação local 1–5min após saída | ✅ (E3-01) |
+| Formulário < 45s com 4 perguntas | ✅ (E3-02) |
+| Janela de 24h + 1 lembrete único | ✅ (E3-03) |
+| Bloquear feedback duplicado (unique `visitaId`) | ✅ (E3-04) |
+| Feedback anônimo (`usuarioId` nulo) | ✅ (E3-05) |
+| Tela de agradecimento e impacto | ✅ (E3-06) |
+
+---
+
+### ✅ F-06 — Indicadores Públicos por Hospital
+**Status: FUNCIONAL (Épico 4)**
+
+| O que a feature precisa | O que existe |
+|---|---|
+| Nota média do hospital | ✅ Agregado `agregados_hospitais` + média 90 dias (RN-14) |
+| Tempo médio/mediano | ✅ Mediana do tempo de espera (RN-16/RN-24) |
+| Detalhe público do hospital | ✅ `GET /api/v1/hospitais/{id}/indicadores` + tela dedicada |
+| Atualização dos agregados a cada 15min | ✅ Job `@Scheduled` + evento `FeedbackSalvoEvent` (E4-04) |
+| Transparência (exibir só N≥5) | ✅ RN-15 |
+| Ranking de hospitais (E4-05) | 🔴 Pendente (sprint S6) |
 
 ---
 
@@ -114,6 +138,6 @@
 
 ## 3. Recomendações Atualizadas
 
-1. **A Fase 0 e o Épico 1 já estão cobertos no backend.** O teste End-to-End demonstrou geração real de tokens e proteção das rotas de admin (como a criação de hospitais).
-2. O passo crítico agora é integrar o Frontend aos endpoints já prontos (listar hospitais no mapa) ou iniciar a construção do **Épico 2 (Módulo de Visitas e Geofence)**.
-3. Recomendamos focar imediatamente no `startGeofencingAsync` do Expo para substituir o custoso `watchPositionAsync`.
+1. **Fase 0 e Épicos 1 a 4 já estão cobertos e testados** (backend + mobile): autenticação JWT/BCrypt, CRUD/geofence de hospitais, visitas com geofencing nativo, feedback pós-saída e indicadores públicos por hospital.
+2. O passo crítico agora é iniciar o **Épico 5 (Conta/Consentimento/Privacidade)** e o **Épico 6 (UX/polimento, Bottom Tabs, a11y)**, além de fechar o **ranking de hospitais (E4-05)**, o **rate limiting (F0-04)** e a **exclusão de conta LGPD (F0-05)**.
+3. Também pendentes: **F-10** (moderação de sugestões de hospitais — branch `feature/f-10-moderacao-sugestoes-hospitais` ainda não mergeada) e o **Painel Admin Web (Épico 7 / F-11)**.

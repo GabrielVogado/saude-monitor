@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.feedback.service.impl;
 
+import br.com.saude_monitor.api.agregado.event.FeedbackSalvoEvent;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
@@ -15,6 +16,7 @@ import br.com.saude_monitor.api.visita.document.StatusVisita;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
 import br.com.saude_monitor.api.visita.repository.VisitaRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -42,6 +44,7 @@ public class FeedbackServiceImpl implements FeedbackService {
 
     private final FeedbackRepository feedbackRepository;
     private final VisitaRepository visitaRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public FeedbackResponse criar(FeedbackRequest request, String usuarioId) {
@@ -72,6 +75,11 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .build();
 
         FeedbackDocument salvo = feedbackRepository.save(feedback);
+
+        // Dispara o recálculo assíncrono do agregado do hospital (Épico 04, RN-18).
+        // AFTER_COMMIT no listener garante que só recalcula depois do commit desta transação.
+        eventPublisher.publishEvent(new FeedbackSalvoEvent(salvo.getHospitalId()));
+
         return toResponse(salvo, true);
     }
 
@@ -107,6 +115,10 @@ public class FeedbackServiceImpl implements FeedbackService {
         feedback.setComentario(request.comentario());
 
         FeedbackDocument salvo = feedbackRepository.save(feedback);
+
+        // Edição dentro da janela de 24h pode alterar a nota — recalcula o agregado (RN-18).
+        eventPublisher.publishEvent(new FeedbackSalvoEvent(salvo.getHospitalId()));
+
         return toResponse(salvo, true);
     }
 

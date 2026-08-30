@@ -130,6 +130,18 @@ class HospitalService {
   }
 
   /**
+   * Indicadores públicos enriquecidos do hospital (§3.5 / E4-01..E4-04).
+   *
+   * Campos: `hospitalId`, `indicadoresDisponiveis`, `notaMedia`, `nAvaliacoes`,
+   * `tempoMedianoMinutos`, `nVisitas`, `periodo.{inicio,fim}`, `atualizadoEm`.
+   * Quando `nAvaliacoes < 5`, `indicadoresDisponiveis = false` e `notaMedia`/
+   * `tempoMedianoMinutos` são `null` (RN-15).
+   */
+  static buscarIndicadores(id) {
+    return request(`${BASE_PATH}/${id}/indicadores`);
+  }
+
+  /**
    * Cadastro, atualização e ativação/desativação de hospital (E1-01/E1-02/E1-04)
    * são operações administrativas — migradas para o Painel Administrativo Web
    * (F-11). Este cliente mobile expõe apenas as operações públicas abaixo.

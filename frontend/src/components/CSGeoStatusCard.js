@@ -1,7 +1,8 @@
 import React, {useEffect, useState} from "react";
-import {Text, View} from "react-native";
+import {StyleSheet, Text, View} from "react-native";
 import CSCard from "./CSCard";
 import CSButton from "./CSButton";
+import {colors, typography, spacing} from "../theme";
 
 /**
  * Card de visita ativa (E2-07): exibe o hospital e um cronômetro de permanência,
@@ -11,6 +12,8 @@ import CSButton from "./CSButton";
  * Quando `visita.status === "GPS_INTERROMPIDO"` (E2-05/RN-06: sem sinal de GPS por mais
  * de 10min, encerrada automaticamente pelo backend), o card vira somente leitura: sem
  * cronômetro ativo nem botão "Não estou aqui" — não há mais nada a fazer sobre essa visita.
+ *
+ * E6-02: cores migradas para os tokens do Design System v2.0 (`theme/tokens.js`).
  */
 export default function CSGeoStatusCard({ visita, onEncerrar, onSinalizarTipo }) {
   const [agora, setAgora] = useState(Date.now());
@@ -27,10 +30,10 @@ export default function CSGeoStatusCard({ visita, onEncerrar, onSinalizarTipo })
   if (gpsInterrompido) {
     return (
       <CSCard accessibilityLiveRegion="polite">
-        <Text style={{ fontSize: 14, fontWeight: "600", color: "#b3261e" }}>
+        <Text style={styles.warningTitle}>
           Localização perdida - visita encerrada automaticamente
         </Text>
-        <Text style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+        <Text style={styles.warningDescription}>
           Não conseguimos confirmar sua localização em {visita?.hospitalNome || "o hospital"}{" "}
           por mais de 10 minutos.
         </Text>
@@ -48,20 +51,18 @@ export default function CSGeoStatusCard({ visita, onEncerrar, onSinalizarTipo })
 
   return (
     <CSCard accessibilityLiveRegion="polite">
-      <Text style={{ fontSize: 14, fontWeight: "600", color: "#0b6e4f" }}>
+      <Text style={styles.activeTitle}>
         Você está em {visita?.hospitalNome || "um hospital"}
       </Text>
-      <Text style={{ fontSize: 28, fontWeight: "700", fontVariant: ["tabular-nums"], marginVertical: 4 }}>
-        {cronometro}
-      </Text>
-      <Text style={{ fontSize: 12, color: "#666" }}>tempo de permanência</Text>
+      <Text style={styles.cronometro}>{cronometro}</Text>
+      <Text style={styles.activeDescription}>tempo de permanência</Text>
 
       {podeSinalizarTipo && onSinalizarTipo && (
         <CSButton
           label="Estou em observação ou internado"
           onPress={onSinalizarTipo}
           variant="secondary"
-          style={{ marginTop: 8 }}
+          style={{ marginTop: spacing.s2 }}
         />
       )}
 
@@ -70,9 +71,36 @@ export default function CSGeoStatusCard({ visita, onEncerrar, onSinalizarTipo })
           label="Não estou aqui"
           onPress={onEncerrar}
           variant="tertiary"
-          style={{ marginTop: 8 }}
+          style={{ marginTop: spacing.s2 }}
         />
       )}
     </CSCard>
   );
 }
+
+const styles = StyleSheet.create({
+  warningTitle: {
+    ...typography.titleMd,
+    color: colors.error,
+  },
+  warningDescription: {
+    ...typography.bodySm,
+    color: colors.onSurfaceVariant,
+    marginTop: spacing.s1,
+  },
+  activeTitle: {
+    ...typography.titleMd,
+    color: colors.geoActive,
+  },
+  cronometro: {
+    fontSize: 28,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+    color: colors.onSurface,
+    marginVertical: spacing.s1,
+  },
+  activeDescription: {
+    ...typography.bodySm,
+    color: colors.onSurfaceVariant,
+  },
+});

@@ -2,6 +2,7 @@ import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ArrowLeft, ShieldCheck } from "lucide-react-native";
+import { colors, typography, spacing, radii } from "../../../theme";
 
 /**
  * Tela de Política de Privacidade / Termos de Uso (Épico 05 — E5-02).
@@ -20,14 +21,14 @@ export default function PrivacidadeScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={voltar} accessibilityRole="button" accessibilityLabel="Voltar">
-          <ArrowLeft size={22} color="#075985" />
+          <ArrowLeft size={22} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Privacidade e Termos</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.badge}>
-          <ShieldCheck size={20} color="#0085C7" />
+          <ShieldCheck size={20} color={colors.primary} />
           <Text style={styles.badgeText}>
             Em conformidade com a LGPD (Lei 13.709/2018).
           </Text>
@@ -75,29 +76,46 @@ export default function PrivacidadeScreen({ navigation }) {
   );
 }
 
+// E6-02: cores migradas para os tokens do Design System v2.0.
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
+  container: { flex: 1, backgroundColor: colors.surfaceContainerLowest },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.s4,
+    paddingVertical: spacing.s3,
     borderBottomWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.outlineVariant,
   },
-  backBtn: { marginRight: 12 },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: "#0F172A" },
-  content: { padding: 20 },
+  backBtn: { marginRight: spacing.s3, minHeight: 48, minWidth: 48, justifyContent: "center" },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: colors.onSurface },
+  content: { padding: spacing.s5 },
   badge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 18,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: radii.md,
+    padding: spacing.s3 + 2,
+    marginBottom: spacing.s5,
   },
-  badgeText: { color: "#075985", fontSize: 14, fontWeight: "600", marginLeft: 10, flex: 1 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A", marginTop: 14, marginBottom: 6 },
-  paragraph: { fontSize: 14, lineHeight: 21, color: "#334155", marginBottom: 8 },
-  version: { fontSize: 12, color: "#94A3B8", marginTop: 18, textAlign: "center" },
+  badgeText: {
+    color: colors.onPrimaryContainer,
+    fontSize: 14,
+    fontWeight: "600",
+    marginLeft: spacing.s3,
+    flex: 1,
+  },
+  sectionTitle: {
+    ...typography.titleMd,
+    color: colors.onSurface,
+    marginTop: spacing.s3 + 2,
+    marginBottom: spacing.s2,
+  },
+  paragraph: {
+    ...typography.bodyMd,
+    lineHeight: 21,
+    color: colors.onSurfaceVariant,
+    marginBottom: spacing.s2,
+  },
+  version: { fontSize: 12, color: colors.outline, marginTop: spacing.s5, textAlign: "center" },
 });

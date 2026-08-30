@@ -170,7 +170,7 @@ export default function LoginScreen({navigation}) {
                         </View>
                         <View style={styles.badgeItem}>
                             <ShieldCheck size={14} color="#64748B" />
-                            <Text style={styles.badgeText}>HIPAA COMPLIANT</Text>
+                            <Text style={styles.badgeText}>LGPD COMPLIANT</Text>
                         </View>
                     </View>
 
@@ -202,7 +202,9 @@ export default function LoginScreen({navigation}) {
                         <View style={styles.dot} />
                         <Text style={styles.simpleFooterLink}>Cookies</Text>
                         <View style={styles.dot} />
-                        <Text style={styles.simpleFooterLink}>Privacidade</Text>
+                        <TouchableOpacity onPress={() => navigation.navigate?.("Privacidade")}>
+                            <Text style={styles.link}>Privacidade</Text>
+                        </TouchableOpacity>
                     </View>
 
                 </ScrollView>

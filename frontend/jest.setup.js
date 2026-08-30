@@ -33,6 +33,7 @@ jest.mock("expo-location", () => {
     Accuracy: { BestForNavigation: "BestForNavigation", Balanced: "Balanced" },
     GeofencingEventType: { Enter: 1, Exit: 2 },
     requestForegroundPermissionsAsync: jest.fn(),
+    getForegroundPermissionsAsync: jest.fn(),
     requestBackgroundPermissionsAsync: jest.fn(),
     getCurrentPositionAsync: jest.fn(),
     watchPositionAsync: jest.fn(),

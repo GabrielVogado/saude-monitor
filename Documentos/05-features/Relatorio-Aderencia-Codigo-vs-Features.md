@@ -15,7 +15,7 @@
 | 🟡 Parcial (precisa refatoração) | 2/9 | 22% |
 | 🔴 Inexistente (precisa construir) | 0/9 | 0% |
 
-**Conclusão:** O código atual já cobre a Fase 0 e os Épicos 1 a 4 de forma madura e testada. O backend **possui** autenticação JWT segura (BCrypt), CRUD/geofence de Hospitais, módulo de Visitas com detecção automática via geofencing nativo + heartbeat, módulo de Feedback pós-saída com dedupe e anônimo, e o módulo de agregações estatísticas (Indicadores Públicos por Hospital) com job de atualização a cada 15min. Os pontos ainda **parciais** são: integração visual de listagem no Mapa do app (F-07) e o polimento/design system consolidado (F-08). Permanecem **pendentes** os módulos de sugestão/moderação de hospitais (F-10), os itens de Conta/Privacidade do Épico 5, o ranking de hospitais (E4-05) e o Painel Admin Web (Épico 7 / F-11).
+**Conclusão:** O código atual já cobre a Fase 0 e os Épicos 1 a 5 (frontend de Conta/Consentimento/Privacidade) de forma madura e testada. O backend **possui** autenticação JWT segura (BCrypt), CRUD/geofence de Hospitais, módulo de Visitas com detecção automática via geofencing nativo + heartbeat, módulo de Feedback pós-saída com dedupe e anônimo, e o módulo de agregações estatísticas (Indicadores Públicos por Hospital) com job de atualização a cada 15min. O **Épico 5 (Sprint S5)** foi implementado no frontend: tela **Perfil → Dados e Privacidade** (E5-01 consulta/solicita/revoga localização; F0-05 exclusão de conta; E5-04 conta opcional), tela de **Política de Privacidade/Termos** acessível em 2 toques (E5-02) e remoção do selo HIPAA (substituído por LGPD). Permanecem **pendentes/parciais**: integração visual de listagem no Mapa do app (F-07), o polimento/design system consolidado (F-08), o histórico pessoal + exportação de dados (E5-03, stretch), a revogação nativa completa de geolocalização (E5-05, stretch), o ranking de hospitais (E4-05), o módulo de sugestão/moderação de hospitais (F-10) e o Painel Admin Web (Épico 7 / F-11).
 
 ---
 
@@ -139,5 +139,5 @@
 ## 3. Recomendações Atualizadas
 
 1. **Fase 0 e Épicos 1 a 4 já estão cobertos e testados** (backend + mobile): autenticação JWT/BCrypt, CRUD/geofence de hospitais, visitas com geofencing nativo, feedback pós-saída e indicadores públicos por hospital.
-2. O passo crítico agora é iniciar o **Épico 5 (Conta/Consentimento/Privacidade)** e o **Épico 6 (UX/polimento, Bottom Tabs, a11y)**, além de fechar o **ranking de hospitais (E4-05)**, o **rate limiting (F0-04)** e a **exclusão de conta LGPD (F0-05)**.
+2. O Épico 5 (**Sprint S5**) já foi iniciado e está **parcialmente implementado** (E5-01/02/04 no frontend + F0-05 no backend). Próximo passo: fechar os stretches **E5-03 (histórico/exportação)**, **E5-05 (revogação nativa completa)** e avançar no **Épico 6 (UX/polimento, Bottom Tabs, a11y)** e no **ranking de hospitais (E4-05)**.
 3. Também pendentes: **F-10** (moderação de sugestões de hospitais — branch `feature/f-10-moderacao-sugestoes-hospitais` ainda não mergeada) e o **Painel Admin Web (Épico 7 / F-11)**.

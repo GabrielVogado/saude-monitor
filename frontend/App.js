@@ -16,6 +16,8 @@ import SugestoesPendentesScreen from "./src/screens/hospitais/view/SugestoesPend
 import RevisarSugestaoScreen from "./src/screens/hospitais/view/RevisarSugestaoScreen.js";
 import CheckinManualScreen from "./src/screens/visitas/view/CheckinManualScreen.js";
 import FeedbackFormScreen from "./src/screens/feedback/view/FeedbackFormScreen.js";
+import PerfilScreen from "./src/screens/perfil/view/PerfilScreen.js";
+import PrivacidadeScreen from "./src/screens/perfil/view/PrivacidadeScreen.js";
 import { agendarLembrete, pendenciaAtual } from "./src/screens/feedback/service/FeedbackNotificationService";
 
 const Stack = createStackNavigator();
@@ -150,6 +152,14 @@ export default function App() {
                     />
                     <Drawer.Screen name="Login" component={LoginScreen} />
                     <Drawer.Screen name="Cadastro" component={UserScreen} />
+                    <Drawer.Screen name="Perfil" component={PerfilScreen} />
+                    <Drawer.Screen
+                        name="Privacidade"
+                        component={PrivacidadeScreen}
+                        options={{
+                            drawerItemStyle: { display: "none" },
+                        }}
+                    />
                     <Drawer.Screen
                         name="Geolocalizacao"
                         component={GeoLocalizacaoScreen}

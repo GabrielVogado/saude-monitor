@@ -8,17 +8,19 @@ import {iniciarGeofencing, sincronizarVisitaAtiva} from "../../visitas/service/G
 import {iniciarHeartbeat, pararHeartbeat} from "../../visitas/service/HeartbeatService";
 import {agendarFeedback} from "../../feedback/service/FeedbackNotificationService";
 import CSGeoStatusCard from "../../../components/CSGeoStatusCard";
+import CSButton from "../../../components/CSButton";
+import CSLoading from "../../../components/CSLoading";
 
 const DOZE_HORAS_MS = 12 * 60 * 60 * 1000;
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
     const [visitaAtiva, setVisitaAtiva] = useState(null);
+    const [carregandoVisita, setCarregandoVisita] = useState(true);
+    const [erroVisita, setErroVisita] = useState(null);
     const promptTipoExibidoRef = useRef(false);
 
     useEffect(() => {
-        VisitaService.buscarAtiva()
-            .then((data) => setVisitaAtiva(data?.visita || null))
-            .catch(() => setVisitaAtiva(null));
+        carregarVisitaAtiva();
 
         // Inicializa o geofencing nativo (F-03/ADR-002) uma vez, no ciclo de vida global do
         // app — mesmo padrão de inicialização usado hoje pelo `GeoLocalizacaoService`.
@@ -26,6 +28,18 @@ export default function HomeScreen() {
             // Sem permissão de localização em background: o usuário ainda pode usar o
             // check-in manual (`CheckinManualScreen`); nada a fazer aqui.
         });
+    }, []);
+
+    const carregarVisitaAtiva = useCallback(() => {
+        setCarregandoVisita(true);
+        setErroVisita(null);
+        VisitaService.buscarAtiva()
+            .then((data) => setVisitaAtiva(data?.visita || null))
+            .catch(() => {
+                setErroVisita("Não foi possível consultar sua visita ativa.");
+                setVisitaAtiva(null);
+            })
+            .finally(() => setCarregandoVisita(false));
     }, []);
 
     useEffect(() => {
@@ -108,7 +122,22 @@ export default function HomeScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
-                {visitaAtiva && (
+                {/* E6-04: estado de carregamento da visita ativa */}
+                {carregandoVisita && (
+                    <View accessibilityRole="progressbar" accessibilityLabel="Carregando visita ativa">
+                        <CSLoading height={120} radius={16} />
+                    </View>
+                )}
+
+                {/* E6-04: estado de erro com retry */}
+                {!carregandoVisita && erroVisita && (
+                    <View style={styles.errorBox}>
+                        <Text style={styles.errorText}>{erroVisita}</Text>
+                        <CSButton label="Tentar novamente" onPress={carregarVisitaAtiva} variant="secondary" />
+                    </View>
+                )}
+
+                {!carregandoVisita && !erroVisita && visitaAtiva && (
                     <CSGeoStatusCard
                         visita={visitaAtiva}
                         onEncerrar={encerrarVisita}
@@ -116,10 +145,21 @@ export default function HomeScreen() {
                     />
                 )}
 
-                {/* Tag da versão */}
-                {/*<View style={styles.versionTag}>
-                    <Text style={styles.versionText}>Versão Enterprise 2.4</Text>
-                </View>*/}
+                {/* E6-01: acessos rápidos (antes no Drawer) — check-in manual e mapa */}
+                <View style={styles.actionsRow}>
+                    <CSButton
+                        label="Check-in manual"
+                        onPress={() => navigation?.navigate?.("CheckinManual")}
+                        variant="secondary"
+                        style={styles.actionButton}
+                    />
+                    <CSButton
+                        label="Ver mapa"
+                        onPress={() => navigation?.navigate?.("Geolocalizacao")}
+                        variant="tertiary"
+                        style={styles.actionButton}
+                    />
+                </View>
 
                 {/* Headline destacada */}
                 <Text style={styles.headline}>
@@ -136,14 +176,15 @@ export default function HomeScreen() {
                     integrando dashboards em tempo real para uma gestão hospitalar eficiente.
                 </Text>
 
-                {/* Tópicos com ícones e descrição */}
+                {/* Tópicos com ícones e descrição (E6-03: imagens decorativas ocultas do leitor) */}
                 <View style={styles.topicsContainer}>
-                    {/* Analytics de Lotação com ícone */}
                     <View style={styles.topicBlock}>
                         <View style={styles.topicHeader}>
                             <Image
                                 source={require("../../../../assets/img/grafico-de-pizza.png")}
                                 style={styles.topicIcon}
+                                importantForAccessibility="no"
+                                accessibilityElementsHidden
                             />
                             <Text style={styles.topicTitle}>Analytics de Lotação</Text>
                         </View>
@@ -152,12 +193,13 @@ export default function HomeScreen() {
                         </Text>
                     </View>
 
-                    {/* Geolocalização Automática */}
                     <View style={styles.topicBlock}>
                         <View style={styles.topicHeader}>
                             <Image
                                 source={require("../../../../assets/img/localizacao.png")}
                                 style={styles.topicIcon}
+                                importantForAccessibility="no"
+                                accessibilityElementsHidden
                             />
                             <Text style={styles.topicTitle}>Geolocalização Automática</Text>
                         </View>
@@ -166,12 +208,13 @@ export default function HomeScreen() {
                         </Text>
                     </View>
 
-                    {/* Feedback do Paciente */}
                     <View style={styles.topicBlock}>
                         <View style={styles.topicHeader}>
                             <Image
                                 source={require("../../../../assets/img/bubble-chat.png")}
                                 style={styles.topicIcon}
+                                importantForAccessibility="no"
+                                accessibilityElementsHidden
                             />
                             <Text style={styles.topicTitle}>Feedback do Paciente</Text>
                         </View>
@@ -185,6 +228,8 @@ export default function HomeScreen() {
                     <Image
                         source={require("../../../../assets/img/home_melhorado.png")}
                         style={styles.homeImage}
+                        importantForAccessibility="no"
+                        accessibilityElementsHidden
                     />
                 </View>
             </View>

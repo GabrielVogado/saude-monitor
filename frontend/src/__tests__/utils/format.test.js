@@ -5,6 +5,8 @@
 import {
   formatarDuracao,
   formatarNota,
+  formatarData,
+  formatarPeriodo,
   cnpjValido,
   telefoneValido,
   emailValido,
@@ -45,6 +47,26 @@ describe("utils/format — formatarNota", () => {
   test("retorna null para inválidos", () => {
     expect(formatarNota(null)).toBeNull();
     expect(formatarNota("x")).toBeNull();
+  });
+});
+
+describe("utils/format — formatarData / formatarPeriodo (Épico 04, RN-19)", () => {
+  test("formatarData converte ISO para dd/mm/aaaa", () => {
+    expect(formatarData("2026-08-07T16:55:05Z")).toBe("07/08/2026");
+    expect(formatarData(null)).toBeNull();
+    expect(formatarData("invalido")).toBeNull();
+  });
+
+  test("formatarPeriodo monta 'inicio a fim'", () => {
+    expect(
+      formatarPeriodo({ inicio: "2026-05-10T00:00:00Z", fim: "2026-08-07T23:59:59Z" })
+    ).toBe("10/05/2026 a 07/08/2026");
+  });
+
+  test("formatarPeriodo lida com campos ausentes", () => {
+    expect(formatarPeriodo({})).toBeNull();
+    expect(formatarPeriodo(undefined)).toBeNull();
+    expect(formatarPeriodo({ fim: "2026-08-07T23:59:59Z" })).toBe("até 07/08/2026");
   });
 });
 

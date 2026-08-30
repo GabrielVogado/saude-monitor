@@ -20,6 +20,9 @@ public interface HospitalRepository extends MongoRepository<HospitalDocument, St
     /** Nome não é único no índice (UPAs/UBS podem repetir razão social); por isso retorna lista. */
     List<HospitalDocument> findAllByNomeIgnoreCase(String nome);
 
+    /** Hospitais ativos — usado no recálculo em lote dos agregados (Épico 04). */
+    List<HospitalDocument> findAllByAtivoTrue();
+
     boolean existsByCnpj(String cnpj);
 
     Optional<HospitalDocument> findByCnpj(String cnpj);

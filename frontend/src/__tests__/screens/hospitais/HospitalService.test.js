@@ -90,4 +90,43 @@ describe("HospitalService (Épico 01)", () => {
     // apenas 1 chamada (sem retry)
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
+
+  test("buscarIndicadores chama GET /api/v1/hospitais/{id}/indicadores (E4-01..E4-04, §3.5)", async () => {
+    const payload = {
+      hospitalId: "h1",
+      indicadoresDisponiveis: true,
+      notaMedia: 4.2,
+      nAvaliacoes: 12,
+      tempoMedianoMinutos: 95,
+      nVisitas: 34,
+      periodo: { inicio: "2026-05-10T00:00:00Z", fim: "2026-08-07T23:59:59Z" },
+      atualizadoEm: "2026-08-07T16:55:05Z",
+    };
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse(payload));
+
+    const resp = await HospitalService.buscarIndicadores("h1");
+    const [url, config] = global.fetch.mock.calls[0];
+    expect(url).toContain("/api/v1/hospitais/h1/indicadores");
+    expect(config.method).toBe("GET");
+    expect(resp.indicadoresDisponiveis).toBe(true);
+    expect(resp.notaMedia).toBe(4.2);
+    expect(resp.nVisitas).toBe(34);
+    expect(resp.periodo.inicio).toBe("2026-05-10T00:00:00Z");
+  });
+
+  test("buscarIndicadores devolve indisponível quando N < 5 (RN-15)", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      jsonResponse({ hospitalId: "h1", indicadoresDisponiveis: false, notaMedia: null, nAvaliacoes: 3 })
+    );
+    const resp = await HospitalService.buscarIndicadores("h1");
+    expect(resp.indicadoresDisponiveis).toBe(false);
+    expect(resp.notaMedia).toBeNull();
+  });
+
+  test("buscarIndicadores lança 404 quando hospital não existe", async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "Hospital não encontrado." }, 404));
+    await expect(HospitalService.buscarIndicadores("nao-existe")).rejects.toThrow(
+      "Hospital não encontrado."
+    );
+  });
 });

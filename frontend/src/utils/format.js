@@ -28,6 +28,24 @@ export function formatarNota(nota) {
   return Number(nota).toFixed(1).replace(".", ",");
 }
 
+/** Formata data ISO em dd/mm/aaaa (pt-BR, fuso UTC). Retorna null se inválida. */
+export function formatarData(iso) {
+  if (!iso) return null;
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return null;
+  return data.toLocaleDateString("pt-BR", { timeZone: "UTC" });
+}
+
+/** Formata um período {inicio,fim} (ISO) como "dd/mm/aaaa a dd/mm/aaaa". */
+export function formatarPeriodo({ inicio, fim } = {}) {
+  const ini = formatarData(inicio);
+  const fimTxt = formatarData(fim);
+  if (!ini && !fimTxt) return null;
+  if (!fimTxt) return `desde ${ini}`;
+  if (!ini) return `até ${fimTxt}`;
+  return `${ini} a ${fimTxt}`;
+}
+
 /** Valida CNPJ no formato XX.XXX.XXX/XXXX-XX. */
 export function cnpjValido(cnpj) {
   return /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(cnpj || "");

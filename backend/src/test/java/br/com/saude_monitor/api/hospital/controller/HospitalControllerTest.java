@@ -1,6 +1,7 @@
 package br.com.saude_monitor.api.hospital.controller;
 
 import br.com.saude_monitor.api.config.exception.GlobalExceptionHandler;
+import br.com.saude_monitor.api.agregado.service.AgregadoService;
 import br.com.saude_monitor.api.hospital.document.StatusSugestao;
 import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
 import br.com.saude_monitor.api.hospital.dto.GeoJsonPolygonDto;
@@ -26,6 +27,7 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import java.time.Instant;
 import java.util.List;
 
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -54,7 +56,7 @@ class HospitalControllerTest {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 
-        mockMvc = MockMvcBuilders.standaloneSetup(new HospitalController(service, authHelper))
+        mockMvc = MockMvcBuilders.standaloneSetup(new HospitalController(service, authHelper, mock(AgregadoService.class)))
                 .setValidator(validator)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();

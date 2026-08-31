@@ -5,7 +5,7 @@ import {NavigationContainer} from "@react-navigation/native";
 import {SafeAreaProvider} from "react-native-safe-area-context";
 import {Text} from "react-native";
 import * as Notifications from "expo-notifications";
-import {Building2, Home as HomeIcon, User as UserIcon} from "lucide-react-native";
+import {Building2, Home as HomeIcon, Map as MapIcon, User as UserIcon} from "lucide-react-native";
 import HomeScreen from "./src/screens/home/view/HomeScreen.js";
 import LoginScreen from "./src/screens/auth/view/LoginScreen.js";
 import UserScreen from "./src/screens/user/view/UserScreen.js";
@@ -15,7 +15,6 @@ import HospitalDetalheScreen from "./src/screens/hospitais/view/HospitalDetalheS
 import SugerirHospitalScreen from "./src/screens/hospitais/view/SugerirHospitalScreen.js";
 import SugestoesPendentesScreen from "./src/screens/hospitais/view/SugestoesPendentesScreen.js";
 import RevisarSugestaoScreen from "./src/screens/hospitais/view/RevisarSugestaoScreen.js";
-import CheckinManualScreen from "./src/screens/visitas/view/CheckinManualScreen.js";
 import FeedbackFormScreen from "./src/screens/feedback/view/FeedbackFormScreen.js";
 import PerfilScreen from "./src/screens/perfil/view/PerfilScreen.js";
 import PrivacidadeScreen from "./src/screens/perfil/view/PrivacidadeScreen.js";
@@ -26,13 +25,12 @@ const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // Stack da aba Início (E6-01): a Home é a âncora do geofencing/visita ativa (E2-07).
-// Check-in manual e Mapa são rotas internas (acesso pela própria Home).
+// É uma tela de apresentação do app; o check-in manual agora vive na lista Hospitais
+// e o mapa é uma aba própria ("Mapa").
 function HomeStack() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Home" component={HomeScreen} />
-            <Stack.Screen name="CheckinManual" component={CheckinManualScreen} />
-            <Stack.Screen name="Geolocalizacao" component={GeoLocalizacaoScreen} />
         </Stack.Navigator>
     );
 }
@@ -72,8 +70,9 @@ function FeedbackStack() {
     );
 }
 
-// Navegação por Bottom Tabs (E6-01): 3 abas de 1 polegar (Início, Hospitais, Perfil)
-// substituindo o antigo Drawer. Transições suaves via burst (<no animation> resolve).
+// Navegação por Bottom Tabs (E6-01): 4 abas de 1 polegar (Início, Hospitais, Mapa,
+// Perfil) substituindo o antigo Drawer. O mapa entrou como aba própria (navegação
+// revisada), em vez de botão dentro da Home. Transições suaves via burst.
 function Tabs() {
     return (
         <Tab.Navigator
@@ -96,7 +95,7 @@ function Tabs() {
                 component={HomeStack}
                 options={{
                     tabBarLabel: "Início",
-                    tabBarAccessibilityLabel: "Início — status da visita e mapa",
+                    tabBarAccessibilityLabel: "Início — apresentação do app",
                     tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} />,
                 }}
             />
@@ -121,6 +120,15 @@ function Tabs() {
                         }
                     },
                 })}
+            />
+            <Tab.Screen
+                name="Mapa"
+                component={GeoLocalizacaoScreen}
+                options={{
+                    tabBarLabel: "Mapa",
+                    tabBarAccessibilityLabel: "Mapa — hospitais e geolocalização",
+                    tabBarIcon: ({ color, size }) => <MapIcon color={color} size={size} />,
+                }}
             />
             <Tab.Screen
                 name="Perfil"

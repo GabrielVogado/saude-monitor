@@ -21,8 +21,20 @@ const CATEGORIA_LABEL = {
 
 /**
  * Card de hospital (lista/ranking) — card inteiro clicável.
+ *
+ * Navegação revisada: aceita `onCheckin`/`checkinLoading`/`checkinAtivo` para exibir um
+ * botão compacto de check-in manual no próprio card (sem abrir o detalhe). Ao tocar no
+ * corpo do card (fora do botão), `onPress` abre o detalhe como antes.
  */
-export default function CSHospitalCard({ hospital, onPress, distanciaKm }) {
+export default function CSHospitalCard({
+  hospital,
+  onPress,
+  distanciaKm,
+  onCheckin,
+  checkinLoading,
+  checkinAtivo,
+  checkinDesabilitado = false,
+}) {
   const indicadores = hospital?.indicadores;
   const temIndicadores =
     indicadores?.notaMedia !== null &&
@@ -87,6 +99,41 @@ export default function CSHospitalCard({ hospital, onPress, distanciaKm }) {
             Tempo médio: {formatarDuracao(indicadores.tempoMedianoMinutos)}
           </Text>
         ) : null}
+
+        {onCheckin && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              checkinAtivo
+                ? `${hospital?.nome} — ver check-in ativo`
+                : `Fazer check-in em ${hospital?.nome}`
+            }
+            disabled={checkinLoading || checkinDesabilitado}
+            onPress={(event) => {
+              event.stopPropagation();
+              onCheckin();
+            }}
+            style={({ pressed }) => [
+              styles.checkinButton,
+              checkinAtivo && styles.checkinButtonActive,
+              pressed && styles.checkinButtonPressed,
+              (checkinLoading || checkinDesabilitado) && styles.checkinButtonDisabled,
+            ]}
+          >
+            <Text
+              style={[
+                styles.checkinText,
+                checkinAtivo && styles.checkinTextActive,
+              ]}
+            >
+              {checkinLoading
+                ? "Enviando..."
+                : checkinAtivo
+                  ? "Em visita — ver"
+                  : "Check-in"}
+            </Text>
+          </Pressable>
+        )}
       </View>
     </Pressable>
   );
@@ -157,5 +204,32 @@ const styles = StyleSheet.create({
   timeMetric: {
     ...typography.bodySm,
     color: colors.onSurfaceVariant,
+  },
+  checkinButton: {
+    alignSelf: "flex-start",
+    minHeight: 40,
+    paddingHorizontal: spacing.s4,
+    paddingVertical: spacing.s2,
+    borderRadius: radii.md,
+    backgroundColor: colors.primary,
+    justifyContent: "center",
+    marginTop: spacing.s2,
+  },
+  checkinButtonActive: {
+    backgroundColor: colors.surfaceContainer,
+  },
+  checkinButtonPressed: {
+    opacity: 0.8,
+  },
+  checkinButtonDisabled: {
+    opacity: 0.6,
+  },
+  checkinText: {
+    ...typography.labelMd,
+    color: colors.onPrimary,
+    fontWeight: "600",
+  },
+  checkinTextActive: {
+    color: colors.primary,
   },
 });

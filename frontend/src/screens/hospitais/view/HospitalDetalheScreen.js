@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import { Camera, GeoJSONSource, Layer, Map, Marker } from "@maplibre/maplibre-react-native";
 import { Building2, Clock, Mail, MapPin, Phone } from "lucide-react-native";
 import {
   CSBadge,
+  CSButton,
   CSCard,
   CSHeader,
   CSEmptyState,
@@ -13,6 +15,8 @@ import {
 } from "../../../components";
 import { colors, radii, spacing, typography } from "../../../theme/tokens";
 import HospitalService from "../service/HospitalService";
+import VisitaService from "../../visitas/service/VisitaService";
+import { agendarFeedback } from "../../feedback/service/FeedbackNotificationService";
 import {
   calcularCentroide,
   coordenadasParaGeoJson,
@@ -57,6 +61,13 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
 
+  // Navegação revisada: visita ativa do modo MANUAL deste hospital — exibe temporizador
+  // hh:mm:ss + botão de checkout ("Não estou aqui"). Só é mostrada quando a visita ativa
+  // veio do check-in manual (§ específico), jamais para visitas GEOFENCE ou de outro hospital.
+  const [visitaManual, setVisitaManual] = useState(null);
+  const [agora, setAgora] = useState(Date.now());
+  const [enviandoCheckout, setEnviandoCheckout] = useState(false);
+
   const carregar = async () => {
     setCarregando(true);
     setErro(null);
@@ -82,6 +93,61 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   useEffect(() => {
     if (id) carregar();
   }, [id]);
+
+  // Sincroniza o estado da visita manual ao focar a tela (ex.: ao voltar do check-in
+  // da lista Hospital → este detalhe). Modo anônimo usa `dispositivoId` (§3.3).
+  const carregarVisitaManual = async () => {
+    try {
+      const data = await VisitaService.buscarAtiva();
+      const visita = data?.visita || null;
+      setVisitaManual(
+        visita && visita.origem === "MANUAL" && visita.hospitalId === id ? visita : null
+      );
+      if (visita?.origem === "MANUAL" && visita.hospitalId === id) {
+        setAgora(Date.now());
+      }
+    } catch {
+      setVisitaManual(null);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      if (id) carregarVisitaManual();
+    }, [id])
+  );
+
+  // Temporizador hh:mm:ss atualizado a cada segundo enquanto houver visita manual ativa.
+  useEffect(() => {
+    if (!visitaManual) {
+      return undefined;
+    }
+    const timer = setInterval(() => setAgora(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [visitaManual]);
+
+  const encerrarVisitaManual = async () => {
+    if (!visitaManual) return;
+    setEnviandoCheckout(true);
+    try {
+      await VisitaService.checkout(visitaManual.id, { encerramentoManual: true });
+      // Épico 03 — E3-01: agenda o pedido de feedback ~1–5 min após a saída.
+      agendarFeedback({
+        visitaId: visitaManual.id,
+        hospitalId: visitaManual.hospitalId,
+        hospitalNome: hospital?.nome,
+        saidaEm: new Date().toISOString(),
+      });
+      setVisitaManual(null);
+    } catch (e) {
+      Alert.alert(
+        "Check-out",
+        e.message || "Não foi possível finalizar o check-out. Tente novamente."
+      );
+    } finally {
+      setEnviandoCheckout(false);
+    }
+  };
 
   const coordenadas = useMemo(
     () => (hospital?.geofence ? geojsonParaCoordenadas(hospital.geofence) : []),
@@ -150,11 +216,48 @@ export default function HospitalDetalheScreen({ navigation, route }) {
       ? hospital.horarioFuncionamento
       : null;
 
+  // Formata o tempo decorrido como hh:mm:ss (temporizador do check-in manual).
+  const temporizadorTexto = useMemo(() => {
+    if (!visitaManual?.entrada) return "00:00:00";
+    const decorrido = Math.max(0, Math.floor((agora - new Date(visitaManual.entrada).getTime()) / 1000));
+    const h = Math.floor(decorrido / 3600);
+    const m = Math.floor((decorrido % 3600) / 60);
+    const s = decorrido % 60;
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  }, [visitaManual, agora]);
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <CSHeader title={hospital.nome} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {visitaManual && (
+          <CSCard style={styles.section}>
+            <Text style={styles.checkinActiveTitle}>
+              Check-in manual ativo
+            </Text>
+            <Text style={styles.checkinSubtitle}>
+              Você está em {hospital.nome}
+            </Text>
+            <Text
+              accessibilityLabel={`Tempo de permanência ${temporizadorTexto}`}
+              style={styles.temporizador}
+            >
+              {temporizadorTexto}
+            </Text>
+            <Text style={styles.temporizadorLabel}>tempo de permanência</Text>
+            <CSButton
+              label="Não estou aqui"
+              onPress={encerrarVisitaManual}
+              loading={enviandoCheckout}
+              disabled={enviandoCheckout}
+              variant="tertiary"
+              style={styles.checkoutButton}
+            />
+          </CSCard>
+        )}
+
         {coordenadas.length > 0 ? (
           <View style={styles.mapContainer}>
             <Map style={styles.map} mapStyle={OSM_RASTER_STYLE}>
@@ -301,6 +404,30 @@ const styles = StyleSheet.create({
   mapContainer: {
     borderRadius: radii.xl,
     overflow: "hidden",
+  },
+  checkinActiveTitle: {
+    ...typography.titleMd,
+    color: colors.geoActive,
+  },
+  checkinSubtitle: {
+    ...typography.bodyMd,
+    color: colors.onSurfaceVariant,
+    marginTop: spacing.s1,
+  },
+  temporizador: {
+    fontSize: 40,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+    color: colors.onSurface,
+    marginTop: spacing.s2,
+  },
+  temporizadorLabel: {
+    ...typography.bodySm,
+    color: colors.onSurfaceVariant,
+    marginBottom: spacing.s2,
+  },
+  checkoutButton: {
+    marginTop: spacing.s2,
   },
   map: {
     height: 200,

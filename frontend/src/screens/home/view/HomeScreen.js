@@ -1,47 +1,46 @@
-import React, {useCallback, useEffect, useRef, useState} from "react";
-import {Alert, Image, ScrollView, Text, View} from "react-native";
-import {SafeAreaView} from "react-native-safe-area-context";
-import {useFocusEffect} from "@react-navigation/native";
+import React, { useCallback, useEffect, useState } from "react";
+import { Image, ScrollView, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import styles from "./css/HomeStyle";
 import VisitaService from "../../visitas/service/VisitaService";
-import {iniciarGeofencing, sincronizarVisitaAtiva} from "../../visitas/service/GeofencingTaskService";
-import {iniciarHeartbeat, pararHeartbeat} from "../../visitas/service/HeartbeatService";
-import {agendarFeedback} from "../../feedback/service/FeedbackNotificationService";
-import CSGeoStatusCard from "../../../components/CSGeoStatusCard";
-import CSButton from "../../../components/CSButton";
-import CSLoading from "../../../components/CSLoading";
+import { iniciarGeofencing, sincronizarVisitaAtiva } from "../../visitas/service/GeofencingTaskService";
+import { iniciarHeartbeat, pararHeartbeat } from "../../visitas/service/HeartbeatService";
 
-const DOZE_HORAS_MS = 12 * 60 * 60 * 1000;
-
-export default function HomeScreen({ navigation }) {
-    const [visitaAtiva, setVisitaAtiva] = useState(null);
-    const [carregandoVisita, setCarregandoVisita] = useState(true);
-    const [erroVisita, setErroVisita] = useState(null);
-    const promptTipoExibidoRef = useRef(false);
+/**
+ * Tela inicial (E6-01): apresentação do app.
+ *
+ * Navegação revisada — a Home deixou de hospedar o card de visita ativa e os acessos
+ * rápidos (check-in manual agora é feito na lista de Hospitais e o mapa é uma aba
+ * própria). Permanece, porém, como âncora dos serviços de ciclo de vida da visita:
+ *
+ * - `iniciarGeofencing()` (E2-07/ADR-002): sem a UI, ainda inicia o geofencing nativo
+ *   de background para o check-in/checkout automático.
+ * - reidrata a visita ativa no foco e mantém `sincronizarVisitaAtiva` + heartbeat
+ *   (E2-09) vivos — sem UX visível, preservando o comportamento atual do backend
+ *   (expiração/GPS_INTERROMPIDO e checkout automático por geofence).
+ */
+export default function HomeScreen() {
+    const [visitaAtivaId, setVisitaAtivaId] = useState(null);
 
     useEffect(() => {
-        // Inicializa o geofencing nativo (F-03/ADR-002) uma vez, no ciclo de vida global do
-        // app — mesmo padrão de inicialização usado hoje pelo `GeoLocalizacaoService`.
+        // Inicializa o geofencing nativo (F-03/ADR-002) uma vez, no ciclo de vida global
+        // do app — check-in/checkout automático continuam funcionando mesmo sem o card.
         iniciarGeofencing().catch(() => {
             // Sem permissão de localização em background: o usuário ainda pode usar o
-            // check-in manual (`CheckinManualScreen`); nada a fazer aqui.
+            // check-in manual na lista de Hospitais; nada a fazer aqui.
         });
     }, []);
 
     const carregarVisitaAtiva = useCallback(() => {
-        setCarregandoVisita(true);
-        setErroVisita(null);
         VisitaService.buscarAtiva()
-            .then((data) => setVisitaAtiva(data?.visita || null))
-            .catch(() => {
-                setErroVisita("Não foi possível consultar sua visita ativa.");
-                setVisitaAtiva(null);
-            })
-            .finally(() => setCarregandoVisita(false));
+            .then((data) => setVisitaAtivaId(data?.visita?.id || null))
+            .catch(() => setVisitaAtivaId(null));
     }, []);
 
-    // Relê a visita ativa sempre que a Home ganha foco (ex.: ao voltar do check-in
-    // manual/do mapa) — no modo anônimo isso reidrata o card pelo dispositivoId (§3.3).
+    // Reidrata a visita ativa sempre que a Home ganha foco (anônimo via dispositivoId
+    // ou autenticado). Alimenta `sincronizarVisitaAtiva`/heartbeat para manter o
+    // checkout automático e a expiração por inatividade funcionando como antes.
     useFocusEffect(
         useCallback(() => {
             carregarVisitaAtiva();
@@ -49,81 +48,13 @@ export default function HomeScreen({ navigation }) {
     );
 
     useEffect(() => {
-        sincronizarVisitaAtiva(visitaAtiva?.id);
-
-        if (visitaAtiva?.id && visitaAtiva.status !== "GPS_INTERROMPIDO") {
-            iniciarHeartbeat(visitaAtiva.id);
+        sincronizarVisitaAtiva(visitaAtivaId);
+        if (visitaAtivaId) {
+            iniciarHeartbeat(visitaAtivaId);
         } else {
             pararHeartbeat();
         }
-
-        if (!visitaAtiva) {
-            promptTipoExibidoRef.current = false;
-        }
-    }, [visitaAtiva]);
-
-    // Prompt de tipo de permanência (E2-10/RN-24): ao voltar para a Home com uma visita
-    // ativa há mais de 12h e ainda sem `tipoPermanencia`, pergunta em 1 toque se é
-    // observação ou internação. Optou-se por `Alert.alert` ao focar a tela (em vez de
-    // agendar uma notificação local com `expo-notifications`) por ser o padrão já usado
-    // em todo o app para confirmações (ex.: `CheckinManualScreen`, `LoginScreen`) e por
-    // não depender de o app estar em background no momento exato das 12h.
-    useFocusEffect(
-        useCallback(() => {
-            if (
-                !visitaAtiva ||
-                visitaAtiva.tipoPermanencia ||
-                visitaAtiva.status === "GPS_INTERROMPIDO" ||
-                promptTipoExibidoRef.current
-            ) {
-                return;
-            }
-
-            const entrada = visitaAtiva.entrada ? new Date(visitaAtiva.entrada).getTime() : null;
-            if (entrada && Date.now() - entrada >= DOZE_HORAS_MS) {
-                promptTipoExibidoRef.current = true;
-                abrirPromptTipoPermanencia();
-            }
-        }, [visitaAtiva])
-    );
-
-    const definirTipoPermanencia = async (tipo) => {
-        if (!visitaAtiva) return;
-        try {
-            await VisitaService.definirTipoPermanencia(visitaAtiva.id, tipo);
-            setVisitaAtiva((anterior) => (anterior ? { ...anterior, tipoPermanencia: tipo } : anterior));
-        } catch {
-            // usuário pode tentar novamente pelo botão "Estou em observação ou internado" no card
-        }
-    };
-
-    const abrirPromptTipoPermanencia = () => {
-        Alert.alert(
-            "Tipo de permanência",
-            "Você está em observação ou internado?",
-            [
-                { text: "Observação", onPress: () => definirTipoPermanencia("OBSERVACAO") },
-                { text: "Internação", onPress: () => definirTipoPermanencia("INTERNACAO") },
-            ]
-        );
-    };
-
-    const encerrarVisita = async () => {
-        if (!visitaAtiva) return;
-        try {
-            await VisitaService.checkout(visitaAtiva.id, { encerramentoManual: true });
-            // Épico 03 — E3-01: agenda o pedido de feedback ~1–5 min após a saída.
-            agendarFeedback({
-                visitaId: visitaAtiva.id,
-                hospitalId: visitaAtiva.hospitalId,
-                hospitalNome: visitaAtiva.hospitalNome || visitaAtiva.hospital?.nome,
-                saidaEm: new Date().toISOString(),
-            });
-            setVisitaAtiva(null);
-        } catch {
-            // mantém o card; erro é tratado pelo usuário ao tentar novamente
-        }
-    };
+    }, [visitaAtivaId]);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -131,45 +62,6 @@ export default function HomeScreen({ navigation }) {
                 contentContainerStyle={styles.content}
                 showsVerticalScrollIndicator={false}
             >
-                {/* E6-04: estado de carregamento da visita ativa */}
-                {carregandoVisita && (
-                    <View accessibilityRole="progressbar" accessibilityLabel="Carregando visita ativa">
-                        <CSLoading height={120} radius={16} />
-                    </View>
-                )}
-
-                {/* E6-04: estado de erro com retry */}
-                {!carregandoVisita && erroVisita && (
-                    <View style={styles.errorBox}>
-                        <Text style={styles.errorText}>{erroVisita}</Text>
-                        <CSButton label="Tentar novamente" onPress={carregarVisitaAtiva} variant="secondary" />
-                    </View>
-                )}
-
-                {!carregandoVisita && !erroVisita && visitaAtiva && (
-                    <CSGeoStatusCard
-                        visita={visitaAtiva}
-                        onEncerrar={encerrarVisita}
-                        onSinalizarTipo={abrirPromptTipoPermanencia}
-                    />
-                )}
-
-                {/* E6-01: acessos rápidos (antes no Drawer) — check-in manual e mapa */}
-                <View style={styles.actionsRow}>
-                    <CSButton
-                        label="Check-in manual"
-                        onPress={() => navigation?.navigate?.("CheckinManual")}
-                        variant="secondary"
-                        style={styles.actionButton}
-                    />
-                    <CSButton
-                        label="Ver mapa"
-                        onPress={() => navigation?.navigate?.("Geolocalizacao")}
-                        variant="tertiary"
-                        style={styles.actionButton}
-                    />
-                </View>
-
                 {/* Headline destacada */}
                 <Text style={styles.headline}>
                     MONITORE A EXPERIÊNCIA{" "}

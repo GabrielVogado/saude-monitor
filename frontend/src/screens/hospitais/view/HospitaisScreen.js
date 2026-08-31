@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import { MapPinOff, Search } from "lucide-react-native";
 import {
   CSHeader,
@@ -12,6 +13,7 @@ import {
 } from "../../../components";
 import { colors, spacing } from "../../../theme/tokens";
 import HospitalService from "../service/HospitalService";
+import VisitaService from "../../visitas/service/VisitaService";
 import { normalizeText } from "../../../utils/normalize";
 
 const TIPO_FILTROS = [
@@ -23,6 +25,12 @@ const TIPO_FILTROS = [
 
 /**
  * Listagem pública de hospitais ativos (E1-03).
+ *
+ * Navegação revisada: cada card ganhou um botão compacto de check-in manual. Ao tocar
+ * em "Check-in", o app registra a visita (origem MANUAL) e redireciona para o
+ * `HospitalDetalhe`, que exibe o temporizador e o botão de checkout quando a visita
+ * ativa é do modo manual. O corpo do card (fora do botão) continua abrindo o detalhe
+ * como antes.
  */
 export default function HospitaisScreen({ navigation }) {
   const [busca, setBusca] = useState("");
@@ -31,6 +39,9 @@ export default function HospitaisScreen({ navigation }) {
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro, setErro] = useState(null);
+
+  const [visitaAtiva, setVisitaAtiva] = useState(null);
+  const [checkinEnviandoId, setCheckinEnviandoId] = useState(null);
 
   const debounceRef = useRef(null);
 
@@ -66,8 +77,59 @@ export default function HospitaisScreen({ navigation }) {
     return () => clearTimeout(debounceRef.current);
   }, [carregar]);
 
+  // Reidrata a visita ativa ao focar a aba (e ao voltar do detalhe) para refletir o
+  // estado do botão de check-in por hospital (modo anônimo via dispositivoId, §3.3).
+  const atualizarVisitaAtiva = useCallback(() => {
+    VisitaService.buscarAtiva()
+      .then((data) => setVisitaAtiva(data?.visita || null))
+      .catch(() => setVisitaAtiva(null));
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      atualizarVisitaAtiva();
+    }, [atualizarVisitaAtiva])
+  );
+
   const abrirDetalhe = (hospital) => {
     navigation.navigate("HospitalDetalhe", { id: hospital.id });
+  };
+
+  const tratarConflitoGeofence = (conflito) => {
+    setCheckinEnviandoId(null);
+    Alert.alert(
+      "Qual hospital é este?",
+      conflito.message || "Encontramos mais de um hospital nesta localização.",
+      [
+        ...conflito.candidatos.map((candidato) => ({
+          text: candidato.nome,
+          onPress: () => fazerCheckin({ id: candidato.hospitalId, nome: candidato.nome }),
+        })),
+        { text: "Cancelar", style: "cancel" },
+      ]
+    );
+  };
+
+  const fazerCheckin = async (hospital) => {
+    setCheckinEnviandoId(hospital.id);
+    setErro(null);
+    try {
+      await VisitaService.checkin({
+        hospitalId: hospital.id,
+        origem: "MANUAL",
+      });
+      // Redireciona ao detalhe do hospital, que exibe o temporizador + checkout
+      // (específico do check-in manual).
+      setCheckinEnviandoId(null);
+      navigation.navigate("HospitalDetalhe", { id: hospital.id });
+    } catch (e) {
+      setCheckinEnviandoId(null);
+      if (e.status === 409 && e.data?.candidatos?.length) {
+        tratarConflitoGeofence(e.data);
+        return;
+      }
+      Alert.alert("Check-in", e.message || "Não foi possível fazer o check-in.");
+    }
   };
 
   const renderVazio = () => {
@@ -137,7 +199,14 @@ export default function HospitaisScreen({ navigation }) {
           data={dados}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <CSHospitalCard hospital={item} onPress={() => abrirDetalhe(item)} />
+            <CSHospitalCard
+              hospital={item}
+              onPress={() => abrirDetalhe(item)}
+              onCheckin={() => fazerCheckin(item)}
+              checkinLoading={checkinEnviandoId === item.id}
+              checkinAtivo={visitaAtiva?.hospitalId === item.id}
+              checkinDesabilitado={checkinEnviandoId !== null && checkinEnviandoId !== item.id}
+            />
           )}
           ListEmptyComponent={renderVazio}
           contentContainerStyle={styles.listContent}

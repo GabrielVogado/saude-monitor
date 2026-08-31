@@ -13,6 +13,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import java.util.Map;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,6 +35,11 @@ class AuthControllerTest {
         public AuthResponse refresh(RefreshRequest request) {
             return new AuthResponse("new-access", "new-refresh", 900,
                     new UsuarioDto("1", "Marina Souza", "marina@email.com", "USER"));
+        }
+
+        @Override
+        public Map<String, Object> logout(RefreshRequest request) {
+            return Map.of("success", true, "message", "Sessão encerrada. Refresh token revogado.");
         }
     };
 
@@ -93,5 +100,17 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.code").value("CAMPOS_INVALIDOS"))
                 .andExpect(jsonPath("$.traceId").exists());
+    }
+
+    @Test
+    void deveEncerrarSessaoNoLogout() throws Exception {
+        String payload = "{\"refreshToken\":\"refresh-token\"}";
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Sessão encerrada. Refresh token revogado."));
     }
 }

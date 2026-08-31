@@ -14,10 +14,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
 /**
- * Endpoints de autenticação (F0-01), alinhados ao contrato v2.0 (§3.1).
+ * Endpoints de autenticação (F0-01/F0-02), alinhados ao contrato v2.0 (§3.1).
  *
- * <p>Todos públicos ({@code permitAll} em {@code SecurityConfig}): login e refresh de tokens.</p>
+ * <p>Todos públicos ({@code permitAll} em {@code SecurityConfig}): login, refresh e
+ * logout (revoga o refresh token apresentado).</p>
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -40,5 +43,14 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
         return ResponseEntity.ok(authService.refresh(request));
+    }
+
+    /**
+     * 🔒 Encerra a sessão revogando o refresh token na blacklist (F0-02/§3.1).
+     * Idempotente: devolve 200 mesmo se o token já estiver expirado/revogado.
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, Object>> logout(@Valid @RequestBody RefreshRequest request) {
+        return ResponseEntity.ok(authService.logout(request));
     }
 }

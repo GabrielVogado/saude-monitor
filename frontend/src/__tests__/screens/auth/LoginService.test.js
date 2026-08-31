@@ -59,10 +59,36 @@ describe("LoginService (Fase 0)", () => {
     await expect(LoginService.refresh()).rejects.toThrow("Sessão expirada");
   });
 
-  test("logout limpa a sessão", async () => {
+  test("logout revoga o refresh token no servidor e limpa a sessão", async () => {
     await TokenStorage.salvarTokens({ accessToken: "A", refreshToken: "R", usuario: { id: "u1" } });
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ success: true, message: "ok" }));
+
     await LoginService.logout();
+
+    // revoga o refresh no backend antes de limpar localmente (§3.1)
+    const [url, config] = global.fetch.mock.calls[0];
+    expect(url).toContain("/api/v1/auth/logout");
+    expect(config.method).toBe("POST");
+    expect(JSON.parse(config.body).refreshToken).toBe("R");
     expect(await TokenStorage.getAccessToken()).toBeNull();
+    expect(await TokenStorage.getRefreshToken()).toBeNull();
+  });
+
+  test("logout é best-effort: falha de rede ainda limpa a sessão local", async () => {
+    await TokenStorage.salvarTokens({ accessToken: "A", refreshToken: "R", usuario: { id: "u1" } });
+    global.fetch = jest.fn().mockRejectedValue(new Error("Network request failed"));
+
+    await LoginService.logout();
+
+    // revogação falhou, mas o logout local não pode ficar bloqueado
+    expect(await TokenStorage.getAccessToken()).toBeNull();
+    expect(await TokenStorage.getRefreshToken()).toBeNull();
+  });
+
+  test("logout sem sessão só limpa (não chama o backend)", async () => {
+    global.fetch = jest.fn();
+    await LoginService.logout();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   test("erro de rede vira mensagem pt-BR amigável", async () => {

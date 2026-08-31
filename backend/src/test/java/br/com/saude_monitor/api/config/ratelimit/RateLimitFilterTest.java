@@ -69,7 +69,7 @@ class RateLimitFilterTest {
                 .isNull();
         assertThat(filter.resolverGrupo("POST", "/api/v1/hospitais/sugestoes/1/aprovar"))
                 .isNull();
-        assertThat(filter.resolverGrupo("GET", "/api/v1/usuarios/me"))
+        assertThat(filter.resolverGrupo("GET", "/api/v1/contas/visitas"))
                 .isNull();
     }
 

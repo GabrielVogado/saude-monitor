@@ -2,24 +2,36 @@ package br.com.saude_monitor.api.user.controller;
 
 import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
+import br.com.saude_monitor.api.feedback.dto.FeedbackResponse;
+import br.com.saude_monitor.api.feedback.service.FeedbackService;
+import br.com.saude_monitor.api.hospital.dto.PageResponse;
 import br.com.saude_monitor.api.user.service.UserService;
+import br.com.saude_monitor.api.visita.dto.VisitaResponse;
+import br.com.saude_monitor.api.visita.service.VisitaService;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
 /**
- * Gestão da conta do usuário autenticado (F0-05 — LGPD).
+ * Gestão da conta do usuário autenticado — o namespace {@code /api/v1/contas} agrupa
+ * tudo que diz respeito ao titular (substitui o antigo {@code /usuarios/me}, F0-05/LGPD).
  *
- * <p>O endpoint é autenticado (cai na regra {@code anyRequest().authenticated()}
- * do {@code SecurityConfig}) e permite ao usuário excluir os próprios dados
- * pessoais (exclusão de conta), com anonimização dos dados estatísticos.</p>
+ * <p>Endpoints autenticados (regra {@code anyRequest().authenticated()} do
+ * {@code SecurityConfig}): histórico de visitas e feedbacks, exportação de dados
+ * pessoais (art. 18 LGPD) e exclusão de conta.</p>
  */
 @Slf4j
+@Validated
 @RestController
 @RequestMapping("/api/v1/contas")
 @RequiredArgsConstructor
@@ -27,6 +39,33 @@ public class ContaController {
 
     private final UserService userService;
     private final AutenticacaoHelper autenticacaoHelper;
+    private final VisitaService visitaService;
+    private final FeedbackService feedbackService;
+
+    /** 🔒 Histórico paginado de visitas do usuário (E5-03/RN-22). */
+    @GetMapping("/visitas")
+    public ResponseEntity<PageResponse<VisitaResponse>> historicoVisitas(
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        String usuarioId = exigirUsuarioAutenticado();
+        return ResponseEntity.ok(visitaService.historico(usuarioId, page, size));
+    }
+
+    /** 🔒 Histórico paginado de feedbacks do usuário (E5-03/RN-22). */
+    @GetMapping("/feedbacks")
+    public ResponseEntity<PageResponse<FeedbackResponse>> historicoFeedbacks(
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        String usuarioId = exigirUsuarioAutenticado();
+        return ResponseEntity.ok(feedbackService.historico(usuarioId, page, size));
+    }
+
+    /** 🔒 Exportação de dados pessoais em JSON (E5-03 / art. 18 LGPD). */
+    @GetMapping("/export")
+    public ResponseEntity<Map<String, Object>> exportarDados() {
+        String usuarioId = exigirUsuarioAutenticado();
+        return ResponseEntity.ok(userService.exportarDados(usuarioId));
+    }
 
     /**
      * 🔒 Exclui a conta e os dados pessoais do usuário autenticado (F0-05/LGPD).
@@ -34,8 +73,7 @@ public class ContaController {
      */
     @DeleteMapping("/exclusao")
     public ResponseEntity<Map<String, Object>> excluirConta() {
-        String usuarioId = autenticacaoHelper.usuarioIdAtual()
-                .orElseThrow(() -> new NaoAutorizadoException("Usuário não autenticado."));
+        String usuarioId = exigirUsuarioAutenticado();
 
         userService.excluirConta(usuarioId);
 
@@ -44,5 +82,10 @@ public class ContaController {
                 "success", true,
                 "message", "Conta excluída com sucesso. Seus dados pessoais foram removidos."
         ));
+    }
+
+    private String exigirUsuarioAutenticado() {
+        return autenticacaoHelper.usuarioIdAtual()
+                .orElseThrow(() -> new NaoAutorizadoException("Usuário não autenticado."));
     }
 }

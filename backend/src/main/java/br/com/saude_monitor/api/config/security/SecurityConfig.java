@@ -41,7 +41,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/**", "/api/user/**").permitAll()
+                        .requestMatchers("/api/v1/auth/**").permitAll()
                         // Check-in/checkout/heartbeat de visitas (Épico 02) admitem uso anônimo via
                         // dispositivoId (§3.3); a identificação obrigatória é validada em serviço.
                         .requestMatchers(HttpMethod.POST, "/api/v1/visitas/checkin",

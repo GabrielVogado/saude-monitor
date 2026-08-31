@@ -194,51 +194,60 @@
 
 | Endpoint | Situação | Ref. |
 |---|---|---|
-| `POST /api/v1/auth/registro` | 🟡 app/backend usam **`POST /api/user/cadastro`** (legado); alinhamento ao path v2 pendente | PR #5/#6 |
+| `POST /api/v1/auth/registro` | 🟢 (migrado de `/api/user/cadastro`; consentimento LGPD obrigatório) | PR `contas - registro e contas` |
 | `POST /api/v1/auth/login` | 🟢 (rate limit 10/min/IP) | PR #1/#24 |
 | `POST /api/v1/auth/refresh` | 🟢 (rotação) | PR #22 |
 | `POST /api/v1/auth/logout` | 🟢 (blacklist de refresh; idempotente) | PR `feature/logout-server-revogacao-refresh` |
-| `DELETE /api/v1/usuarios/me` | 🟡 implementado como **`DELETE /api/v1/contas/exclusao`** | PR #25 |
-| `GET /api/v1/usuarios/me` | 🔴 não implementado (perfil no payload do login) | — |
-| `PUT /api/v1/usuarios/me/consentimentos` | 🔴 não implementado (consentimentos no cadastro; revogação local/SO) | PR #26 |
+| `DELETE /api/v1/contas/exclusao` | 🟢 | PR #25 |
+| `GET /api/v1/contas/feedbacks` | 🟢 | PR `contas - registro e contas` |
+| `GET /api/v1/contas/export` | 🟢 (LGPD art. 18 — portabilidade) | PR `contas - registro e contas` |
+| `PUT /api/v1/contas/consentimentos` | 🔴 agendado **Sprint S8 (E5-05)** — revogação de consentimentos via API | — |
+| `GET /api/v1/usuarios/me` | ⛔ **removido do contrato** — perfil servido no payload do login | decisão 31/08/2026 |
 | `GET /api/v1/hospitais` (+ `{id}`, `geofence`) | 🟢 | PR #12/#13 |
 | `POST/PUT/PATCH /api/v1/hospitais...` | 🟢 (ADMIN) | PR #12/#13 |
 | `GET /api/v1/hospitais/ranking` | 🟢 (backend; UI em S8) | PR #27 |
 | `POST /api/v1/hospitais/sugestoes` + moderação | 🟢 | PR #14 |
 | `POST /api/v1/visitas/checkin` · `checkout` · `heartbeat` · PATCH `tipo-permanencia` | 🟢 | PR #17/#18|
-| `GET /api/v1/visitas/ativas` · `GET /api/v1/usuarios/me/visitas` | 🟢 | PR #18/#23 |
+| `GET /api/v1/visitas/ativas` · `GET /api/v1/contas/visitas` | 🟢 | PR #18/#23 |
 | `POST /api/v1/visitas/{id}/expirar` (job) | 🟢 como job interno `@Scheduled` | PR #18 |
 | `POST /api/v1/feedbacks` | 🟢 | PR #22 |
 | `GET /api/v1/visitas/{id}/feedback` · `PUT /api/v1/feedbacks/{id}` | 🟢 | PR #22 |
 | `GET /api/v1/hospitais/{id}/indicadores` | 🟢 | PR #23 |
 
-### 3.1 Auth e Usuário
+### 3.1 Auth e Conta
 
 #### `POST /api/v1/auth/registro` 🔓
-Cria conta (opcional no MVP — jornada principal funciona sem login).
+Cria conta (opcional no MVP — jornada principal funciona sem login). Substitui o antigo `POST /api/user/cadastro` (legado) e registra o consentimento LGPD no momento do cadastro.
 
-> 🟡 **Situação atual (30/08/2026):** o contrato meta é este path, mas o app mobile e o backend utilizam **`POST /api/user/cadastro`** (path legado da Árvore Tecnológica — PRs #5/#6). Migração para `/api/v1/auth/registro` **pendente de decisão**.
+> ✅ **Situação atual (31/08/2026):** implementado. `AuthController#registro` delegou para `UserService.saveUser`, que **rejeita com 400** quando `consentimento.termosUso != true` (decisão de contrato que antes ficava implícita no `UserServiceImpl`). O app mobile usa `UserService.registro` (`frontend/src/screens/user/service/UserService.js`).
 
 **Request:**
 ```json
 {
-  "nome": "Marina Souza",
+  "fullName": "Marina Souza",
   "email": "marina@email.com",
-  "senha": "S3nh@Forte!",
-  "telefone": "(11) 99999-0000",
+  "password": "S3nh@Forte!",
+  "phone": "(11) 99999-0000",
   "consentimento": { "termosUso": true, "versaoTermos": "1.0" }
 }
 ```
+> Nota de contrato: os campos `fullName`/`password`/`phone` são herdados do `UserRequest` legado (`/api/user/cadastro`) e mantidos em inglês; o alinhamento completo do payload a camelCase pt-BR (checklist §7) segue como pendência consolidada.
+
 **201 Created**
 ```json
 {
+  "success": true,
+  "message": "Conta criada com sucesso.",
   "id": "652c9f3e1a2b3c4d5e6f7081",
-  "nome": "Marina Souza",
+  "fullName": "Marina Souza",
   "email": "marina@email.com",
-  "criadoEm": "2026-08-01T10:00:00Z"
+  "phone": "(11) 99999-0000",
+  "active": true,
+  "createdAt": "2026-08-31T10:00:00Z",
+  "updatedAt": "2026-08-31T10:00:00Z"
 }
 ```
-**Validações:** e-mail válido e único; senha ≥ 8 chars com número e letra; `consentimento.termosUso` obrigatório = true (LGPD).
+**Validações:** e-mail válido e único (`VALIDACAO` com `errors`); senha ≥ 8 chars com número e letra; `consentimento.termosUso` obrigatório = true (LGPD).
 
 #### `POST /api/v1/auth/login` 🔓
 **Request:**
@@ -271,15 +280,11 @@ Exclui conta e dados pessoais (LGPD). **200** com resumo do que foi removido/ano
 
 > ✅ **Situação atual (30/08/2026):** implementado (PR #25). Substitui o path anterior `DELETE /api/v1/usuarios/me` por clareza semântica. Cascade: remove `users` + `auth_logins` (`AuthRepository.deleteByUser_Id`), anonimiza `visitas`/`feedbacks` (`usuarioId → null`, `anonimizado=true`) e **recalcula os agregados** afetados (job de 15min cobre falhas).
 
-#### `GET /api/v1/usuarios/me` 🔒
-Perfil do usuário logado (dados + consentimentos).
+#### `GET /api/v1/usuarios/me` ⛔ (removido do contrato)
+> **Decisão (31/08/2026):** removido da especificação — o perfil é servido no payload do `POST /api/v1/auth/login` e persistido localmente (`TokenStorage`). O namespace `me/` foi substituído por **`/api/v1/contas`** (responsabilidade lógica do titular) — ver §3.6.
 
-> 🔴 **Situação atual (30/08/2026):** não implementado — o perfil é servido no payload do `POST /api/v1/auth/login` e persistido localmente (`TokenStorage`). Pendente de decisão.
-
-#### `PUT /api/v1/usuarios/me/consentimentos` 🔒
-Atualiza consentimentos (ex.: revogar localização). **Request:** `{ "localizacao": { "aceito": false } }`
-
-> 🔴 **Situação atual (30/08/2026):** não implementado — os consentimentos são registrados no cadastro (`consentimentosIniciais` no `UserServiceImpl`); a revogação de localização no app é local/permissão do SO (E5-05, Sprint S8). Pendente de decisão.
+#### `PUT /api/v1/contas/consentimentos` 🔒 (agendado — Sprint S8, E5-05)
+> **Situação:** não implementado. Os consentimentos são registrados no cadastro (`/api/v1/auth/registro`); a revogação de localização no app é local/permissão do SO (E5-05). **Agendado para a Sprint S8** sob o path já renomeado para o namespace `contas`. **Request** (desenho): `{ "localizacao": { "aceito": false } }`.
 
 ---
 
@@ -374,8 +379,15 @@ Sinaliza internação/observação (RN-24) — disponível quando a visita tem �
 #### `GET /api/v1/visitas/ativas` 🔒
 Retorna visita `EM_ATENDIMENTO` do usuário (para card/cronômetro). **200** `{ "visita": {...} | null }`
 
-#### `GET /api/v1/usuarios/me/visitas` 🔒
-Histórico do usuário (paginado). **200** paginação com visita + hospital + status + feedback (se houver).
+#### `GET /api/v1/contas/visitas` 🔒
+Histórico do usuário (paginado). **200** paginação com visita + hospital + status + feedback (se houver).*Antigo `GET /api/v1/usuarios/me/visitas` — renomeado para o namespace `contas`.*
+
+```json
+{
+  "content": [ { "id": "v1", "hospital": {...}, "status": "FINALIZADA", "feedback": null } ],
+  "page": 0, "size": 20, "totalElements": 1, "totalPages": 1
+}
+```
 
 #### `POST /api/v1/visitas/{id}/expirar` 🛡️ (job interno)
 Expira visita **apenas após 24h sem heartbeat** (RN-04) — proteção contra GPS "preso", sem cortar esperas reais de 12h+. Chamado por job agendado (ex.: a cada 15min). Visitas em `SUSPEITA` há 2h são candidatas; sem heartbeat por 24h → `EXPIRADA`.
@@ -408,6 +420,28 @@ Retorna feedback da visita (se houver) — usado para edição de comentário (o
 
 #### `PUT /api/v1/feedbacks/{id}` 🔒 (dono)
 Permite editar comentário/nota dentro da janela de 24h (RN-09). **200**.
+
+#### `GET /api/v1/contas/feedbacks` 🔒
+Histórico de feedbacks do usuário (paginado, RN-22 — E5-03). Mesma paginação de `contas/visitas`; cada item traz o feedback e a visita/hospital de referência. **200** `PageResponse`.
+
+---
+
+### 3.6 Conta do titular (namespace `contas`)
+
+> Substitui o namespace `me/` por responsabilidade lógica (decisão 31/08/2026): recursos que dizem respeito ao titular autenticado vivem sob `/api/v1/contas`, não sob um path literal `me`.
+
+#### `GET /api/v1/contas/export` 🔒 (LGPD art. 18)
+Portabilidade: exporta todos os dados pessoais do titular (perfil, visitas, feedbacks e consentimentos) em um único JSON. **200**
+```json
+{
+  "geradoEm": "2026-08-31T00:00:00Z",
+  "usuario": { "id": "u1", "nome": "Marina Souza", "email": "marina@email.com", "telefone": "(11) 99999-0000", "consentimentos": {...} },
+  "visitas": [], "feedbacks": []
+}
+```
+
+#### `DELETE /api/v1/contas/exclusao` 🔒
+Vide §3.1 — exclui conta e anonimiza dados (LGPD art. 18/19), recomputando os agregados afetados.
 
 ---
 

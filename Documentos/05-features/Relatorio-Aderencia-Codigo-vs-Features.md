@@ -1,9 +1,9 @@
-# 🔍 Relatório de Aderência — Features × Código Real (v3.3)
+# 🔍 Relatório de Aderência — Features × Código Real (v3.4)
 
 > **Verificação do que existe implementado vs. o que as Features propõem**
 >
-> Data: Atualizada — v3.3 (auditoria: 30/08/2026; logout server-side implementado)
-> Alterações desta versão: Reflete a auditoria completa da `develop` em 30/08/2026 — confirma Fase 0 (JWT/BCrypt/rate limiting/exclusão LGPD), Épicos 1–6 (Sprint S6 concluída), ranking (backend), formaliza a Sprint S8 e corrige o endpoint de exclusão de conta (`DELETE /api/v1/contas/exclusao`, PR #25) e o estado F-08/E6. A v3.2 registrou as 3 correções de estória (RN-07, RN-10/11, E3-03). A **v3.3** registra a implementação do **logout server-side** (F0-02): `POST /api/v1/auth/logout` com blacklist de refresh tokens revogados — reduzindo as decisões de contrato pendentes a duas (path de cadastro e `GET /usuarios/me`).
+> Data: Atualizada — v3.4 (31/08/2026; decisões de contrato executadas — cadastro, namespace `contas`, E5-03 backend)
+> Alterações desta versão: A **v3.4** registra a execução das decisões de contrato abertas na v3.3: (1) cadastro migrado de `/api/user/cadastro` para **`POST /api/v1/auth/registro`** com **consentimento LGPD obrigatório** no request; (2) **`GET /api/v1/usuarios/me` removido** do contrato (perfil segue no payload do login); e (3) o namespace **`me/`** foi substituído por **`/api/v1/contas`** (responsabilidade lógica do titular). Também implementa o **backend de E5-03** (histórico paginado de visitas/feedbacks + **exportação LGPD art. 18** em `GET /api/v1/contas/export`), que passou de "fora do escopo" para **parcialmente coberto** (UI do histórico segue na Sprint S8). As v3.2/v3.3 registraram, respectivamente, as 3 correções de estória (RN-07, RN-10/11, E3-03) e o logout server-side (F0-02).
 
 ---
 
@@ -15,9 +15,9 @@
 | 🟡 Parcial (desvio de detalhe em estória RN) | 0/9 (3 estórias corrigidas: E2-08, E3-02, E3-03) | — |
 | 🔴 Inexistente (precisa construir) | 0/9 | 0% |
 
-> **Escopo:** MVP Sprints **S0–S6**. Itens da Sprint S8 (E4-05 UI, F-07 mapa, E5-03, E5-05, E6-05) e Épico 7/Painel (F-11) são fora do escopo do MVP e **não contam como parciais/inexistentes**.
+> **Escopo:** MVP Sprints **S0–S6** + backend de E5-03 (implementado na v3.4). Fora do escopo do MVP e **não contam como parciais/inexistentes**: UI do histórico (E5-03), E4-05 UI, F-07 mapa, E5-05 revogação nativa, E6-05 opt-in de notificações — Sprint S8 — e Épico 7/Painel (F-11).
 
-**Conclusão:** No escopo S0–S6, a `develop` está **100% coberta** nas 9 Features com **0 desvios RN pendentes**: autenticação JWT/BCrypt, rate limiting (F0-04), exclusão de conta LGPD com anonimização (F0-05), CRUD/geofence de Hospitais, sugestões + moderação (backend), Visitas com detecção automática via geofencing nativo + heartbeat, Feedback pós-saída com dedupe e anônimo, agregações estatísticas (Indicadores Públicos por Hospital, atualização ≤ 15min) + ranking (backend), frontend de Conta/Privacidade (E5-01/02/04) e UX (Bottom Tabs, Design System v2.0, a11y AA — E6-01..04). Os **3 desvios de estória** apontados na v3.1 foram **corrigidos** no PR `bugfix/ajustes-rn-feedback-estatisticas`: RN-07 (filtro <2min na agregação), RN-10/11 (select de especialidade, ramificação por triagem, "Não interagi", remoção de `DESISTI`, motivo obrigatório) e E3-03 (lembrete único em ~6h). Na v3.3, o **logout com blacklist de refresh** (F0-02, teste da Sprint S0) foi **implementado**. Restam apenas as **decisões de contrato** (path de cadastro e `GET /usuarios/me`), já registradas nas recomendações.
+**Conclusão:** No escopo S0–S6, a `develop` está **100% coberta** nas 9 Features com **0 desvios RN pendentes**: autenticação JWT/BCrypt, rate limiting (F0-04), exclusão de conta LGPD com anonimização (F0-05), CRUD/geofence de Hospitais, sugestões + moderação (backend), Visitas com detecção automática via geofencing nativo + heartbeat, Feedback pós-saída com dedupe e anônimo, agregações estatísticas (Indicadores Públicos por Hospital, atualização ≤ 15min) + ranking (backend), frontend de Conta/Privacidade (E5-01/02/04) e UX (Bottom Tabs, Design System v2.0, a11y AA — E6-01..04). Os **3 desvios de estória** apontados na v3.1 foram **corrigidos** no PR `bugfix/ajustes-rn-feedback-estatisticas` (RN-07, RN-10/11 e E3-03). Na v3.3, o **logout com blacklist de refresh** (F0-02) foi implementado. Na **v3.4**, as decisões de contrato foram **executadas**: cadastro migrado para `/api/v1/auth/registro` com consentimento LGPD, `GET /usuarios/me` removido e o namespace `me/` renomeado para **`/api/v1/contas`** — **zero decisões de contrato pendentes**.
 
 ---
 
@@ -47,7 +47,7 @@
 | `AuthDocument.java` | ✅ Existe | Mongo document OK |
 | `AuthServiceImpl.java` | ✅ **Seguro** | Compara senha via `passwordEncoder.matches`; refresh rotaciona e revoga o anterior; logout idempotente |
 | `AuthRepository.java` | ✅ Existe | `findByEmail` |
-| `UserController.java` | ✅ Existe | `POST /api/user/cadastro` |
+| `UserController.java` | ❌ Removido (v3.4) | Legado `POST /api/user/cadastro` migrado para `POST /api/v1/auth/registro` (`AuthController` §3.1) |
 | `UserDocument.java` | ✅ Existe | Mongo document OK |
 | `UserServiceImpl.java` | ✅ **Seguro** | Salva o usuário codificando a senha via `passwordEncoder.encode()` |
 | `LoginRequest/Response.java` | ✅ Existe | DTOs OK |
@@ -147,13 +147,17 @@
 
 ## 3. Recomendações Atualizadas
 
-> **Escopo desta auditoria (30/08/2026): MVP — Sprints S0–S6.** Itens da **Sprint S8** (E4-05 UI, F-07 mapa, E5-03 histórico/exportação, E5-05 revogação nativa, E6-05 opt-in de notificações) e do **Épico 7 / Painel Administrativo Web (F-11)** são **fora do escopo do MVP** e não são contabilizados como pendência.
+> **Escopo desta auditoria (31/08/2026): MVP — Sprints S0–S6** + backend de E5-03 (v3.4). Itens da **Sprint S8** (UI do histórico E5-03, E4-05 UI, F-07 mapa, E5-05 revogação via API, E6-05 opt-in de notificações) e do **Épico 7 / Painel Administrativo Web (F-11)** são **fora do escopo do MVP** e não são contabilizados como pendência.
 
 1. **No escopo S0–S6, a `develop` está concluída e validada**: autenticação JWT/BCrypt, rate limiting (F0-04), exclusão de conta LGPD (`DELETE /api/v1/contas/exclusao`, F0-05), CRUD/geofence de hospitais + sugestões e moderação (backend), visitas com geofencing nativo + heartbeat, feedback pós-saída (backend + mobile), indicadores públicos por hospital + ranking (backend) e o frontend de Conta/Privacidade (E5-01/02/04) e de UX (E6-01..04).
 2. **Correções aplicadas (PR `bugfix/ajustes-rn-feedback-estatisticas`)** — os 3 desvios de estória da v3.1 foram implementados e testados:
    - **RN-07 / E2-08:** filtro **< 2min na agregação** (`DURACAO_MINIMA_MINUTOS=2` no `AgregadoServiceImpl`) + teste;
    - **E3-02 / RN-10-11:** select searchable de especialidade, ramificação "triagem=Não → pula especialidade", "Não interagi" em `tratamentoEquipe`, remoção da opção `DESISTI` e motivo obrigatório quando não foi atendido (`FeedbackFormScreen`) + testes FE;
    - **E3-03 / RN-09:** lembrete único em **~6h** após a 1ª notificação (`FeedbackNotificationService`).
-   Validação FE: 15 suítes/91 testes ✓ + `tsc --noEmit` ✓. (Testes unit do backend dependem de JDK 25/Docker — rodam no CI.)
-3. **Decisões de contrato pendentes (spec §3.1 vs código — funcional, precisa alinhar doc ou código)**: endpoint de cadastro (`/api/user/cadastro` legado vs `/api/v1/auth/registro` ou `/api/v1/contas/cadastro`) e **`GET /api/v1/usuarios/me`** (perfil servido no payload do login). O **`POST /api/v1/auth/logout` com blacklist de refresh** (teste previsto na Sprint S0) foi **implementado** no PR `feature/logout-server-revogacao-refresh`.
-4. **Fora do escopo do MVP** (não são pendências desta auditoria): UI do ranking, mapa com geofences, histórico/exportação, revogação nativa completa, opt-in dedicado de notificações (**Sprint S8**) e o **Painel Admin Web** (Épico 7/F-11, cujo fluxo de moderação de sugestões absorve as telas mobile de F-10).
+   Validação FE: 16 suítes/99 testes ✓ + `tsc --noEmit` ✓. (Testes unit do backend dependem de JDK 25/Docker — rodam no CI.)
+3. **Decisões de contrato executadas (PR `contas - registro e contas`, 31/08/2026)** — encerra as pendências da v3.3:
+   - **Cadastro:** `POST /api/user/cadastro` (legado) → **`POST /api/v1/auth/registro`**, com `consentimento` LGPD obrigatório (`termosUso: true`), validado em `UserServiceImpl.saveUser` (400 quando ausente). `UserController` removido.
+   - **`GET /api/v1/usuarios/me`:** removido do contrato (perfil no payload do login).
+   - **Namespace `me/` → `/api/v1/contas`:** `GET /api/v1/contas/visitas` (histórico), `GET /api/v1/contas/feedbacks`, `GET /api/v1/contas/export` (LGPD art. 18), `DELETE /api/v1/contas/exclusao`. App mobile atualizado (`UserService.registro`, `VisitaService.listarHistorico`, testes).
+   - **E5-03 backend implementado:** histórico paginado de visitas e de feedbacks + exportação de dados do titular; fica como S8 apenas a **UI** dessas telas e o `PUT /api/v1/contas/consentimentos` (E5-05).
+4. **Fora do escopo do MVP** (não são pendências desta auditoria): UI de histórico/exportação, UI do ranking, mapa com geofences, revogação de consentimentos via API, opt-in dedicado de notificações (**Sprint S8**) e o **Painel Admin Web** (Épico 7/F-11, cujo fluxo de moderação de sugestões absorve as telas mobile de F-10).

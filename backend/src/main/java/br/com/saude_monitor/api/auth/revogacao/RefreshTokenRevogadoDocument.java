@@ -38,7 +38,7 @@ public class RefreshTokenRevogadoDocument {
     /** Momento em que o token foi revogado (logout ou rotação). */
     private Instant revogadoEm;
 
-    /** Expiração do próprio refresh token; TTL (<code>expireAfterSeconds = 0</code>) purga o registro aqui. */
-    @Indexed(expireAfterSeconds = 0)
+    /** Expiração do próprio refresh token; TTL (0s) purga o registro aqui. */
+    @Indexed(expireAfter = "0s")
     private Instant expiraEm;
 }

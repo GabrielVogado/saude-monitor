@@ -41,7 +41,7 @@ O padrão v1.2 ("Clinical Sanctuary") foi desenhado para o **gestor hospitalar**
 
 | # | Princípio | Tradução prática |
 |---|---|---|
-| P1 | **Zero fricção na entrada** | O usuário **nunca** faz check-in manual. O geofence detecta, e o app apenas confirma com um card gentil: "Você está em X". Se o GPS falhar, oferece uma alternativa manual em 1 toque. |
+| P1 | **Zero fricção na entrada** | A detecção automática (geofence) é a via principal e o app confirma com um card gentil: "Você está em X". O **check-in manual em 1 toque** é um caminho de primeira classe, ao lado do automático — não uma exceção — para quem tem GPS desligado, permissão negada ou iOS restritivo. Ambas as vias mantêm a fricção mínima na entrada. |
 | P2 | **Feedback não-cansativo** | Máximo de **4 perguntas**, tempo alvo **< 45 segundos**, progresso visível, botão **"Pular" sempre presente**, comentário opcional, envio em 1 toque. Nunca bloquear o uso do app por falta de resposta. |
 | P3 | **Momento certo é o meio-termo** | O pedido de feedback chega **1 a 5 minutos após a saída** (notificação local + card na home), com janela de 24h e **no máximo 1 lembrete**. Fora da janela, o feedback perde a validade sem penalizar o usuário. |
 | P4 | **Transparência radical** | Todo dado exibido publicamente é **agregado e anônimo**, com N mínimo de amostra e data da medição. O usuário vê o próprio tempo registrado e entende como ele vira estatística. |
@@ -177,11 +177,13 @@ flowchart TD
 flowchart TD
     SPL[Splash] --> ONB[Onboarding / Permissões<br/>3 passos no máx.]
     ONB --> MAIN[Main Tabs]
-    MAIN --> MAPA[Mapa<br/>home do paciente]
+    MAIN --> INI[Início<br/>apresentação]
     MAIN --> HOSP[Hospitais<br/>lista + ranking]
+    MAIN --> MAPA[Mapa<br/>geolocalização]
     MAIN --> PERF[Perfil]
-    MAPA --> DET[Detalhe do Hospital]
+    INI --> DET[Detalhe do Hospital]
     HOSP --> DET
+    MAPA --> DET
     DET --> FB[Feedback pós-saída<br/>full-screen]
     FB --> AGR[Agradecimento<br/>+ impacto]
     PERF --> LOGIN[Login / Cadastro<br/>opcional]
@@ -200,10 +202,10 @@ Clinical Sanctuary
 │   ├── Passo 2 — Permissão de localização (granular, explicada)
 │   └── Passo 3 — Permissão de notificações (opcional, explicada)
 ├── Main Tabs (navegação inferior)
-│   ├── Mapa (aba 1 — principal)
-│   │   ├── Mapa com hospitais próximos
-│   │   ├── Card de permanência ativa (geofence) — sobreposto
-│   │   └── Sugestão de hospital (empty/edge)
+│   ├── Início (aba 1 — apresentação)
+│   │   ├── Apresentação do produto/valor
+│   │   ├── Atalho para busca de hospitais
+│   │   └── Card de permanência ativa (geofence/check-in manual) — sobreposto
 │   ├── Hospitais (aba 2)
 │   │   ├── Busca por nome
 │   │   ├── Lista/ranking com nota média + tempo médio
@@ -212,7 +214,12 @@ Clinical Sanctuary
 │   │       ├── Barras por categoria (recepção, enfermagem, médico, medicação)
 │   │       ├── Tempo médio de permanência
 │   │       └── Botão "Avaliar agora" (se esteve lá)
-│   └── Perfil (aba 3)
+│   │       └── Botão de check-in manual (1 toque)
+│   ├── Mapa (aba 3)
+│   │   ├── Mapa com hospitais próximos (pins)
+│   │   ├── Card de permanência ativa (geofence) — sobreposto
+│   │   └── Sugestão de hospital (empty/edge)
+│   └── Perfil (aba 4)
 │       ├── Identidade (anônimo ou logado)
 │       ├── Histórico de visitas (data, hospital, tempo, nota)
 │       ├── Minhas avaliações (editar/excluir)
@@ -228,12 +235,13 @@ Clinical Sanctuary
 
 ### 4.3 Navegação inferior (Bottom Navigation)
 
-3 abas — nunca mais que 3 no v1. O Mapa é a aba inicial (jornada principal).
+4 abas — no máximo 4 no v1. Início (apresentação) é a aba inicial; Mapa é a 3ª aba (geolocalização); a jornada de detecção/check-in é distribuída entre Início, Hospitais e Mapa.
 
 | Aba | Ícone (lucide) | Label | Papel |
 |---|---|---|---|
-| Mapa | `MapPin` | Mapa | Detecção, permanência ativa, hospitais próximos |
-| Hospitais | `Building2` | Hospitais | Busca, ranking público, detalhe |
+| Início | `Home` | Início | Apresentação, atalhos, card de permanência ativa |
+| Hospitais | `Building2` | Hospitais | Busca, ranking público, detalhe, check-in manual |
+| Mapa | `MapPin` | Mapa | Geolocalização, hospitais próximos, permanência ativa |
 | Perfil | `UserRound` | Perfil | Histórico, conta (opcional), LGPD |
 
 ### 4.4 Decisão estrutural: conta opcional
@@ -1013,8 +1021,8 @@ flowchart LR
 4. **Dados públicos só com N mínimo e metodologia visível** — transparência e honestidade (P4, P9) constroem a confiança que sustenta um produto de reputação hospitalar. Uma média de 2 avaliações seria um risco de produto e reputação.
 5. **Identidade visual herdada do Clinical Sanctuary** — a paleta tonal, a regra no-line, o glass e o gradiente já comunicam "segurança e inteligência". Evoluímos a voz (acolhedora, paciente) sem quebrar a linguagem visual da v1.2 — consistência reduz risco de implementação e custo de manutenção.
 6. **Estrelas em `tertiary` (#884e00) em vez de amarelo saturado** — mantém a profundidade tonal do sistema e garante contraste AA (6.3:1); o amarelo padrão de rating quebra a paleta e falha contraste sobre superfícies claras.
-7. **Modo manual como plano B do geofence** — geolocalização é imperfeita; um caminho manual em 1 toque evita abandonar usuários com GPS desligado/permissão negada sem comprometer o fluxo automático (P1 + P9).
-8. **Navegação em 3 abas com Mapa como home** — a jornada principal começa pela detecção; lista/ranking e perfil são contextos secundários. Menos abas = menos decisão = mais clareza (P6).
+7. **Modo manual como caminho de primeira classe (não plano B)** — geolocalização é imperfeita; um check-in manual em 1 toque no card/lista de hospitais coexiste com o fluxo automático (geofence), atendendo GPS desligado, permissão negada e iOS restritivo sem sacrificar fricção mínima (P1 + P9).
+8. **Navegação em 4 abas com Início de apresentação** — a aba Início comunica o produto/tomada de decisão; Hospitais, Mapa e Perfil são os contextos operacionais. 4 abas é o teto no v1 para manter cada tela com uma ação primária clara (P6).
 
 ---
 

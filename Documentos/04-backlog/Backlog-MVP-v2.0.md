@@ -65,7 +65,7 @@
 | E2-03 | P0 | Como sistema, devo **expirar visitas presas apenas após 24h sem heartbeat** (não por tempo de permanência — esperas reais de 12h+ no SUS não podem ser cortadas). | CA: job de expiração roda periodicamente (ex.: 15min); visita com `ultimoHeartbeat` > 24h vira `EXPIRADA`; tempo parcial preservado; visita com heartbeats regulares permanece ativa indefinidamente. | RN-04, RN-23 |
 | E2-04 | P0 | Como sistema, devo **tratar conflito de áreas sobrepostas** escolhendo o hospital mais próximo. | CA: com 2 geofences contendo o ponto, escolhe a menor distância; se empate persistir, app pergunta em 1 toque. | RN-05 |
 | E2-05 | P1 | Como sistema, devo **recuperar visitas com GPS interrompido** por até 10 minutos. | CA: falha de GPS não encerra a visita imediatamente; após 10 min sem sinal, encerra com `GPS_INTERROMPIDO`. | RN-06 |
-| E2-06 | P0 | Como usuário com GPS desligado/permissão negada, devo poder **fazer check-in manual em 1 toque** como plano B. | CA: botão "Estou em um hospital" na home; seleção do hospital; visita manual com flag `manual=true`. | P1, P9, UI/UX §5 |
+| E2-06 | P0 | Como usuário, devo **fazer check-in manual em 1 toque** (caminho de primeira classe), selecionando o hospital da lista — essencial com GPS desligado, permissão negada ou iOS restritivo. | CA: botão "Estou em um hospital" na home/lista; seleção do hospital; visita manual com flag `manual=true`. | P1, P9, UI/UX §5 |
 | E2-07 | P0 | Como usuário, devo **ver minha visita ativa** (hospital + cronômetro) sem precisar abrir o app durante a permanência. | CA: card de visita ativa na home e notificação silenciosa persistente; atualização a cada minuto. | RF-02, UI/UX TimerBanner |
 | E2-08 | P1 | Como sistema, devo **ignorar visitas < 2 minutos** nas estatísticas públicas. | CA: filtro aplicado na agregação; visita curta permanece no histórico do usuário, mas não entra no agregado. | RN-07, RN-17 |
 | E2-09 | P0 | Como app, devo **enviar heartbeat a cada 30 minutos** enquanto houver visita ativa. | CA: heartbeat registra `ultimoHeartbeat`; ausência de 2h marca visita `SUSPEITA`; heartbeat retoma status `EM_ATENDIMENTO`; consumo de rede/bateria validado em teste de campo. | RN-23, RF-02 |
@@ -115,7 +115,7 @@
 
 | ID | Prioridade | Estória | Critérios de aceite (CA) | Ref. |
 |---|---|---|---|---|
-| E6-01 | P0 | Como usuário, devo **navegar por Bottom Tabs** (Mapa, Hospitais, Perfil) conforme o novo padrão de navegação. | CA: navegação de 1 polegar; substituição do Drawer; telas existentes (Login/Cadastro) integradas ao fluxo. | UI/UX §4, P6 |
+| E6-01 | P0 | Como usuário, devo **navegar por Bottom Tabs** (Início, Hospitais, Mapa, Perfil) conforme o novo padrão de navegação. | CA: navegação de 1 polegar; substituição do Drawer; telas existentes (Login/Cadastro) integradas ao fluxo. | UI/UX §4, P6 |
 | E6-02 | P0 | Como usuário, devo **usar o Design System v2.0** (tokens, tipografia, componentes) em todas as telas do app. | CA: tokens aplicados (cores, raios, sombras); componentes do padrão (Button, RatingStars, FeedbackSheet etc.); remoção de assets antigos (GIF/PNG); selos LGPD no lugar de HIPAA. | UI/UX §5–6 |
 | E6-03 | P1 | Como usuário com deficiência, devo **usar o app com leitor de tela e contraste AA**. | CA: roles/labels de acessibilidade; alvos ≥ 48dp; contraste verificado; navegação por teclado em web. | RNF-08, P8 |
 | E6-04 | P1 | Como usuário, devo **ver estados de carregamento/vazio/erro** em todas as telas. | CA: LoadingState em carregamentos; EmptyState quando sem dados; erro com ação de retry. | UI/UX §5 |

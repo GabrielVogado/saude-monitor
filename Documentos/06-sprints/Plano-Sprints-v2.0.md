@@ -197,7 +197,7 @@ S0 (Segurança)
 |---|---|---|---|---|---|
 | E2-01 | P0 | Detecção automática de entrada (≥ 2 min no geofence) | 5 | FE + BE | ➕ Nova |
 | E2-02 | P0 | Detecção automática de saída (≥ 5 min fora do geofence) | 5 | FE + BE | ➕ Nova |
-| E2-06 | P0 | Check-in manual em 1 toque (fallback para GPS desligado) | 3 | FE + BE | ➕ Nova |
+| E2-06 | P0 | Check-in manual em 1 toque (caminho de primeira classe; essencial com GPS desligado/negado) | 3 | FE + BE | ➕ Nova |
 | E2-07 | P0 | Card de visita ativa com cronômetro (home + notificação persistente) | 3 | FE | ➕ Nova |
 | E2-09 | P0 | Heartbeat de presença a cada 30 minutos | 3 | FE + BE | ➕ Nova |
 
@@ -205,8 +205,7 @@ S0 (Segurança)
 
 - **E2-01 e E2-02 são indivisíveis**: entrada e saída formam o ciclo completo de uma visita; desenvolver uma sem a outra gera retrabalho de integração.
 - **E2-09 (heartbeat) é P0 e está junto com detecção básica**: o heartbeat é o que distingue "espera real no hospital" (12h+ no SUS) de "GPS preso". Sem ele, a expiração de 24h (E2-03 no S3) não tem como saber se o usuário ainda está no hospital. **Desenvolver detecção sem heartbeat é construir sobre premissa errada.**
-- **E2-06 (check-in manual) é o plano B**: se o geofencing nativo falhar (GPS desligado, permissão negada, iOS restritivo), o app ainda funciona. Mitiga o risco de dependência total do geofence.
-- **E2-07 (card de visita) é a interface visível**: sem ela, o usuário não sabe que foi detectado — a experiência "zero fricção" perde o feedback visual.
+- **E2-06 (check-in manual) é um caminho de primeira classe**: ao lado do fluxo automático (geofence), essencial com GPS desligado, permissão negada ou iOS restritivo, sem comprometer a fricção mínima. O app funciona com ou sem o manual. while (200- **E2-09 (heartbeat) é P0 e está junto com detecção básica**: o heartbeat é o que distingue "espera real no hospital" (12h+ no SUS) de "GPSpreso". Sem ele, a expiração de 24h (E2-03 no S3) não tem como saber se o usuário ainda está no hospital. **Desenvolver detecção sem heartbeat é construir sobre premissa errada.**
 
 ### 4.4 Migração crítica: `watchPositionAsync` → `startGeofencingAsync`
 
@@ -414,7 +413,7 @@ TaskManager.defineTask("GEOFENCE_TASK", ({ data, error }) => { /* checkin/checko
 | Risco | Prob. | Impacto | Mitigação |
 |---|---|---|---|
 | Cálculo de mediana em memória (Java) com performance ruim se N crescer | Baixa | Baixo | Para MVP com N < 1000, é irrelevante; cache materializado evita recomputação em cada request; reavaliar se N > 10.000 |
-| Usuário rejeitar permissão de localização e app perder funcionalidade core | Alta | Médio | Check-in manual (E2-06) já implementado; app continua funcional para consulta pública e feedback manual; comunicação clara de que sem localização, detecção automática não funciona |
+| Usuário rejeitar permissão de localização e app perder funcionalidade core | Alta | Médio | Check-in manual (E2-06) é um caminho de primeira classe ao lado do automático; app continua funcional para consulta pública e feedback; comunicação clara de que sem localização, detecção automática não funciona |
 | Onboarding complexo (múltiplos estados: primeira vez, retorno, revogação) | Média | Médio | FE usa máquina de estados finita para onboarding; testar todos os caminhos (permissão concedida, negada, revogada depois) |
 
 ### 7.6 Definição de Pronto (DoD) do sprint
@@ -440,7 +439,7 @@ TaskManager.defineTask("GEOFENCE_TASK", ({ data, error }) => { /* checkin/checko
 
 | ID | Prioridade | Estória | Pontos | Resp. | Tipo |
 |---|---|---|---|---|---|
-| E6-01 | P0 | Navegação por Bottom Tabs (Mapa, Hospitais, Perfil) | 5 | FE | 🔄 Refatorar |
+| E6-01 | P0 | Navegação por Bottom Tabs (Início, Hospitais, Mapa, Perfil) | 5 | FE | 🔄 Refatorar |
 | E6-02 | P0 | Design System v2.0 aplicado em todas as telas | 5 | FE | 🔄 Refatorar |
 | E6-03 | P1 | Acessibilidade WCAG AA (leitor de tela, contraste, alvos 48dp) | 3 | FE | ➕ Nova |
 | E6-04 | P1 | Estados de carregamento/vazio/erro em todas as telas | 2 | FE | ➕ Nova |
@@ -456,7 +455,7 @@ TaskManager.defineTask("GEOFENCE_TASK", ({ data, error }) => { /* checkin/checko
 
 ### 8.4 Entregáveis esperados
 
-- [x] **Bottom Tabs implementados**: 3 abas (Mapa, Hospitais, Perfil); substituição do Drawer navigation; navegação de 1 polegar; transições suaves.
+- [x] **Bottom Tabs implementados**: 4 abas (Início, Hospitais, Mapa, Perfil); substituição do Drawer navigation; navegação de 1 polegar; transições suaves.
 - [x] **Design System v2.0 aplicado**: tokens de cor, tipografia, raios, sombras em todas as telas; componentes padronizados (Button, RatingStars, FeedbackSheet, TimerBanner); remoção de assets antigos (GIF, PNGs de ícones); selos LGPD no lugar de "HIPAA Compliant".
 - [x] **Acessibilidade**: `accessibilityLabel` e `accessibilityRole` em componentes interativos; alvos de toque ≥ 48dp; contraste de texto ≥ 4.5:1 (AA); teste com TalkBack (Android) e VoiceOver (iOS).
 - [x] **Estados de UI**: `LoadingState` (skeleton/spinner), `EmptyState` (ilustração + mensagem), `ErrorState` (mensagem + botão retry) em todas as telas com dados assíncronos.
@@ -531,7 +530,7 @@ TaskManager.defineTask("GEOFENCE_TASK", ({ data, error }) => { /* checkin/checko
 |---|---|---|---|---|
 | E2-01 | Detecção automática de entrada — geofencing nativo + checkin API | 5 | FE + BE | S1 |
 | E2-02 | Detecção automática de saída — checkout + `duracaoMinutos` | 5 | FE + BE | E2-01 |
-| E2-06 | Check-in manual em 1 toque — fallback GPS desligado | 3 | FE + BE | S1 |
+| E2-06 | Check-in manual em 1 toque — caminho de primeira classe ao lado do automático (GPS desligado/negado) | 3 | FE + BE | S1 |
 | E2-07 | Card de visita ativa com cronômetro — home + notificação persistente | 3 | FE | E2-01 |
 | E2-09 | Heartbeat a cada 30 minutos — sinal de presença | 3 | FE + BE | E2-01 |
 
@@ -604,7 +603,7 @@ TaskManager.defineTask("GEOFENCE_TASK", ({ data, error }) => { /* checkin/checko
 
 | Estória ID | Descrição Resumida | Pontos | Resp. | Dep. |
 |---|---|---|---|---|
-| E6-01 | Bottom Tabs (Mapa, Hospitais, Perfil) — substituir Drawer | 5 | FE | — |
+| E6-01 | Bottom Tabs (Início, Hospitais, Mapa, Perfil) — substituir Drawer | 5 | FE | — |
 | E6-02 | Design System v2.0 em todas as telas — tokens, componentes, remoção assets antigos | 5 | FE | — |
 | E6-03 | Acessibilidade WCAG AA — leitor de tela, contraste, alvos 48dp | 3 | FE | E6-02 |
 | E6-04 | Estados de carregamento/vazio/erro em todas as telas | 2 | FE | — |
@@ -996,19 +995,19 @@ Após a conclusão das 7 sprints (S0–S6) e com o Painel Administrativo Web tra
 | ID | Prioridade | Estória | Pontos | Resp. | Tipo | Status base |
 |---|---|---|---|---|---|---|
 | **E4-05 (UI)** | P0 | Ranking de hospitais — UI de ordenação por nota e tempo consumindo `GET /api/v1/hospitais/ranking` (backend já na develop) | 3 | FE | ➕ Nova | Backend pronto (PR #27) |
-| **F-07** | P0 | Mapa renderizando os polígonos/geofences dos hospitais + filtro geo (raio) consumindo `GET /api/v1/hospitais` | 5 | FE + BE | 🔄 Refatorar | Mapa existe, sem polígonos/hospitais |
+| **F-07** | P0 | Mapa renderizando os polígonos/geofences dos hospitais + filtro geo (raio) consumindo `GET /api/v1/hospitais` — integração com navegação **4 abas** (Início, Hospitais, Mapa, Perfil); polígonos dos geofences renderizados no `react-native-maps`; filtro por raio; previously marked as "refatorar" status now aligned com a arquitetura 4-tab.
 | **E5-03** | P1 | Histórico pessoal de visitas e feedbacks do usuário logado + exportação de dados (LGPD) | 3 | FE + BE | ➕ Nova | Stretch adiado da S6 |
 | **E5-05** | P1 | Revogação nativa completa do consentimento de geolocalização (além do Perfil, também desligamento no SO) | 2 | FE | ➕ Nova | Parcial (Perfil + SO manual) |
 | **E6-05** | P1 | Tela dedicada de permissão/opt-in de notificações (independente do fluxo de feedback E3) | 2 | FE | ➕ Nova | Parcial (via fluxo E3) |
 
 ### 21.3 Objetivo do sprint
 
-> **"Fechar as pendências do MVP mobile: tornar o mapa completo (hospitais + geofences + filtro geo), entregar a UI do ranking e os itens de privacidade/histórico/notificações que ficaram como stretch nas 7 sprints."**
+> **"Fechar as pendências do MVP mobile: tornar o mapa completo (hospitais + geofences + filtro geo), entregar a UI do ranking e os itens de privacidade/histórico/notificações que ficaram como stretch nas 7 sprints, com a navegação **4 abas** (Início, Hospitais, Mapa, Perfil) já estabelecida a partir da S6."**
 
 ### 21.4 Entregáveis esperados
 
 - [ ] **UI do ranking (E4-05)**: lista de hospitais ordenável por nota e tempo, com filtro por tipo (público/privado) e paginação; tela dedicada consumindo o endpoint já mergeado.
-- [ ] **Mapa completo (F-07)**: polígonos das geofences dos hospitais renderizados no mapa; filtro por raio consumindo `GET /api/v1/hospitais`; integração visual da listagem no mapa.
+- [ ] **Mapa completo (F-07)**: polígonos das geofences dos hospitais renderizados no mapa; filtro por raio consumindo `GET /api/v1/hospitais`; integração visual da listagem no mapa; agora alinhado à **4 abas** (Início, Hospitais, Mapa, Perfil).
 - [ ] **Histórico + exportação (E5-03)**: tela no Perfil listando visitas e feedbacks do usuário logado; botão de exportação (CSV) atendendo ao direito de portabilidade LGPD.
 - [ ] **Revogação nativa completa (E5-05)**: revogar consentimento de localização no app e, quando aplicável, encaminhar para as configurações nativas do SO.
 - [ ] **Notificações opt-in (E6-05)**: tela dedicada de permissão de notificações, desacoplada do fluxo de feedback.
@@ -1016,7 +1015,7 @@ Após a conclusão das 7 sprints (S0–S6) e com o Painel Administrativo Web tra
 ### 21.5 DoD do sprint
 
 - [ ] Todos os endpoints consumidos estão na develop (E4-05 ranking) ou são criados nesta sprint.
-- [ ] Mapas renderizando geofences dos hospitais + filtro geo funcional.
+- [ ] Mapas renderizando geofences dos hospitais + filtro geo funcional — integrados à **4 abas** (Início, Hospitais, Mapa, Perfil).
 - [ ] Ranking ordenável por nota/tempo com filtro.
 - [ ] Histórico + exportação LGPD funcionais na aba Perfil.
 - [ ] Revogação de localização completa (app + SO).

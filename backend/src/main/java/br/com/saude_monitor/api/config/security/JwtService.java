@@ -10,6 +10,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 
 /**
  * Emissão e validação de tokens JWT (F0-01).
@@ -19,6 +20,9 @@ import java.util.Date;
  *   <li>{@code access} — 15 min, usado na autorização de requisições;</li>
  *   <li>{@code refresh} — 30 dias, usado apenas para renovar o access (com rotação).</li>
  * </ul>
+ *
+ * <p>Todos os tokens carregam um claim {@code jti} (UUID). O {@code jti} dos tokens de
+ * refresh alimenta a blacklist de tokens revogados no logout (F0-02/§3.1).</p>
  *
  * <p>Assinatura HS256 com chave simétrica derivada de {@link JwtProperties#secret()}.</p>
  */
@@ -59,6 +63,21 @@ public class JwtService {
         return extractAllClaims(token).getSubject();
     }
 
+    /** Extrai o claim {@code jti} (UUID) do token. Lança se o token for inválido. */
+    public String extractJti(String token) {
+        Claims claims = extractAllClaims(token);
+        String jti = claims.get(Claims.ID);
+        if (jti == null || jti.isBlank()) {
+            throw new IllegalArgumentException("Token sem claim jti.");
+        }
+        return jti;
+    }
+
+    /** Extrai a expiração do token (para replicar o TTL na blacklist). */
+    public Instant extractExpiration(String token) {
+        return extractAllClaims(token).getExpiration().toInstant();
+    }
+
     /** True se o token é um access token válido (assinatura, tipo e expiração) para o e-mail. */
     public boolean isAccessTokenValid(String token, String email) {
         try {
@@ -85,6 +104,7 @@ public class JwtService {
     private String buildToken(UserDocument user, long expirationMs, String type) {
         Instant now = Instant.now();
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(user.getEmail())
                 .claim(CLAIM_USER_ID, user.getId())
                 .claim(CLAIM_PAPEL, user.getPapel() == null ? "USER" : user.getPapel().name())

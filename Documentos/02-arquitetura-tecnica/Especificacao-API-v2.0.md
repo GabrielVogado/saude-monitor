@@ -197,7 +197,7 @@
 | `POST /api/v1/auth/registro` | 🟡 app/backend usam **`POST /api/user/cadastro`** (legado); alinhamento ao path v2 pendente | PR #5/#6 |
 | `POST /api/v1/auth/login` | 🟢 (rate limit 10/min/IP) | PR #1/#24 |
 | `POST /api/v1/auth/refresh` | 🟢 (rotação) | PR #22 |
-| `POST /api/v1/auth/logout` | 🔴 não implementado (logout local no app) | — |
+| `POST /api/v1/auth/logout` | 🟢 (blacklist de refresh; idempotente) | PR `feature/logout-server-revogacao-refresh` |
 | `DELETE /api/v1/usuarios/me` | 🟡 implementado como **`DELETE /api/v1/contas/exclusao`** | PR #25 |
 | `GET /api/v1/usuarios/me` | 🔴 não implementado (perfil no payload do login) | — |
 | `PUT /api/v1/usuarios/me/consentimentos` | 🔴 não implementado (consentimentos no cadastro; revogação local/SO) | PR #26 |
@@ -261,9 +261,10 @@ Cria conta (opcional no MVP — jornada principal funciona sem login).
 Rotação de refresh token (revoga o anterior).
 
 #### `POST /api/v1/auth/logout` 🔒
-**200** — invalida refresh token (blacklist).
+**Request:** `{ "refreshToken": "..." }` → **200** `{ "success": true, "message": "Sessão encerrada. Refresh token revogado." }`
+Revoga o refresh token na blacklist (`refresh_tokens_revogados`, TTL até a expiração do token), impedindo novos refreshes. Idempotente: token já expirado/malformado/revogado também responde 200.
 
-> 🔴 **Situação atual (30/08/2026):** não implementado — não há blacklist de refresh token no backend; o logout é apenas local no app (`TokenStorage.limparTokens`). Implementação/prazo **pendentes de decisão**.
+> ✅ **Situação atual (30/08/2026):** **implementado** (PR `feature/logout-server-revogacao-refresh`). `POST /api/v1/auth/logout` insere o `jti` do refresh na blacklist; `POST /api/v1/auth/refresh` rejeita tokens revogados (401 `NAO_AUTORIZADO`) e, na rotação, também revoga o refresh anterior. O app chama o endpoint best-effort e sempre limpa os tokens locais (`TokenStorage.limparTokens`).
 
 #### `DELETE /api/v1/contas/exclusao` 🔒
 Exclui conta e dados pessoais (LGPD). **200** com resumo do que foi removido/anonimizado.

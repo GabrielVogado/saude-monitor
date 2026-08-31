@@ -7,6 +7,7 @@ const BASE_PATH = "/api/v1/auth";
  * Cliente de autenticação alinhado ao contrato v2.0 (§3.1):
  * - `POST /api/v1/auth/login` → `{ accessToken, refreshToken, expiraEm, usuario }`
  * - `POST /api/v1/auth/refresh` → rotaciona o par de tokens
+ * - `POST /api/v1/auth/logout` → revoga o refresh token no servidor (blacklist)
  */
 async function post(path, body) {
   const url = buildApiUrl(path);
@@ -98,8 +99,24 @@ class LoginService {
     return response;
   }
 
-  /** Remove a sessão persistida (logout local). */
+  /**
+   * Encerra a sessão (§3.1): revoga o refresh token no servidor (best-effort) e limpa
+   * os tokens persistidos no dispositivo.
+   *
+   * A revogação server-side é best-effort de propósito — o logout local nunca fica
+   * bloqueado por falha de rede/backend (o interceptor 401 também chama este método).
+   */
   static async logout() {
+    const refreshToken = await TokenStorage.getRefreshToken();
+
+    if (refreshToken) {
+      try {
+        await post(`${BASE_PATH}/logout`, { refreshToken });
+      } catch {
+        // ignora: sem conexão o refresh expira sozinho; o logout local segue.
+      }
+    }
+
     await TokenStorage.limparTokens();
   }
 

@@ -8,7 +8,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |
 |---|---|---|---|
 | **F0-01** | Hash BCrypt para senhas | **F-02**, **F-09** | ✅ Existente (Seguro) |
-| **F0-02** | Autenticação via JWT | **F-02** | ✅ Existente |
+| **F0-02** | Autenticação via JWT | **F-02** | ✅ Existente (login/refresh/logout; refresh rotaciona e **logout revoga o refresh na blacklist** — PR `feature/logout-server-revogacao-refresh`) |
 | **F0-03** | Padronizar envelope de erro | **F-09** | ✅ Existente |
 | **F0-04** | Rate limiting | **F-09** | ✅ Existente (PR #24 — login/refresh > 10/min/IP e públicos > 60/min/IP retornam 429 no envelope padrão) |
 | **F0-05** | Exclusão de conta (LGPD) | **F-02**, **F-09** | ✅ Existente (PR #25 — `DELETE /api/v1/contas/exclusao` com cascade: remove user + `auth_logins`, anonimiza visitas/feedbacks e recalcula agregados) |

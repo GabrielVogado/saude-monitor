@@ -7,11 +7,12 @@ const styles = StyleSheet.create({
         backgroundColor: colors.surface,
     },
     content: {
-        flex: 1,
+        flexGrow: 1,
         justifyContent: "flex-start",
         alignItems: "flex-start",
         paddingHorizontal: spacing.s5,
-        paddingTop: spacing.s8,
+        paddingTop: spacing.s2,
+        paddingBottom: spacing.s4,
     },
     errorBox: {
         width: "100%",
@@ -81,12 +82,13 @@ const styles = StyleSheet.create({
     },
     imagePlaceholder: {
         width: "100%",
-        height: 150,
+        height: 160,
         backgroundColor: colors.surfaceContainerLowest,
         borderRadius: radii.lg,
         justifyContent: "center",
         alignItems: "center",
-        marginBottom: spacing.s8,
+        marginTop: spacing.s2,
+        marginBottom: spacing.s2,
         overflow: "hidden",
     },
     homeImage: {

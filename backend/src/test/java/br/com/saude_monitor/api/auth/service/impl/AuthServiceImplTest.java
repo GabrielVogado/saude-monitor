@@ -144,11 +144,10 @@ class AuthServiceImplTest {
 
         assertTrue((Boolean) resposta.get("success"));
         // o refresh token apresentado entra na blacklist com TTL da própria expiração
-        verify(revogadoRepository).insert(argThat(doc ->
-                doc instanceof RefreshTokenRevogadoDocument
-                        && jti.equals(((RefreshTokenRevogadoDocument) doc).getId())
-                        && "marina@email.com".equals(((RefreshTokenRevogadoDocument) doc).getEmail())
-                        && ((RefreshTokenRevogadoDocument) doc).getExpiraEm() != null));
+        verify(revogadoRepository).insert(argThat((RefreshTokenRevogadoDocument doc) ->
+                jti.equals(doc.getId())
+                        && "marina@email.com".equals(doc.getEmail())
+                        && doc.getExpiraEm() != null));
     }
 
     @Test
@@ -164,7 +163,7 @@ class AuthServiceImplTest {
 
         assertEquals("Refresh token inválido ou expirado.", ex.getMessage());
         // token revogado não reemitido
-        verify(revogadoRepository, never()).insert(any());
+        verify(revogadoRepository, never()).insert(any(RefreshTokenRevogadoDocument.class));
     }
 
     @Test
@@ -173,6 +172,6 @@ class AuthServiceImplTest {
         Map<String, Object> resposta = authService.logout(new RefreshRequest("token-invalido"));
 
         assertTrue((Boolean) resposta.get("success"));
-        verify(revogadoRepository, never()).insert(any());
+        verify(revogadoRepository, never()).insert(any(RefreshTokenRevogadoDocument.class));
     }
 }

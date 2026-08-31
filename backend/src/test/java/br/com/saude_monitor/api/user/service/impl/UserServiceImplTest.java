@@ -6,6 +6,7 @@ import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
 import br.com.saude_monitor.api.config.exception.ValidacaoNegocioException;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.user.document.ConsentimentoItem;
+import br.com.saude_monitor.api.user.document.ConsentimentosDocument;
 import br.com.saude_monitor.api.user.document.Papel;
 import br.com.saude_monitor.api.user.document.UserDocument;
 import br.com.saude_monitor.api.user.dto.ConsentimentoRequest;
@@ -70,6 +71,7 @@ class UserServiceImplTest {
                 .senhaHash("hash")
                 .papel(Papel.USER)
                 .active(true)
+                .consentimentos(new ConsentimentosDocument())
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build();

@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { LogIn, MapPin, ShieldCheck, Trash2, UserPlus } from "lucide-react-native";
+import { LogIn, MapPin, History, ShieldCheck, Trash2, UserPlus } from "lucide-react-native";
 import PerfilService from "../service/PerfilService";
 import LoginService from "../../auth/service/LoginService";
 import CSLoading, { CSLoadingList } from "../../../components/CSLoading";
@@ -177,6 +177,16 @@ export default function PerfilScreen({ navigation }) {
                   </View>
                   <Text style={styles.userName}>{usuario.nome || usuario.fullName || "Usuário"}</Text>
                   <Text style={styles.userEmail}>{usuario.email || ""}</Text>
+
+                  <TouchableOpacity
+                    style={styles.buttonSecondary}
+                    onPress={() => irPara("Historico")}
+                    accessibilityRole="button"
+                    accessibilityLabel="Ver meu histórico de visitas e avaliações"
+                  >
+                    <History size={18} color={colors.onSurface} />
+                    <Text style={styles.buttonTextSecondary}> Meu histórico</Text>
+                  </TouchableOpacity>
 
                   <TouchableOpacity
                     style={styles.buttonSecondary}

@@ -22,11 +22,13 @@ export default function LoginScreen({navigation}) {
     const [rememberDevice, setRememberDevice] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // Após o login bem-sucedido volta para a aba Início (Home), que é a âncora do app
-    // (E6-01: navegação por Bottom Tabs substituiu o Drawer). "Inicio" é a rota de
-    // tab no navigator pai; o navigate propaga até resolvê-la.
-    const redirectToGeo = () => {
-        navigation?.navigate?.("Inicio");
+    // Após o login bem-sucedido volta para a área logada: a tela Perfil (Padrao-UI-UX
+    // v2.0 §4.1 — estado de sucesso do Login/Cadastro "Navega para Perfil"). É lá que o
+    // usuário vê os dados da conta e o histórico de visitas/feedbacks (E5-03/RN-22).
+    // O PerfilStack está dentro da aba Perfil; "Perfil" é a rota raiz desse stack, então
+    // o navigate volta à tela Perfil, cujo `useFocusEffect` recarrega o usuário logado.
+    const redirectToAreaLogada = () => {
+        navigation?.navigate?.("Perfil");
     };
 
     const handleLogin = async () => {
@@ -39,7 +41,7 @@ export default function LoginScreen({navigation}) {
 
         try {
             await LoginService.login({email, password, rememberDevice});
-            redirectToGeo();
+            redirectToAreaLogada();
         } catch (error) {
             Alert.alert("Erro no login", error.message || "Erro inesperado.");
         } finally {

@@ -39,6 +39,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * Implementação do serviço de visitas (Épico 02 — Detecção de Visitas/Geofence).
@@ -193,7 +196,14 @@ public class VisitaServiceImpl implements VisitaService {
     public PageResponse<VisitaResponse> historico(String usuarioId, int page, int size) {
         String uid = exigirUsuario(usuarioId);
         Page<VisitaDocument> resultado = visitaRepository.findByUsuarioIdOrderByEntradaDesc(uid, PageRequest.of(page, size));
-        List<VisitaResponse> content = resultado.getContent().stream().map(this::toResponse).toList();
+
+        // E5-03/RN-22: anexa o nome do hospital (Especificacao-API-v2.0 §3.5 — "visita + hospital"),
+        // resolvendo os nomes em lote (um `findAllById` para a página, não 1:N).
+        Map<String, String> nomesHospitais = resolverNomesHospitais(
+                resultado.getContent().stream().map(VisitaDocument::getHospitalId).toList());
+        List<VisitaResponse> content = resultado.getContent().stream()
+                .map(v -> toResponse(v, nomesHospitais.get(v.getHospitalId())))
+                .toList();
         return PageResponse.of(content, page, size, resultado.getTotalElements());
     }
 
@@ -351,11 +361,25 @@ public class VisitaServiceImpl implements VisitaService {
                 .build();
     }
 
+    /** Resolve em lote (um único `findAllById`) o nome de exibição dos hospitais de uma página. */
+    private Map<String, String> resolverNomesHospitais(List<String> ids) {
+        List<String> distintos = ids.stream().filter(Objects::nonNull).distinct().toList();
+        if (distintos.isEmpty()) {
+            return Map.of();
+        }
+        return hospitalRepository.findAllById(distintos).stream()
+                .collect(Collectors.toMap(HospitalDocument::getId, HospitalDocument::getNome, (a, b) -> a));
+    }
+
     private VisitaResponse toResponse(VisitaDocument v) {
+        return toResponse(v, null);
+    }
+
+    private VisitaResponse toResponse(VisitaDocument v, String hospitalNome) {
         // RN-07/E2-08: visita "curta" (< 2min) permanece no histórico, mas não é estatisticamente válida.
         boolean visitaValida = v.getDuracaoMinutos() == null || v.getDuracaoMinutos() >= 2;
         return new VisitaResponse(
-                v.getId(), v.getUsuarioId(), v.getHospitalId(), v.getEntrada(), v.getSaida(),
+                v.getId(), v.getUsuarioId(), v.getHospitalId(), hospitalNome, v.getEntrada(), v.getSaida(),
                 v.getDuracaoMinutos(), v.getStatus(), v.getTipoPermanencia(), v.getUltimoHeartbeat(),
                 v.getOrigem(), v.getCriadoEm(), visitaValida);
     }

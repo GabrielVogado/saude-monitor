@@ -128,7 +128,8 @@ export async function agendarLembrete({ visitaId, hospitalNome }) {
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: new Date(Date.now() + 60 * 60 * 1000), // 1 lembrete dentro da janela de 24h
+      // Plano-Sprints E3-03: lembrete único ~6h após o pedido inicial (janela de 24h, RN-09).
+      date: new Date(Date.now() + 6 * 60 * 60 * 1000),
     },
   });
   await armazenarPendencia(pendencia);

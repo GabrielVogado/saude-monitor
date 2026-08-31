@@ -116,6 +116,18 @@ class AgregadoServiceImplTest {
     }
 
     @Test
+    void recalcularExcluiVisitasAbaixoDe2Minutos() {
+        // RN-07: visitas com menos de 2 minutos são ruído e não entram nas estatísticas públicas.
+        when(visitaRepository.findByHospitalIdAndStatusInAndSaidaBetweenAndTipoPermanencia(
+                eq("h1"), any(), any(), any(), any()))
+                .thenReturn(List.of(visitaFinalizada(1), visitaFinalizada(2), visitaFinalizada(60)));
+
+        AgregadoHospitalDocument agregado = service.recalcular("h1");
+        assertThat(agregado.getNVisitas()).isEqualTo(2);
+        assertThat(agregado.getTempoMedianoMinutos()).isEqualTo(31); // mediana de (2, 60)
+    }
+
+    @Test
     void recalcularExcluiVisitasSemDuracao() {
         VisitaDocument semDuracao = VisitaDocument.builder()
                 .hospitalId("h1").status(StatusVisita.FINALIZADA)

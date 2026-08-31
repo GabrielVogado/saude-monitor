@@ -12,17 +12,60 @@ import { concluirFeedback } from "../service/FeedbackNotificationService";
 /**
  * Formulário de feedback pós-saída (Épico 03 — F-05/E3-02).
  *
- * Fluxo de 4 telas ramificado (RN-10), otimizado para <45s e pulável (RN-11):
- *   1. Triagem (fezTriagem)
- *   2. Especialidade + Atendimento (foiAtendido / teveMedico / motivoNaoAtendido se NAO)
- *   3. Medicamento/Receita + Tratamento da equipe (medicacaoReceita / tratamentoEquipe)
- *   4. Avaliação geral (nota 1–5 obrigatória + comentário opcional)
+ * Fluxo de 4 telas ramificado (RN-10/RN-11), otimizado para <45s e pulável (RN-11):
+ *   1. Triagem (fezTriagem). Responder "Não"/"Não sei" PULA a Tela 2 (especialidade + atendimento).
+ *   2. Especialidade (select searchable — RN-10) + Atendimento (foiAtendido / teveMedico /
+ *      motivoNaoAtendido se NAO)
+ *   3. Medicamento/Receita + Tratamento da equipe (medicacaoReceita / tratamentoEquipe 1-5 +
+ *      "Não interagi", que zera a estrela)
+ *   4. Avaliação geral (nota 1-5 obrigatória + comentário opcional)
  *
  * Todas as perguntas, exceto a `nota`, podem ser puladas. Submit dispara POST
  * (criação) ou PUT (edição — janela de 24h, RN-09).
  */
 
 const OPCOES_SIM_NAO = ["SIM", "NAO", "NAO_SEI"];
+
+/**
+ * Lista curada de especialidades para o select searchable da Tela 2 (RN-10).
+ * Base referencial CNES/DATASUS/TABNET — aproximação local, sem dataset completo no app.
+ */
+const ESPECIALIDADES = [
+  "Acupuntura",
+  "Anestesiologia",
+  "Cardiologia",
+  "Clínica médica",
+  "Dermatologia",
+  "Endocrinologia e metabologia",
+  "Gastroenterologia",
+  "Geriatria",
+  "Ginecologia e obstetrícia",
+  "Infectologia",
+  "Medicina de família e comunidade",
+  "Medicina de urgência (emergência)",
+  "Nefrologia",
+  "Neurologia",
+  "Nutrição",
+  "Oftalmologia",
+  "Ortopedia e traumatologia",
+  "Otorrinolaringologia",
+  "Pediatria",
+  "Pneumologia",
+  "Pronto-socorro geral",
+  "Psicologia",
+  "Psiquiatria",
+  "Urologia",
+];
+
+/** Normaliza para busca insensível a acentos/maiúsculas/minúsculas. */
+function normalizar(texto) {
+  return (texto || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+const ROTULOS_TRATAMENTO = ["Ruim", "Regular", "Bom", "Muito bom", "Excelente"];
 
 const OpcoesFezTriagem = ({ valor, aoSelecionar, rotulo, opcoes = OPCOES_SIM_NAO }) => (
   <View style={styles.opcoes}>
@@ -69,7 +112,7 @@ function Estrelas({ valor, aoSelecionar, tamanho = 36, testIDPrefix = "star" }) 
 }
 
 const rotulos = {
-  foiAtendido: { SIM: "Fui atendido", NAO: "Não fui atendido", DESISTI: "Desisti de esperar" },
+  foiAtendido: { SIM: "Fui atendido", NAO: "Não fui atendido" },
   teveMedico: { SIM: "Sim", NAO: "Não", NAO_PRECISEI: "Não precisei" },
   fezTriagem: { SIM: "Sim", NAO: "Não", NAO_SEI: "Não sei" },
   medicacaoReceita: { RECEBI: "Recebi", NAO_RECEBEU: "Não recebi", NAO_PRECISEI: "Não precisei" },
@@ -104,6 +147,7 @@ export default function FeedbackFormScreen({ navigation, route }) {
   const [enviado, setEnviado] = useState(false);
   const [erro, setErro] = useState(null);
   const [jaAvaliado, setJaAvaliado] = useState(false);
+  const [naoInteragi, setNaoInteragi] = useState(false);
 
   const [form, setForm] = useState({
     fezTriagem: null,
@@ -117,14 +161,38 @@ export default function FeedbackFormScreen({ navigation, route }) {
     comentario: "",
   });
 
-  const passo = ETAPAS[etapa];
-  const ultimoPasso = etapa === ETAPAS.length - 1;
-  const progresso = useMemo(() => ((etapa + 1) / ETAPAS.length) * 100, [etapa]);
+  // RN-11: a Tela 2 (especialidade + atendimento) só aparece quando triagem = Sim.
+  // Sem triagem o fluxo vai direto da Tela 1 para a Tela 3.
+  const etapasDaVez = useMemo(() => {
+    if (form.fezTriagem === "SIM") return ETAPAS;
+    return ETAPAS.filter((item) => item.chave !== "atendimento");
+  }, [form.fezTriagem]);
+
+  const passo = etapasDaVez[etapa];
+  const ultimoPasso = etapa === etapasDaVez.length - 1;
+  const progresso = useMemo(
+    () => ((etapa + 1) / etapasDaVez.length) * 100,
+    [etapa, etapasDaVez.length]
+  );
+
+  /** Sugestões do select searchable de especialidade (RN-10), máx. 6. */
+  const sugestoesEspecialidades = useMemo(() => {
+    const termo = normalizar(form.especialidadeProcurada);
+    const filtradas = termo
+      ? ESPECIALIDADES.filter((e) => normalizar(e).includes(termo))
+      : ESPECIALIDADES;
+    return filtradas.slice(0, 6);
+  }, [form.especialidadeProcurada]);
 
   const setCampo = (campo, valor) => setForm((f) => ({ ...f, [campo]: valor }));
 
   const avancar = () => {
     setErro(null);
+    // RN-10: quando respondeu "Não fui atendido", o motivo é obrigatório (via Continuar).
+    if (passo.chave === "atendimento" && form.foiAtendido === "NAO" && !form.motivoNaoAtendido) {
+      setErro("Informe o principal motivo (obrigatório quando não foi atendido).");
+      return;
+    }
     if (ultimoPasso) {
       enviar();
     } else {
@@ -237,15 +305,27 @@ export default function FeedbackFormScreen({ navigation, route }) {
           <>
             <Text style={styles.pergunta}>Qual especialidade você procurou?</Text>
             <CSTextField
-              placeholder="Ex.: pronto-socorro, clínica médica"
+              placeholder="Pesquise a especialidade (ex.: pronto-socorro)"
               value={form.especialidadeProcurada}
               onChangeText={(t) => setCampo("especialidadeProcurada", t)}
             />
+            {sugestoesEspecialidades.length > 0 ? (
+              <View style={styles.sugestoes}>
+                {sugestoesEspecialidades.map((especialidade) => (
+                  <CSChip
+                    key={especialidade}
+                    label={especialidade}
+                    selected={form.especialidadeProcurada === especialidade}
+                    onPress={() => setCampo("especialidadeProcurada", especialidade)}
+                  />
+                ))}
+              </View>
+            ) : null}
             <Text style={styles.pergunta}>Você foi atendido?</Text>
             <OpcoesFezTriagem
               valor={form.foiAtendido}
               rotulo={(o) => rotulos.foiAtendido[o]}
-              opcoes={["SIM", "NAO", "DESISTI"]}
+              opcoes={["SIM", "NAO"]}
               aoSelecionar={(v) => setCampo("foiAtendido", v)}
             />
             {form.foiAtendido === "NAO" ? (
@@ -279,10 +359,27 @@ export default function FeedbackFormScreen({ navigation, route }) {
               aoSelecionar={(v) => setCampo("medicacaoReceita", v)}
             />
             <Text style={styles.pergunta}>Como foi o tratamento da equipe?</Text>
-            <Estrelas testIDPrefix="tratamento" valor={form.tratamentoEquipe} aoSelecionar={(v) => setCampo("tratamentoEquipe", v)} />
+            <Estrelas
+              testIDPrefix="tratamento"
+              valor={form.tratamentoEquipe}
+              aoSelecionar={(v) => {
+                setNaoInteragi(false);
+                setCampo("tratamentoEquipe", v);
+              }}
+            />
+            <View style={styles.opcoes}>
+              <CSChip
+                label="Não interagi"
+                selected={naoInteragi}
+                onPress={() => {
+                  setNaoInteragi(true);
+                  setCampo("tratamentoEquipe", null);
+                }}
+              />
+            </View>
             {form.tratamentoEquipe ? (
               <Text style={styles.rotuloEstrela}>
-                {["Ruim", "Regular", "Bom", "Muito bom", "Excelente"][form.tratamentoEquipe - 1]}
+                {ROTULOS_TRATAMENTO[form.tratamentoEquipe - 1]}
               </Text>
             ) : null}
           </>
@@ -311,7 +408,7 @@ export default function FeedbackFormScreen({ navigation, route }) {
       <View style={styles.header}>
         <Text style={styles.hospital}>{hospitalNome || "Sua visita"}</Text>
         <Text style={styles.etapaIndice}>
-          Etapa {etapa + 1} de {ETAPAS.length}
+          Etapa {etapa + 1} de {etapasDaVez.length}
         </Text>
         <View style={styles.barraProgresso}>
           <View style={[styles.barraPreenchida, { width: `${progresso}%` }]} />
@@ -423,6 +520,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.s2,
+  },
+  sugestoes: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.s2,
+    marginTop: spacing.s2,
   },
   estrelas: {
     flexDirection: "row",

@@ -983,4 +983,54 @@ Para referência, as estórias que estão fora do MVP mas documentadas para a Fa
 
 ---
 
+## 21. Sprint S8 — Pendências / Stretch (APÓS as 7 Sprints) 🧹
+
+> **2 semanas · 15 story points · Depende de: S6 concluído · Não inclui o Painel Admin (Sprint S7, seção 20) nem Épico 7/F-11**
+
+### 21.1 Contexto
+
+Após a conclusão das 7 sprints (S0–S6) e com o Painel Administrativo Web tratado como frente paralela (Sprint S7, seção 20), restou um conjunto de estórias **stretch / parcialmente cobertas** que não entraram no escopo prioritário das 7 sprints. Esta **Sprint S8** consolida essas pendências em uma entrega única para fechar o MVP mobile.
+
+### 21.2 Estórias do sprint
+
+| ID | Prioridade | Estória | Pontos | Resp. | Tipo | Status base |
+|---|---|---|---|---|---|---|
+| **E4-05 (UI)** | P0 | Ranking de hospitais — UI de ordenação por nota e tempo consumindo `GET /api/v1/hospitais/ranking` (backend já na develop) | 3 | FE | ➕ Nova | Backend pronto (PR #27) |
+| **F-07** | P0 | Mapa renderizando os polígonos/geofences dos hospitais + filtro geo (raio) consumindo `GET /api/v1/hospitais` | 5 | FE + BE | 🔄 Refatorar | Mapa existe, sem polígonos/hospitais |
+| **E5-03** | P1 | Histórico pessoal de visitas e feedbacks do usuário logado + exportação de dados (LGPD) | 3 | FE + BE | ➕ Nova | Stretch adiado da S6 |
+| **E5-05** | P1 | Revogação nativa completa do consentimento de geolocalização (além do Perfil, também desligamento no SO) | 2 | FE | ➕ Nova | Parcial (Perfil + SO manual) |
+| **E6-05** | P1 | Tela dedicada de permissão/opt-in de notificações (independente do fluxo de feedback E3) | 2 | FE | ➕ Nova | Parcial (via fluxo E3) |
+
+### 21.3 Objetivo do sprint
+
+> **"Fechar as pendências do MVP mobile: tornar o mapa completo (hospitais + geofences + filtro geo), entregar a UI do ranking e os itens de privacidade/histórico/notificações que ficaram como stretch nas 7 sprints."**
+
+### 21.4 Entregáveis esperados
+
+- [ ] **UI do ranking (E4-05)**: lista de hospitais ordenável por nota e tempo, com filtro por tipo (público/privado) e paginação; tela dedicada consumindo o endpoint já mergeado.
+- [ ] **Mapa completo (F-07)**: polígonos das geofences dos hospitais renderizados no mapa; filtro por raio consumindo `GET /api/v1/hospitais`; integração visual da listagem no mapa.
+- [ ] **Histórico + exportação (E5-03)**: tela no Perfil listando visitas e feedbacks do usuário logado; botão de exportação (CSV) atendendo ao direito de portabilidade LGPD.
+- [ ] **Revogação nativa completa (E5-05)**: revogar consentimento de localização no app e, quando aplicável, encaminhar para as configurações nativas do SO.
+- [ ] **Notificações opt-in (E6-05)**: tela dedicada de permissão de notificações, desacoplada do fluxo de feedback.
+
+### 21.5 DoD do sprint
+
+- [ ] Todos os endpoints consumidos estão na develop (E4-05 ranking) ou são criados nesta sprint.
+- [ ] Mapas renderizando geofences dos hospitais + filtro geo funcional.
+- [ ] Ranking ordenável por nota/tempo com filtro.
+- [ ] Histórico + exportação LGPD funcionais na aba Perfil.
+- [ ] Revogação de localização completa (app + SO).
+- [ ] Notificações com opt-in dedicado.
+- [ ] Suíte de testes frontend 100% verde + typecheck sem erros.
+
+### 21.6 Riscos do sprint
+
+| Risco | Prob. | Impacto | Mitigação |
+|---|---|---|---|
+| Renderização de muitos polígonos degradar performance do mapa mobile | Média | Médio | Simplificar geometria; carregar hospitais do raio em vez de todos; `react-native-maps` com polygon leve |
+| Exportação de dados (E5-03) com volume grande | Baixa | Baixo | Paginar/limitar e exportar assíncrono (job) se necessário |
+| Revogação nativa no SO com comportamento variável (Android x iOS) | Média | Médio | Usar `Linking.openSettings` para encaminhar às configurações; documentar comportamento por SO |
+
+---
+
 *Fim do Plano de Sprints v2.0 — "Plans are worthless, but planning is everything." — Dwight D. Eisenhower*

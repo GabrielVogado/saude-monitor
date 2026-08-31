@@ -59,9 +59,10 @@ export default function PerfilScreen({ navigation }) {
 
   const permissaoConcedida = permissao === "granted";
 
+  // Rotas internas do PerfilStack (Login, Cadastro, Privacidade). Navega no próprio
+  // stack — o antigo `getParent()` (Tab) não resolve essas rotas e "engolia" o toque.
   const irPara = (rota) => {
-    const nav = navigation?.getParent?.() || navigation;
-    nav?.navigate?.(rota);
+    navigation?.navigate?.(rota);
   };
 
   const solicitarPermissao = async () => {
@@ -194,24 +195,26 @@ export default function PerfilScreen({ navigation }) {
                     Criar uma conta é opcional — você pode usar o aplicativo sem se cadastrar.
                     Faça login para acessar seus dados e o histórico.
                   </Text>
-                  <TouchableOpacity
-                    style={styles.button}
-                    onPress={() => irPara("Login")}
-                    accessibilityRole="button"
-                    accessibilityLabel="Entrar"
-                  >
-                    <LogIn size={18} color={colors.onPrimary} />
-                    <Text style={styles.buttonText}> Entrar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.buttonSecondary}
-                    onPress={() => irPara("Cadastro")}
-                    accessibilityRole="button"
-                    accessibilityLabel="Criar conta"
-                  >
-                    <UserPlus size={18} color={colors.onSurface} />
-                    <Text style={styles.buttonTextSecondary}> Criar conta</Text>
-                  </TouchableOpacity>
+                  <View style={styles.semAcessoActions}>
+                    <TouchableOpacity
+                      style={[styles.button, styles.actionButton]}
+                      onPress={() => irPara("Login")}
+                      accessibilityRole="button"
+                      accessibilityLabel="Entrar"
+                    >
+                      <LogIn size={18} color={colors.onPrimary} />
+                      <Text style={styles.buttonText}> Entrar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.buttonSecondary, styles.actionButton]}
+                      onPress={() => irPara("Cadastro")}
+                      accessibilityRole="button"
+                      accessibilityLabel="Criar conta"
+                    >
+                      <UserPlus size={18} color={colors.onSurface} />
+                      <Text style={styles.buttonTextSecondary}> Criar conta</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </View>

@@ -44,8 +44,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         // Check-in/checkout/heartbeat de visitas (Épico 02) admitem uso anônimo via
                         // dispositivoId (§3.3); a identificação obrigatória é validada em serviço.
+                        // Consulta da visita ativa também é anônima via dispositivoId (modo sem login).
                         .requestMatchers(HttpMethod.POST, "/api/v1/visitas/checkin",
                                 "/api/v1/visitas/*/checkout", "/api/v1/visitas/*/heartbeat").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/visitas/ativas").permitAll()
                         // Exceção PÚBLICA (spec §3.2 / E1-05): sugestão anônima de hospital.
                         // Deve vir ANTES da regra genérica de POST admin (a ordem importa).
                         .requestMatchers(HttpMethod.POST, "/api/v1/hospitais/sugestoes").permitAll()

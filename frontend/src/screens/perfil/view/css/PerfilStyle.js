@@ -56,6 +56,15 @@ export default StyleSheet.create({
   semAcesso: { alignItems: "center", paddingVertical: spacing.s5 },
   semAcessoTitle: { ...typography.titleLg, color: colors.onSurface, marginTop: spacing.s3, marginBottom: spacing.s2 },
   semAcessoText: { ...typography.bodyMd, color: colors.onSurfaceVariant, textAlign: "center", marginBottom: spacing.s4 },
+  semAcessoActions: {
+    flexDirection: "row",
+    gap: spacing.s3,
+    alignSelf: "stretch",
+  },
+  actionButton: {
+    flex: 1,
+    marginTop: 0,
+  },
 
   button: {
     backgroundColor: colors.primary,

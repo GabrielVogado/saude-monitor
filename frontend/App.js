@@ -108,6 +108,19 @@ function Tabs() {
                     tabBarAccessibilityLabel: "Hospitais — lista com indicadores",
                     tabBarIcon: ({ color, size }) => <Building2 color={color} size={size} />,
                 }}
+                listeners={({ navigation }) => ({
+                    // Item 07 (revisão de UX): ao reabrir a aba Hospitais, volta para a
+                    // lista — nunca para o HospitalDetalhe/Sugestão que estava no topo do
+                    // stack aninhado quando o usuário trocou de aba.
+                    tabPress: () => {
+                        const state = navigation.getState();
+                        const aba = state?.routes?.find((r) => r.name === "Hospitais");
+                        const interna = aba?.state?.routes?.[aba.state.index ?? 0]?.name;
+                        if (interna && interna !== "HospitaisLista") {
+                            navigation.navigate("Hospitais", { screen: "HospitaisLista" });
+                        }
+                    },
+                })}
             />
             <Tab.Screen
                 name="Perfil"

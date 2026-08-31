@@ -22,6 +22,9 @@ public interface VisitaRepository extends MongoRepository<VisitaDocument, String
     Optional<VisitaDocument> findFirstByUsuarioIdAndStatusInOrderByEntradaDesc(
             String usuarioId, List<StatusVisita> status);
 
+    Optional<VisitaDocument> findFirstByDispositivoIdAndStatusInOrderByEntradaDesc(
+            String dispositivoId, List<StatusVisita> status);
+
     Page<VisitaDocument> findByUsuarioIdOrderByEntradaDesc(String usuarioId, Pageable pageable);
 
     List<VisitaDocument> findByStatusAndUltimoHeartbeatBefore(StatusVisita status, Instant limite);

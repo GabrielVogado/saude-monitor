@@ -172,7 +172,16 @@ public class VisitaServiceImpl implements VisitaService {
     }
 
     @Override
-    public VisitaAtivaResponse buscarAtiva(String usuarioId) {
+    public VisitaAtivaResponse buscarAtiva(String usuarioId, String dispositivoId) {
+        // Modo anônimo (sem login, §3.3): identifica a visita ativa pelo dispositivo.
+        if ((usuarioId == null || usuarioId.isBlank()) && dispositivoId != null && !dispositivoId.isBlank()) {
+            return visitaRepository.findFirstByDispositivoIdAndStatusInOrderByEntradaDesc(
+                            dispositivoId, STATUS_ATIVOS)
+                    .map(this::toResponse)
+                    .map(VisitaAtivaResponse::new)
+                    .orElse(new VisitaAtivaResponse(null));
+        }
+
         String uid = exigirUsuario(usuarioId);
         return visitaRepository.findFirstByUsuarioIdAndStatusInOrderByEntradaDesc(uid, STATUS_ATIVOS)
                 .map(this::toResponse)

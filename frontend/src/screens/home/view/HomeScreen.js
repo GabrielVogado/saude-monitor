@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useRef, useState} from "react";
-import {Alert, Image, Text, View} from "react-native";
+import {Alert, Image, ScrollView, Text, View} from "react-native";
 import {SafeAreaView} from "react-native-safe-area-context";
 import {useFocusEffect} from "@react-navigation/native";
 import styles from "./css/HomeStyle";
@@ -127,7 +127,10 @@ export default function HomeScreen({ navigation }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.content}>
+            <ScrollView
+                contentContainerStyle={styles.content}
+                showsVerticalScrollIndicator={false}
+            >
                 {/* E6-04: estado de carregamento da visita ativa */}
                 {carregandoVisita && (
                     <View accessibilityRole="progressbar" accessibilityLabel="Carregando visita ativa">
@@ -238,7 +241,7 @@ export default function HomeScreen({ navigation }) {
                         accessibilityElementsHidden
                     />
                 </View>
-            </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }

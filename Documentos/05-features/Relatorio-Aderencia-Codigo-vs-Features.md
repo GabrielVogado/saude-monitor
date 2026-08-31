@@ -1,21 +1,23 @@
-# 🔍 Relatório de Aderência — Features × Código Real (v3.0)
+# 🔍 Relatório de Aderência — Features × Código Real (v3.1)
 
 > **Verificação do que existe implementado vs. o que as Features propõem**
 >
-> Data: Atualizada — v3.0
-> Alterações desta versão: Reflete a verificação E2E comprovando a funcionalidade real da Fase 0 (JWT/BCrypt) e dos Épicos 1 a 4 (Hospitais, Visitas/Geofence, Feedback e Indicadores Públicos por Hospital).
+> Data: Atualizada — v3.1 (última auditoria: 30/08/2026)
+> Alterações desta versão: Reflete a auditoria completa da `develop` em 30/08/2026 — confirma Fase 0 (JWT/BCrypt/rate limiting/exclusão LGPD), Épicos 1–6 (Sprint S6 concluída), ranking (backend), formaliza a Sprint S8 e corrige o endpoint de exclusão de conta (`DELETE /api/v1/contas/exclusao`, PR #25) e o estado F-08/E6.
 
 ---
 
 ## 1. Resumo Executivo
 
-| Categoria | Quantidade | % das Features |
+| Categoria | Quantidade no escopo S0–S6 | % das Features |
 |---|---|---|
-| ✅ Existente (funcional) | 7/9 | 78% |
-| 🟡 Parcial (precisa refatoração) | 2/9 | 22% |
+| ✅ Existente (funcional) | 9/9 | 100% |
+| 🟡 Parcial (desvio de detalhe em estória RN) | 0 features 🟡 (3 estórias: E2-08, E3-02, E3-03) | — |
 | 🔴 Inexistente (precisa construir) | 0/9 | 0% |
 
-**Conclusão:** O código atual já cobre a Fase 0 e os Épicos 1 a 5 (frontend de Conta/Consentimento/Privacidade) de forma madura e testada, com o ranking público de hospitais (E4-05, backend) implementado. O backend **possui** autenticação JWT segura (BCrypt), CRUD/geofence de Hospitais, módulo de Visitas com detecção automática via geofencing nativo + heartbeat, módulo de Feedback pós-saída com dedupe e anônimo, o módulo de agregações estatísticas (Indicadores Públicos por Hospital) com job de atualização a cada 15min e o **ranking ordenável por nota/tempo (E4-05)**. O **Épico 5 (Sprint S5)** foi implementado no frontend: **Perfil → Dados e Privacidade** (E5-01 localização, F0-05 exclusão de conta, E5-04 conta opcional) e **Política de Privacidade/Termos** (E5-02) com selo LGPD (sem HIPAA). Permanecem **pendentes/parciais**: a **UI do ranking** (ordenação visual da lista, S6), a integração visual de listagem no Mapa do app (F-07), o polimento/design system consolidado (F-08), o histórico pessoal + exportação de dados (E5-03, stretch), a revogação nativa completa de geolocalização (E5-05, stretch) e o Painel Admin Web (Épico 7 / F-11).
+> **Escopo:** MVP Sprints **S0–S6**. Itens da Sprint S8 (E4-05 UI, F-07 mapa, E5-03, E5-05, E6-05) e Épico 7/Painel (F-11) são fora do escopo do MVP e **não contam como parciais/inexistentes**.
+
+**Conclusão:** No escopo S0–S6, a `develop` está **100% coberta** nas 9 Features: autenticação JWT/BCrypt, rate limiting (F0-04), exclusão de conta LGPD com anonimização (F0-05), CRUD/geofence de Hospitais, sugestões + moderação (backend), Visitas com detecção automática via geofencing nativo + heartbeat, Feedback pós-saída com dedupe e anônimo, agregações estatísticas (Indicadores Públicos por Hospital, atualização ≤ 15min) + ranking (backend), frontend de Conta/Privacidade (E5-01/02/04) e UX (Bottom Tabs, Design System v2.0, a11y AA — E6-01..04). Permanecem apenas **3 desvios de detalhe em estórias (RN)**, sem comprometer a Feature: RN-07 (filtro <2min na agregação), E3-02 (select CNES/DATASUS, ramificação por triagem, "Não interagi") e E3-03 (lembrete +1h vs ~6h).
 
 ---
 
@@ -49,7 +51,7 @@
 | `UserDocument.java` | ✅ Existe | Mongo document OK |
 | `UserServiceImpl.java` | ✅ **Seguro** | Salva o usuário codificando a senha via `passwordEncoder.encode()` |
 | `LoginRequest/Response.java` | ✅ Existe | DTOs OK |
-| `LoginScreen.js` | 🟡 Parcial | Frontend usa assets antigos, mas o serviço processa JWT |
+| `LoginScreen.js` | ✅ Existe | Consome o serviço JWT; design system v2.0 (S6/PR #29), selo LGPD |
 | `LoginService.js` | ✅ Existe | Lê os tokens (`accessToken` e `refreshToken`) da resposta da API |
 
 ---
@@ -66,7 +68,7 @@
 | Conflito de geofences sobrepostos | ✅ Hospital mais próximo (E2-04) |
 | Recuperação de GPS interrompido | ✅ Timeout 10min (E2-05) |
 | Prompt de internação/observação | ✅ Após 12h (E2-10) |
-| Ignorar visitas < 2min | ✅ Filtro nas estatísticas (E2-08) |
+| Ignorar visitas < 2min | 🟡 Parcial (RN-07): entrada automática exige ≥ 2min (E2-01/02) e barra curtas, mas não há filtro explícito **< 2min na agregação** — decidir implementar |
 
 ---
 
@@ -88,7 +90,7 @@
 | O que a feature precisa | O que existe |
 |---|---|
 | Notificação local 1–5min após saída | ✅ (E3-01) |
-| Formulário < 45s com 4 perguntas | ✅ (E3-02) |
+| Formulário < 45s com 4 perguntas | 🟡 Parcial (RN-10/11): fluxo de 4 telas + Pular implementado, mas a especialidade é texto livre (doc: select CNES/DATASUS), a ramificação por triagem não é feita e `tratamentoEquipe` usa estrelas 1–5 sem a opção "Não interagi" |
 | Janela de 24h + 1 lembrete único | ✅ (E3-03) |
 | Bloquear feedback duplicado (unique `visitaId`) | ✅ (E3-04) |
 | Feedback anônimo (`usuarioId` nulo) | ✅ (E3-05) |
@@ -106,14 +108,14 @@
 | Detalhe público do hospital | ✅ `GET /api/v1/hospitais/{id}/indicadores` + tela dedicada |
 | Atualização dos agregados a cada 15min | ✅ Job `@Scheduled` + evento `FeedbackSalvoEvent` (E4-04) |
 | Transparência (exibir só N≥5) | ✅ RN-15 |
-| Ranking de hospitais (E4-05) | ✅ `GET /api/v1/hospitais/ranking` (NOTA/TEMPO + filtro tipo + paginação); UI pendente (S6) |
+| Ranking de hospitais (E4-05) | ✅ `GET /api/v1/hospitais/ranking` (NOTA/TEMPO + filtro tipo + paginação, PR #27) — todo o backend no escopo S0–S6 · UI de ordenação é **Sprint S8 (fora do escopo)** |
 
 ---
 
 ### 🟡 F-07 — Mapa e Busca de Hospitais
-**Status: PARCIAL — frontend tem mapa com posição do usuário, mas sem hospitais**
+**Status: FORA DO ESCOPO S0–S6 — `react-native-maps` presente; integração de geofences/hospitais e filtro geo é **Sprint S8** (F-06 da S8). Não conta como pendência desta auditoria.**
 
-| O que falta |
+| Fora do escopo (S8) |
 |---|
 | `GET /api/v1/hospitais` consumido pelo front com filtro geo (raio) |
 | Marcadores dos polígonos dos hospitais renderizados no `react-native-maps` |
@@ -121,7 +123,14 @@
 ---
 
 ### 🟡 F-08 — Polimento e Acessibilidade
-**Status: PARCIAL — inconsistência visual entre telas**
+**Status: FUNCIONAL no escopo S0–S6 — Sprint S6 concluída (E6-01..04, PR #29); único item fora do escopo é E6-05 (opt-in dedicado) → Sprint S8**
+
+| O que existe (no escopo) |
+|---|
+| Bottom Tabs (Início/Hospitais/Perfil) substituindo o Drawer (E6-01) |
+| Design System v2.0 — tokens (cores/raios/sombras) em 100% das telas + componentes `CS*` (E6-02); assets legados GIF/PNG removidos |
+| Acessibilidade AA + estados loading/erro/empty (E6-03/E6-04) |
+| **Fora do escopo:** E6-05 (opt-in de notificações desacoplado do fluxo E3) — Sprint S8 |
 
 ---
 
@@ -131,13 +140,19 @@
 | Vulnerabilidade | Localização / Resposta |
 |---|---|
 | **Senha em texto puro** | ❌ (Corrigido/Inexistente - App utiliza BCrypt e JWT) |
-| **Exclusão de Conta / LGPD** | ✅ Protegido (`POST /api/v2/usuario/me` retorna 401 para requisições não autenticadas) |
+| **Exclusão de Conta / LGPD** | ✅ `DELETE /api/v1/contas/exclusao` (autenticada) — cascade remove user + `auth_logins`, anonimiza visitas/feedbacks e recalcula agregados (F0-05, PR #25) |
 | **Erros da API (Envelope)** | ✅ Padronizado (Retorna timestamp, traceId, message) |
 
 ---
 
 ## 3. Recomendações Atualizadas
 
-1. **Fase 0 e Épicos 1 a 5 já estão cobertos e testados** (backend + mobile), incluindo o **ranking de hospitais (E4-05, backend)**: autenticação JWT/BCrypt, CRUD/geofence de hospitais, visitas com geofencing nativo, feedback pós-saída, indicadores públicos por hospital, ranking ordenável por nota/tempo e o frontend de Conta/Privacidade (E5-01/02/04 + F0-05).
-2. Próximos passos: fechar **Épico 6 (UX/polimento, Bottom Tabs, a11y)**, a **UI do ranking** (ordenação visual da lista de hospitais, S6) e os stretches **E5-03 (histórico/exportação)** e **E5-05 (revogação nativa completa)**.
-3. Também pendentes: o **Painel Admin Web (Épico 7 / F-11)**. (A moderação de sugestões de hospitais — **F-10** — já foi mergeada na develop via PR #14 e está implementada.)
+> **Escopo desta auditoria (30/08/2026): MVP — Sprints S0–S6.** Itens da **Sprint S8** (E4-05 UI, F-07 mapa, E5-03 histórico/exportação, E5-05 revogação nativa, E6-05 opt-in de notificações) e do **Épico 7 / Painel Administrativo Web (F-11)** são **fora do escopo do MVP** e não são contabilizados como pendência.
+
+1. **No escopo S0–S6, a `develop` está concluída e validada**: autenticação JWT/BCrypt, rate limiting (F0-04), exclusão de conta LGPD (`DELETE /api/v1/contas/exclusao`, F0-05), CRUD/geofence de hospitais + sugestões e moderação (backend), visitas com geofencing nativo + heartbeat, feedback pós-saída (backend + mobile), indicadores públicos por hospital + ranking (backend) e o frontend de Conta/Privacidade (E5-01/02/04) e de UX (E6-01..04).
+2. **Pendências reais dentro do escopo S0–S6** (a tratar no código — desvios de implementação):
+   - **RN-07 / E2-08:** filtro de visitas < 2min **não implementado na agregação** (`AgregadoServiceImpl`);
+   - **E3-02 / RN-10-11:** detalhes do formulário — especialidade como select CNES/DATASUS, ramificação "triagem=Não → pula especialidade" e opção "Não interagi" em `tratamentoEquipe`;
+   - **E3-03 / RN-09:** lembrete de feedback em **+1h** vs doc **~6h**.
+3. **Decisões de contrato pendentes (spec §3.1 vs código — funcional, precisa alinhar doc ou código)**: endpoint de cadastro (`/api/user/cadastro` legado vs `/api/v1/auth/registro`), **logout/blacklist de refresh** (teste previsto na Sprint S0 e não implementado) e **`GET /api/v1/usuarios/me`** (perfil servido no payload do login).
+4. **Fora do escopo do MVP** (não são pendências desta auditoria): UI do ranking, mapa com geofences, histórico/exportação, revogação nativa completa, opt-in dedicado de notificações (**Sprint S8**) e o **Painel Admin Web** (Épico 7/F-11, cujo fluxo de moderação de sugestões absorve as telas mobile de F-10).

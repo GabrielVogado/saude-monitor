@@ -156,11 +156,11 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 - **Épico:** Épico 2 — Detecção de Visitas
 - **Prioridade:** P0 — a experiência de "estou sendo monitorado sem fazer nada" é o principal diferencial do produto
 - **Status de implementação:** 🔴 **Inexistente** — zero arquivos backend e frontend. Nenhuma coleção `visitas` no MongoDB, nenhum endpoint de heartbeat/tipo-permanencia, nenhum card de visita ativa no app, nenhum cronômetro, nenhuma pergunta de internação. Depende de F-03 (geofence). (Ver `Relatorio-Aderencia-Codigo-vs-Features.md` §F-04)
-- **Descrição:** Esta feature implementa a **camada de experiência** sobre a detecção de geofence (F-03). Enquanto F-03 é o motor, F-04 é o painel: o card de permanência ativa que aparece sobre o mapa com o nome do hospital e o cronômetro ao vivo, a opção de check-in manual quando o GPS falha, o filtro de visitas muito curtas nas estatísticas, e a sinalização de internação/observação para evitar que longas permanências hospitalares (ex.: paciente internado por 5 dias) distorçam o indicador de "tempo de atendimento".
+- **Descrição:** Esta feature implementa a **camada de experiência** sobre a detecção de geofence (F-03). Enquanto F-03 é o motor, F-04 é o painel: o card de permanência ativa que aparece sobre o mapa com o nome do hospital e o cronômetro ao vivo, o check-in manual em 1 toque (caminho de primeira classe), o filtro de visitas muito curtas nas estatísticas, e a sinalização de internação/observação para evitar que longas permanências hospitalares (ex.: paciente internado por 5 dias) distorçam o indicador de "tempo de atendimento".
 
   O cartão de visita ativa (`CSGeoStatusCard`) é o elemento central da UX: glass sobre o mapa, com ícone pulsante, timer em `display-sm` Manrope com tabular-nums, e botão "Não estou aqui / Encerrar". Ele aparece automaticamente na detecção de entrada (F-03) e some na saída. O timer é acessível: `accessibilityLiveRegion="polite"` anuncia o tempo a cada minuto.
 
-  O check-in manual (1 toque) é o **plano B de dignidade**: se o GPS estiver desligado ou a permissão negada, o usuário ainda pode registrar sua visita selecionando o hospital da lista. Visitas manuais recebem flag `manual = true`.
+  O check-in manual (1 toque) é um **caminho de primeira classe**, ao lado do automático: o usuário seleciona o hospital na lista e registra a visita, típico quando o GPS está desligado, a permissão foi negada ou em iOS restritivo. Visitas manuais recebem flag `manual = true`.
 
   A sinalização de internação (RN-24) aparece após 12h de visita ativa: um prompt de 1 toque pergunta "Você está em observação ou internado?". Se sim, a visita é excluída do indicador de pronto-atendimento mas permanece no histórico pessoal.
 
@@ -332,13 +332,13 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 - **Épico:** Épico 1 (Listagem) + Épico 6 (Navegação)
 - **Prioridade:** P0 — é a porta de entrada para consulta pública; sem mapa, o cidadão não descobre hospitais próximos
 - **Status de implementação:** 🟡 **Parcial** — `GeoLocalizacaoScreen` já renderiza `MapView` + `Marker` da posição do usuário com `react-native-maps` instalado. Mas **não exibe hospitais** (zero marcadores de hospital, zero polígonos de geofence), não tem busca por nome/tipo, e o GPS é modo contínuo (será substituído por geofencing em F-03). Aproveita-se o MapView e a estrutura de tela; o resto é novo. (Ver `Relatorio-Aderencia-Codigo-vs-Features.md` §F-07)
-- **Descrição:** Esta feature implementa as telas de descoberta de hospitais: o **mapa** interativo com pins de hospitais e posição do usuário, a **lista** com busca por nome e ordenação, e a **navegação inferior** (Bottom Tabs) que organiza o app em 3 abas: Mapa, Hospitais e Perfil. A migração de Drawer (atual) para Bottom Tabs é parte desta feature, pois a navegação de 1 polegar é mandatória para a persona paciente (mãos ocupadas, pressa, uma mão só).
+- **Descrição:** Esta feature implementa as telas de descoberta de hospitais: o **mapa** interativo com pins de hospitais e posição do usuário, a **lista** com busca por nome e ordenação, e a **navegação inferior** (Bottom Tabs) que organiza o app em 4 abas: Início, Hospitais, Mapa e Perfil. A migração de Drawer (atual) para Bottom Tabs é parte desta feature, pois a navegação de 1 polegar é mandatória para a persona paciente (mãos ocupadas, pressa, uma mão só).
 
   O mapa (`react-native-maps`) exibe hospitais ativos como pins `MapPin` em `primary`, com geofence renderizado como polígono translúcido. O FAB centraliza no GPS do usuário. Ao tocar em um pin, abre o card de detalhe rápido com nome, distância e nota — toque no card leva ao Detalhe do Hospital (F-06).
 
   A lista de hospitais oferece busca por nome (filtro local no client ou query parametrizada `GET /api/v2/hospitais?nome=X`) e ordenação por nota ou tempo médio. O empty state "Nenhum hospital perto de você" inclui CTA "Sugerir hospital" (E1-05), que envia uma sugestão para revisão administrativa.
 
-  A migração de navegação de Drawer → Bottom Tabs com 3 abas (Mapa, Hospitais, Perfil) segue estritamente o Padrão UI/UX v2.0 (§4.3), utilizando `CSBottomNav` com glass morphism.
+  A migração de navegação de Drawer → Bottom Tabs com 4 abas (Início, Hospitais, Mapa, Perfil) segue o Padrão UI/UX v2.0 (§4.3), utilizando `CSBottomNav` com glass morphism.
 
 - **User Stories vinculadas:** E1-03, E1-05, E6-01
 - **Critérios de aceite:**
@@ -349,7 +349,7 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
   5. Busca por nome filtra a lista em tempo real (< 300ms); sem resultados → `CSEmptyState` "Nenhum hospital encontrado com esse nome"
   6. Ordenação: padrão por nota (decrescente); alternável para tempo médio (crescente); opção visível no header da lista
   7. Sugestão de hospital (E1-05): CTA "Sugerir hospital" disponível no empty state do mapa e da lista; formulário simples (nome + endereço opcional) envia `POST /api/v2/hospitais/sugestoes`
-  8. Navegação Bottom Tabs (`CSBottomNav`) com 3 abas: Mapa (MapPin), Hospitais (Building2), Perfil (UserRound); glass morphism com blur 30px; crossfade de 200ms na troca de aba
+  8. Navegação Bottom Tabs (`CSBottomNav`) com 4 abas: Início (Home), Hospitais (Building2), Mapa (MapPin), Perfil (UserRound); glass morphism com blur 30px; crossfade de 200ms na troca de aba
   9. Drawer de navegação anterior removido; telas de Login/Cadastro integradas ao fluxo via stack navigation a partir da aba Perfil
 - **Regras de negócio aplicáveis:** N/A (feature de interface/descoberta)
 - **Dependências:** **F-01 (Hospitais cadastrados)** — sem hospital, o mapa fica vazio (estado normal: empty state). **F-06 (Indicadores)** — o card exibe nota que depende de agregação. Pode iniciar com dados mockados.
@@ -613,8 +613,8 @@ Fase 4 (polimento):  F-08                →  [sobre tudo; incremental ou sprint
 | **Tempo médio de atendimento** | Mediana dos tempos de permanência das visitas finalizadas de pronto-atendimento (até 24h, excluindo `INTERNACAO`/`OBSERVACAO`). Mediana é robusta a outliers — uma espera de 14h não distorce o indicador como faria a média. |
 | **Nota média** | Média aritmética das notas 1–5 dos feedbacks dos últimos 90 dias. Exibida apenas com N ≥ 5. |
 | **N (amostra)** | Quantidade de avaliações no período. N ≥ 5 é o piso para exibição pública. |
-| **Check-in manual** | Alternativa de 1 toque quando o GPS está indisponível: o usuário seleciona o hospital em uma lista. Visita é registrada com flag `manual = true`. |
-| **Bottom Tabs** | Navegação inferior com 3 abas (Mapa, Hospitais, Perfil). Substitui o Drawer anterior. Navegação de 1 polegar — adequada ao contexto do paciente (pressa, mãos ocupadas). |
+| **Check-in manual** | Caminho de primeira classe em 1 toque: o usuário seleciona o hospital na lista e registra a visita (típico quando o GPS está indisponível/negado). Visita é registrada com flag `manual = true`. |
+| **Bottom Tabs** | Navegação inferior com 4 abas (Início, Hospitais, Mapa, Perfil). Substitui o Drawer anterior. Navegação de 1 polegar — adequada ao contexto do paciente (pressa, mãos ocupadas). |
 | **Glass morphism** | Efeito visual: fundo com opacidade 80% + `backdrop-blur` 20-40px + borda fantasma 20%. Usado no Bottom Nav e no card de geofence sobre o mapa. |
 | **DoD (Definition of Done)** | Critério de pronto: condições que uma feature deve atender para ser considerada concluída. Inclui o DoD geral do MVP (código revisado, testado, documentado) + critérios específicos da feature. |
 | **ADR (Architecture Decision Record)** | Registro de decisão de arquitetura. Referenciado nas features quando impactam implementação. Ex.: ADR-001 (JWT + BCrypt), ADR-002 (geofencing nativo). |
@@ -863,7 +863,7 @@ Com base na Árvore Tecnológica (Fase 0 → 1 → 2) e nas dependências do roa
 | F-01 | Hospitais cadastrados, geofences com área correta | Dashboard admin | 50 hospitais cadastrados; 0 geofences inválidos em produção |
 | F-02 | Cadastros, logins, taxa de conta criada pós-feedback | Analytics (evento `conta_criada`, `login`) | 20% dos usuários de feedback criam conta em 30 dias |
 | F-03 | Precisão de detecção, falsos positivos, consumo de bateria | Logs de visita + teste de campo | ≥ 90% detecções corretas; ≤ 5% falsos positivos; bateria ≤ 5%/dia |
-| F-04 | Uso de check-in manual, resposta ao prompt de 12h | Analytics (`checkin_manual`, `prompt_internacao_respondido`) | ≤ 30% das visitas são manuais; ≥ 40% respondem prompt de 12h |
+| F-04 | Uso de check-in manual, resposta ao prompt de 12h | Analytics (`checkin_manual`, `prompt_internacao_respondido`) | Manual como caminho de primeira classe sem penalizar o automático; ≥ 40% respondem prompt de 12h |
 | F-05 | Taxa de resposta, tempo médio, abandono | Analytics (`feedback_iniciado`, `feedback_enviado`, `feedback_abandonado`, duração) | ≥ 25% taxa de resposta; < 45s tempo médio; < 20% abandono |
 | F-06 | Hospitais com N ≥ 5, atualização ≤ 15 min | Query no banco + health check do job | 20 hospitais com N ≥ 5; 100% das atualizações em ≤ 15 min |
 | F-07 | Buscas realizadas, hospitais visualizados | Analytics (`busca_hospital`, `detalhe_hospital_aberto`) | ≥ 500 buscas/semana |

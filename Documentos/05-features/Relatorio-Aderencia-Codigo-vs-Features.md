@@ -80,7 +80,7 @@
 | `VisitaDocument.java` (MongoDB) — entrada, saída, duração, status | ✅ |
 | `VisitaController.java` — endpoints checkin/checkout/heartbeat | ✅ |
 | Card de visita ativa na Home | ✅ Card com cronômetro (E2-07) |
-| Check-in manual em 1 toque | ✅ Fallback GPS desligado (E2-06) |
+| Check-in manual em 1 toque | ✅ Caminho de primeira classe ao lado automático (E2-06) |
 
 ---
 
@@ -113,12 +113,12 @@
 ---
 
 ### 🟡 F-07 — Mapa e Busca de Hospitais
-**Status: FORA DO ESCOPO S0–S6 — `react-native-maps` presente; integração de geofences/hospitais e filtro geo é **Sprint S8** (F-06 da S8). Não conta como pendência desta auditoria.**
+**Status: FORA DO ESCOPO S0–S6 — `react-native-maps` presente; integração de geofences/hospitais e filtro geo é **Sprint S8** (F-06 da S8), agora alinhado à **4 abas** (Início, Hospitais, Mapa, Perfil) que formam a navegação baseline a partir da S6. Não conta como pendência desta auditoria.**
 
 | Fora do escopo (S8) |
 |---|
-| `GET /api/v1/hospitais` consumido pelo front com filtro geo (raio) |
-| Marcadores dos polígonos dos hospitais renderizados no `react-native-maps` |
+| `GET /api/v1/hospitais` consumido pelo front com filtro geo (raio); agora integrado à **4 abas** (Início, Hospitais, Mapa, Perfil) da navegação baseline |
+| Marcadores dos polígonos dos hospitais renderizados no `react-native-maps`; agora parte da aba **Mapa (3ª tab)** da navegação 4-tab |
 
 ---
 
@@ -127,7 +127,7 @@
 
 | O que existe (no escopo) |
 |---|
-| Bottom Tabs (Início/Hospitais/Perfil) substituindo o Drawer (E6-01) |
+| Bottom Tabs (Início/Hospitais/Mapa/Perfil) substituindo o Drawer (E6-01) |
 | Design System v2.0 — tokens (cores/raios/sombras) em 100% das telas + componentes `CS*` (E6-02); assets legados GIF/PNG removidos |
 | Acessibilidade AA + estados loading/erro/empty (E6-03/E6-04) |
 | **Fora do escopo:** E6-05 (opt-in de notificações desacoplado do fluxo E3) — Sprint S8 |

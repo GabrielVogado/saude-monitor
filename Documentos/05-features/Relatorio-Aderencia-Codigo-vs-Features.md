@@ -1,9 +1,9 @@
-# 🔍 Relatório de Aderência — Features × Código Real (v3.1)
+# 🔍 Relatório de Aderência — Features × Código Real (v3.2)
 
 > **Verificação do que existe implementado vs. o que as Features propõem**
 >
-> Data: Atualizada — v3.1 (última auditoria: 30/08/2026)
-> Alterações desta versão: Reflete a auditoria completa da `develop` em 30/08/2026 — confirma Fase 0 (JWT/BCrypt/rate limiting/exclusão LGPD), Épicos 1–6 (Sprint S6 concluída), ranking (backend), formaliza a Sprint S8 e corrige o endpoint de exclusão de conta (`DELETE /api/v1/contas/exclusao`, PR #25) e o estado F-08/E6.
+> Data: Atualizada — v3.2 (auditoria: 30/08/2026; correções das estórias aplicadas)
+> Alterações desta versão: Reflete a auditoria completa da `develop` em 30/08/2026 — confirma Fase 0 (JWT/BCrypt/rate limiting/exclusão LGPD), Épicos 1–6 (Sprint S6 concluída), ranking (backend), formaliza a Sprint S8 e corrige o endpoint de exclusão de conta (`DELETE /api/v1/contas/exclusao`, PR #25) e o estado F-08/E6. A v3.2 registra a aplicação das 3 correções de estória (RN-07, RN-10/11, E3-03) no PR do `bugfix/ajustes-rn-feedback-estatisticas` — agora com **0 desvios RN dentro do escopo S0–S6**.
 
 ---
 
@@ -12,12 +12,12 @@
 | Categoria | Quantidade no escopo S0–S6 | % das Features |
 |---|---|---|
 | ✅ Existente (funcional) | 9/9 | 100% |
-| 🟡 Parcial (desvio de detalhe em estória RN) | 0 features 🟡 (3 estórias: E2-08, E3-02, E3-03) | — |
+| 🟡 Parcial (desvio de detalhe em estória RN) | 0/9 (3 estórias corrigidas: E2-08, E3-02, E3-03) | — |
 | 🔴 Inexistente (precisa construir) | 0/9 | 0% |
 
 > **Escopo:** MVP Sprints **S0–S6**. Itens da Sprint S8 (E4-05 UI, F-07 mapa, E5-03, E5-05, E6-05) e Épico 7/Painel (F-11) são fora do escopo do MVP e **não contam como parciais/inexistentes**.
 
-**Conclusão:** No escopo S0–S6, a `develop` está **100% coberta** nas 9 Features: autenticação JWT/BCrypt, rate limiting (F0-04), exclusão de conta LGPD com anonimização (F0-05), CRUD/geofence de Hospitais, sugestões + moderação (backend), Visitas com detecção automática via geofencing nativo + heartbeat, Feedback pós-saída com dedupe e anônimo, agregações estatísticas (Indicadores Públicos por Hospital, atualização ≤ 15min) + ranking (backend), frontend de Conta/Privacidade (E5-01/02/04) e UX (Bottom Tabs, Design System v2.0, a11y AA — E6-01..04). Permanecem apenas **3 desvios de detalhe em estórias (RN)**, sem comprometer a Feature: RN-07 (filtro <2min na agregação), E3-02 (select CNES/DATASUS, ramificação por triagem, "Não interagi") e E3-03 (lembrete +1h vs ~6h).
+**Conclusão:** No escopo S0–S6, a `develop` está **100% coberta** nas 9 Features com **0 desvios RN pendentes**: autenticação JWT/BCrypt, rate limiting (F0-04), exclusão de conta LGPD com anonimização (F0-05), CRUD/geofence de Hospitais, sugestões + moderação (backend), Visitas com detecção automática via geofencing nativo + heartbeat, Feedback pós-saída com dedupe e anônimo, agregações estatísticas (Indicadores Públicos por Hospital, atualização ≤ 15min) + ranking (backend), frontend de Conta/Privacidade (E5-01/02/04) e UX (Bottom Tabs, Design System v2.0, a11y AA — E6-01..04). Os **3 desvios de estória** apontados na v3.1 foram **corrigidos** no PR `bugfix/ajustes-rn-feedback-estatisticas`: RN-07 (filtro <2min na agregação), RN-10/11 (select de especialidade, ramificação por triagem, "Não interagi", remoção de `DESISTI`, motivo obrigatório) e E3-03 (lembrete único em ~6h). Restam apenas as **decisões de contrato** (path de cadastro, logout/blacklist, `GET /usuarios/me`), já registradas nas recomendações.
 
 ---
 
@@ -68,7 +68,7 @@
 | Conflito de geofences sobrepostos | ✅ Hospital mais próximo (E2-04) |
 | Recuperação de GPS interrompido | ✅ Timeout 10min (E2-05) |
 | Prompt de internação/observação | ✅ Após 12h (E2-10) |
-| Ignorar visitas < 2min | 🟡 Parcial (RN-07): entrada automática exige ≥ 2min (E2-01/02) e barra curtas, mas não há filtro explícito **< 2min na agregação** — decidir implementar |
+| Ignorar visitas < 2min | ✅ `DURACAO_MINIMA_MINUTOS=2` na agregação (RN-07 — corrigido no PR do bugfix) |
 
 ---
 
@@ -90,8 +90,8 @@
 | O que a feature precisa | O que existe |
 |---|---|
 | Notificação local 1–5min após saída | ✅ (E3-01) |
-| Formulário < 45s com 4 perguntas | 🟡 Parcial (RN-10/11): fluxo de 4 telas + Pular implementado, mas a especialidade é texto livre (doc: select CNES/DATASUS), a ramificação por triagem não é feita e `tratamentoEquipe` usa estrelas 1–5 sem a opção "Não interagi" |
-| Janela de 24h + 1 lembrete único | ✅ (E3-03) |
+| Formulário < 45s com 4 perguntas | ✅ (E3-02 — RN-10/11 corrigidos no PR do bugfix: select searchable de especialidade, ramificação triagem=Sim→Tela 2, "Não interagi" zera `tratamentoEquipe`, opção `DESISTI` removida, motivo obrigatório quando não atendido) |
+| Janela de 24h + 1 lembrete único | ✅ (E3-03 — lembrete único em ~6h após a 1ª notificação, janela 24h/RN-09) |
 | Bloquear feedback duplicado (unique `visitaId`) | ✅ (E3-04) |
 | Feedback anônimo (`usuarioId` nulo) | ✅ (E3-05) |
 | Tela de agradecimento e impacto | ✅ (E3-06) |
@@ -150,9 +150,10 @@
 > **Escopo desta auditoria (30/08/2026): MVP — Sprints S0–S6.** Itens da **Sprint S8** (E4-05 UI, F-07 mapa, E5-03 histórico/exportação, E5-05 revogação nativa, E6-05 opt-in de notificações) e do **Épico 7 / Painel Administrativo Web (F-11)** são **fora do escopo do MVP** e não são contabilizados como pendência.
 
 1. **No escopo S0–S6, a `develop` está concluída e validada**: autenticação JWT/BCrypt, rate limiting (F0-04), exclusão de conta LGPD (`DELETE /api/v1/contas/exclusao`, F0-05), CRUD/geofence de hospitais + sugestões e moderação (backend), visitas com geofencing nativo + heartbeat, feedback pós-saída (backend + mobile), indicadores públicos por hospital + ranking (backend) e o frontend de Conta/Privacidade (E5-01/02/04) e de UX (E6-01..04).
-2. **Pendências reais dentro do escopo S0–S6** (a tratar no código — desvios de implementação):
-   - **RN-07 / E2-08:** filtro de visitas < 2min **não implementado na agregação** (`AgregadoServiceImpl`);
-   - **E3-02 / RN-10-11:** detalhes do formulário — especialidade como select CNES/DATASUS, ramificação "triagem=Não → pula especialidade" e opção "Não interagi" em `tratamentoEquipe`;
-   - **E3-03 / RN-09:** lembrete de feedback em **+1h** vs doc **~6h**.
+2. **Correções aplicadas (PR `bugfix/ajustes-rn-feedback-estatisticas`)** — os 3 desvios de estória da v3.1 foram implementados e testados:
+   - **RN-07 / E2-08:** filtro **< 2min na agregação** (`DURACAO_MINIMA_MINUTOS=2` no `AgregadoServiceImpl`) + teste;
+   - **E3-02 / RN-10-11:** select searchable de especialidade, ramificação "triagem=Não → pula especialidade", "Não interagi" em `tratamentoEquipe`, remoção da opção `DESISTI` e motivo obrigatório quando não foi atendido (`FeedbackFormScreen`) + testes FE;
+   - **E3-03 / RN-09:** lembrete único em **~6h** após a 1ª notificação (`FeedbackNotificationService`).
+   Validação FE: 15 suítes/91 testes ✓ + `tsc --noEmit` ✓. (Testes unit do backend dependem de JDK 25/Docker — rodam no CI.)
 3. **Decisões de contrato pendentes (spec §3.1 vs código — funcional, precisa alinhar doc ou código)**: endpoint de cadastro (`/api/user/cadastro` legado vs `/api/v1/auth/registro`), **logout/blacklist de refresh** (teste previsto na Sprint S0 e não implementado) e **`GET /api/v1/usuarios/me`** (perfil servido no payload do login).
 4. **Fora do escopo do MVP** (não são pendências desta auditoria): UI do ranking, mapa com geofences, histórico/exportação, revogação nativa completa, opt-in dedicado de notificações (**Sprint S8**) e o **Painel Admin Web** (Épico 7/F-11, cujo fluxo de moderação de sugestões absorve as telas mobile de F-10).

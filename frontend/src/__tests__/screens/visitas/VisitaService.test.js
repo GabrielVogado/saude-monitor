@@ -68,9 +68,9 @@ describe("VisitaService (Épico 02)", () => {
     expect(chamadas[0].url).toContain("/api/v1/visitas/ativas");
   });
 
-  test("listarHistorico usa /usuarios/me/visitas com paginação", async () => {
+  test("listarHistorico usa /contas/visitas com paginação", async () => {
     await VisitaService.listarHistorico({ page: 2, size: 20 });
-    expect(chamadas[0].url).toContain("/api/v1/usuarios/me/visitas");
+    expect(chamadas[0].url).toContain("/api/v1/contas/visitas");
     expect(chamadas[0].url).toContain("page=2");
     expect(chamadas[0].url).toContain("size=20");
   });

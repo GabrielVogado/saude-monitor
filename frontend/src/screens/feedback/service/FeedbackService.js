@@ -106,6 +106,11 @@ class FeedbackService {
   static atualizar(id, payload) {
     return request(`${BASE_PATH}/${id}`, { method: "PUT", body: payload });
   }
+
+  /** Histórico paginado de feedbacks do usuário (E5-03/RN-22 — namespace contas). */
+  static listarHistorico({ page = 0, size = 20 } = {}) {
+    return request(`/api/v1/contas/feedbacks?page=${page}&size=${size}`);
+  }
 }
 
 export default FeedbackService;

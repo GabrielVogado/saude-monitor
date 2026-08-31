@@ -2,7 +2,6 @@ package br.com.saude_monitor.api.visita.controller;
 
 import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
-import br.com.saude_monitor.api.hospital.dto.PageResponse;
 import br.com.saude_monitor.api.visita.dto.CheckinRequest;
 import br.com.saude_monitor.api.visita.dto.CheckinResponse;
 import br.com.saude_monitor.api.visita.dto.CheckoutRequest;
@@ -13,22 +12,16 @@ import br.com.saude_monitor.api.visita.dto.PosicaoDto;
 import br.com.saude_monitor.api.visita.dto.TipoPermanenciaRequest;
 import br.com.saude_monitor.api.visita.dto.TipoPermanenciaResponse;
 import br.com.saude_monitor.api.visita.dto.VisitaAtivaResponse;
-import br.com.saude_monitor.api.visita.dto.VisitaResponse;
 import br.com.saude_monitor.api.visita.service.VisitaService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -38,7 +31,6 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequiredArgsConstructor
-@Validated
 public class VisitaController {
 
     private final VisitaService visitaService;
@@ -84,15 +76,6 @@ public class VisitaController {
     public ResponseEntity<VisitaAtivaResponse> buscarAtiva() {
         String usuarioId = exigirUsuarioAutenticado();
         return ResponseEntity.ok(visitaService.buscarAtiva(usuarioId));
-    }
-
-    /** 🔒 Histórico paginado de visitas do usuário. */
-    @GetMapping("/api/v1/usuarios/me/visitas")
-    public ResponseEntity<PageResponse<VisitaResponse>> historico(
-            @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        String usuarioId = exigirUsuarioAutenticado();
-        return ResponseEntity.ok(visitaService.historico(usuarioId, page, size));
     }
 
     private String exigirUsuarioAutenticado() {

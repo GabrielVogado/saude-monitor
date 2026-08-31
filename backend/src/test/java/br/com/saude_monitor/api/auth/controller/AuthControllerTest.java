@@ -6,6 +6,9 @@ import br.com.saude_monitor.api.auth.dto.RefreshRequest;
 import br.com.saude_monitor.api.auth.dto.UsuarioDto;
 import br.com.saude_monitor.api.auth.service.AuthService;
 import br.com.saude_monitor.api.config.exception.GlobalExceptionHandler;
+import br.com.saude_monitor.api.user.dto.UserRequest;
+import br.com.saude_monitor.api.user.dto.UserResponse;
+import br.com.saude_monitor.api.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -13,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import java.time.Instant;
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -43,6 +47,25 @@ class AuthControllerTest {
         }
     };
 
+    private final UserService userService = new UserService() {
+        @Override
+        public UserResponse saveUser(UserRequest request) {
+            return new UserResponse(true, "Usuário cadastrado com sucesso", "u1",
+                    request.fullName(), request.email(), request.phone(),
+                    true, Instant.now(), Instant.now());
+        }
+
+        @Override
+        public Map<String, Object> exportarDados(String usuarioId) {
+            return Map.of();
+        }
+
+        @Override
+        public void excluirConta(String usuarioId) {
+            // no-op no teste de controller
+        }
+    };
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -51,7 +74,7 @@ class AuthControllerTest {
         validator.afterPropertiesSet();
 
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new AuthController(authService))
+                .standaloneSetup(new AuthController(authService, userService))
                 .setValidator(validator)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -100,6 +123,44 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.code").value("CAMPOS_INVALIDOS"))
                 .andExpect(jsonPath("$.traceId").exists());
+    }
+
+    @Test
+    void deveRegistrarContaEmAuthRegistro() throws Exception {
+        String payload = """
+                {
+                  "fullName": "Marina Souza",
+                  "email": "marina@email.com",
+                  "password": "S3nh@Forte!",
+                  "phone": "(11) 99999-0000",
+                  "consentimento": { "termosUso": true, "versaoTermos": "1.0" }
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/registro")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.email").value("marina@email.com"));
+    }
+
+    @Test
+    void deveRetornar400QuandoConsentimentoAusenteNoRegistro() throws Exception {
+        String payload = """
+                {
+                  "fullName": "Marina Souza",
+                  "email": "marina@email.com",
+                  "password": "S3nh@Forte!"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/registro")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value("CAMPOS_INVALIDOS"));
     }
 
     @Test

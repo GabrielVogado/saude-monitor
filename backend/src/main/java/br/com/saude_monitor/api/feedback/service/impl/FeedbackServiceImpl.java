@@ -12,11 +12,14 @@ import br.com.saude_monitor.api.feedback.dto.FeedbackRequest;
 import br.com.saude_monitor.api.feedback.dto.FeedbackResponse;
 import br.com.saude_monitor.api.feedback.repository.FeedbackRepository;
 import br.com.saude_monitor.api.feedback.service.FeedbackService;
+import br.com.saude_monitor.api.hospital.dto.PageResponse;
 import br.com.saude_monitor.api.visita.document.StatusVisita;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
 import br.com.saude_monitor.api.visita.repository.VisitaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -120,6 +123,16 @@ public class FeedbackServiceImpl implements FeedbackService {
         eventPublisher.publishEvent(new FeedbackSalvoEvent(salvo.getHospitalId()));
 
         return toResponse(salvo, true);
+    }
+
+    @Override
+    public PageResponse<FeedbackResponse> historico(String usuarioId, int page, int size) {
+        Page<FeedbackDocument> resultado = feedbackRepository
+                .findByUsuarioIdOrderByCriadoEmDesc(usuarioId, PageRequest.of(page, size));
+        List<FeedbackResponse> content = resultado.getContent().stream()
+                .map(f -> toResponse(f, true))
+                .toList();
+        return PageResponse.of(content, page, size, resultado.getTotalElements());
     }
 
     @Override

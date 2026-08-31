@@ -4,10 +4,14 @@ import br.com.saude_monitor.api.auth.dto.AuthResponse;
 import br.com.saude_monitor.api.auth.dto.LoginRequest;
 import br.com.saude_monitor.api.auth.dto.RefreshRequest;
 import br.com.saude_monitor.api.auth.service.AuthService;
+import br.com.saude_monitor.api.user.dto.UserRequest;
+import br.com.saude_monitor.api.user.dto.UserResponse;
+import br.com.saude_monitor.api.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,10 +21,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 /**
- * Endpoints de autenticação (F0-01/F0-02), alinhados ao contrato v2.0 (§3.1).
+ * Endpoints de autenticação e conta (F0-01/F0-02), alinhados ao contrato v2.0 (§3.1).
  *
- * <p>Todos públicos ({@code permitAll} em {@code SecurityConfig}): login, refresh e
- * logout (revoga o refresh token apresentado).</p>
+ * <p>Todos públicos ({@code permitAll} em {@code SecurityConfig}): registro, login,
+ * refresh e logout (revoga o refresh token apresentado).</p>
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -30,6 +34,13 @@ public class AuthController {
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthService authService;
+    private final UserService userService;
+
+    /** 🔓 Cria conta opcional (E5-04); exige aceite dos termos LGPD (consentimento.termosUso). */
+    @PostMapping("/registro")
+    public ResponseEntity<UserResponse> registro(@Valid @RequestBody UserRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(userService.saveUser(request));
+    }
 
     /** 🔓 Autentica credenciais e devolve access + refresh tokens. */
     @PostMapping("/login")

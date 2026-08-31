@@ -51,11 +51,12 @@ const HospitalRegisterScreen = ({navigation}) => {
         try {
             setIsSubmitting(true);
 
-            await UserService.cadastro({
+            await UserService.registro({
                 fullName,
                 email,
                 phone,
                 password,
+                consentimento: { termosUso: true, versaoTermos: "1.0" },
             });
 
             Alert.alert('Cadastro realizado', 'Seu cadastro foi enviado com sucesso.');

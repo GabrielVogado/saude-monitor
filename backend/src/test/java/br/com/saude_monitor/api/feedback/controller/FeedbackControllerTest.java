@@ -5,6 +5,7 @@ import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
 import br.com.saude_monitor.api.feedback.dto.FeedbackRequest;
 import br.com.saude_monitor.api.feedback.dto.FeedbackResponse;
 import br.com.saude_monitor.api.feedback.service.FeedbackService;
+import br.com.saude_monitor.api.hospital.dto.PageResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -13,6 +14,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -45,6 +47,11 @@ class FeedbackControllerTest {
         @Override
         public FeedbackResponse atualizar(String id, FeedbackRequest request, String usuarioId) {
             return null;
+        }
+
+        @Override
+        public PageResponse<FeedbackResponse> historico(String usuarioId, int page, int size) {
+            return PageResponse.of(List.<FeedbackResponse>of(), page, size, 0);
         }
 
         @Override

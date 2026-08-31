@@ -27,7 +27,7 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 | Feature ID | Nome | Épico(s) | Prioridade | Status Código | Estórias vinculadas | RN principais | Esforço |
 |---|---|---|---|---|---|---|---|
 | **F-01** | Cadastro e gestão de hospitais | Épico 1 | P0 | 🔴 Inexistente | E1-01, E1-02, E1-03, E1-04 | — | M (16) |
-| **F-02** | Autenticação e conta do usuário | Fase 0 + Épico 5 | P0 | 🟡 Parcial | F0-01, F0-02, F0-05, E5-04, E5-03 | RN-20, RN-21, RN-22 | M (18) |
+| **F-02** | Autenticação e conta do usuário | Fase 0 + Épico 5 | P0 | 🟢 Funcional | F0-01, F0-02, F0-05, E5-04, E5-03 (BE) | RN-20, RN-21, RN-22 | M (18) |
 | **F-03** | Detecção automática de entrada/saída | Épico 2 | P0 | 🔴 Inexistente | E2-01, E2-02, E2-03, E2-04, E2-05, E2-09 | RN-01..RN-07, RN-23 | L (19) |
 | **F-04** | Visita ativa e cronômetro | Épico 2 | P0 | 🔴 Inexistente | E2-06, E2-07, E2-08, E2-10 | RN-07, RN-24 | M (21) |
 | **F-05** | Feedback pós-saída | Épico 3 | P0 | 🔴 Inexistente | E3-01, E3-02, E3-03, E3-04, E3-05, E3-06 | RN-08..RN-13 | M (16) |
@@ -83,7 +83,7 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 - **ID:** F-02
 - **Épico:** Fase 0 (Estabilização e Segurança) + Épico 5 (Conta, Consentimento e Privacidade)
 - **Prioridade:** P0 — endpoints protegidos não podem existir sem autenticação; senha em texto puro é bloqueante de segurança
-- **Status de implementação:** 🟡 **Parcial** — 7 arquivos backend + 4 frontend existem (login/cadastro funcionais), mas **senha salva em texto puro** (`AuthServiceImpl.java`) e **sem emissão de JWT** — o login apenas grava um documento MongoDB sem token. Frontend tem LoginScreen e UserScreen funcionais, mas sem SecureStore/JWT. (Ver `Relatorio-Aderencia-Codigo-vs-Features.md` §F-02)
+- **Status de implementação:** 🟢 **Funcional** — Fase 0 (JWT + BCrypt + refresh c/ rotação + rate limit) e Épico 5 (cadastro marcado LGPD, perfil, exclusão/anonimização e **backend de E5-03**). Namespace do titular: **`/api/v1/contas`** (substitui o antigo `me/`): `GET /api/v1/contas/visitas`, `GET /api/v1/contas/feedbacks`, `GET /api/v1/contas/export`, `DELETE /api/v1/contas/exclusao`; cadastro em `POST /api/v1/auth/registro` com `consentimento` obrigatório; logout server-side com blacklist de refresh (v3.3/v3.4 do Relatório de Aderência). A **UI de histórico/exportação** fica para a Sprint S8.
 - **Descrição:** Esta feature implementa a base de segurança do sistema e a experiência de conta do usuário. No backend: hash BCrypt para senhas, emissão de JWT (access token 15 min + refresh token 30 dias), proteção de endpoints e exclusão de conta conforme LGPD. No app: fluxo de cadastro/login **opcional** (o usuário pode usar toda a jornada principal sem conta), tela de perfil com dados pessoais e histórico.
 
   A conta é um **acelerador de retenção**, não um gate: o usuário cria quando quiser consultar seu histórico ou gerenciar preferências. O feedback anônimo (sem login) continua funcionando — o vínculo ao usuário logado é interno e nunca exposto publicamente. O JWT é armazenado no dispositivo via `expo-secure-store`.

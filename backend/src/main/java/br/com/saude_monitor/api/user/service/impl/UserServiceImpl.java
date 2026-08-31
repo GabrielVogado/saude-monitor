@@ -3,11 +3,13 @@ package br.com.saude_monitor.api.user.service.impl;
 import br.com.saude_monitor.api.agregado.service.AgregadoService;
 import br.com.saude_monitor.api.auth.repository.AuthRepository;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
+import br.com.saude_monitor.api.config.exception.ValidacaoNegocioException;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.user.document.ConsentimentoItem;
 import br.com.saude_monitor.api.user.document.ConsentimentosDocument;
 import br.com.saude_monitor.api.user.document.Papel;
 import br.com.saude_monitor.api.user.document.UserDocument;
+import br.com.saude_monitor.api.user.dto.ConsentimentoRequest;
 import br.com.saude_monitor.api.user.dto.UserRequest;
 import br.com.saude_monitor.api.user.dto.UserResponse;
 import br.com.saude_monitor.api.user.repository.UserRepository;
@@ -23,8 +25,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -71,13 +76,18 @@ public class UserServiceImpl implements UserService {
             );
         }
 
+        ConsentimentoRequest consent = request.consentimento();
+        if (consent == null || !consent.termosUso()) {
+            throw new ValidacaoNegocioException("Aceite dos termos de uso é obrigatório para criar a conta.");
+        }
+
         var user = userRepository.save(UserDocument.builder()
                 .fullName(request.fullName())
                 .email(normalizedEmail)
                 .phone(request.phone())
                 .senhaHash(passwordEncoder.encode(request.password()))
                 .papel(Papel.USER)
-                .consentimentos(consentimentosIniciais(now))
+                .consentimentos(consentimentosRegistrados(consent, now))
                 .active(true)
                 .createdAt(now)
                 .updatedAt(now)
@@ -94,6 +104,29 @@ public class UserServiceImpl implements UserService {
                 user.getCreatedAt(),
                 user.getUpdatedAt()
         );
+    }
+
+    @Override
+    public Map<String, Object> exportarDados(String usuarioId) {
+        UserDocument user = userRepository.findById(usuarioId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado."));
+
+        Query query = Query.query(Criteria.where("usuarioId").is(user.getId()));
+        List<VisitaDocument> visitas = mongoTemplate.find(query, VisitaDocument.class);
+        List<FeedbackDocument> feedbacks = mongoTemplate.find(query, FeedbackDocument.class);
+
+        Map<String, Object> dados = new LinkedHashMap<>();
+        dados.put("geradoEm", Instant.now());
+        dados.put("usuario", Map.of(
+                "nome", user.getFullName(),
+                "email", user.getEmail(),
+                "telefone", user.getPhone() == null ? "" : user.getPhone(),
+                "criadoEm", user.getCreatedAt(),
+                "consentimentos", user.getConsentimentos()
+        ));
+        dados.put("visitas", visitas);
+        dados.put("feedbacks", feedbacks);
+        return dados;
     }
 
     @Override
@@ -157,13 +190,16 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * Registra os consentimentos iniciais. O aceite dos termos de uso é obrigatório
-     * (LGPD) e, no MVP, é concedido implicitamente pelo fluxo de cadastro; localização
-     * e notificações ficam pendentes até o usuário optar explicitamente.
+     * Registra os consentimentos LGPD do titular no cadastro. O aceite dos termos de uso
+     * é obrigatório e vem explícito no payload (§3.1 — {@code consentimento.termosUso});
+     * localização e notificações ficam pendentes até o usuário optar explicitamente.
      */
-    private ConsentimentosDocument consentimentosIniciais(Instant now) {
+    private ConsentimentosDocument consentimentosRegistrados(ConsentimentoRequest consent, Instant now) {
+        String versao = consent.versaoTermos() == null || consent.versaoTermos().isBlank()
+                ? VERSAO_TERMOS
+                : consent.versaoTermos();
         return ConsentimentosDocument.builder()
-                .termosUso(ConsentimentoItem.builder().aceito(true).data(now).versao(VERSAO_TERMOS).build())
+                .termosUso(ConsentimentoItem.builder().aceito(true).data(now).versao(versao).build())
                 .localizacao(ConsentimentoItem.builder().aceito(false).data(null).versao(null).build())
                 .notificacoes(ConsentimentoItem.builder().aceito(false).data(null).versao(null).build())
                 .build();

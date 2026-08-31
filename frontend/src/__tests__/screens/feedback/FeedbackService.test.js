@@ -56,6 +56,15 @@ describe("FeedbackService (Épico 03)", () => {
     expect(c.url).toContain("/api/v1/feedbacks/fb1");
   });
 
+  test("listarHistorico faz GET em /api/v1/contas/feedbacks com paginação", async () => {
+    await FeedbackService.listarHistorico({ page: 1, size: 10 });
+    const c = chamadas[0];
+    expect(c.method).toBe("GET");
+    expect(c.url).toContain("/api/v1/contas/feedbacks");
+    expect(c.url).toContain("page=1");
+    expect(c.url).toContain("size=10");
+  });
+
   test("duplicidade (dedupe RN-12) — 409 propagado com status", async () => {
     global.fetch = jest.fn().mockResolvedValue(
       jsonResponse({ message: "Você já avaliou esta visita." }, 409)

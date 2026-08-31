@@ -1,15 +1,23 @@
 import {buildApiUrl} from "../../../config/api";
 
 class UserService {
-	static async cadastro({fullName, email, password, phone}) {
+	/**
+	 * Cria a conta opcional (E5-04) em {@code POST /api/v1/auth/registro} (§3.1).
+	 * O consentimento LGPD é obrigatório (termos de uso com versão vigente).
+	 */
+	static async registro({fullName, email, password, phone, consentimento}) {
 		const payload = {
 			fullName: fullName?.trim() || "",
 			email: email?.trim() || "",
 			password: password || "",
 			phone: phone?.trim() || "",
+			consentimento: {
+				termosUso: consentimento?.termosUso === true,
+				versaoTermos: consentimento?.versaoTermos || "1.0",
+			},
 		};
 
-		const cadastroUrl = buildApiUrl("/api/user/cadastro");
+		const cadastroUrl = buildApiUrl("/api/v1/auth/registro");
 
 		let response;
 

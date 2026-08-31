@@ -5,8 +5,8 @@
 > | Campo | Valor |
 > |---|---|
 > | **Versão** | 2.0 |
-> | **Status** | Proposta de contrato — congelar com o time antes da implementação |
-> | **Data** | 07/08/2026 |
+> | **Status** | Contrato em validação — endpoints já implementados na `develop` (auditoria 30/08/2026); alterações refletidas neste documento e registradas por PR |
+> | **Data** | 07/08/2026 (última atualização: 30/08/2026) |
 > | **Base** | Árvore Tecnológica v2.0 (ADRs) · Documento Negocial v2.0 (RN) · Backlog v2.0 (E1–E6) |
 > | **Padrão** | REST + JSON · OpenAPI 3.1 (gerar spec a partir deste documento) |
 
@@ -190,10 +190,34 @@
 
 > Legenda: 🔓 público · 🔒 autenticado · 🛡️ admin/gestor
 
+> **Situação de implantação (auditoria `develop` — 30/08/2026):** 🟢 implementado · 🟡 divergente · 🔴 não implementado · Ref = PR que decidiu/materializou.
+
+| Endpoint | Situação | Ref. |
+|---|---|---|
+| `POST /api/v1/auth/registro` | 🟡 app/backend usam **`POST /api/user/cadastro`** (legado); alinhamento ao path v2 pendente | PR #5/#6 |
+| `POST /api/v1/auth/login` | 🟢 (rate limit 10/min/IP) | PR #1/#24 |
+| `POST /api/v1/auth/refresh` | 🟢 (rotação) | PR #22 |
+| `POST /api/v1/auth/logout` | 🔴 não implementado (logout local no app) | — |
+| `DELETE /api/v1/usuarios/me` | 🟡 implementado como **`DELETE /api/v1/contas/exclusao`** | PR #25 |
+| `GET /api/v1/usuarios/me` | 🔴 não implementado (perfil no payload do login) | — |
+| `PUT /api/v1/usuarios/me/consentimentos` | 🔴 não implementado (consentimentos no cadastro; revogação local/SO) | PR #26 |
+| `GET /api/v1/hospitais` (+ `{id}`, `geofence`) | 🟢 | PR #12/#13 |
+| `POST/PUT/PATCH /api/v1/hospitais...` | 🟢 (ADMIN) | PR #12/#13 |
+| `GET /api/v1/hospitais/ranking` | 🟢 (backend; UI em S8) | PR #27 |
+| `POST /api/v1/hospitais/sugestoes` + moderação | 🟢 | PR #14 |
+| `POST /api/v1/visitas/checkin` · `checkout` · `heartbeat` · PATCH `tipo-permanencia` | 🟢 | PR #17/#18|
+| `GET /api/v1/visitas/ativas` · `GET /api/v1/usuarios/me/visitas` | 🟢 | PR #18/#23 |
+| `POST /api/v1/visitas/{id}/expirar` (job) | 🟢 como job interno `@Scheduled` | PR #18 |
+| `POST /api/v1/feedbacks` | 🟢 | PR #22 |
+| `GET /api/v1/visitas/{id}/feedback` · `PUT /api/v1/feedbacks/{id}` | 🟢 | PR #22 |
+| `GET /api/v1/hospitais/{id}/indicadores` | 🟢 | PR #23 |
+
 ### 3.1 Auth e Usuário
 
 #### `POST /api/v1/auth/registro` 🔓
 Cria conta (opcional no MVP — jornada principal funciona sem login).
+
+> 🟡 **Situação atual (30/08/2026):** o contrato meta é este path, mas o app mobile e o backend utilizam **`POST /api/user/cadastro`** (path legado da Árvore Tecnológica — PRs #5/#6). Migração para `/api/v1/auth/registro` **pendente de decisão**.
 
 **Request:**
 ```json
@@ -239,14 +263,22 @@ Rotação de refresh token (revoga o anterior).
 #### `POST /api/v1/auth/logout` 🔒
 **200** — invalida refresh token (blacklist).
 
-#### `DELETE /api/v1/usuarios/me` 🔒
+> 🔴 **Situação atual (30/08/2026):** não implementado — não há blacklist de refresh token no backend; o logout é apenas local no app (`TokenStorage.limparTokens`). Implementação/prazo **pendentes de decisão**.
+
+#### `DELETE /api/v1/contas/exclusao` 🔒
 Exclui conta e dados pessoais (LGPD). **200** com resumo do que foi removido/anonimizado.
+
+> ✅ **Situação atual (30/08/2026):** implementado (PR #25). Substitui o path anterior `DELETE /api/v1/usuarios/me` por clareza semântica. Cascade: remove `users` + `auth_logins` (`AuthRepository.deleteByUser_Id`), anonimiza `visitas`/`feedbacks` (`usuarioId → null`, `anonimizado=true`) e **recalcula os agregados** afetados (job de 15min cobre falhas).
 
 #### `GET /api/v1/usuarios/me` 🔒
 Perfil do usuário logado (dados + consentimentos).
 
+> 🔴 **Situação atual (30/08/2026):** não implementado — o perfil é servido no payload do `POST /api/v1/auth/login` e persistido localmente (`TokenStorage`). Pendente de decisão.
+
 #### `PUT /api/v1/usuarios/me/consentimentos` 🔒
 Atualiza consentimentos (ex.: revogar localização). **Request:** `{ "localizacao": { "aceito": false } }`
+
+> 🔴 **Situação atual (30/08/2026):** não implementado — os consentimentos são registrados no cadastro (`consentimentosIniciais` no `UserServiceImpl`); a revogação de localização no app é local/permissão do SO (E5-05, Sprint S8). Pendente de decisão.
 
 ---
 
@@ -436,7 +468,7 @@ sequenceDiagram
 | **TLS** | HTTPS obrigatório; HSTS; certificados gerenciados |
 | **JWT** | Access 15min (curto) + Refresh 30d (rotação, SecureStore no app) |
 | **CORS** | Restrito a domínios do app web (dev) |
-| **Rate limit** | Login 10/min/IP · Feedback 30/min/IP · Público 60/min/IP |
+| **Rate limit** | Login/refresh 10/min/IP (`AUTH`) · Público 60/min/IP (`PUBLICO`, inclui feedbbacks e agregados) — implementado (PR #24) |
 | **Validação** | Bean Validation em todos os DTOs; mensagens pt-BR |
 | **Logs** | Sem dados pessoais (nunca logar e-mail/senha/posição bruta); `traceId` em todas as respostas |
 | **Papéis** | `USER` (padrão) · `HOSPITAL_ADMIN` (futuro) · `ADMIN` (cadastro de hospitais) |
@@ -463,7 +495,7 @@ No MVP, esses eventos são processados **in-process** (job/`@TransactionalEventL
 - [ ] Confirmar política de `origem=MANUAL` (check-in manual) e seus limites anti-abuso.
 - [ ] Confirmar `dispositivoId` anônimo: formato e duração de retenção (LGPD).
 - [ ] Confirmar política de heartbeat/expiração (RN-04/RN-23): intervalo de 30min, marcação `SUSPEITA` aos 2h, expiração aos 24h sem sinal — validar consumo de bateria e rede em teste de campo.
-- [ ] Decidir edição de feedback: permitida só comentário ou nota também? (Proposta: comentário editável; nota não — integridade do agregado.)
+- [x] Decisão (PR #22): **nota e demais campos editáveis dentro da janela de 24h** (RN-09); agregado recalcula no `PUT` via evento `FeedbackSalvoEvent`.
 - [ ] Gerar spec OpenAPI 3.1 a partir deste documento e versionar em `backend/src/main/resources/openapi/`.
 - [ ] Testes de integração por recurso no Sprint 0 (F0-03).
 

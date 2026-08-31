@@ -79,11 +79,12 @@ jest.mock("react-native-gesture-handler", () => {
 });
 
 describe("App — Bottom Tabs (E6-01)", () => {
-  it("monta o app e exibe as 3 abas (Início, Hospitais, Perfil)", () => {
+  it("monta o app e exibe as 4 abas (Início, Hospitais, Mapa, Perfil)", () => {
     render(<App />);
 
     expect(screen.getByText("Início")).toBeOnTheScreen();
     expect(screen.getByText("Hospitais")).toBeOnTheScreen();
+    expect(screen.getByText("Mapa")).toBeOnTheScreen();
     expect(screen.getByText("Perfil")).toBeOnTheScreen();
   });
 
@@ -92,10 +93,12 @@ describe("App — Bottom Tabs (E6-01)", () => {
 
     const abaHospitais = screen.getByLabelText("Hospitais — lista com indicadores");
     const abaPerfil = screen.getByLabelText("Perfil — conta e privacidade");
-    const abaInicio = screen.getByLabelText("Início — status da visita e mapa");
+    const abaInicio = screen.getByLabelText("Início — apresentação do app");
+    const abaMapa = screen.getByLabelText("Mapa — hospitais e geolocalização");
 
     expect(abaHospitais).toBeOnTheScreen();
     expect(abaPerfil).toBeOnTheScreen();
     expect(abaInicio).toBeOnTheScreen();
+    expect(abaMapa).toBeOnTheScreen();
   });
 });

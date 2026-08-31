@@ -40,8 +40,9 @@ import java.util.stream.Collectors;
  *       últimos 90 dias (RN-14);</li>
  *   <li><b>nAvaliacoes</b> — quantidade de feedbacks na janela; exibir apenas se ≥ 5 (RN-15);</li>
  *   <li><b>tempoMedianoMinutos</b> — mediana das durações de visitas elegíveis na janela,
- *       considerando apenas visitas ≤ 24h e com {@code tipoPermanencia = ATENDIMENTO}
- *       (exclui {@code INTERNACAO}/{@code OBSERVACAO} — RN-16/RN-24); visitas
+ *       considerando apenas visitas com duração entre 2min e 24h e com
+ *       {@code tipoPermanencia = ATENDIMENTO} (exclui {@code INTERNACAO}/{@code OBSERVACAO} —
+ *       RN-16/RN-24); durações < 2min são ruído e ficam de fora (RN-07); visitas
  *       {@code GPS_INTERROMPIDO} entram apenas se a cobertura de GPS ≥ 90% (RN-17);</li>
  *   <li><b>{@code atualizadoEm}</b> — atualização ≤ 15min após feedback, via evento
  *       (RN-18) e job de 15min.</li>
@@ -60,6 +61,9 @@ public class AgregadoServiceImpl implements AgregadoService {
 
     /** Teto de duração para a métrica de tempo (RN-16): visitas de até 24h. */
     static final int TETO_DURACAO_MINUTOS = 24 * 60;
+
+    /** Piso de duração para a métrica de tempo (RN-07): visitas com menos de 2 minutos são ruído e não entram nas estatísticas públicas. */
+    static final int DURACAO_MINIMA_MINUTOS = 2;
 
     /** Percentual mínimo de cobertura de GPS para visitas {@code GPS_INTERROMPIDO} (RN-17). */
     static final double COBERTURA_GPS_MINIMA = 0.90;
@@ -99,6 +103,7 @@ public class AgregadoServiceImpl implements AgregadoService {
 
         List<Integer> duracoes = candidatas.stream()
                 .filter(v -> v.getDuracaoMinutos() != null)
+                .filter(v -> v.getDuracaoMinutos() >= DURACAO_MINIMA_MINUTOS)
                 .filter(v -> v.getDuracaoMinutos() <= TETO_DURACAO_MINUTOS)
                 .filter(AgregadoServiceImpl::tempoConfiável)
                 .map(VisitaDocument::getDuracaoMinutos)

@@ -66,7 +66,7 @@ public class JwtService {
     /** Extrai o claim {@code jti} (UUID) do token. Lança se o token for inválido. */
     public String extractJti(String token) {
         Claims claims = extractAllClaims(token);
-        String jti = claims.get(Claims.ID);
+        String jti = claims.get(Claims.ID, String.class);
         if (jti == null || jti.isBlank()) {
             throw new IllegalArgumentException("Token sem claim jti.");
         }

@@ -25,7 +25,7 @@ public interface VisitaService {
 
     TipoPermanenciaResponse sinalizarTipoPermanencia(String id, TipoPermanenciaRequest request, String usuarioId);
 
-    VisitaAtivaResponse buscarAtiva(String usuarioId);
+    VisitaAtivaResponse buscarAtiva(String usuarioId, String dispositivoId);
 
     PageResponse<VisitaResponse> historico(String usuarioId, int page, int size);
 

@@ -40,6 +40,22 @@ describe("VisitaService (Épico 02)", () => {
     expect(body.origem).toBe("GEOFENCE");
   });
 
+  test("checkin anônimo anexa dispositivoId automaticamente (modo sem login)", async () => {
+    await VisitaService.checkin({ hospitalId: "h1", origem: "MANUAL" });
+
+    const body = JSON.parse(chamadas[0].body);
+    expect(body.dispositivoId).toBeTruthy();
+    expect(body.dispositivoId).toContain("anon-");
+  });
+
+  test("checkin autenticado NÃO envia dispositivoId", async () => {
+    await TokenStorage.salvarTokens({ accessToken: "TOK", refreshToken: "R" });
+    await VisitaService.checkin({ hospitalId: "h1", origem: "MANUAL" });
+
+    const body = JSON.parse(chamadas[0].body);
+    expect(body.dispositivoId).toBeUndefined();
+  });
+
   test("checkout faz POST em /checkout com encerramentoManual", async () => {
     await VisitaService.checkout("v1", { encerramentoManual: true });
     const c = chamadas[0];
@@ -68,6 +84,13 @@ describe("VisitaService (Épico 02)", () => {
     expect(chamadas[0].url).toContain("/api/v1/visitas/ativas");
   });
 
+  test("buscarAtiva anônimo envia dispositivoId no query string", async () => {
+    await VisitaService.buscarAtiva();
+    const url = chamadas[0].url;
+    expect(url).toContain("dispositivoId=");
+    expect(url).toContain("anon-");
+  });
+
   test("listarHistorico usa /contas/visitas com paginação", async () => {
     await VisitaService.listarHistorico({ page: 2, size: 20 });
     expect(chamadas[0].url).toContain("/api/v1/contas/visitas");
@@ -79,6 +102,7 @@ describe("VisitaService (Épico 02)", () => {
     await TokenStorage.salvarTokens({ accessToken: "TOK", refreshToken: "R" });
     await VisitaService.buscarAtiva();
     expect(global.fetch.mock.calls[0][1].headers.Authorization).toBe("Bearer TOK");
+    expect(chamadas[0].url).not.toContain("dispositivoId=");
   });
 
   test("401 renova token via refresh e tenta novamente", async () => {

@@ -1,5 +1,6 @@
 import { buildApiUrl } from "../../../config/api";
 import TokenStorage from "../../../services/TokenStorage";
+import DispositivoId from "../../../services/DispositivoId";
 import LoginService from "../../auth/service/LoginService";
 
 const BASE_PATH = "/api/v1/visitas";
@@ -104,12 +105,20 @@ class VisitaService {
   /**
    * Registra entrada (E2-01/E2-06). `origem` = "GEOFENCE" | "MANUAL".
    * `posicao` é obrigatória para GEOFENCE; `dispositivoId` permite visita anônima.
+   * Quando não autenticado, o `dispositivoId` é gerado/persistido automaticamente
+   * (modo anônimo sem login — §3.3 / RN-03).
    * Em caso de empate de geofences (E2-04), o backend responde 409 com `candidatos`.
    */
-  static checkin({ hospitalId, origem, posicao, dispositivoId }) {
+  static async checkin({ hospitalId, origem, posicao, dispositivoId }) {
+    const corpo = { hospitalId, origem, posicao };
+    if (dispositivoId) {
+      corpo.dispositivoId = dispositivoId;
+    } else if (!(await TokenStorage.getAccessToken())) {
+      corpo.dispositivoId = await DispositivoId.obter();
+    }
     return request(`${BASE_PATH}/checkin`, {
       method: "POST",
-      body: { hospitalId, origem, posicao, dispositivoId },
+      body: corpo,
     });
   }
 
@@ -137,9 +146,12 @@ class VisitaService {
     });
   }
 
-  /** Visita ativa do usuário, para o card/cronômetro (E2-07). */
-  static buscarAtiva() {
-    return request(`${BASE_PATH}/ativas`);
+  /** Visita ativa do usuário/dispositivo, para o card/cronômetro (E2-07). */
+  static async buscarAtiva() {
+    const dispositivoId = (await TokenStorage.getAccessToken())
+      ? undefined
+      : await DispositivoId.obter();
+    return request(`${BASE_PATH}/ativas${buildQuery({ dispositivoId })}`);
   }
 
   /** Histórico paginado de visitas do usuário (E5-03 — namespace contas). */

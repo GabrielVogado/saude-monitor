@@ -20,8 +20,6 @@ export default function HomeScreen({ navigation }) {
     const promptTipoExibidoRef = useRef(false);
 
     useEffect(() => {
-        carregarVisitaAtiva();
-
         // Inicializa o geofencing nativo (F-03/ADR-002) uma vez, no ciclo de vida global do
         // app — mesmo padrão de inicialização usado hoje pelo `GeoLocalizacaoService`.
         iniciarGeofencing().catch(() => {
@@ -41,6 +39,14 @@ export default function HomeScreen({ navigation }) {
             })
             .finally(() => setCarregandoVisita(false));
     }, []);
+
+    // Relê a visita ativa sempre que a Home ganha foco (ex.: ao voltar do check-in
+    // manual/do mapa) — no modo anônimo isso reidrata o card pelo dispositivoId (§3.3).
+    useFocusEffect(
+        useCallback(() => {
+            carregarVisitaAtiva();
+        }, [carregarVisitaAtiva])
+    );
 
     useEffect(() => {
         sincronizarVisitaAtiva(visitaAtiva?.id);

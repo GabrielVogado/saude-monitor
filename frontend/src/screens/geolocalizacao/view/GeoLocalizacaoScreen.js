@@ -3,7 +3,7 @@
 // fonte de verdade do ciclo de vida das visitas (check-in/checkout automáticos, E2-01/02).
 // Esta tela permanece apenas como ferramenta de depuração/mapa com `watchPositionAsync`
 // em foreground — não dispara check-in/checkout e não deve ser alterada para isso.
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Camera, Map, Marker } from "@maplibre/maplibre-react-native";
@@ -12,6 +12,8 @@ import {
   useGeolocalizacao,
 } from "../service/GeoLocalizacaoService";
 import { getInitialViewState, OSM_RASTER_STYLE } from "../../../utils/mapStyle";
+import { geojsonParaCoordenadas, calcularCentroide } from "../../../utils/geojson";
+import HospitalService from "../../hospitais/service/HospitalService";
 import { colors, typography, spacing, radii } from "../../../theme";
 
 const BRASIL_REGION = {
@@ -31,6 +33,16 @@ function GeolocalizacaoContent() {
     iniciarMonitoramento,
     pararMonitoramento,
   } = useGeolocalizacao();
+  const [hospitais, setHospitais] = useState([]);
+  const [erroHospitais, setErroHospitais] = useState(null);
+
+  // Item 05 (revisão de UX): o mapa exibe TODOS os hospitais ativos, não apenas o
+  // usuário. Pagina de uma vez (size 100) — o catálogo de hospitais é público (E1-03).
+  useEffect(() => {
+    HospitalService.listar({ size: 100 })
+      .then((data) => setHospitais(data?.content || data || []))
+      .catch((e) => setErroHospitais(e.message || "Não foi possível carregar os hospitais."));
+  }, []);
 
   const regionAtual = useMemo(() => {
     if (!coordenadas) {
@@ -54,6 +66,32 @@ function GeolocalizacaoContent() {
     });
   };
 
+  // Enquadra a câmera para cobrir todos os hospitais cadastrados (item 05) sempre
+  // que a lista carregar — assim o "todos os hospitais" é visível de imediato.
+  const enquadrarHospitais = useCallback(() => {
+    const pontos = hospitais
+      .map((h) => calcularCentroide(geojsonParaCoordenadas(h.geofence)))
+      .filter(Boolean);
+    if (pontos.length === 0) {
+      return;
+    }
+
+    const lats = pontos.map((p) => p.latitude);
+    const lngs = pontos.map((p) => p.longitude);
+    cameraRef.current?.fitBounds(
+      [Math.max(...lngs), Math.max(...lats)],
+      [Math.min(...lngs), Math.min(...lats)],
+      48,
+      600
+    );
+  }, [hospitais]);
+
+  useEffect(() => {
+    if (hospitais.length > 0) {
+      enquadrarHospitais();
+    }
+  }, [hospitais, enquadrarHospitais]);
+
   useEffect(() => {
     iniciarMonitoramento();
     return () => {
@@ -61,11 +99,13 @@ function GeolocalizacaoContent() {
     };
   }, [iniciarMonitoramento, pararMonitoramento]);
 
+  // Centraliza no GPS apenas quando não há hospitais enquadrados (ex.: base sem
+  // cadastro); com hospitais, o usuário usa o botão "Centralizar no meu GPS".
   useEffect(() => {
-    if (coordenadas) {
+    if (coordenadas && hospitais.length === 0) {
       centralizar();
     }
-  }, [coordenadas, regionAtual]);
+  }, [coordenadas, regionAtual, hospitais.length]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -76,11 +116,30 @@ function GeolocalizacaoContent() {
       <Map style={styles.map} mapStyle={OSM_RASTER_STYLE}>
         <Camera ref={cameraRef} initialViewState={getInitialViewState(BRASIL_REGION)} />
 
-        {!coordenadas && (
+        {!coordenadas && !hospitais.length && (
           <Marker lngLat={[BRASIL_REGION.longitude, BRASIL_REGION.latitude]}>
             <View style={styles.markerDot} />
           </Marker>
         )}
+
+        {hospitais.map((hospital) => {
+          const centroide = calcularCentroide(geojsonParaCoordenadas(hospital.geofence));
+          if (!centroide) {
+            return null;
+          }
+          return (
+            <Marker key={hospital.id} lngLat={[centroide.longitude, centroide.latitude]}>
+              <View style={styles.hospitalMarker}>
+                <View style={styles.hospitalDot} />
+                <View style={styles.hospitalLabelBox}>
+                  <Text style={styles.hospitalLabel} numberOfLines={1}>
+                    {hospital.nome}
+                  </Text>
+                </View>
+              </View>
+            </Marker>
+          );
+        })}
 
         {coordenadas && (
           <Marker lngLat={[coordenadas.longitude, coordenadas.latitude]}>
@@ -119,6 +178,12 @@ function GeolocalizacaoContent() {
         {erro && (
           <Text style={styles.errorText} accessibilityLiveRegion="polite">
             {erro}
+          </Text>
+        )}
+
+        {erroHospitais && (
+          <Text style={styles.errorText} accessibilityLiveRegion="polite">
+            {erroHospitais}
           </Text>
         )}
 
@@ -216,5 +281,29 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderWidth: 3,
     borderColor: colors.surfaceContainerLowest,
+  },
+  hospitalMarker: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  hospitalDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.geoActive,
+    borderWidth: 3,
+    borderColor: colors.surfaceContainerLowest,
+  },
+  hospitalLabelBox: {
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: radii.xs,
+    paddingHorizontal: spacing.s2,
+    paddingVertical: 2,
+    marginLeft: spacing.s1,
+  },
+  hospitalLabel: {
+    ...typography.labelSm,
+    color: colors.onSurface,
+    maxWidth: 140,
   },
 });

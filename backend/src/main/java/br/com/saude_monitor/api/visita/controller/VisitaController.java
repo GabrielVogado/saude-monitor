@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -71,11 +72,12 @@ public class VisitaController {
         return ResponseEntity.ok(visitaService.sinalizarTipoPermanencia(id, request, usuarioId));
     }
 
-    /** 🔒 Visita ativa do usuário, para o card/cronômetro (E2-07). */
+    /** 🔓/🔒 Visita ativa do usuário/dispositivo anônimo, para o card/cronômetro (E2-07). */
     @GetMapping("/api/v1/visitas/ativas")
-    public ResponseEntity<VisitaAtivaResponse> buscarAtiva() {
-        String usuarioId = exigirUsuarioAutenticado();
-        return ResponseEntity.ok(visitaService.buscarAtiva(usuarioId));
+    public ResponseEntity<VisitaAtivaResponse> buscarAtiva(
+            @RequestParam(required = false) String dispositivoId) {
+        String usuarioId = autenticacaoHelper.usuarioIdAtual().orElse(null);
+        return ResponseEntity.ok(visitaService.buscarAtiva(usuarioId, dispositivoId));
     }
 
     private String exigirUsuarioAutenticado() {

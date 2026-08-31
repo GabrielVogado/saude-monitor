@@ -19,7 +19,7 @@ import {colors, typography, spacing, radii} from "../../../theme";
 export default function CheckinManualScreen({ navigation }) {
   const [hospitais, setHospitais] = useState([]);
   const [carregando, setCarregando] = useState(true);
-  const [enviando, setEnviando] = useState(false);
+  const [enviandoId, setEnviandoId] = useState(null);
   const [erro, setErro] = useState(null);
 
   const carregar = () => {
@@ -36,7 +36,7 @@ export default function CheckinManualScreen({ navigation }) {
   }, []);
 
   const fazerCheckin = async (hospital) => {
-    setEnviando(true);
+    setEnviandoId(hospital.id);
     setErro(null);
     try {
       await VisitaService.checkin({
@@ -50,8 +50,7 @@ export default function CheckinManualScreen({ navigation }) {
         return;
       }
       setErro(e.message);
-    } finally {
-      setEnviando(false);
+      setEnviandoId(null);
     }
   };
 
@@ -69,13 +68,13 @@ export default function CheckinManualScreen({ navigation }) {
           text: candidato.nome,
           onPress: () => reenviarCheckinComCandidato(candidato),
         })),
-        { text: "Cancelar", style: "cancel", onPress: () => setEnviando(false) },
+        { text: "Cancelar", style: "cancel", onPress: () => setEnviandoId(null) },
       ]
     );
   };
 
   const reenviarCheckinComCandidato = async (candidato) => {
-    setEnviando(true);
+    setEnviandoId(candidato.hospitalId);
     setErro(null);
     try {
       await VisitaService.checkin({
@@ -85,8 +84,7 @@ export default function CheckinManualScreen({ navigation }) {
       navigation.goBack();
     } catch (e) {
       setErro(e.message);
-    } finally {
-      setEnviando(false);
+      setEnviandoId(null);
     }
   };
 
@@ -128,7 +126,8 @@ export default function CheckinManualScreen({ navigation }) {
               <CSButton
                 label="Estou aqui"
                 onPress={() => fazerCheckin(item)}
-                loading={enviando}
+                loading={enviandoId === item.id}
+                disabled={enviandoId !== null}
                 variant="secondary"
               />
             </CSCard>

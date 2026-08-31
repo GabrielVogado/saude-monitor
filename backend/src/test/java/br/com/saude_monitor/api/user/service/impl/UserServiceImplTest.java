@@ -118,7 +118,7 @@ class UserServiceImplTest {
         ArgumentCaptor<UserDocument> captor = ArgumentCaptor.forClass(UserDocument.class);
         verify(userRepository).save(captor.capture());
         ConsentimentoItem termos = captor.getValue().getConsentimentos().getTermosUso();
-        assertTrue(termos.getAceito());
+        assertTrue(termos.isAceito());
         assertEquals("1.0", termos.getVersao());
     }
 

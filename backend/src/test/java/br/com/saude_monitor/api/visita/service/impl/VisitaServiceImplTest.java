@@ -7,12 +7,16 @@ import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import br.com.saude_monitor.api.visita.document.OrigemVisita;
 import br.com.saude_monitor.api.visita.document.StatusVisita;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
+import br.com.saude_monitor.api.hospital.dto.PageResponse;
 import br.com.saude_monitor.api.visita.dto.CheckinRequest;
 import br.com.saude_monitor.api.visita.dto.CheckinResponse;
 import br.com.saude_monitor.api.visita.dto.VisitaAtivaResponse;
+import br.com.saude_monitor.api.visita.dto.VisitaResponse;
 import br.com.saude_monitor.api.visita.repository.VisitaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.time.Instant;
@@ -116,5 +120,31 @@ class VisitaServiceImplTest {
         assertThrows(NaoAutorizadoException.class, () -> visitaService.buscarAtiva(null, null));
         verify(visitaRepository, never()).findFirstByDispositivoIdAndStatusInOrderByEntradaDesc(
                 anyString(), any());
+    }
+
+    @Test
+    void historicoAnexaNomeDoHospital() {
+        VisitaDocument visita = VisitaDocument.builder()
+                .id("v10")
+                .usuarioId("u1")
+                .hospitalId("h1")
+                .entrada(Instant.parse("2026-08-30T10:00:00Z"))
+                .saida(Instant.parse("2026-08-30T11:30:00Z"))
+                .duracaoMinutos(90)
+                .status(StatusVisita.FINALIZADA)
+                .origem(OrigemVisita.GEOFENCE)
+                .build();
+
+        when(visitaRepository.findByUsuarioIdOrderByEntradaDesc("u1", PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(visita)));
+        when(hospitalRepository.findAllById(List.of("h1")))
+                .thenReturn(List.of(HospitalDocument.builder().id("h1").nome("Hospital Central").build()));
+
+        PageResponse<VisitaResponse> resultado = visitaService.historico("u1", 0, 20);
+
+        assertEquals(1, resultado.content().size());
+        VisitaResponse item = resultado.content().get(0);
+        assertEquals("h1", item.hospitalId());
+        assertEquals("Hospital Central", item.hospitalNome());
     }
 }

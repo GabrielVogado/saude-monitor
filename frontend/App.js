@@ -17,6 +17,7 @@ import SugestoesPendentesScreen from "./src/screens/hospitais/view/SugestoesPend
 import RevisarSugestaoScreen from "./src/screens/hospitais/view/RevisarSugestaoScreen.js";
 import FeedbackFormScreen from "./src/screens/feedback/view/FeedbackFormScreen.js";
 import PerfilScreen from "./src/screens/perfil/view/PerfilScreen.js";
+import HistoricoScreen from "./src/screens/perfil/view/HistoricoScreen.js";
 import PrivacidadeScreen from "./src/screens/perfil/view/PrivacidadeScreen.js";
 import {colors, spacing} from "./src/theme";
 import { agendarLembrete, pendenciaAtual } from "./src/screens/feedback/service/FeedbackNotificationService";
@@ -53,6 +54,7 @@ function PerfilStack() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Perfil" component={PerfilScreen} />
+            <Stack.Screen name="Historico" component={HistoricoScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Cadastro" component={UserScreen} />
             <Stack.Screen name="Privacidade" component={PrivacidadeScreen} />

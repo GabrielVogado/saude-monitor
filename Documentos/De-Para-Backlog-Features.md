@@ -62,7 +62,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 |---|---|---|---|
 | **E5-01** | Permissão localização etapas | **F-09** | 🟢 Implementado (FE: Perfil → Dados e Privacidade, consulta/solicita/revoga) |
 | **E5-02** | Termos de privacidade LGPD | **F-09** | 🟢 Implementado (FE: tela Privacidade/Termos acessível em 2 toques; selo HIPAA removido) |
-| **E5-03** | Histórico pessoal visitas/fb | **F-02** | 🟡 Parcial (**backend 31/08/2026**: `GET /api/v1/contas/visitas`, `GET /api/v1/contas/feedbacks` e exportação LGPD `GET /api/v1/contas/export` implementados; falta **UI** do histórico/exportação — Sprint S8) |
+| **E5-03** | Histórico pessoal visitas/fb | **F-02** | 🟢 Implementado (31/08/2026: backend `GET /api/v1/contas/visitas`, `GET /api/v1/contas/feedbacks`, `GET /api/v1/contas/export`; **UI** `HistoricoScreen` na aba Perfil com visitas + avaliações do usuário logado, acessível pelo botão "Meu histórico"; pós-login navega para Perfil) |
 | **E5-04** | Cadastro/login opcional | **F-02** | 🟢 Implementado (FE: conta opcional na jornada principal; Perfil orienta Login/Cadastro) |
 | **E5-05** | Revogar consentimento LGPD | **F-09** | 🟡 Parcial (revogação em Perfil; desligamento nativo via configurações do SO → conclusão na **Sprint S8**) |
 

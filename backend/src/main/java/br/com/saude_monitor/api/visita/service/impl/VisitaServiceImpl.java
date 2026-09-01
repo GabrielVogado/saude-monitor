@@ -275,7 +275,7 @@ public class VisitaServiceImpl implements VisitaService {
         if (posicao == null) {
             throw new ValidacaoNegocioException("posicao é obrigatória para check-in via GEOFENCE.");
         }
-        GeoJsonPoint ponto = new GeoJsonPoint(posicao.coordinates().get(0), posicao.coordinates().get(1));
+        GeoJsonPoint ponto = new GeoJsonPoint(posicao.coordinates().getFirst(), posicao.coordinates().get(1));
 
         Query query = new Query(Criteria.where("ativo").is(true).and("geofence").intersects(ponto));
         List<HospitalDocument> candidatos = mongoTemplate.find(query, HospitalDocument.class);
@@ -284,7 +284,7 @@ public class VisitaServiceImpl implements VisitaService {
             throw new ValidacaoNegocioException("A posição informada não está dentro do geofence de nenhum hospital.");
         }
         if (candidatos.size() == 1) {
-            return candidatos.get(0).getId();
+            return candidatos.getFirst().getId();
         }
 
         // Sobreposição de geofences (E2-04/RN-05): ordena por distância ao centroide.
@@ -292,7 +292,7 @@ public class VisitaServiceImpl implements VisitaService {
                 .sorted(Comparator.comparingDouble(h -> distanciaMetros(ponto, h.getLocalizacao())))
                 .toList();
 
-        HospitalDocument maisProximo = ordenados.get(0);
+        HospitalDocument maisProximo = ordenados.getFirst();
         HospitalDocument segundo = ordenados.get(1);
         double d1 = distanciaMetros(ponto, maisProximo.getLocalizacao());
         double d2 = distanciaMetros(ponto, segundo.getLocalizacao());
@@ -360,7 +360,7 @@ public class VisitaServiceImpl implements VisitaService {
 
     private PontoAmostralDocument toPontoAmostral(PosicaoDto dto, Instant em) {
         return PontoAmostralDocument.builder()
-                .posicao(new GeoJsonPoint(dto.coordinates().get(0), dto.coordinates().get(1)))
+                .posicao(new GeoJsonPoint(dto.coordinates().getFirst(), dto.coordinates().get(1)))
                 .em(em)
                 .build();
     }

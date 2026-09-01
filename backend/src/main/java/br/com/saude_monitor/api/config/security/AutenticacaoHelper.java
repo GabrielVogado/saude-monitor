@@ -31,9 +31,10 @@ public class AutenticacaoHelper {
             return Optional.empty();
         }
         Object principal = authentication.getPrincipal();
-        if (principal instanceof UserDetails userDetails) {
-            return Optional.ofNullable(userDetails.getUsername());
-        }
-        return Optional.empty();
+        return switch (principal) {
+            case UserDetails userDetails -> Optional.ofNullable(userDetails.getUsername());
+            case null -> Optional.empty();
+            default -> Optional.empty();
+        };
     }
 }

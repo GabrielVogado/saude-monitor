@@ -36,10 +36,10 @@ public class GeofenceFactory {
      * Converte o DTO em {@link GeoJsonPolygon}, usando o anel externo informado.
      */
     public GeoJsonPolygon toPolygon(GeoJsonPolygonDto dto) {
-        List<List<Double>> anel = dto.coordinates().get(0);
+        List<List<Double>> anel = dto.coordinates().getFirst();
         List<Point> pontos = new ArrayList<>(anel.size());
         for (List<Double> posicao : anel) {
-            pontos.add(new Point(posicao.get(0), posicao.get(1)));
+            pontos.add(new Point(posicao.getFirst(), posicao.get(1)));
         }
         return new GeoJsonPolygon(pontos);
     }
@@ -67,13 +67,13 @@ public class GeofenceFactory {
      * aritmética dos vértices.
      */
     public GeoJsonPoint calcularCentroide(GeoJsonPolygon polygon) {
-        List<Point> anel = polygon.getCoordinates().get(0).getCoordinates();
+        List<Point> anel = polygon.getCoordinates().getFirst().getCoordinates();
         int n = anel.size();
         if (n == 0) {
             return null;
         }
         // Despreza o ponto de fechamento repetido.
-        List<Point> vertices = anel.get(0).equals(anel.get(n - 1)) ? anel.subList(0, n - 1) : anel;
+        List<Point> vertices = anel.getFirst().equals(anel.getLast()) ? anel.subList(0, n - 1) : anel;
         int m = vertices.size();
 
         double area = 0;
@@ -120,7 +120,7 @@ public class GeofenceFactory {
             pontos.add(new Point(lng, lat));
         }
         // Fecha o anel.
-        pontos.add(pontos.get(0));
+        pontos.add(pontos.getFirst());
         return new GeoJsonPolygon(pontos);
     }
 }

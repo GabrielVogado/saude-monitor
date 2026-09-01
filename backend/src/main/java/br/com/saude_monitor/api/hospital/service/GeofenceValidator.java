@@ -38,7 +38,7 @@ public class GeofenceValidator {
             throw new ValidacaoNegocioException("O tipo do geofence deve ser 'Polygon'.");
         }
         if (geofence.coordinates() == null || geofence.coordinates().isEmpty()
-                || geofence.coordinates().get(0) == null) {
+            || geofence.coordinates().getFirst() == null) {
             throw new ValidacaoNegocioException("O geofence deve possuir ao menos um anel de coordenadas.");
         }
         // MVP: um único anel externo (sem buracos).
@@ -46,7 +46,7 @@ public class GeofenceValidator {
             throw new ValidacaoNegocioException("Geofence com buracos (multi-anel) não é suportado.");
         }
 
-        List<List<Double>> anel = geofence.coordinates().get(0);
+        List<List<Double>> anel = geofence.coordinates().getFirst();
         validarAnel(anel);
     }
 
@@ -57,8 +57,8 @@ public class GeofenceValidator {
                     "O geofence deve ter ao menos 3 vértices distintos (anel fechado).");
         }
 
-        double[] primeiro = posicao(anel.get(0));
-        double[] ultimo = posicao(anel.get(anel.size() - 1));
+        double[] primeiro = posicao(anel.getFirst());
+        double[] ultimo = posicao(anel.getLast());
         if (primeiro[0] != ultimo[0] || primeiro[1] != ultimo[1]) {
             throw new ValidacaoNegocioException(
                     "O anel do geofence deve ser fechado (primeiro e último vértice iguais).");
@@ -85,7 +85,7 @@ public class GeofenceValidator {
         if (p == null || p.size() < 2) {
             throw new ValidacaoNegocioException("Cada posição do geofence deve ser [longitude, latitude].");
         }
-        return new double[]{p.get(0), p.get(1)};
+        return new double[]{p.getFirst(), p.get(1)};
     }
 
     private void validarLimites(double[] p) {

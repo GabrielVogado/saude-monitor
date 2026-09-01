@@ -23,8 +23,8 @@ const CATEGORIA_LABEL = {
  * Card de hospital (lista/ranking) — card inteiro clicável.
  *
  * Navegação revisada: aceita `onCheckin`/`checkinLoading`/`checkinAtivo` para exibir um
- * botão compacto de check-in manual no próprio card (sem abrir o detalhe). Ao tocar no
- * corpo do card (fora do botão), `onPress` abre o detalhe como antes.
+ * botão compacto de check-in manual no próprio card (sem abrir o detalhe). O controle
+ * fica fora do Pressable que abre o detalhe para evitar duas navegações no mesmo toque.
  */
 export default function CSHospitalCard({
   hospital,
@@ -40,7 +40,6 @@ export default function CSHospitalCard({
     indicadores?.notaMedia !== null &&
     indicadores?.notaMedia !== undefined &&
     indicadores?.nAvaliacoes >= 5;
-
   const tipoLabel = TIPO_LABEL[hospital?.tipo] || hospital?.tipo || "Hospital";
   const categoriaLabel = CATEGORIA_LABEL[hospital?.categoria] || hospital?.categoria;
   const tipoUnidade =
@@ -49,106 +48,102 @@ export default function CSHospitalCard({
       : null;
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${hospital?.nome}, ${categoriaLabel || tipoLabel}`}
-      onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-    >
-      <View style={styles.avatar}>
-        <Building2 size={24} color={colors.primary} />
-      </View>
-
-      <View style={styles.body}>
-        <Text style={styles.name} numberOfLines={1}>
-          {hospital?.nome}
-        </Text>
-
-        <View style={styles.metaRow}>
-          {categoriaLabel ? (
-            <CSBadge label={categoriaLabel} variant="info" />
-          ) : (
-            <CSBadge label={tipoLabel} variant="info" />
-          )}
-          {tipoLabel && categoriaLabel ? (
-            <CSBadge label={tipoLabel} variant="neutral" />
-          ) : null}
-          {distanciaKm !== null && distanciaKm !== undefined ? (
-            <Text style={styles.distance}>{distanciaKm.toFixed(1)} km</Text>
-          ) : null}
+    <View style={styles.card}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${hospital?.nome}, ${categoriaLabel || tipoLabel}`}
+        onPress={onPress}
+        style={({ pressed }) => [styles.detailsButton, pressed && styles.pressed]}
+      >
+        <View style={styles.avatar}>
+          <Building2 size={24} color={colors.primary} />
         </View>
 
-        {tipoUnidade ? (
-          <Text style={styles.unitType} numberOfLines={1}>
-            {tipoUnidade}
+        <View style={styles.body}>
+          <Text style={styles.name} numberOfLines={1}>
+            {hospital?.nome}
           </Text>
-        ) : null}
-
-        {temIndicadores ? (
-          <View style={styles.ratingRow}>
-            <CSRatingStars nota={indicadores.notaMedia} size={16} />
-            <Text style={styles.ratingValue}>{formatarNota(indicadores.notaMedia)}</Text>
-            <Text style={styles.ratingCount}>{indicadores.nAvaliacoes} avaliações</Text>
+          <View style={styles.metaRow}>
+            {categoriaLabel ? (
+              <CSBadge label={categoriaLabel} variant="info" />
+            ) : (
+              <CSBadge label={tipoLabel} variant="info" />
+            )}
+            {tipoLabel && categoriaLabel ? (
+              <CSBadge label={tipoLabel} variant="neutral" />
+            ) : null}
+            {distanciaKm !== null && distanciaKm !== undefined ? (
+              <Text style={styles.distance}>{distanciaKm.toFixed(1)} km</Text>
+            ) : null}
           </View>
-        ) : (
-          <Text style={styles.noRating}>Ainda sem avaliações suficientes</Text>
-        )}
-
-        {temIndicadores && indicadores.tempoMedianoMinutos != null ? (
-          <Text style={styles.timeMetric}>
-            Tempo médio: {formatarDuracao(indicadores.tempoMedianoMinutos)}
-          </Text>
-        ) : null}
-
-        {onCheckin && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              checkinAtivo
-                ? `${hospital?.nome} — ver check-in ativo`
-                : `Fazer check-in em ${hospital?.nome}`
-            }
-            disabled={checkinLoading || checkinDesabilitado}
-            onPress={(event) => {
-              event.stopPropagation();
-              onCheckin();
-            }}
-            style={({ pressed }) => [
-              styles.checkinButton,
-              checkinAtivo && styles.checkinButtonActive,
-              pressed && styles.checkinButtonPressed,
-              (checkinLoading || checkinDesabilitado) && styles.checkinButtonDisabled,
+          {tipoUnidade ? (
+            <Text style={styles.unitType} numberOfLines={1}>
+              {tipoUnidade}
+            </Text>
+          ) : null}
+          {temIndicadores ? (
+            <View style={styles.ratingRow}>
+              <CSRatingStars nota={indicadores.notaMedia} size={16} />
+              <Text style={styles.ratingValue}>{formatarNota(indicadores.notaMedia)}</Text>
+              <Text style={styles.ratingCount}>{indicadores.nAvaliacoes} avaliações</Text>
+            </View>
+          ) : (
+            <Text style={styles.noRating}>Ainda sem avaliações suficientes</Text>
+          )}
+          {temIndicadores && indicadores.tempoMedianoMinutos != null ? (
+            <Text style={styles.timeMetric}>
+              Tempo médio: {formatarDuracao(indicadores.tempoMedianoMinutos)}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
+      {onCheckin && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            checkinAtivo
+              ? `${hospital?.nome} — ver check-in ativo`
+              : `Fazer check-in em ${hospital?.nome}`
+          }
+          disabled={checkinLoading || checkinDesabilitado}
+          onPress={onCheckin}
+          style={({ pressed }) => [
+            styles.checkinButton,
+            checkinAtivo && styles.checkinButtonActive,
+            pressed && styles.checkinButtonPressed,
+            (checkinLoading || checkinDesabilitado) && styles.checkinButtonDisabled,
+          ]}
+        >
+          <Text
+            style={[
+              styles.checkinText,
+              checkinAtivo && styles.checkinTextActive,
             ]}
           >
-            <Text
-              style={[
-                styles.checkinText,
-                checkinAtivo && styles.checkinTextActive,
-              ]}
-            >
-              {checkinLoading
-                ? "Enviando..."
-                : checkinAtivo
-                  ? "Em visita — ver"
-                  : "Check-in"}
-            </Text>
-          </Pressable>
-        )}
-      </View>
-    </Pressable>
+            {checkinLoading
+              ? "Enviando..."
+              : checkinAtivo
+                ? "Em visita — ver"
+                : "Check-in"}
+          </Text>
+        </Pressable>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.s3,
     minHeight: 80,
     backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radii.xl,
     padding: spacing.s5,
     ...shadows.cloud1,
+  },
+  detailsButton: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.s3,
   },
   pressed: {
     backgroundColor: colors.surfaceContainer,

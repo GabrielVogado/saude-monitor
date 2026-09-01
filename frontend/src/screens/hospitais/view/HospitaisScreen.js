@@ -44,6 +44,7 @@ export default function HospitaisScreen({ navigation }) {
   const [checkinEnviandoId, setCheckinEnviandoId] = useState(null);
 
   const debounceRef = useRef(null);
+  const carregamentoInicialFeitoRef = useRef(false);
 
   const carregar = useCallback(async (modo = "inicial") => {
     if (modo === "refresh") setRefreshing(true);
@@ -72,6 +73,12 @@ export default function HospitaisScreen({ navigation }) {
   }, [busca, tipo]);
 
   useEffect(() => {
+    if (!carregamentoInicialFeitoRef.current) {
+      carregamentoInicialFeitoRef.current = true;
+      carregar();
+      return undefined;
+    }
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => carregar(), 400);
     return () => clearTimeout(debounceRef.current);
@@ -111,13 +118,26 @@ export default function HospitaisScreen({ navigation }) {
   };
 
   const fazerCheckin = async (hospital) => {
+    if (visitaAtiva) {
+      if (visitaAtiva.hospitalId === hospital.id) {
+        navigation.navigate("HospitalDetalhe", { id: hospital.id });
+      } else {
+        Alert.alert(
+          "Check-in ativo",
+          "Finalize o check-in atual antes de iniciar uma visita em outro hospital."
+        );
+      }
+      return;
+    }
+
     setCheckinEnviandoId(hospital.id);
     setErro(null);
     try {
-      await VisitaService.checkin({
+      const resposta = await VisitaService.checkin({
         hospitalId: hospital.id,
         origem: "MANUAL",
       });
+      setVisitaAtiva({ ...resposta, origem: "MANUAL" });
       // Redireciona ao detalhe do hospital, que exibe o temporizador + checkout
       // (específico do check-in manual).
       setCheckinEnviandoId(null);
@@ -205,7 +225,10 @@ export default function HospitaisScreen({ navigation }) {
               onCheckin={() => fazerCheckin(item)}
               checkinLoading={checkinEnviandoId === item.id}
               checkinAtivo={visitaAtiva?.hospitalId === item.id}
-              checkinDesabilitado={checkinEnviandoId !== null && checkinEnviandoId !== item.id}
+              checkinDesabilitado={
+                (checkinEnviandoId !== null && checkinEnviandoId !== item.id) ||
+                (visitaAtiva !== null && visitaAtiva.hospitalId !== item.id)
+              }
             />
           )}
           ListEmptyComponent={renderVazio}

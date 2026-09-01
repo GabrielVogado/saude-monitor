@@ -84,13 +84,17 @@ public class VisitaServiceImpl implements VisitaService {
                 : exigirHospitalAtivo(request.hospitalId());
 
         VisitaDocument existente = usuarioId != null
-                ? visitaRepository.findFirstByUsuarioIdAndHospitalIdAndStatusInOrderByEntradaDesc(
-                        usuarioId, hospitalId, STATUS_ATIVOS).orElse(null)
-                : visitaRepository.findFirstByDispositivoIdAndHospitalIdAndStatusInOrderByEntradaDesc(
-                        request.dispositivoId(), hospitalId, STATUS_ATIVOS).orElse(null);
+            ? visitaRepository.findFirstByUsuarioIdAndStatusInOrderByEntradaDesc(
+                usuarioId, STATUS_ATIVOS).orElse(null)
+            : visitaRepository.findFirstByDispositivoIdAndStatusInOrderByEntradaDesc(
+                request.dispositivoId(), STATUS_ATIVOS).orElse(null);
 
         // Idempotência (RN-03/§3.3): já existe visita ativa no mesmo hospital, retorna a existente (HTTP 200).
         if (existente != null) {
+            if (!existente.getHospitalId().equals(hospitalId)) {
+            throw new ConflitoException(
+                "Você já possui um check-in ativo em outro hospital. Finalize-o antes de iniciar uma nova visita.");
+            }
             return new CheckinResponse(existente.getId(), existente.getHospitalId(),
                     existente.getEntrada(), existente.getStatus(), false);
         }

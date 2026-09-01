@@ -260,7 +260,11 @@ export default function HospitalDetalheScreen({ navigation, route }) {
 
         {coordenadas.length > 0 ? (
           <View style={styles.mapContainer}>
-            <Map style={styles.map} mapStyle={OSM_RASTER_STYLE}>
+            <Map
+              androidView="texture"
+              style={styles.map}
+              mapStyle={OSM_RASTER_STYLE}
+            >
               <Camera initialViewState={getInitialViewState(region)} />
               <GeoJSONSource id="geofence" data={geofenceGeoJson}>
                 <Layer

@@ -1,11 +1,20 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 07/08/2026 · Responsável: Gabriel Vogado
+> Última atualização: 01/09/2026 · Responsável: Gabriel Vogado
 
 ---
 
-## 📌 Última revisão (07/08/2026)
+## 📌 Última revisão (01/09/2026)
+
+**Correcao de check-in manual e carregamento inicial da lista:**
+
+- Garante uma unica visita ativa por usuario ou dispositivo, seja manual ou geofence; segunda visita em hospital diferente retorna conflito.
+- Remove a concorrencia entre toque de check-in e navegacao ao detalhe que podia encerrar o app Android.
+- Carrega a lista de hospitais imediatamente na primeira abertura; o debounce permanece apenas na busca e nos filtros.
+- Registro, impacto e evidencias: [Registro de Correcao - Check-in Manual e Performance v1.0](./05-features/Registro-Correcao-Checkin-Manual-e-Performance-v1.0.md).
+
+---
 
 **Correção de regra de negócio — RN-04/RN-16/RN-17** (validação com stakeholders):
 
@@ -74,6 +83,7 @@ Documentos/
 | 4 | [Padrão UI/UX](./03-ui-ux/Padrao-UI-UX-v2.0.md) | 2.0 | ✅ Ativo | Princípios de UX, personas, jornada ponta a ponta, arquitetura de informação, design system completo (tokens, componentes), acessibilidade WCAG AA, LGPD por design e protótipos ASCII. |
 | 5 | [Backlog do MVP](./04-backlog/Backlog-MVP-v2.0.md) | 2.0 | ✅ Ativo | Backlog priorizado (Fase 0 + 6 épicos), estórias com critérios de aceite e referências às RN, sequência de sprints, DoD e backlog futuro. |
 | 6 | [Plano de Sprints](./06-sprints/Plano-Sprints-v2.0.md) | 2.0 | ✅ Ativo | Plano detalhado de 7 sprints (S0–S6), estimativas em story points (Fibonacci), velocity, riscos por sprint, cerimônias, métricas de acompanhamento e plano de testes de campo. |
+| 7 | [Registro de Correção - Check-in Manual e Performance](./05-features/Registro-Correcao-Checkin-Manual-e-Performance-v1.0.md) | 1.0 | ✅ Implementado | Exclusividade de visita ativa, correção da interação do card e redução da latência artificial na primeira carga da lista. |
 
 ---
 

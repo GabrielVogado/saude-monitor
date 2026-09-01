@@ -1,6 +1,7 @@
 package br.com.saude_monitor.api.visita.service.impl;
 
 import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
+import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.ValidacaoNegocioException;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
@@ -78,8 +79,8 @@ class VisitaServiceImplTest {
     @Test
     void checkinAnonimoComDispositivoIdCriaVisita() {
         when(hospitalRepository.findById("h1")).thenReturn(Optional.of(hospitalAtivo("h1")));
-        when(visitaRepository.findFirstByDispositivoIdAndHospitalIdAndStatusInOrderByEntradaDesc(
-                anyString(), anyString(), any())).thenReturn(Optional.empty());
+        when(visitaRepository.findFirstByDispositivoIdAndStatusInOrderByEntradaDesc(
+            anyString(), any())).thenReturn(Optional.empty());
         when(visitaRepository.save(any(VisitaDocument.class))).thenAnswer(inv -> {
             VisitaDocument v = inv.getArgument(0);
             v.setId("v9");
@@ -92,6 +93,19 @@ class VisitaServiceImplTest {
         assertTrue(resposta.criado());
         assertEquals("v9", resposta.id());
         verify(visitaRepository).save(any(VisitaDocument.class));
+    }
+
+    @Test
+    void checkinAnonimoEmOutroHospitalComVisitaAtivaLancaConflito() {
+        when(hospitalRepository.findById("h2")).thenReturn(Optional.of(hospitalAtivo("h2")));
+        when(visitaRepository.findFirstByDispositivoIdAndStatusInOrderByEntradaDesc(
+                "anon-abc", List.of(StatusVisita.EM_ATENDIMENTO, StatusVisita.SUSPEITA)))
+                .thenReturn(Optional.of(visitaAtivaAnonima("anon-abc")));
+
+        CheckinRequest request = new CheckinRequest("h2", OrigemVisita.MANUAL, null, "anon-abc");
+
+        assertThrows(ConflitoException.class, () -> visitaService.checkin(request, null));
+        verify(visitaRepository, never()).save(any(VisitaDocument.class));
     }
 
     @Test

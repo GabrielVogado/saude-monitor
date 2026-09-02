@@ -175,7 +175,7 @@ Critérios definidos pelo próprio projeto em `Features-MVP-v2.0.md §7` e `Back
 
 | ID | Critério do DoD | Situação | Evidência |
 |---|---|---|---|
-| DOD-01 | Cobertura ≥ 70% nas regras de negócio | ❌ **Não medida** | Sem JaCoCo no `build.gradle`; sem threshold no Jest |
+| DOD-01 | Cobertura ≥ 70% nas regras de negócio | 🟡 **Medida, abaixo do alvo** | JaCoCo em `build.gradle` (67,49% instruções / 51,78% branches, piso 65%/50%) e `coverageThreshold` em `jest.config.js` (71,83% statements / 61,35% branches, piso 70%/58%). Ambas as portas reprovam o PR em caso de queda; o frontend já cumpre o DoD em statements, o backend ainda não |
 | DOD-02 | Contratos documentados em OpenAPI/Swagger | ❌ **Ausente** | Sem `springdoc-openapi`; contrato mantido à mão no `.md` |
 | DOD-03 | Contratos testados via testes de integração | ❌ **Ausente** | 1 único `@SpringBootTest` (smoke); todos os `*ControllerTest` usam `standaloneSetup` com serviços mockados → repositórios, agregações e consultas `2dsphere` nunca executados em teste |
 | DOD-04 | Verificação de acessibilidade WCAG 2.2 AA | 🟡 **Parcial** | a11y aplicada consistentemente no código; sem auditoria formal (ferramenta + manual) |

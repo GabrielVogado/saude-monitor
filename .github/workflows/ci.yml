@@ -33,9 +33,20 @@ jobs:
           restore-keys: ${{ runner.os }}-gradle
 
       - name: Compilar e rodar testes
+        # `build` inclui `check`, que agora depende da verificação de cobertura
+        # do JaCoCo: queda abaixo do piso reprova o PR (DOD-01 / E8-08).
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon build
+
+      - name: Publicar relatório de cobertura (backend)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-backend
+          path: backend/build/reports/jacoco/test
+          retention-days: 14
+          if-no-files-found: ignore
 
   frontend:
     name: Frontend (Expo Web)
@@ -60,8 +71,19 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Testes (Jest)
-        run: npm test -- --ci --maxWorkers=2
+      - name: Testes (Jest) com cobertura
+        # O piso configurado em `jest.config.js` reprova o PR quando a cobertura
+        # cai — mesma porta do backend (DOD-01 / E8-08).
+        run: npm run test:coverage -- --ci --maxWorkers=2
+
+      - name: Publicar relatório de cobertura (frontend)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-frontend
+          path: frontend/coverage
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Build web (export Expo)
         run: npx expo export --platform web

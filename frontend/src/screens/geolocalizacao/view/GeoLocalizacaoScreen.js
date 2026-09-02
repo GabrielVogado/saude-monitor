@@ -6,15 +6,31 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Camera, Map, Marker } from "@maplibre/maplibre-react-native";
+import { Camera, GeoJSONSource, Layer, Map, Marker } from "@maplibre/maplibre-react-native";
 import {
   GeolocalizacaoProvider,
   useGeolocalizacao,
 } from "../service/GeoLocalizacaoService";
 import { getInitialViewState, OSM_RASTER_STYLE } from "../../../utils/mapStyle";
-import { geojsonParaCoordenadas, calcularCentroide } from "../../../utils/geojson";
+import {
+  geojsonParaCoordenadas,
+  calcularCentroide,
+  geofencesParaFeatureCollection,
+} from "../../../utils/geojson";
 import HospitalService from "../../hospitais/service/HospitalService";
+import { CSChip } from "../../../components";
 import { colors, typography, spacing, radii } from "../../../theme";
+
+// F-07: filtro geo por raio. "Todos" mantém o comportamento anterior (catálogo
+// completo); os demais dependem do GPS e são resolvidos pelo backend
+// (GET /api/v1/hospitais?latitude&longitude&raioKm).
+const RAIOS_KM = [
+  { value: null, label: "Todos" },
+  { value: 1, label: "1 km" },
+  { value: 5, label: "5 km" },
+  { value: 10, label: "10 km" },
+  { value: 25, label: "25 km" },
+];
 
 const BRASIL_REGION = {
   latitude: -14.235,
@@ -23,7 +39,7 @@ const BRASIL_REGION = {
   longitudeDelta: 35,
 };
 
-function GeolocalizacaoContent() {
+function GeolocalizacaoContent({ navigation }) {
   const cameraRef = useRef(null);
   const {
     coordenadas,
@@ -35,14 +51,45 @@ function GeolocalizacaoContent() {
   } = useGeolocalizacao();
   const [hospitais, setHospitais] = useState([]);
   const [erroHospitais, setErroHospitais] = useState(null);
+  const [raioKm, setRaioKm] = useState(null);
 
-  // Item 05 (revisão de UX): o mapa exibe TODOS os hospitais ativos, não apenas o
-  // usuário. Pagina de uma vez (size 100) — o catálogo de hospitais é público (E1-03).
+  // Item 05 (revisão de UX) + F-07: o mapa exibe todos os hospitais ativos e, quando
+  // há um raio selecionado com GPS disponível, delega o recorte geográfico ao backend
+  // (`raioKm`) em vez de baixar o catálogo inteiro — mitigação do risco de performance
+  // com muitos polígonos (§21.6 do Plano de Sprints).
+  const posicaoRef = useRef(null);
+  posicaoRef.current = coordenadas;
+  const temGps = coordenadas !== null;
+
+  const carregarHospitais = useCallback(async () => {
+    const posicao = posicaoRef.current;
+
+    // Filtro por raio exige posição: sem GPS, mantém o catálogo completo.
+    const filtros =
+      raioKm !== null && posicao
+        ? {
+            latitude: posicao.latitude,
+            longitude: posicao.longitude,
+            raioKm,
+            size: 100,
+          }
+        : { size: 100 };
+
+    setErroHospitais(null);
+    try {
+      const data = await HospitalService.listar(filtros);
+      setHospitais(data?.content || data || []);
+    } catch (e) {
+      setErroHospitais(e.message || "Não foi possível carregar os hospitais.");
+    }
+  }, [raioKm]);
+
+  // Refaz a busca ao trocar o raio e quando o GPS passa a ter (ou perde) posição.
+  // Não depende de `coordenadas` diretamente: a posição muda a cada leitura do
+  // watchPosition e dispararia uma requisição por atualização.
   useEffect(() => {
-    HospitalService.listar({ size: 100 })
-      .then((data) => setHospitais(data?.content || data || []))
-      .catch((e) => setErroHospitais(e.message || "Não foi possível carregar os hospitais."));
-  }, []);
+    carregarHospitais();
+  }, [carregarHospitais, temGps]);
 
   const regionAtual = useMemo(() => {
     if (!coordenadas) {
@@ -56,6 +103,29 @@ function GeolocalizacaoContent() {
       longitudeDelta: 0.015,
     };
   }, [coordenadas]);
+
+  // F-07: polígonos das geofences renderizados como uma única fonte GeoJSON —
+  // muito mais leve que um componente por hospital.
+  const geofencesFeatureCollection = useMemo(
+    () => geofencesParaFeatureCollection(hospitais),
+    [hospitais]
+  );
+
+  // Toque no polígono abre o detalhe do hospital (aba Hospitais → HospitalDetalhe).
+  const abrirHospital = (hospitalId) => {
+    if (!hospitalId) {
+      return;
+    }
+    navigation?.navigate?.("Hospitais", {
+      screen: "HospitalDetalhe",
+      params: { id: hospitalId },
+    });
+  };
+
+  const aoTocarGeofence = (evento) => {
+    const feature = evento?.features?.[0];
+    abrirHospital(feature?.properties?.id || feature?.id);
+  };
 
   const centralizar = () => {
     const alvo = getInitialViewState(regionAtual);
@@ -111,6 +181,24 @@ function GeolocalizacaoContent() {
     <SafeAreaView style={styles.container}>
       <View style={styles.screenHeader}>
         <Text style={styles.screenHeaderTitle}>Mapa de Geolocalização</Text>
+
+        {/* F-07: filtro geográfico por raio a partir da posição atual. */}
+        <View style={styles.filtroRaio}>
+          {RAIOS_KM.map((r) => (
+            <CSChip
+              key={r.label}
+              label={r.label}
+              selected={raioKm === r.value}
+              onPress={() => setRaioKm(r.value)}
+            />
+          ))}
+        </View>
+
+        {raioKm !== null && !coordenadas && (
+          <Text style={styles.infoSubText} accessibilityLiveRegion="polite">
+            Aguardando o GPS para filtrar hospitais num raio de {raioKm} km.
+          </Text>
+        )}
       </View>
 
       <Map style={styles.map} mapStyle={OSM_RASTER_STYLE}>
@@ -122,6 +210,26 @@ function GeolocalizacaoContent() {
           </Marker>
         )}
 
+        {geofencesFeatureCollection.features.length > 0 && (
+          <GeoJSONSource
+            id="geofences-hospitais"
+            testID="geofences-hospitais"
+            data={geofencesFeatureCollection}
+            onPress={aoTocarGeofence}
+          >
+            <Layer
+              id="geofences-preenchimento"
+              type="fill"
+              paint={{ "fill-color": colors.primary, "fill-opacity": 0.18 }}
+            />
+            <Layer
+              id="geofences-contorno"
+              type="line"
+              paint={{ "line-color": colors.primary, "line-width": 2 }}
+            />
+          </GeoJSONSource>
+        )}
+
         {hospitais.map((hospital) => {
           const centroide = calcularCentroide(geojsonParaCoordenadas(hospital.geofence));
           if (!centroide) {
@@ -129,7 +237,13 @@ function GeolocalizacaoContent() {
           }
           return (
             <Marker key={hospital.id} lngLat={[centroide.longitude, centroide.latitude]}>
-              <View style={styles.hospitalMarker}>
+              <View
+                style={styles.hospitalMarker}
+                accessibilityRole="button"
+                accessibilityLabel={`Abrir detalhe de ${hospital.nome}`}
+                onStartShouldSetResponder={() => true}
+                onResponderRelease={() => abrirHospital(hospital.id)}
+              >
                 <View style={styles.hospitalDot} />
                 <View style={styles.hospitalLabelBox}>
                   <Text style={styles.hospitalLabel} numberOfLines={1}>
@@ -213,10 +327,10 @@ function GeolocalizacaoContent() {
   );
 }
 
-export default function GeoLocalizacaoScreen() {
+export default function GeoLocalizacaoScreen({ navigation }) {
   return (
     <GeolocalizacaoProvider>
-      <GeolocalizacaoContent />
+      <GeolocalizacaoContent navigation={navigation} />
     </GeolocalizacaoProvider>
   );
 }
@@ -231,6 +345,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceContainerLowest,
   },
   screenHeaderTitle: { ...typography.titleMd, color: colors.onSurface },
+  filtroRaio: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.s2,
+    marginTop: spacing.s2,
+  },
   map: { flex: 1 },
   infoBox: {
     backgroundColor: colors.surface,

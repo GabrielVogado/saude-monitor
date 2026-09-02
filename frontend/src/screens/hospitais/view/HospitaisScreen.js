@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { MapPinOff, Search } from "lucide-react-native";
+import { MapPinOff, Search, Trophy } from "lucide-react-native";
 import {
   CSHeader,
   CSHospitalCard,
@@ -10,6 +10,7 @@ import {
   CSLoadingList,
   CSChip,
   CSTextField,
+  CSIconButton,
 } from "../../../components";
 import { colors, spacing } from "../../../theme/tokens";
 import HospitalService from "../service/HospitalService";
@@ -190,7 +191,16 @@ export default function HospitaisScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <CSHeader title="Hospitais" />
+      <CSHeader
+        title="Hospitais"
+        rightAction={
+          <CSIconButton
+            icon={Trophy}
+            onPress={() => navigation.navigate("Ranking")}
+            accessibilityLabel="Abrir ranking de hospitais"
+          />
+        }
+      />
 
       <View style={styles.searchArea}>
         <CSTextField

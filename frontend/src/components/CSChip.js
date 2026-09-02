@@ -12,10 +12,12 @@ export default function CSChip({
   onPress,
   icon: Icon,
   style,
+  accessibilityLabel,
 }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected }}
       onPress={onPress}
       style={({ pressed }) => [

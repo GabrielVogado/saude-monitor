@@ -3,10 +3,11 @@
  *
  * Verifica: (a) área logada — sem sessão mostra o empty state com CTA de login;
  * (b) carrega e lista as visitas do usuário com o nome do hospital anexado pelo
- * backend (hospitalNome); (c) alterna para a aba de avaliações e lista os feedbacks.
+ * backend (hospitalNome); (c) alterna para a aba de avaliações e lista os feedbacks;
+ * (d) exporta o relatório de dados pessoais em PDF (art. 18 da LGPD).
  */
 import React from "react";
-import { render, fireEvent, screen } from "@testing-library/react-native";
+import { render, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import HistoricoScreen from "../../../screens/perfil/view/HistoricoScreen";
 import PerfilService from "../../../screens/perfil/service/PerfilService";
 import VisitaService from "../../../screens/visitas/service/VisitaService";
@@ -90,5 +91,76 @@ describe("HistoricoScreen (E5-03/RN-22)", () => {
     fireEvent.press(await screen.findByText("Avaliações"));
     expect(await screen.findByText("Atendimento rápido e acolhedor.")).toBeTruthy();
     expect(screen.getByText("4,0 / 5")).toBeTruthy();
+  });
+
+  describe("exportação de dados em PDF (E5-03 / art. 18 LGPD)", () => {
+    beforeEach(() => {
+      PerfilService.usuarioLogado.mockResolvedValue({ id: "u1", nome: "Marina" });
+      VisitaService.listarHistorico.mockResolvedValue({ content: [] });
+      FeedbackService.listarHistorico.mockResolvedValue({ content: [] });
+    });
+
+    test("gera o relatório e confirma ao usuário", async () => {
+      PerfilService.exportarDadosPdf.mockResolvedValue({
+        uri: "file:///cache/meus-dados-2026-09-01.pdf",
+        nomeArquivo: "meus-dados-2026-09-01.pdf",
+        compartilhado: true,
+      });
+
+      renderizar();
+      fireEvent.press(await screen.findByLabelText("Exportar meus dados em PDF"));
+
+      expect(PerfilService.exportarDadosPdf).toHaveBeenCalledTimes(1);
+      expect(
+        await screen.findByText("Relatório meus-dados-2026-09-01.pdf gerado.")
+      ).toBeTruthy();
+    });
+
+    test("informa onde o arquivo ficou salvo quando não há compartilhamento", async () => {
+      PerfilService.exportarDadosPdf.mockResolvedValue({
+        uri: "file:///cache/meus-dados-2026-09-01.pdf",
+        nomeArquivo: "meus-dados-2026-09-01.pdf",
+        compartilhado: false,
+      });
+
+      renderizar();
+      fireEvent.press(await screen.findByLabelText("Exportar meus dados em PDF"));
+
+      expect(
+        await screen.findByText(/salvo como meus-dados-2026-09-01\.pdf/i)
+      ).toBeTruthy();
+    });
+
+    test("mostra a mensagem de erro quando a exportação falha", async () => {
+      PerfilService.exportarDadosPdf.mockRejectedValue(
+        new Error("Sessão expirada. Faça login novamente.")
+      );
+
+      renderizar();
+      fireEvent.press(await screen.findByLabelText("Exportar meus dados em PDF"));
+
+      expect(
+        await screen.findByText("Sessão expirada. Faça login novamente.")
+      ).toBeTruthy();
+    });
+
+    test("bloqueia toques repetidos enquanto o PDF é gerado", async () => {
+      let liberar;
+      PerfilService.exportarDadosPdf.mockReturnValue(
+        new Promise((resolve) => {
+          liberar = () => resolve({ nomeArquivo: "meus-dados.pdf", compartilhado: true });
+        })
+      );
+
+      renderizar();
+      const botao = await screen.findByLabelText("Exportar meus dados em PDF");
+      fireEvent.press(botao);
+      fireEvent.press(botao);
+
+      expect(PerfilService.exportarDadosPdf).toHaveBeenCalledTimes(1);
+
+      liberar();
+      await waitFor(() => expect(screen.getByText(/Relatório meus-dados\.pdf/)).toBeTruthy());
+    });
   });
 });

@@ -2,11 +2,14 @@
  * Perfil → Dados e Privacidade (Épico 05).
  *
  * Verifica o gerenciamento da sessão (usuário logado / deslogar), o controle da
- * permissão de localização (consultar/solicitar) e a auditoria dos consentimentos.
- * Alinhado aos critérios de aceite de E5-01 (permissão consultável/revogável),
+ * permissão de localização (consultar/solicitar), a exportação dos dados pessoais
+ * em PDF e a auditoria dos consentimentos. Alinhado aos critérios de aceite de
+ * E5-01 (permissão consultável/revogável), E5-03 (exportação, art. 18 da LGPD),
  * E5-04 (conta opcional) e E5-05 (revogação registrada, art. 8º §5º da LGPD).
  */
 import * as Location from "expo-location";
+import { File } from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import PerfilService from "../../../screens/perfil/service/PerfilService";
 import LoginService from "../../../screens/auth/service/LoginService";
@@ -55,6 +58,78 @@ describe("PerfilService (Épico 05)", () => {
     const status = await PerfilService.solicitarPermissaoLocalizacao();
     expect(Location.requestForegroundPermissionsAsync).toHaveBeenCalledTimes(1);
     expect(status).toBe("denied");
+  });
+
+  describe("exportarDadosPdf (E5-03 / art. 18 LGPD)", () => {
+    test("exige sessão ativa", async () => {
+      await expect(PerfilService.exportarDadosPdf()).rejects.toThrow(
+        "Faça login para exportar seus dados."
+      );
+      expect(File.downloadFileAsync).not.toHaveBeenCalled();
+    });
+
+    test("baixa o PDF com o token e abre o compartilhamento", async () => {
+      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-123");
+
+      const resultado = await PerfilService.exportarDadosPdf();
+
+      const [url, , opcoes] = File.downloadFileAsync.mock.calls[0];
+      expect(url).toContain("/api/v1/contas/export/pdf");
+      expect(opcoes.headers.Authorization).toBe("Bearer token-123");
+      expect(resultado.nomeArquivo).toMatch(/^meus-dados-\d{4}-\d{2}-\d{2}\.pdf$/);
+      expect(resultado.compartilhado).toBe(true);
+      expect(Sharing.shareAsync).toHaveBeenCalledWith(
+        resultado.uri,
+        expect.objectContaining({ mimeType: "application/pdf" })
+      );
+    });
+
+    test("mantém o arquivo salvo quando o dispositivo não compartilha", async () => {
+      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-123");
+      Sharing.isAvailableAsync.mockResolvedValueOnce(false);
+
+      const resultado = await PerfilService.exportarDadosPdf();
+
+      expect(resultado.compartilhado).toBe(false);
+      expect(resultado.uri).toContain(resultado.nomeArquivo);
+      expect(Sharing.shareAsync).not.toHaveBeenCalled();
+    });
+
+    test("renova o token e repete o download quando o backend responde 401", async () => {
+      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-velho");
+      File.downloadFileAsync.mockRejectedValueOnce(new Error("response has status: 401"));
+      LoginService.refresh.mockImplementation(async () => {
+        await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-novo");
+      });
+
+      await PerfilService.exportarDadosPdf();
+
+      expect(File.downloadFileAsync).toHaveBeenCalledTimes(2);
+      expect(File.downloadFileAsync.mock.calls[1][2].headers.Authorization).toBe(
+        "Bearer token-novo"
+      );
+    });
+
+    test("encerra a sessão quando a renovação do token falha", async () => {
+      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-velho");
+      File.downloadFileAsync.mockRejectedValueOnce(new Error("response has status: 401"));
+      LoginService.refresh.mockRejectedValue(new Error("refresh inválido"));
+
+      await expect(PerfilService.exportarDadosPdf()).rejects.toThrow(
+        "Sessão expirada. Faça login novamente."
+      );
+      expect(LoginService.logout).toHaveBeenCalledTimes(1);
+    });
+
+    test("propaga falhas de geração do relatório", async () => {
+      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-123");
+      File.downloadFileAsync.mockRejectedValueOnce(new Error("response has status: 500"));
+
+      await expect(PerfilService.exportarDadosPdf()).rejects.toThrow(
+        "response has status: 500"
+      );
+      expect(Sharing.shareAsync).not.toHaveBeenCalled();
+    });
   });
 
   describe("atualizarConsentimento (E5-05 / art. 8º §5º LGPD)", () => {

@@ -7,6 +7,7 @@ import br.com.saude_monitor.api.feedback.service.FeedbackService;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
 import br.com.saude_monitor.api.user.document.UserDocument;
 import br.com.saude_monitor.api.user.repository.UserRepository;
+import br.com.saude_monitor.api.user.service.ExportacaoPdfService;
 import br.com.saude_monitor.api.user.service.UserService;
 import br.com.saude_monitor.api.visita.dto.VisitaResponse;
 import br.com.saude_monitor.api.visita.service.VisitaService;
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -91,6 +93,12 @@ class ContaControllerTest {
         when(feedbackService.historico("u1", 0, 20))
                 .thenReturn(PageResponse.of(List.<FeedbackResponse>of(), 0, 20, 0));
 
+        // O conteúdo do documento é coberto em ExportacaoPdfServiceImplTest;
+        // aqui interessa apenas o contrato HTTP do endpoint.
+        ExportacaoPdfService exportacaoPdfService = mock(ExportacaoPdfService.class);
+        when(exportacaoPdfService.gerar(org.mockito.ArgumentMatchers.anyMap()))
+                .thenReturn("%PDF-1.4".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+
         authenticateAs("marina@email.com");
 
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
@@ -98,7 +106,7 @@ class ContaControllerTest {
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new ContaController(userService, new AutenticacaoHelper(userRepository),
-                        visitaService, feedbackService))
+                        visitaService, feedbackService, exportacaoPdfService))
                 .setValidator(validator)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -139,6 +147,23 @@ class ContaControllerTest {
         mockMvc.perform(get("/api/v1/contas/export"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.usuario.email").value("marina@email.com"));
+    }
+
+    @Test
+    void deveExportarDadosPessoaisEmPdf() throws Exception {
+        mockMvc.perform(get("/api/v1/contas/export/pdf"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(header().string("Content-Disposition",
+                        org.hamcrest.Matchers.startsWith("attachment; filename=\"meus-dados-")));
+    }
+
+    @Test
+    void deveNegarExportacaoEmPdfSemAutenticacao() throws Exception {
+        SecurityContextHolder.clearContext();
+
+        mockMvc.perform(get("/api/v1/contas/export/pdf"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

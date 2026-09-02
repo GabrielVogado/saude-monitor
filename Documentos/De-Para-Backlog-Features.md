@@ -119,7 +119,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **E8-05** | Inventário dos bugs observados em uso | Cross | 🔴 Pendente — **P0**, depende de insumo do Product Owner |
 | **E8-06** | Métricas de latência e erro por endpoint | Cross | 🔴 Pendente |
 | **E8-07** | Crash reporting no app | Cross | 🔴 Pendente |
-| **E8-08** | Medição de cobertura de testes (DoD ≥ 70%) | Cross | 🔴 Pendente — 121 testes no BE e 186 no FE (ambos rodando na esteira após E8-12), cobertura nunca medida |
+| **E8-08** | Medição de cobertura de testes (DoD ≥ 70%) | Cross | 🟡 Parcial (02/09/2026) — cobertura medida e com piso na esteira: JaCoCo no backend (**67,49%** de instruções, **51,78%** de *branches*, piso 65%/50%) e `coverageThreshold` no Jest (**71,83%** de *statements*, **61,35%** de *branches*, piso 70%/58%). Relatórios publicados como artefato do CI. Falta subir os pisos até o DoD de 70% nas regras de negócio |
 | **E8-09** | Contrato OpenAPI publicado | **F-09** | 🔴 Pendente |
 | **E8-10** | Testes de integração com contexto Spring | Cross | 🔴 Pendente |
 | **E8-11** | Analytics de produto (funil, retenção) | Cross | 🔴 Pendente |

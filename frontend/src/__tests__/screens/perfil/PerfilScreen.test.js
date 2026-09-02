@@ -56,7 +56,10 @@ describe("PerfilScreen (E5-05 — revogação nativa)", () => {
 
   async function renderizar() {
     render(<PerfilScreen navigation={NAVEGACAO} />);
-    await screen.findByText("Dados e Privacidade");
+    // "Dados e Privacidade" é o cabeçalho, pintado já durante o carregamento
+    // inicial: esperar por ele deixava o teste seguir com a tela ainda vazia.
+    // O card "Minha conta" só existe depois que o perfil chega.
+    await screen.findByText("Minha conta");
   }
 
   test("revoga: audita no backend e abre as configurações do sistema", async () => {

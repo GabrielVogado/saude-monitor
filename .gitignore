@@ -75,3 +75,8 @@ backup-hospitais/
 
 # Segredos de deploy (VM Oracle Cloud) — nunca versionar
 deploy/oracle/.env
+
+# Relatorios de cobertura (gerados por Jest e JaCoCo)
+coverage/
+frontend/coverage/
+backend/build/

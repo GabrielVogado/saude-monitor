@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { LogIn, MapPin, History, ShieldCheck, Trash2, UserPlus } from "lucide-react-native";
+import { Bell, LogIn, MapPin, History, ShieldCheck, Trash2, UserPlus } from "lucide-react-native";
 import PerfilService from "../service/PerfilService";
 import LoginService from "../../auth/service/LoginService";
 import CSLoading, { CSLoadingList } from "../../../components/CSLoading";
@@ -26,6 +26,7 @@ import styles from "./css/PerfilStyle";
  *   app reconhece a mudança ao voltar do SO (`AppState`) e audita a decisão no
  *   backend (`PUT /api/v1/contas/consentimentos`, art. 8º §5º da LGPD).
  * - E5-02: link à Política de Privacidade (2 toques a partir do app).
+ * - E6-05: acesso à tela dedicada de opt-in de notificações.
  * - E5-04: quando não há conta, orienta Cadastro/Login (conta é opcional).
  * - F0-05: botão de exclusão de conta (dados pessoais), com anonimização das
  *   estatísticas.
@@ -315,6 +316,16 @@ export default function PerfilScreen({ navigation }) {
                 A permissão é usada apenas para detectar automaticamente suas visitas a hospitais
                 (geofencing). Negar ou revogar não bloqueia a consulta pública nem o restante do app.
               </Text>
+
+              <TouchableOpacity
+                style={styles.buttonSecondary}
+                onPress={() => irPara("Notificacoes")}
+                accessibilityRole="button"
+                accessibilityLabel="Gerenciar notificações"
+              >
+                <Bell size={17} color={colors.primary} />
+                <Text style={styles.buttonTextSecondary}> Notificações</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.card}>

@@ -171,6 +171,21 @@ export default function HospitalDetalheScreen({ navigation, route }) {
     return BRASIL_REGION;
   }, [centroide]);
 
+  // Formata o tempo decorrido como hh:mm:ss (temporizador do check-in manual).
+  // IMPORTANTE: precisa ficar antes dos `return` condicionais abaixo — hooks não podem
+  // ser chamados condicionalmente (Regras de Hooks). Estar depois deles fazia o número
+  // de hooks variar entre a renderização de "carregando" e a renderização com dados
+  // prontos, derrubando o app com "Rendered more hooks than during the previous render".
+  const temporizadorTexto = useMemo(() => {
+    if (!visitaManual?.entrada) return "00:00:00";
+    const decorrido = Math.max(0, Math.floor((agora - new Date(visitaManual.entrada).getTime()) / 1000));
+    const h = Math.floor(decorrido / 3600);
+    const m = Math.floor((decorrido % 3600) / 60);
+    const s = decorrido % 60;
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  }, [visitaManual, agora]);
+
   if (carregando) {
     return (
       <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -215,17 +230,6 @@ export default function HospitalDetalheScreen({ navigation, route }) {
     hospital.horarioFuncionamento.trim()
       ? hospital.horarioFuncionamento
       : null;
-
-  // Formata o tempo decorrido como hh:mm:ss (temporizador do check-in manual).
-  const temporizadorTexto = useMemo(() => {
-    if (!visitaManual?.entrada) return "00:00:00";
-    const decorrido = Math.max(0, Math.floor((agora - new Date(visitaManual.entrada).getTime()) / 1000));
-    const h = Math.floor(decorrido / 3600);
-    const m = Math.floor((decorrido % 3600) / 60);
-    const s = decorrido % 60;
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${pad(h)}:${pad(m)}:${pad(s)}`;
-  }, [visitaManual, agora]);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>

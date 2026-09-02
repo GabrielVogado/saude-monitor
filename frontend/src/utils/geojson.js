@@ -65,3 +65,26 @@ export function calcularCentroide(vertices) {
     longitude: soma.longitude / pts.length,
   };
 }
+
+/**
+ * Monta a FeatureCollection dos geofences dos hospitais para o MapLibre (F-07).
+ *
+ * Cada feature carrega `id` e `nome` nas propriedades, para que o toque no
+ * polígono consiga identificar o hospital de origem. Hospitais sem geofence
+ * válido são descartados — o mapa não deve quebrar por dado incompleto.
+ */
+export function geofencesParaFeatureCollection(hospitais) {
+  const features = (hospitais || [])
+    .filter((hospital) => Array.isArray(hospital?.geofence?.coordinates?.[0]))
+    .map((hospital) => ({
+      type: "Feature",
+      id: hospital.id,
+      properties: { id: hospital.id, nome: hospital.nome },
+      geometry: {
+        type: "Polygon",
+        coordinates: hospital.geofence.coordinates,
+      },
+    }));
+
+  return { type: "FeatureCollection", features };
+}

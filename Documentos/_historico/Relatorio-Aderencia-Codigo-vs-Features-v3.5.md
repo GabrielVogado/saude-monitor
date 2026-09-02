@@ -1,10 +1,8 @@
-# 🔍 Relatório de Aderência — Features × Código Real (v3.6)
+# 🔍 Relatório de Aderência — Features × Código Real (v3.5)
 
 > **Verificação do que existe implementado vs. o que as Features propõem**
 >
-> Data: Atualizada — v3.6 (02/09/2026; acrescenta o §1.1 — Aderência operacional)
-> Alterações da v3.6: a v3.5 concluía que a `develop` está "100% coberta" nas 9 features do escopo. **Isso continua correto e continua insuficiente.** A v3.6 acrescenta o **§1.1**, que verifica o código contra os requisitos **não funcionais** — e ali a aderência não é de 100%: o RNF-02 (resposta < 300 ms p95; tela pública em < 2 s) é violado por uma ordem de grandeza. Nenhum status de feature foi alterado.
-> Data anterior: v3.5 (01/09/2026; Sprint S8 entregue — E4-05 UI, F-07 mapa, E5-03 PDF, E5-05, E6-05)
+> Data: Atualizada — v3.5 (01/09/2026; Sprint S8 entregue — E4-05 UI, F-07 mapa, E5-03 PDF, E5-05, E6-05)
 > Alterações desta versão: A **v3.5** registra a entrega da **Sprint S8**, que fecha todos os itens que a v3.4 listava como "fora do escopo do MVP": (1) **E4-05 UI** — `RankingScreen` com ordenação NOTA/TEMPO, filtro por tipo e paginação; (2) **F-07** — polígonos das geofences no mapa (`@maplibre/maplibre-react-native`) e filtro por raio; (3) **E5-03** — exportação dos dados do titular em **PDF** (`GET /api/v1/contas/export/pdf`, OpenPDF) com download/compartilhamento no app, escolhido no lugar de CSV por acessibilidade à população; (4) **E5-05** — novo **`PUT /api/v1/contas/consentimentos`** auditando a decisão do titular (LGPD art. 8º §5º) + revogação nativa que leva às configurações do SO e resincroniza no retorno; e (5) **E6-05** — tela dedicada de opt-in de notificações no Perfil, desacoplada do fluxo de feedback (E3-01). Restam fora do escopo apenas o **Épico 7 / Painel Admin Web (F-11)**. A **v3.4** havia registrado a execução das decisões de contrato abertas na v3.3: (1) cadastro migrado de `/api/user/cadastro` para **`POST /api/v1/auth/registro`** com **consentimento LGPD obrigatório** no request; (2) **`GET /api/v1/usuarios/me` removido** do contrato (perfil segue no payload do login); e (3) o namespace **`me/`** foi substituído por **`/api/v1/contas`** (responsabilidade lógica do titular). Também implementa o **backend de E5-03** (histórico paginado de visitas/feedbacks + **exportação LGPD art. 18** em `GET /api/v1/contas/export`), que passou de "fora do escopo" para **parcialmente coberto** (UI do histórico segue na Sprint S8). As v3.2/v3.3 registraram, respectivamente, as 3 correções de estória (RN-07, RN-10/11, E3-03) e o logout server-side (F0-02).
 
 ---
@@ -20,28 +18,6 @@
 > **Escopo:** MVP Sprints **S0–S6** + **Sprint S8** completa (E4-05 UI, F-07 mapa, E5-03 histórico e exportação em PDF, E5-05 revogação nativa com auditoria, E6-05 opt-in de notificações — 01/09/2026). Fora do escopo do MVP e **não conta como parcial/inexistente**: apenas o Épico 7/Painel Admin Web (F-11).
 
 **Conclusão:** No escopo S0–S6, a `develop` está **100% coberta** nas 9 Features com **0 desvios RN pendentes**: autenticação JWT/BCrypt, rate limiting (F0-04), exclusão de conta LGPD com anonimização (F0-05), CRUD/geofence de Hospitais, sugestões + moderação (backend), Visitas com detecção automática via geofencing nativo + heartbeat, Feedback pós-saída com dedupe e anônimo, agregações estatísticas (Indicadores Públicos por Hospital, atualização ≤ 15min) + ranking (backend), frontend de Conta/Privacidade (E5-01/02/04) e UX (Bottom Tabs, Design System v2.0, a11y AA — E6-01..04). Os **3 desvios de estória** apontados na v3.1 foram **corrigidos** no PR `bugfix/ajustes-rn-feedback-estatisticas` (RN-07, RN-10/11 e E3-03). Na v3.3, o **logout com blacklist de refresh** (F0-02) foi implementado. Na **v3.4**, as decisões de contrato foram **executadas**: cadastro migrado para `/api/v1/auth/registro` com consentimento LGPD, `GET /usuarios/me` removido e o namespace `me/` renomeado para **`/api/v1/contas`** — **zero decisões de contrato pendentes**.
-
----
-
-## 1.1 Aderência operacional — o que a verificação por arquivo não enxerga
-
-> Acrescentado na **v3.6 (02/09/2026)**. Este relatório sempre respondeu a uma pergunta: *"o arquivo que a feature exige existe e faz o que deveria?"*. A resposta é sim para as 9 features. Mas o MVP também tem requisitos **não funcionais**, e eles não se verificam lendo arquivo — verificam-se medindo o sistema em execução. Feita a medição, a aderência deixa de ser 100%.
-
-**Medição contra `https://saude-monitor.onrender.com` (02/09/2026, `curl`):**
-
-| Requisição | TTFB medido | Requisito | Aderência |
-|---|---|---|---|
-| `GET /actuator/health` — 1ª após ociosidade | **109,1 s** · HTTP **503** | Serviço disponível | 🔴 **Não adere** |
-| `GET /actuator/health` — quente | 2,5 – 3,2 s | — | 🔴 Indica CPU insuficiente |
-| `GET /api/v1/hospitais?page=0&size=20` | 1,9 – 4,9 s (35 KB) | **RNF-02:** < 300 ms p95 (E1-03) | 🔴 **Não adere** — 6× a 16× o orçamento |
-| Tela pública de detalhe do hospital | > 2 s (herda a latência acima) | **E4-03:** carrega em < 2 s p95 | 🔴 **Não adere** |
-| `POST /api/v1/auth/login` — payload inválido | 1,0 s | — | 🔴 Piso de latência por requisição |
-
-**Causa:** comum a todos os sintomas — a instância do backend. O `render.yaml` declara `plan: free`, que suspende o serviço após ~15 min sem tráfego (os 109 s e o 503 da primeira abertura) e entrega fração de vCPU compartilhada (o piso de ~1 s por requisição, mesmo sem tocar o banco). O relato do Product Owner de que "login está lento, lista está lenta, cadastro está lento, envio de feedback está lento" descreve **um problema, não quatro** — e nenhum deles está no código do aplicativo.
-
-**Consequência para a leitura deste relatório:** o ✅ ao lado de cada feature abaixo significa *"o código existe, faz o que a feature pede e tem teste automatizado"*. **Não significa** que a feature seja utilizável pelo cidadão hoje. Para o estado de produto, ver `Features-MVP-v2.1.md` §2.1; para o tratamento, o **Épico 8** do `Backlog-MVP-v2.1.md` e a **Sprint S9** do `Plano-Sprints-v2.1.md`.
-
-**Também não verificável por leitura de arquivo (e não atendido):** cobertura de testes ≥ 70% (nunca medida), contrato OpenAPI (inexistente), testes de integração com contexto Spring (inexistentes), auditoria WCAG 2.2 AA (nunca executada) e analytics de produto (inexistente) — 5 dos 7 critérios de DoD do MVP.
 
 ---
 

@@ -5,6 +5,7 @@ import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
 import br.com.saude_monitor.api.feedback.dto.FeedbackResponse;
 import br.com.saude_monitor.api.feedback.service.FeedbackService;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
+import br.com.saude_monitor.api.user.service.ExportacaoPdfService;
 import br.com.saude_monitor.api.user.service.UserService;
 import br.com.saude_monitor.api.visita.dto.VisitaResponse;
 import br.com.saude_monitor.api.visita.service.VisitaService;
@@ -12,6 +13,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -20,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Map;
 
 /**
@@ -41,6 +46,10 @@ public class ContaController {
     private final AutenticacaoHelper autenticacaoHelper;
     private final VisitaService visitaService;
     private final FeedbackService feedbackService;
+    private final ExportacaoPdfService exportacaoPdfService;
+
+    /** Fuso usado para nomear o arquivo exportado, coerente com o restante do produto. */
+    private static final ZoneId FUSO_BRASILIA = ZoneId.of("America/Sao_Paulo");
 
     /** 🔒 Histórico paginado de visitas do usuário (E5-03/RN-22). */
     @GetMapping("/visitas")
@@ -65,6 +74,26 @@ public class ContaController {
     public ResponseEntity<Map<String, Object>> exportarDados() {
         String usuarioId = exigirUsuarioAutenticado();
         return ResponseEntity.ok(userService.exportarDados(usuarioId));
+    }
+
+    /**
+     * 🔒 Exportação de dados pessoais em PDF (E5-03 / art. 18 LGPD).
+     *
+     * <p>Mesma base de dados do endpoint JSON, porém em documento legível pelo cidadão —
+     * é a via acessível do direito de portabilidade para quem não lida com JSON.</p>
+     */
+    @GetMapping(value = "/export/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> exportarDadosPdf() {
+        String usuarioId = exigirUsuarioAutenticado();
+
+        byte[] pdf = exportacaoPdfService.gerar(userService.exportarDados(usuarioId));
+        String nomeArquivo = "meus-dados-%s.pdf".formatted(LocalDate.now(FUSO_BRASILIA));
+
+        log.info("Exportação de dados em PDF gerada para o usuário {} (LGPD art. 18).", usuarioId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo + "\"")
+                .body(pdf);
     }
 
     /**

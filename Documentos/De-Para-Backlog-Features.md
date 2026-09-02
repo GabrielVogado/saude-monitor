@@ -13,7 +13,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | Aplicativo (Fase 0 + Épicos 1–6) | 42 | 43 | **98%** |
 | Painel Administrativo Web (Épico 7) | 0 | 9 | 0% (adiado) |
 | **Total do backlog** | **42** | **52** | **81%** |
-| Épico 8 — Estabilização e Desempenho (novo, v2.1) | 2 | 15 | 13% |
+| Épico 8 — Estabilização e Desempenho (novo, v2.1) | 3 | 15 | 20% |
 
 > ⚠️ **Entregue ≠ utilizável.** As 42 estórias abaixo estão implementadas e cobertas por teste em CI, mas o sistema **não passou por validação em campo** e apresenta lentidão transversal de origem confirmada na infraestrutura (109 s na primeira abertura, 1–5 s por requisição com o serviço quente). Ver `Features-MVP-v2.1.md` §2.1 e o **Épico 8** do `Backlog-MVP-v2.1.md`.
 
@@ -115,11 +115,11 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **E8-01** | Eliminar cold start na primeira abertura | Cross | 🟡 Em andamento — **P0**, medido em 109 s com HTTP 503. Decisão do PO em 02/09/2026: sair do Render `plan: free` para uma VM **Oracle Cloud Always Free** (Ampere A1, São Paulo, mesma praça do Atlas `sa-east-1`). Artefatos de deploy em `deploy/oracle/`; virada pendente de medição comparativa e de **E8-16**. **Bloqueio externo:** São Paulo está sem capacidade Always Free (A1 e E2.1.Micro) — e a região *home*, onde os recursos gratuitos vivem, é imutável. **Mitigação:** `keep-alive-backend.yml` mantém a instância do Render acordada das 07h às 22h — mas o agendamento só roda a partir da branch padrão (`master`, que por decisão do PO não será alterada), então o disparo periódico fica a cargo de um monitor externo apontado para a mesma URL, eliminando o *cold start* (medido em 119 s às 15h50 de 02/09/2026, logo antes de ativar); os 1–5 s por requisição do vCPU compartilhado permanecem |
 | **E8-02** | Cumprir o orçamento de latência do RNF-02 | Cross | 🔴 Pendente — **P0**, medido em 1,9–4,9 s (orçamento: 300 ms p95) |
 | **E8-03** | Enxugar o payload da listagem de hospitais | **F-01**, **F-07** | ✅ Entregue (02/09/2026) — o `geofence` era 73,6% do corpo (27.849 de 37.838 B). Substituído por `localizacao` + `raioMetros`; cliente reconstrói o círculo. Estimado 35,7 KB → ~11 KB (−70%), **medição pós-deploy pendente** |
-| **E8-04** | Estados de carregamento/erro com timeout explícito | **F-08** | 🔴 Pendente — **P0** |
+| **E8-04** | Estados de carregamento/erro com timeout explícito | **F-08** | ✅ Entregue (02/09/2026) — `frontend/src/config/http.js` impõe timeout de 20 s nas 7 chamadas de rede do app (60 s na exportação LGPD, que gera PDF no servidor) e classifica a falha em **sem internet** (estado de rede lido via `expo-network`), **servidor indisponível** e **servidor demorou a responder**. 14 testes em `__tests__/config/http.test.js`; suíte do frontend em 186 testes |
 | **E8-05** | Inventário dos bugs observados em uso | Cross | 🔴 Pendente — **P0**, depende de insumo do Product Owner |
 | **E8-06** | Métricas de latência e erro por endpoint | Cross | 🔴 Pendente |
 | **E8-07** | Crash reporting no app | Cross | 🔴 Pendente |
-| **E8-08** | Medição de cobertura de testes (DoD ≥ 70%) | Cross | 🔴 Pendente — 121 testes no BE e 171 no FE (ambos rodando na esteira após E8-12), cobertura nunca medida |
+| **E8-08** | Medição de cobertura de testes (DoD ≥ 70%) | Cross | 🔴 Pendente — 121 testes no BE e 186 no FE (ambos rodando na esteira após E8-12), cobertura nunca medida |
 | **E8-09** | Contrato OpenAPI publicado | **F-09** | 🔴 Pendente |
 | **E8-10** | Testes de integração com contexto Spring | Cross | 🔴 Pendente |
 | **E8-11** | Analytics de produto (funil, retenção) | Cross | 🔴 Pendente |

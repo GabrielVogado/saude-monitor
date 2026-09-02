@@ -3,6 +3,8 @@
  * Contrato §3.1: login/refresh retornam { accessToken, refreshToken, expiraEm, usuario };
  * usuário ADMIN é bloqueado no mobile (F-11).
  */
+import * as Network from "expo-network";
+
 import LoginService from "../../../screens/auth/service/LoginService";
 import TokenStorage from "../../../services/TokenStorage";
 
@@ -91,11 +93,19 @@ describe("LoginService (Fase 0)", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  test("erro de rede vira mensagem pt-BR amigável", async () => {
-    const erro = new Error("Network request failed");
-    global.fetch = jest.fn().mockRejectedValue(erro);
+  test("erro de rede sem internet culpa a conexão do usuário (E8-04)", async () => {
+    Network.getNetworkStateAsync.mockResolvedValue({ isConnected: false, isInternetReachable: false });
+    global.fetch = jest.fn().mockRejectedValue(new Error("Network request failed"));
     await expect(LoginService.login({ email: "a@b.com", password: "x" })).rejects.toThrow(
-      "Não foi possível conectar ao backend"
+      /sem conexão com a internet/i
+    );
+  });
+
+  test("erro de rede com internet culpa o servidor (E8-04)", async () => {
+    Network.getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
+    global.fetch = jest.fn().mockRejectedValue(new Error("Network request failed"));
+    await expect(LoginService.login({ email: "a@b.com", password: "x" })).rejects.toThrow(
+      /servidor está indisponível/i
     );
   });
 

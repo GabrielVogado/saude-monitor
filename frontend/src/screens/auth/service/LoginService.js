@@ -1,4 +1,5 @@
 import { buildApiUrl } from "../../../config/api";
+import { classificarErroDeRede, fetchComTimeout } from "../../../config/http";
 import TokenStorage from "../../../services/TokenStorage";
 
 const BASE_PATH = "/api/v1/auth";
@@ -14,18 +15,13 @@ async function post(path, body) {
 
   let response;
   try {
-    response = await fetch(url, {
+    response = await fetchComTimeout(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
   } catch (error) {
-    if (error?.message === "Network request failed") {
-      throw new Error(
-        `Não foi possível conectar ao backend em ${url}. Verifique a API, a URL e a rede.`
-      );
-    }
-    throw error;
+    throw await classificarErroDeRede(error, url);
   }
 
   let data = null;
@@ -137,7 +133,7 @@ class LoginService {
 
     let response;
     try {
-      response = await fetch(url, {
+      response = await fetchComTimeout(url, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -145,12 +141,7 @@ class LoginService {
         },
       });
     } catch (error) {
-      if (error?.message === "Network request failed") {
-        throw new Error(
-          `Não foi possível conectar ao backend em ${url}. Verifique a API, a URL e a rede.`
-        );
-      }
-      throw error;
+      throw await classificarErroDeRede(error, url);
     }
 
     let data = null;

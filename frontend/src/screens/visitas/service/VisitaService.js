@@ -1,4 +1,6 @@
 import { buildApiUrl } from "../../../config/api";
+
+import { classificarErroDeRede, fetchComTimeout } from "../../../config/http";
 import TokenStorage from "../../../services/TokenStorage";
 import DispositivoId from "../../../services/DispositivoId";
 import LoginService from "../../auth/service/LoginService";
@@ -38,14 +40,9 @@ async function request(path, { method = "GET", body, headers = {} } = {}) {
 
     let response;
     try {
-      response = await fetch(url, config);
+      response = await fetchComTimeout(url, config);
     } catch (error) {
-      if (error?.message === "Network request failed") {
-        throw new Error(
-          `Não foi possível conectar ao backend em ${url}. Verifique a API, a URL e a rede.`
-        );
-      }
-      throw error;
+      throw await classificarErroDeRede(error, url);
     }
 
     return response;

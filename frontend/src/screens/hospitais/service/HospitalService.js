@@ -110,6 +110,18 @@ class HospitalService {
   }
 
   /**
+   * Ranking público de hospitais (E4-05).
+   *
+   * `ordem` aceita `NOTA` (maior nota primeiro) ou `TEMPO` (menor tempo mediano
+   * primeiro); `tipo` filtra por natureza do estabelecimento. Hospitais sem amostra
+   * suficiente (RN-15) vêm com `indicadores.indicadoresDisponiveis = false` e são
+   * posicionados ao final pelo backend.
+   */
+  static ranking({ ordem = "NOTA", tipo, page = 0, size = 20 } = {}) {
+    return request(`${BASE_PATH}/ranking${buildQuery({ ordem, tipo, page, size })}`);
+  }
+
+  /**
    * Detalhe público do hospital (campos + indicadores embutidos).
    *
    * Campos esperados no JSON: `nome`, `tipo` (natureza), `categoria`

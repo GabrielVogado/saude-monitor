@@ -2,8 +2,9 @@ import React, { useCallback, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { Building2, History, MessageSquareText, Star } from "lucide-react-native";
+import { Building2, Download, History, MessageSquareText, Star } from "lucide-react-native";
 import CSHeader from "../../../components/CSHeader";
+import CSButton from "../../../components/CSButton";
 import CSEmptyState from "../../../components/CSEmptyState";
 import { CSLoadingList } from "../../../components/CSLoading";
 import VisitaService from "../../visitas/service/VisitaService";
@@ -38,6 +39,8 @@ const ORIGEM_LABEL = {
  *
  * RN-07: visitas < 2min permanecem no histórico pessoal (`visitaValida = false`),
  * apenas excluídas das estatísticas públicas.
+ *
+ * Daqui o titular também exporta o relatório completo em PDF (art. 18 da LGPD).
  */
 export default function HistoricoScreen({ navigation }) {
   const [aba, setAba] = useState(ABA_VISITAS);
@@ -46,6 +49,9 @@ export default function HistoricoScreen({ navigation }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [semSessao, setSemSessao] = useState(false);
+  const [exportando, setExportando] = useState(false);
+  const [avisoExportacao, setAvisoExportacao] = useState(null);
+  const [erroExportacao, setErroExportacao] = useState(null);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -78,6 +84,29 @@ export default function HistoricoScreen({ navigation }) {
   );
 
   const irParaLogin = () => navigation?.navigate?.("Login");
+
+  /**
+   * E5-03: baixa o relatório de dados pessoais em PDF. Quando o dispositivo não
+   * tem app capaz de abrir/compartilhar PDF, o arquivo fica salvo e informamos o
+   * caminho — o direito de acesso não pode depender do menu de compartilhamento.
+   */
+  const exportarDados = async () => {
+    setExportando(true);
+    setErroExportacao(null);
+    setAvisoExportacao(null);
+    try {
+      const { nomeArquivo, compartilhado } = await PerfilService.exportarDadosPdf();
+      setAvisoExportacao(
+        compartilhado
+          ? `Relatório ${nomeArquivo} gerado.`
+          : `Relatório salvo como ${nomeArquivo} nos arquivos do aplicativo.`
+      );
+    } catch (e) {
+      setErroExportacao(e?.message || "Não foi possível exportar seus dados.");
+    } finally {
+      setExportando(false);
+    }
+  };
 
   const renderItemVisita = ({ item }) => (
     <View style={styles.itemCard}>
@@ -222,6 +251,34 @@ export default function HistoricoScreen({ navigation }) {
           contentContainerStyle={styles.listContent}
         />
       )}
+
+      <View style={styles.exportContainer}>
+        <Text style={styles.exportHint}>
+          Baixe um relatório em PDF com todos os dados que guardamos sobre você
+          (art. 18 da LGPD).
+        </Text>
+
+        <CSButton
+          label="Exportar meus dados (PDF)"
+          variant="secondary"
+          icon={Download}
+          loading={exportando}
+          onPress={exportarDados}
+          accessibilityLabel="Exportar meus dados em PDF"
+        />
+
+        {avisoExportacao ? (
+          <Text style={styles.exportSuccess} accessibilityLiveRegion="polite">
+            {avisoExportacao}
+          </Text>
+        ) : null}
+
+        {erroExportacao ? (
+          <Text style={styles.exportError} accessibilityLiveRegion="polite">
+            {erroExportacao}
+          </Text>
+        ) : null}
+      </View>
     </SafeAreaView>
   );
 }
@@ -285,6 +342,18 @@ const styles = StyleSheet.create({
   badgeText: { color: colors.onPrimaryContainer, ...typography.labelMd, fontWeight: "700" },
   badgeSecondary: { backgroundColor: colors.surfaceContainerHigh },
   badgeTextSecondary: { color: colors.onSurfaceVariant, ...typography.labelMd, fontWeight: "700" },
+
+  exportContainer: {
+    paddingHorizontal: spacing.s4,
+    paddingVertical: spacing.s3,
+    borderTopWidth: 1,
+    borderTopColor: colors.outlineVariant,
+    backgroundColor: colors.surface,
+    gap: spacing.s2,
+  },
+  exportHint: { ...typography.bodySm, color: colors.onSurfaceVariant },
+  exportSuccess: { ...typography.bodySm, color: colors.primary },
+  exportError: { ...typography.bodySm, color: colors.error },
 
   feedbackMeta: { gap: spacing.s2, marginTop: spacing.s1 },
   notaRow: { flexDirection: "row", alignItems: "center", gap: spacing.s1 },

@@ -2,7 +2,12 @@
  * Conversores GeoJSON (Épico 02 — detecção de visitas/geofence, F-03).
  * GeoJSON usa [longitude, latitude]; o mapa usa { latitude, longitude }.
  */
-import { geojsonParaCoordenadas, coordenadasParaGeoJson, calcularCentroide } from "../../utils/geojson";
+import {
+  geojsonParaCoordenadas,
+  coordenadasParaGeoJson,
+  calcularCentroide,
+  geofencesParaFeatureCollection,
+} from "../../utils/geojson";
 
 describe("utils/geojson — geojsonParaCoordenadas", () => {
   test("converte Polygon GeoJSON em vértices {latitude, longitude}", () => {
@@ -72,5 +77,39 @@ describe("utils/geojson — calcularCentroide", () => {
   test("retorna null sem vértices válidos", () => {
     expect(calcularCentroide([])).toBeNull();
     expect(calcularCentroide(null)).toBeNull();
+  });
+});
+
+describe("utils/geojson — geofencesParaFeatureCollection (F-07)", () => {
+  const ANEL = [[-47.89, -15.79], [-47.88, -15.79], [-47.88, -15.78], [-47.89, -15.79]];
+
+  test("monta FeatureCollection com id e nome nas propriedades", () => {
+    const fc = geofencesParaFeatureCollection([
+      { id: "h1", nome: "Hospital Alfa", geofence: { type: "Polygon", coordinates: [ANEL] } },
+    ]);
+
+    expect(fc.type).toBe("FeatureCollection");
+    expect(fc.features).toHaveLength(1);
+    expect(fc.features[0]).toMatchObject({
+      type: "Feature",
+      id: "h1",
+      properties: { id: "h1", nome: "Hospital Alfa" },
+      geometry: { type: "Polygon", coordinates: [ANEL] },
+    });
+  });
+
+  test("descarta hospitais sem geofence válido em vez de quebrar o mapa", () => {
+    const fc = geofencesParaFeatureCollection([
+      { id: "h1", nome: "Sem geofence" },
+      { id: "h2", nome: "Geofence vazia", geofence: { type: "Polygon", coordinates: [] } },
+      { id: "h3", nome: "Válido", geofence: { type: "Polygon", coordinates: [ANEL] } },
+    ]);
+
+    expect(fc.features.map((f) => f.id)).toEqual(["h3"]);
+  });
+
+  test("lista vazia ou nula devolve FeatureCollection vazia", () => {
+    expect(geofencesParaFeatureCollection([]).features).toEqual([]);
+    expect(geofencesParaFeatureCollection(null).features).toEqual([]);
   });
 });

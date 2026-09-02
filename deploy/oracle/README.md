@@ -24,10 +24,16 @@ O MongoDB **não muda**: continua no Atlas, `AWS / sa-east-1 (São Paulo)` — m
 |---|---|
 | Image | Canonical Ubuntu 24.04 |
 | Shape | `VM.Standard.A1.Flex` — **2 OCPU / 12 GB** |
-| Boot volume | 50 GB |
+| Boot volume | padrão (46,6 GB) — não marcar *custom size*, que abre os controles de VPU e permite sair da cota gratuita |
 | Public IPv4 | atribuir |
 | SSH keys | subir a chave pública (`ssh-keygen -t ed25519`) |
-| *Advanced → Management → User data* | conteúdo de [`cloud-init.yaml`](./cloud-init.yaml) |
+| *Advanced → Management → User data* | conteúdo de [`cloud-init.yaml`](./cloud-init.yaml) — o campo espera o **conteúdo**, não o caminho |
+| *Advanced → Availability* | *Use live migration if possible* + **Restore instance lifecycle state** habilitado |
+| *Advanced → Launch options* | **Paravirtualized networking** — SR-IOV não suporta live migration |
+| Placement | **On-demand capacity** (a única elegível ao Always Free) |
+| Rede | VCN nova + **subnet pública**; IP público atribuído automaticamente |
+| Boot volume | marcar *Use in-transit encryption*; **não** usar chave própria, que exigiria um Vault (cobrado por versão de chave) |
+| Security | *Shielded instance* e *Confidential computing* desabilitados |
 
 O *shape* usa metade da cota Always Free (o teto é 4 OCPU / 24 GB), deixando margem para uma segunda VM de produção.
 

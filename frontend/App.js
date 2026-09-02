@@ -20,6 +20,7 @@ import FeedbackFormScreen from "./src/screens/feedback/view/FeedbackFormScreen.j
 import PerfilScreen from "./src/screens/perfil/view/PerfilScreen.js";
 import HistoricoScreen from "./src/screens/perfil/view/HistoricoScreen.js";
 import PrivacidadeScreen from "./src/screens/perfil/view/PrivacidadeScreen.js";
+import NotificacoesScreen from "./src/screens/perfil/view/NotificacoesScreen.js";
 import {colors, spacing} from "./src/theme";
 import { agendarLembrete, pendenciaAtual } from "./src/screens/feedback/service/FeedbackNotificationService";
 
@@ -60,6 +61,7 @@ function PerfilStack() {
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Cadastro" component={UserScreen} />
             <Stack.Screen name="Privacidade" component={PrivacidadeScreen} />
+            <Stack.Screen name="Notificacoes" component={NotificacoesScreen} />
         </Stack.Navigator>
     );
 }

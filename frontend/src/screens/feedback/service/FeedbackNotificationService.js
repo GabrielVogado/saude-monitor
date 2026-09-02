@@ -1,6 +1,6 @@
 import * as Notifications from "expo-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Platform } from "react-native";
+import { solicitarPermissaoNotificacao } from "../../../services/NotificacaoPermissao";
 
 /**
  * Notificações locais de feedback pós-saída (Épico 03 — F-05/E3-01/E3-03).
@@ -57,20 +57,11 @@ async function armazenarPendencia(pendencia) {
 /**
  * Pede permissão de notificação. Não é obrigatória (feedback segue pelo app), mas sem
  * ela o pedido pós-saída não aparece — por isso retorna se foi concedida.
+ *
+ * Delega ao helper compartilhado, também usado pelo opt-in do Perfil (E6-05).
  */
 export async function pedirPermissaoNotificacao() {
-  const current = await Notifications.getPermissionsAsync();
-  if (current.granted) return true;
-
-  if (Platform.OS === "android" && !Platform.constants?.isTesting) {
-    await Notifications.setNotificationChannelAsync("feedback", {
-      name: "Feedback após a visita",
-      importance: Notifications.AndroidImportance.HIGH,
-    });
-  }
-
-  const requested = await Notifications.requestPermissionsAsync();
-  return requested.granted;
+  return solicitarPermissaoNotificacao();
 }
 
 /**

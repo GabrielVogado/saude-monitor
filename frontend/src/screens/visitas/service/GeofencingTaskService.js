@@ -3,7 +3,7 @@ import * as Location from "expo-location";
 import HospitalService from "../../hospitais/service/HospitalService";
 import VisitaService from "./VisitaService";
 import { agendarFeedback } from "../../feedback/service/FeedbackNotificationService";
-import { geojsonParaCoordenadas, calcularCentroide } from "../../../utils/geojson";
+import { centroDoHospital } from "../../../utils/geojson";
 
 /**
  * Geofencing nativo (F-03/ADR-002): substitui o GPS contínuo (que não funciona em
@@ -175,7 +175,8 @@ export async function iniciarGeofencing() {
 
   const regioes = lista
     .map((hospital) => {
-      const centroide = calcularCentroide(geojsonParaCoordenadas(hospital.geofence));
+      // E8-03: a listagem devolve `localizacao` (centroide) em vez do poligono.
+      const centroide = centroDoHospital(hospital);
       if (!centroide || !hospital.id) {
         return null;
       }

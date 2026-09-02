@@ -11,6 +11,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Testes unitários do utilitário de geometria (conversão, centroide, círculo).
@@ -56,5 +57,28 @@ class GeofenceFactoryTest {
         assertEquals(GeofenceFactory.LADOS_CIRCULO + 1, anel.size()); // fechado
         assertEquals(anel.get(0).getX(), anel.get(anel.size() - 1).getX(), 1e-9);
         assertEquals(anel.get(0).getY(), anel.get(anel.size() - 1).getY(), 1e-9);
+    }
+
+    // E8-03: a listagem publica passou a expor centro + raio no lugar do poligono.
+    // O raio precisa ser recuperavel do poligono, senao o cliente nao reconstroi o circulo.
+    @Test
+    void deveRecuperarRaioDoCirculoGerado() {
+        double raioOriginal = 150.0;
+        GeoJsonPolygon circulo = factory.criarCirculo(-15.78, -47.88, raioOriginal, GeofenceFactory.LADOS_CIRCULO);
+        GeoJsonPoint centroide = factory.calcularCentroide(circulo);
+
+        Integer raio = factory.raioAproximadoMetros(circulo, centroide);
+
+        assertNotNull(raio);
+        // Tolerancia de 1 m: o centroide de um poligono de 32 lados nao coincide
+        // exatamente com o centro do circulo circunscrito.
+        assertEquals(raioOriginal, raio, 1.0);
+    }
+
+    @Test
+    void deveRetornarRaioNuloQuandoNaoHaGeometria() {
+        assertNull(factory.raioAproximadoMetros(null, new GeoJsonPoint(-47.88, -15.78)));
+        assertNull(factory.raioAproximadoMetros(
+                factory.criarCirculo(-15.78, -47.88, 150.0, GeofenceFactory.LADOS_CIRCULO), null));
     }
 }

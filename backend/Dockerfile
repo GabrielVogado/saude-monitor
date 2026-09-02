@@ -12,6 +12,12 @@ RUN ./gradlew --no-daemon clean bootJar
 FROM eclipse-temurin:25-jre
 WORKDIR /app
 
+# curl serve ao healthcheck do container no deploy da Oracle Cloud
+# (deploy/oracle/docker-compose.yml) e a diagnostico dentro da VM.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /app/build/libs/*.jar app.jar
 
 # Dados do seed de estabelecimentos (DBF + SHP) lidos no startup (app.seed.path=data/).

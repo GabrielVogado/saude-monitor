@@ -1,0 +1,18 @@
+# Terminação TLS e proxy reverso para o backend.
+# O certificado é emitido e renovado automaticamente pelo Let's Encrypt — por
+# isso o DNS de {$DOMINIO} precisa apontar para o IP público da VM ANTES de
+# subir o Caddy, e as portas 80 e 443 precisam estar abertas nos dois firewalls.
+{
+	email {$EMAIL_TLS}
+}
+
+{$DOMINIO} {
+	encode zstd gzip
+
+	# O Spring Boot não comprime resposta por padrão. Com gzip aqui, a listagem
+	# de hospitais (~11 KB após E8-03) desce para a casa de 2 a 3 KB no fio.
+	reverse_proxy backend:8080 {
+		health_uri /actuator/health
+		health_interval 30s
+	}
+}

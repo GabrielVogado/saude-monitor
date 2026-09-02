@@ -8,6 +8,15 @@
 # requisição com o serviço quente) — só a troca de hospedagem resolve.
 #
 # APOSENTAR junto com o Render, assim que a migração for concluída.
+#
+# ⚠️ O `schedule` abaixo NÃO dispara hoje. O GitHub só executa workflows
+# agendados a partir da branch padrão do repositório, que é `master` — 142
+# commits atrás de `develop` e fora do git-flow do projeto. Por decisão do PO
+# em 02/09/2026, `master` não será alterada. Enquanto isso:
+#   - este workflow serve por `workflow_dispatch` (execução manual);
+#   - o ping periódico de fato fica a cargo de um monitor externo (UptimeRobot
+#     ou cron-job.org) apontado para a mesma URL;
+#   - se um dia a branch padrão mudar, o agendamento passa a valer sozinho.
 name: Keep-alive - Backend (Render)
 
 on:

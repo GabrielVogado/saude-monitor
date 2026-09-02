@@ -6,6 +6,9 @@ import {
   geojsonParaCoordenadas,
   coordenadasParaGeoJson,
   calcularCentroide,
+  circuloParaCoordenadas,
+  centroDoHospital,
+  LADOS_CIRCULO,
   geofencesParaFeatureCollection,
 } from "../../utils/geojson";
 
@@ -111,5 +114,55 @@ describe("utils/geojson — geofencesParaFeatureCollection (F-07)", () => {
   test("lista vazia ou nula devolve FeatureCollection vazia", () => {
     expect(geofencesParaFeatureCollection([]).features).toEqual([]);
     expect(geofencesParaFeatureCollection(null).features).toEqual([]);
+  });
+});
+
+// E8-03: a listagem passou a devolver `localizacao` + `raioMetros` no lugar do polígono.
+describe("E8-03 — geofence reconstruído a partir de centro e raio", () => {
+  const hospitalDaListagem = {
+    id: "h1",
+    nome: "Hospital A",
+    localizacao: { latitude: -15.78, longitude: -47.88 },
+    raioMetros: 150,
+  };
+
+  it("reconstrói o círculo com o mesmo número de lados do backend", () => {
+    const vertices = circuloParaCoordenadas(
+      hospitalDaListagem.localizacao,
+      hospitalDaListagem.raioMetros
+    );
+    expect(vertices).toHaveLength(LADOS_CIRCULO + 1);
+    expect(vertices[0]).toEqual(vertices[vertices.length - 1]);
+  });
+
+  it("mantém o centroide reconstruído próximo do centro informado", () => {
+    const centro = centroDoHospital(hospitalDaListagem);
+    expect(centro.latitude).toBeCloseTo(-15.78, 6);
+    expect(centro.longitude).toBeCloseTo(-47.88, 6);
+  });
+
+  it("prefere `localizacao` mas ainda aceita o polígono completo do detalhe", () => {
+    const doDetalhe = {
+      geofence: {
+        type: "Polygon",
+        coordinates: [[[-47.88, -15.78], [-47.87, -15.78], [-47.87, -15.77], [-47.88, -15.78]]],
+      },
+    };
+    expect(centroDoHospital(doDetalhe)).not.toBeNull();
+    expect(centroDoHospital({})).toBeNull();
+  });
+
+  it("monta a FeatureCollection do mapa a partir do formato da listagem", () => {
+    const fc = geofencesParaFeatureCollection([hospitalDaListagem]);
+    expect(fc.features).toHaveLength(1);
+    expect(fc.features[0].geometry.type).toBe("Polygon");
+    expect(fc.features[0].properties.id).toBe("h1");
+    expect(fc.features[0].geometry.coordinates[0].length).toBe(LADOS_CIRCULO + 1);
+  });
+
+  it("descarta hospital sem centro nem polígono", () => {
+    expect(geofencesParaFeatureCollection([{ id: "x" }]).features).toHaveLength(0);
+    expect(circuloParaCoordenadas(null, 150)).toEqual([]);
+    expect(circuloParaCoordenadas({ latitude: -15.78, longitude: -47.88 }, 0)).toEqual([]);
   });
 });

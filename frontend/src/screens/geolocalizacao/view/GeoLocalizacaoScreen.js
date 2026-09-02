@@ -13,8 +13,7 @@ import {
 } from "../service/GeoLocalizacaoService";
 import { getInitialViewState, OSM_RASTER_STYLE } from "../../../utils/mapStyle";
 import {
-  geojsonParaCoordenadas,
-  calcularCentroide,
+  centroDoHospital,
   geofencesParaFeatureCollection,
 } from "../../../utils/geojson";
 import HospitalService from "../../hospitais/service/HospitalService";
@@ -140,7 +139,7 @@ function GeolocalizacaoContent({ navigation }) {
   // que a lista carregar — assim o "todos os hospitais" é visível de imediato.
   const enquadrarHospitais = useCallback(() => {
     const pontos = hospitais
-      .map((h) => calcularCentroide(geojsonParaCoordenadas(h.geofence)))
+      .map((h) => centroDoHospital(h))
       .filter(Boolean);
     if (pontos.length === 0) {
       return;
@@ -231,7 +230,7 @@ function GeolocalizacaoContent({ navigation }) {
         )}
 
         {hospitais.map((hospital) => {
-          const centroide = calcularCentroide(geojsonParaCoordenadas(hospital.geofence));
+          const centroide = centroDoHospital(hospital);
           if (!centroide) {
             return null;
           }

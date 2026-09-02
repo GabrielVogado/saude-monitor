@@ -18,6 +18,7 @@ import br.com.saude_monitor.api.hospital.dto.HospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.HospitalResumoResponse;
 import br.com.saude_monitor.api.hospital.dto.HospitalResponse;
 import br.com.saude_monitor.api.hospital.dto.IndicadoresResponse;
+import br.com.saude_monitor.api.hospital.dto.LocalizacaoDto;
 import br.com.saude_monitor.api.hospital.dto.OrdemRanking;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
 import br.com.saude_monitor.api.hospital.dto.RejeitarSugestaoRequest;
@@ -30,6 +31,7 @@ import br.com.saude_monitor.api.hospital.service.GeofenceFactory;
 import br.com.saude_monitor.api.hospital.service.GeofenceValidator;
 import br.com.saude_monitor.api.hospital.service.HospitalService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -457,10 +459,29 @@ public class HospitalServiceImpl implements HospitalService {
                 d.getCategoria(),
                 d.getTipoUnidade(),
                 d.getEndereco() == null ? null : toEnderecoDto(d.getEndereco()),
-                d.getGeofence() == null ? null : geofenceFactory.toDto(d.getGeofence()),
+                toLocalizacaoDto(d),
+                geofenceFactory.raioAproximadoMetros(d.getGeofence(), centroideDe(d)),
                 d.isAtivo(),
                 indicadores
         );
+    }
+
+    /**
+     * Centroide do hospital: prefere o campo persistido {@code localizacao} (indexado
+     * 2dsphere) e só recalcula a partir do polígono quando ele não existe — caso de
+     * registros anteriores à migração que passou a gravar o centroide.
+     */
+    private GeoJsonPoint centroideDe(HospitalDocument d) {
+        if (d.getLocalizacao() != null) {
+            return d.getLocalizacao();
+        }
+        return d.getGeofence() == null ? null : geofenceFactory.calcularCentroide(d.getGeofence());
+    }
+
+    private LocalizacaoDto toLocalizacaoDto(HospitalDocument d) {
+        GeoJsonPoint centroide = centroideDe(d);
+        // GeoJSON guarda [longitude, latitude]: X = longitude, Y = latitude.
+        return centroide == null ? null : new LocalizacaoDto(centroide.getY(), centroide.getX());
     }
 
     private EnderecoDocument toEndereco(EnderecoDto dto) {

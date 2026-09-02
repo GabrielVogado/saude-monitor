@@ -123,4 +123,34 @@ public class GeofenceFactory {
         pontos.add(pontos.getFirst());
         return new GeoJsonPolygon(pontos);
     }
+
+    /**
+     * Operação inversa de {@link #criarCirculo}: estima o raio, em metros, do círculo
+     * que originou o polígono. Usa a mesma aproximação equiretangular e toma a maior
+     * distância entre o centroide e os vértices — para os geofences gerados pelo
+     * produto (círculos regulares) todas as distâncias são iguais; o máximo apenas
+     * torna o resultado estável caso um polígono venha de importação externa.
+     *
+     * <p>Usado para expor {@code raioMetros} na listagem pública sem trafegar o
+     * polígono inteiro (E8-03).</p>
+     *
+     * @return o raio arredondado em metros, ou {@code null} se não for calculável.
+     */
+    public Integer raioAproximadoMetros(GeoJsonPolygon polygon, GeoJsonPoint centroide) {
+        if (polygon == null || centroide == null || polygon.getCoordinates().isEmpty()) {
+            return null;
+        }
+        List<Point> vertices = polygon.getCoordinates().getFirst().getCoordinates();
+        if (vertices.isEmpty()) {
+            return null;
+        }
+        double cosLat = Math.cos(Math.toRadians(centroide.getY()));
+        double maior = 0.0;
+        for (Point v : vertices) {
+            double dLat = (v.getY() - centroide.getY()) * METROS_POR_GRAU_LAT;
+            double dLng = (v.getX() - centroide.getX()) * METROS_POR_GRAU_LAT * cosLat;
+            maior = Math.max(maior, Math.hypot(dLat, dLng));
+        }
+        return maior < EPS ? null : (int) Math.round(maior);
+    }
 }

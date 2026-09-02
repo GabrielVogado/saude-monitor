@@ -13,7 +13,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | Aplicativo (Fase 0 + Épicos 1–6) | 42 | 43 | **98%** |
 | Painel Administrativo Web (Épico 7) | 0 | 9 | 0% (adiado) |
 | **Total do backlog** | **42** | **52** | **81%** |
-| Épico 8 — Estabilização e Desempenho (novo, v2.1) | 0 | 15 | 0% |
+| Épico 8 — Estabilização e Desempenho (novo, v2.1) | 1 | 15 | 7% |
 
 > ⚠️ **Entregue ≠ utilizável.** As 42 estórias abaixo estão implementadas e cobertas por teste em CI, mas o sistema **não passou por validação em campo** e apresenta lentidão transversal de origem confirmada na infraestrutura (109 s na primeira abertura, 1–5 s por requisição com o serviço quente). Ver `Features-MVP-v2.1.md` §2.1 e o **Épico 8** do `Backlog-MVP-v2.1.md`.
 
@@ -114,7 +114,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 |---|---|---|---|
 | **E8-01** | Eliminar cold start na primeira abertura | Cross | 🔴 Pendente — **P0**, medido em 109 s com HTTP 503 |
 | **E8-02** | Cumprir o orçamento de latência do RNF-02 | Cross | 🔴 Pendente — **P0**, medido em 1,9–4,9 s (orçamento: 300 ms p95) |
-| **E8-03** | Enxugar o payload da listagem de hospitais | **F-01**, **F-07** | 🔴 Pendente — **P0**, 35 KB para 20 itens (geofence trafega na lista) |
+| **E8-03** | Enxugar o payload da listagem de hospitais | **F-01**, **F-07** | ✅ Entregue (02/09/2026) — o `geofence` era 73,6% do corpo (27.849 de 37.838 B). Substituído por `localizacao` + `raioMetros`; cliente reconstrói o círculo. Estimado 35,7 KB → ~11 KB (−70%), **medição pós-deploy pendente** |
 | **E8-04** | Estados de carregamento/erro com timeout explícito | **F-08** | 🔴 Pendente — **P0** |
 | **E8-05** | Inventário dos bugs observados em uso | Cross | 🔴 Pendente — **P0**, depende de insumo do Product Owner |
 | **E8-06** | Métricas de latência e erro por endpoint | Cross | 🔴 Pendente |

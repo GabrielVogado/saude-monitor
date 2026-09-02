@@ -1,5 +1,6 @@
 import { buildApiUrl } from "../../../config/api";
 import { classificarErroDeRede, fetchComTimeout } from "../../../config/http";
+import { geracaoDaSessao, renovarSessao } from "../../../config/sessao";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../auth/service/LoginService";
 
@@ -41,13 +42,16 @@ async function request(path, { method = "GET", body, headers = {} } = {}) {
     return response;
   };
 
+  // Geração lida antes do 401: se ela mudar, outra requisição já renovou a
+  // sessão e esta só precisa repetir a chamada com o token novo.
+  const geracao = geracaoDaSessao();
   let response = await doFetch();
 
   if (response.status === 401) {
     const refreshToken = await TokenStorage.getRefreshToken();
     if (refreshToken) {
       try {
-        await LoginService.refresh();
+        await renovarSessao(() => LoginService.refresh(), geracao);
         response = await doFetch();
       } catch {
         await LoginService.logout();

@@ -7,6 +7,7 @@ process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../../screens/auth/service/LoginService";
+import { reiniciarControleDeRenovacao } from "../../../config/sessao";
 
 jest.mock("../../../screens/auth/service/LoginService");
 
@@ -19,6 +20,7 @@ describe("HospitalService (Épico 01)", () => {
   beforeEach(async () => {
     require("@react-native-async-storage/async-storage").default.__reset();
     jest.clearAllMocks();
+    reiniciarControleDeRenovacao();
     capturada.pathname = "";
     capturada.search = "";
     global.fetch = jest.fn().mockImplementation(async (url, config) => {
@@ -82,6 +84,33 @@ describe("HospitalService (Épico 01)", () => {
     await HospitalService.listar({ size: 10 });
     expect(LoginService.refresh).toHaveBeenCalledTimes(1);
     expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  test("dois 401 simultâneos renovam a sessão uma única vez (ARQ-01)", async () => {
+    await TokenStorage.salvarTokens({ accessToken: "OLD", refreshToken: "R" });
+    LoginService.refresh.mockImplementation(async () => {
+      // Segura a renovação para que a segunda requisição chegue com ela em voo,
+      // que é exatamente a janela em que o token era rotacionado duas vezes.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return { accessToken: "NEW", refreshToken: "R2" };
+    });
+
+    let chamadas = 0;
+    global.fetch = jest.fn().mockImplementation(async () => {
+      chamadas += 1;
+      return chamadas <= 2
+        ? jsonResponse({ message: "expirado" }, 401)
+        : jsonResponse({ content: [] });
+    });
+
+    await Promise.all([
+      HospitalService.listar({ size: 10 }),
+      HospitalService.listar({ size: 20 }),
+    ]);
+
+    expect(LoginService.refresh).toHaveBeenCalledTimes(1);
+    expect(LoginService.logout).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalledTimes(4);
   });
 
   test("401 sem refresh token NÃO tenta renovar e lança o envelope de erro", async () => {

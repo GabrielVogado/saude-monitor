@@ -12,6 +12,7 @@ import UserScreen from "./src/screens/user/view/UserScreen.js";
 import GeoLocalizacaoScreen from "./src/screens/geolocalizacao/view/GeoLocalizacaoScreen.js";
 import HospitaisScreen from "./src/screens/hospitais/view/HospitaisScreen.js";
 import HospitalDetalheScreen from "./src/screens/hospitais/view/HospitalDetalheScreen.js";
+import RankingScreen from "./src/screens/hospitais/view/RankingScreen.js";
 import SugerirHospitalScreen from "./src/screens/hospitais/view/SugerirHospitalScreen.js";
 import SugestoesPendentesScreen from "./src/screens/hospitais/view/SugestoesPendentesScreen.js";
 import RevisarSugestaoScreen from "./src/screens/hospitais/view/RevisarSugestaoScreen.js";
@@ -42,6 +43,7 @@ function HospitaisStack() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="HospitaisLista" component={HospitaisScreen} />
             <Stack.Screen name="HospitalDetalhe" component={HospitalDetalheScreen} />
+            <Stack.Screen name="Ranking" component={RankingScreen} />
             <Stack.Screen name="SugerirHospital" component={SugerirHospitalScreen} />
             <Stack.Screen name="SugestoesPendentes" component={SugestoesPendentesScreen} />
             <Stack.Screen name="RevisarSugestao" component={RevisarSugestaoScreen} />

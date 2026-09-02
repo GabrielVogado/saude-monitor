@@ -36,6 +36,9 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-json'
 	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 	implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-csv'
+	// Relatorio PDF de exportacao de dados do titular (E5-03 / LGPD art. 18).
+	// OpenPDF (MPL-2.0 / LGPL-2.1) usado como biblioteca nao modificada.
+	implementation 'com.github.librepdf:openpdf:2.0.3'
 	// Leitura de arquivos .dbf (atributos do seed de estabelecimentos — Épico 01).
 	// Grupo com.github.albfernandez (fork mantido do JavaDBF original com.linuxense).
 	implementation 'com.github.albfernandez:javadbf:1.14.1'

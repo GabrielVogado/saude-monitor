@@ -1,7 +1,7 @@
 /**
  * Setup global do Jest: mocks de APIs nativas (fetch, AsyncStorage, expo-location,
- * expo-notifications, expo-constants) para que os serviços possam ser testados sem
- * device/emulador.
+ * expo-notifications, expo-constants, expo-file-system, expo-sharing) para que os
+ * serviços possam ser testados sem device/emulador.
  */
 
 // fetch global é fornecido pelo jest-expo/node; garantimos que exista como spy
@@ -60,6 +60,31 @@ jest.mock("expo-notifications", () => {
     addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   };
 });
+
+// expo-file-system: sistema de arquivos em memória (download do PDF de exportação, E5-03).
+jest.mock("expo-file-system", () => {
+  class File {
+    constructor(...partes) {
+      const nome = String(partes[partes.length - 1]);
+      this.name = nome;
+      this.uri = `file:///cache/${nome}`;
+    }
+  }
+  File.downloadFileAsync = jest.fn(async (_url, destino) => destino);
+
+  return {
+    __esModule: true,
+    File,
+    Paths: { cache: { uri: "file:///cache/" }, document: { uri: "file:///document/" } },
+  };
+});
+
+// expo-sharing: menu de compartilhamento do sistema (E5-03).
+jest.mock("expo-sharing", () => ({
+  __esModule: true,
+  isAvailableAsync: jest.fn(async () => true),
+  shareAsync: jest.fn(async () => undefined),
+}));
 
 // @react-native-async-storage/async-storage: armazenamento em memória.
 jest.mock("@react-native-async-storage/async-storage", () => {

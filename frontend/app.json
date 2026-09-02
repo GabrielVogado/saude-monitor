@@ -59,7 +59,8 @@
         }
       ],
       "expo-notifications",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-secure-store"
     ],
     "owner": "gabrielvogado"
   }

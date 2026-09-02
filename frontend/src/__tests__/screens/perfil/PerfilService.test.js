@@ -11,6 +11,7 @@ import * as Location from "expo-location";
 import { File } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import TokenStorage from "../../../services/TokenStorage";
 import PerfilService from "../../../screens/perfil/service/PerfilService";
 import LoginService from "../../../screens/auth/service/LoginService";
 
@@ -23,6 +24,14 @@ function respostaJson(status, corpo) {
     status,
     text: async () => JSON.stringify(corpo),
   };
+}
+
+/**
+ * A sessão é montada pelo `TokenStorage`, e não escrevendo direto no
+ * AsyncStorage: desde o ARQ-02 os tokens vivem no `expo-secure-store` no nativo.
+ */
+async function darSessao(accessToken, refreshToken) {
+  await TokenStorage.salvarTokens({ accessToken, refreshToken });
 }
 
 const USUARIO_KEY = "@saude_monitor:usuario";
@@ -69,7 +78,7 @@ describe("PerfilService (Épico 05)", () => {
     });
 
     test("baixa o PDF com o token e abre o compartilhamento", async () => {
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-123");
+      await darSessao("token-123", "refresh-1");
 
       const resultado = await PerfilService.exportarDadosPdf();
 
@@ -85,7 +94,7 @@ describe("PerfilService (Épico 05)", () => {
     });
 
     test("mantém o arquivo salvo quando o dispositivo não compartilha", async () => {
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-123");
+      await darSessao("token-123", "refresh-1");
       Sharing.isAvailableAsync.mockResolvedValueOnce(false);
 
       const resultado = await PerfilService.exportarDadosPdf();
@@ -96,10 +105,10 @@ describe("PerfilService (Épico 05)", () => {
     });
 
     test("renova o token e repete o download quando o backend responde 401", async () => {
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-velho");
+      await darSessao("token-velho", "refresh-1");
       File.downloadFileAsync.mockRejectedValueOnce(new Error("response has status: 401"));
       LoginService.refresh.mockImplementation(async () => {
-        await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-novo");
+        await darSessao("token-novo", "refresh-2");
       });
 
       await PerfilService.exportarDadosPdf();
@@ -111,7 +120,7 @@ describe("PerfilService (Épico 05)", () => {
     });
 
     test("encerra a sessão quando a renovação do token falha", async () => {
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-velho");
+      await darSessao("token-velho", "refresh-1");
       File.downloadFileAsync.mockRejectedValueOnce(new Error("response has status: 401"));
       LoginService.refresh.mockRejectedValue(new Error("refresh inválido"));
 
@@ -122,7 +131,7 @@ describe("PerfilService (Épico 05)", () => {
     });
 
     test("propaga falhas de geração do relatório", async () => {
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-123");
+      await darSessao("token-123", "refresh-1");
       File.downloadFileAsync.mockRejectedValueOnce(new Error("response has status: 500"));
 
       await expect(PerfilService.exportarDadosPdf()).rejects.toThrow(
@@ -143,7 +152,7 @@ describe("PerfilService (Épico 05)", () => {
     });
 
     test("registra a revogação da localização com a versão dos termos", async () => {
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-123");
+      await darSessao("token-123", "refresh-1");
       global.fetch = jest.fn(async () =>
         respostaJson(200, { localizacao: { aceito: false, versao: "1.0" } })
       );
@@ -159,7 +168,7 @@ describe("PerfilService (Épico 05)", () => {
     });
 
     test("envia apenas as finalidades informadas", async () => {
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-123");
+      await darSessao("token-123", "refresh-1");
       global.fetch = jest.fn(async () => respostaJson(200, {}));
 
       await PerfilService.atualizarConsentimento({ notificacoes: true });
@@ -171,7 +180,7 @@ describe("PerfilService (Épico 05)", () => {
     });
 
     test("ignora chamadas sem nenhuma finalidade booleana", async () => {
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-123");
+      await darSessao("token-123", "refresh-1");
       global.fetch = jest.fn();
 
       expect(await PerfilService.atualizarConsentimento({})).toBeNull();
@@ -179,16 +188,13 @@ describe("PerfilService (Épico 05)", () => {
     });
 
     test("renova o token e repete a chamada após 401", async () => {
-      await AsyncStorage.multiSet([
-        [ACCESS_TOKEN_KEY, "token-velho"],
-        [REFRESH_TOKEN_KEY, "refresh-1"],
-      ]);
+      await darSessao("token-velho", "refresh-1");
       global.fetch = jest
         .fn()
         .mockResolvedValueOnce(respostaJson(401, { message: "expirado" }))
         .mockResolvedValueOnce(respostaJson(200, { localizacao: { aceito: true } }));
       LoginService.refresh.mockImplementation(async () => {
-        await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-novo");
+        await darSessao("token-novo", "refresh-2");
       });
 
       await PerfilService.atualizarConsentimento({ localizacao: true });
@@ -198,7 +204,7 @@ describe("PerfilService (Épico 05)", () => {
     });
 
     test("propaga a mensagem de erro do backend", async () => {
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-123");
+      await darSessao("token-123", "refresh-1");
       global.fetch = jest.fn(async () =>
         respostaJson(400, { message: "Informe ao menos uma finalidade." })
       );

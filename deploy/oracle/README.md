@@ -14,6 +14,11 @@ Medição de 02/09/2026 contra `https://saude-monitor.onrender.com`:
 
 As duas causas eram do plano: *spin-down* após ~15 min e fração de vCPU compartilhada. Uma VM Always Free fica ligada 24/7 e um OCPU Ampere é um core dedicado.
 
+> **Status em 02/09/2026:** a região São Paulo está **sem capacidade Always Free** (tanto `VM.Standard.A1.Flex`
+> quanto `VM.Standard.E2.1.Micro`). Trocar de região não resolve: recursos Always Free só existem na região *home*
+> da conta, que é imutável. Enquanto a capacidade não libera, o `keep-alive-backend.yml` mantém o Render acordado
+> e elimina o *cold start*. Os artefatos abaixo ficam prontos para o momento em que a VM puder ser criada.
+
 O MongoDB **não muda**: continua no Atlas, `AWS / sa-east-1 (São Paulo)` — mesma praça da VM.
 
 ## 1. Criar a VM (console OCI)

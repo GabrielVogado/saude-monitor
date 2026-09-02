@@ -1,5 +1,7 @@
 import {buildApiUrl} from "../../../config/api";
 
+import { classificarErroDeRede, fetchComTimeout } from "../../../config/http";
+
 class UserService {
 	/**
 	 * Cria a conta opcional (E5-04) em {@code POST /api/v1/auth/registro} (§3.1).
@@ -22,7 +24,7 @@ class UserService {
 		let response;
 
 		try {
-			response = await fetch(cadastroUrl, {
+			response = await fetchComTimeout(cadastroUrl, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -30,11 +32,7 @@ class UserService {
 				body: JSON.stringify(payload),
 			});
 		} catch (error) {
-			if (error.message === "Network request failed") {
-				throw new Error(`Nao foi possivel conectar ao backend em ${cadastroUrl}. Verifique API, URL e rede.`);
-			}
-
-			throw error;
+			throw await classificarErroDeRede(error, cadastroUrl);
 		}
 
 		const rawResponseBody = await response.text();

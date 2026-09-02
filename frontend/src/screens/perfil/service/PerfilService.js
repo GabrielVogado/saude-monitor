@@ -3,6 +3,14 @@ import * as Location from "expo-location";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { buildApiUrl } from "../../../config/api";
+
+import { fetchComTimeout } from "../../../config/http";
+
+/**
+ * O PDF de exportação LGPD é montado sob demanda no servidor, então recebe
+ * folga maior que o teto padrão de 20 s — mas ainda finita.
+ */
+const TIMEOUT_EXPORTACAO_MS = 60000;
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../auth/service/LoginService";
 
@@ -100,9 +108,11 @@ async function baixarComToken(nomeArquivo, token) {
 
 /** Fallback web: baixa o PDF como blob e delega o salvamento ao navegador. */
 async function baixarNoNavegador(nomeArquivo, token) {
-  const resposta = await fetch(buildApiUrl(EXPORT_PDF_PATH), {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const resposta = await fetchComTimeout(
+    buildApiUrl(EXPORT_PDF_PATH),
+    { headers: { Authorization: `Bearer ${token}` } },
+    TIMEOUT_EXPORTACAO_MS
+  );
 
   if (!resposta.ok) {
     throw new Error(

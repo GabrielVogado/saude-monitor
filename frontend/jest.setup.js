@@ -79,6 +79,17 @@ jest.mock("expo-file-system", () => {
   };
 });
 
+// expo-network: estado de conectividade consultado ao classificar falha de rede
+// (E8-04). O padrão é "conectado", para que a falha simulada nos testes seja
+// atribuída ao servidor; testes de conectividade sobrescrevem o retorno.
+jest.mock("expo-network", () => ({
+  __esModule: true,
+  getNetworkStateAsync: jest.fn(async () => ({
+    isConnected: true,
+    isInternetReachable: true,
+  })),
+}));
+
 // expo-sharing: menu de compartilhamento do sistema (E5-03).
 jest.mock("expo-sharing", () => ({
   __esModule: true,

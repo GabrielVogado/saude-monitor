@@ -58,7 +58,7 @@ describe("UserService (E5-04 registro)", () => {
   test("falha de rede reporta problema de conexão com backend", async () => {
     global.fetch = jest.fn().mockRejectedValue(new Error("Network request failed"));
     await expect(UserService.registro({ fullName: "A", email: "a@b.c", password: "x" }))
-      .rejects.toThrow(/Nao foi possivel conectar ao backend/);
+      .rejects.toThrow(/servidor está indisponível/i);
   });
 
   test("não faz cadastro sem nome (UserScreen valida antes de chamar o serviço)", async () => {

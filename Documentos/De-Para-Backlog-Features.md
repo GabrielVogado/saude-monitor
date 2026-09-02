@@ -123,7 +123,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **E8-09** | Contrato OpenAPI publicado | **F-09** | 🔴 Pendente |
 | **E8-10** | Testes de integração com contexto Spring | Cross | 🔴 Pendente |
 | **E8-11** | Analytics de produto (funil, retenção) | Cross | 🔴 Pendente |
-| **E8-12** | CI rodando `npm test` no frontend | Cross | ✅ Entregue — step `Testes (Jest)` no job de frontend do `ci.yml` (`npm test -- --ci --maxWorkers=2`), **171 testes** em ~20 s. ⚠️ Metade do CA depende de configuração: `develop` **não tem proteção de branch**, então o check falho aparece vermelho no PR mas não impede o merge |
+| **E8-12** | CI rodando `npm test` no frontend | Cross | ✅ Entregue — step `Testes (Jest)` no job de frontend do `ci.yml` (`npm test -- --ci --maxWorkers=2`), **171 testes** em ~20 s. `develop` passou a ter proteção de branch com os checks `Backend (Spring Boot)` e `Frontend (Expo Web)` **obrigatórios**, sem revisão obrigatória e com bypass de administrador permitido |
 | **E8-13** | Lint no frontend (o `typecheck` atual não verifica nada) | Cross | 🔴 Pendente |
 | **E8-14** | Encerrar divergências de contrato (`password`/`senha`, `users`/`usuarios`) | **F-02** | 🔴 Pendente — abertas desde 20/08/2026 |
 | **E8-15** | Retenção de dados (LGPD art. 16) e teste de restauração de backup | **F-09** | 🔴 Pendente |

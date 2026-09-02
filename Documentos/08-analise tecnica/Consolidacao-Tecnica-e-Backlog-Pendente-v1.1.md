@@ -227,7 +227,7 @@ Estado verificado item a item contra o código em `develop@f26666e`:
 
 | ID | Lacuna | Evidência | Impacto |
 |---|---|---|---|
-| ENG-01 | ~~**O CI não roda os testes do frontend**~~ — ✅ **Resolvido em 02/09/2026 (E8-12)** | O job de frontend do `ci.yml` passou a executar o step `Testes (Jest)` (`npm test -- --ci --maxWorkers=2`); os **171 testes** rodam em todo `push`/`pull_request` para `develop` e `main` | Gate ativo. **Ressalva:** `develop` não tem proteção de branch, então o check falho sinaliza mas não impede o merge — configuração pendente com o PO |
+| ENG-01 | ~~**O CI não roda os testes do frontend**~~ — ✅ **Resolvido em 02/09/2026 (E8-12)** | O job de frontend do `ci.yml` passou a executar o step `Testes (Jest)` (`npm test -- --ci --maxWorkers=2`); os **171 testes** rodam em todo `push`/`pull_request` para `develop` e `main` | Gate ativo e **obrigatório**: `develop` foi protegida em 02/09/2026 exigindo os checks `Backend (Spring Boot)` e `Frontend (Expo Web)`. Sem revisão obrigatória e com bypass de administrador permitido, para não travar o fluxo de um único mantenedor |
 | ENG-02 | Sem linter em nenhum lado | Sem ESLint/Prettier no frontend; sem Spotless/Checkstyle no backend | As inconsistências catalogadas em ARQ-05/07 são exatamente o que um lint bloquearia na origem |
 | ENG-03 | Sem crash reporting | Nenhum Sentry/Crashlytics no app nem no backend | O crash do PR #46 foi descoberto por relato verbal, sem stack trace |
 | ENG-04 | Sem varredura de dependências / SAST | Sem Dependabot, sem CodeQL | App que trata dado pessoal sensível sem alerta de CVE |

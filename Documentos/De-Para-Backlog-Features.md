@@ -13,7 +13,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | Aplicativo (Fase 0 + Épicos 1–6) | 42 | 43 | **98%** |
 | Painel Administrativo Web (Épico 7) | 0 | 9 | 0% (adiado) |
 | **Total do backlog** | **42** | **52** | **81%** |
-| Épico 8 — Estabilização e Desempenho (novo, v2.1) | 1 | 15 | 7% |
+| Épico 8 — Estabilização e Desempenho (novo, v2.1) | 2 | 15 | 13% |
 
 > ⚠️ **Entregue ≠ utilizável.** As 42 estórias abaixo estão implementadas e cobertas por teste em CI, mas o sistema **não passou por validação em campo** e apresenta lentidão transversal de origem confirmada na infraestrutura (109 s na primeira abertura, 1–5 s por requisição com o serviço quente). Ver `Features-MVP-v2.1.md` §2.1 e o **Épico 8** do `Backlog-MVP-v2.1.md`.
 
@@ -119,11 +119,11 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **E8-05** | Inventário dos bugs observados em uso | Cross | 🔴 Pendente — **P0**, depende de insumo do Product Owner |
 | **E8-06** | Métricas de latência e erro por endpoint | Cross | 🔴 Pendente |
 | **E8-07** | Crash reporting no app | Cross | 🔴 Pendente |
-| **E8-08** | Medição de cobertura de testes (DoD ≥ 70%) | Cross | 🔴 Pendente — 118 testes no BE e 166 no FE, cobertura nunca medida |
+| **E8-08** | Medição de cobertura de testes (DoD ≥ 70%) | Cross | 🔴 Pendente — 121 testes no BE e 171 no FE (ambos rodando na esteira após E8-12), cobertura nunca medida |
 | **E8-09** | Contrato OpenAPI publicado | **F-09** | 🔴 Pendente |
 | **E8-10** | Testes de integração com contexto Spring | Cross | 🔴 Pendente |
 | **E8-11** | Analytics de produto (funil, retenção) | Cross | 🔴 Pendente |
-| **E8-12** | CI rodando `npm test` no frontend | Cross | 🔴 Pendente — **P0**, hoje a esteira roda apenas `typecheck` e `expo export` |
+| **E8-12** | CI rodando `npm test` no frontend | Cross | ✅ Entregue — step `Testes (Jest)` no job de frontend do `ci.yml` (`npm test -- --ci --maxWorkers=2`), **171 testes** em ~20 s. ⚠️ Metade do CA depende de configuração: `develop` **não tem proteção de branch**, então o check falho aparece vermelho no PR mas não impede o merge |
 | **E8-13** | Lint no frontend (o `typecheck` atual não verifica nada) | Cross | 🔴 Pendente |
 | **E8-14** | Encerrar divergências de contrato (`password`/`senha`, `users`/`usuarios`) | **F-02** | 🔴 Pendente — abertas desde 20/08/2026 |
 | **E8-15** | Retenção de dados (LGPD art. 16) e teste de restauração de backup | **F-09** | 🔴 Pendente |

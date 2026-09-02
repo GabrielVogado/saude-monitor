@@ -97,6 +97,27 @@ jest.mock("expo-sharing", () => ({
   shareAsync: jest.fn(async () => undefined),
 }));
 
+// Cofre do expo-secure-store fora da fábrica do mock: o `__reset` do
+// AsyncStorage, que as suítes já chamam, limpa os dois armazenamentos de uma
+// vez. Sem isso, um token gravado num teste vazaria para o seguinte.
+const mockCofreSeguro = {};
+
+// expo-secure-store: Keychain/EncryptedSharedPreferences em memória (ARQ-02).
+jest.mock("expo-secure-store", () => ({
+  __esModule: true,
+  setItemAsync: jest.fn(async (k, v) => {
+    mockCofreSeguro[k] = String(v);
+  }),
+  getItemAsync: jest.fn(async (k) => (k in mockCofreSeguro ? mockCofreSeguro[k] : null)),
+  deleteItemAsync: jest.fn(async (k) => {
+    delete mockCofreSeguro[k];
+  }),
+  isAvailableAsync: jest.fn(async () => true),
+  __reset: () => {
+    Object.keys(mockCofreSeguro).forEach((k) => delete mockCofreSeguro[k]);
+  },
+}));
+
 // @react-native-async-storage/async-storage: armazenamento em memória.
 jest.mock("@react-native-async-storage/async-storage", () => {
   const store = {};
@@ -108,7 +129,10 @@ jest.mock("@react-native-async-storage/async-storage", () => {
       removeItem: jest.fn(async (k) => { delete store[k]; }),
       multiSet: jest.fn(async (pares) => { pares.forEach(([k, v]) => { store[k] = String(v); }); }),
       multiRemove: jest.fn(async (ks) => { ks.forEach((k) => { delete store[k]; }); }),
-      __reset: () => { Object.keys(store).forEach((k) => delete store[k]); },
+      __reset: () => {
+        Object.keys(store).forEach((k) => delete store[k]);
+        Object.keys(mockCofreSeguro).forEach((k) => delete mockCofreSeguro[k]);
+      },
     },
   };
 });

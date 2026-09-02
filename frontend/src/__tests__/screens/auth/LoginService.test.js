@@ -47,7 +47,7 @@ describe("LoginService (Fase 0)", () => {
   });
 
   test("refresh rotaciona o par de tokens", async () => {
-    TokenStorage.salvarTokens({ accessToken: "OLD", refreshToken: "RREF" });
+    await TokenStorage.salvarTokens({ accessToken: "OLD", refreshToken: "RREF" });
     global.fetch = jest.fn().mockResolvedValue(
       jsonResponse({ accessToken: "NEW", refreshToken: "NEWREF", expiraEm: 3600, usuario: { id: "u1" } })
     );
@@ -110,7 +110,7 @@ describe("LoginService (Fase 0)", () => {
   });
 
   test("excluirConta envia DELETE autenticado em /api/v1/contas/exclusao e limpa a sessão", async () => {
-    TokenStorage.salvarTokens({ accessToken: "TOK", refreshToken: "RT", usuario: { id: "u1" } });
+    await TokenStorage.salvarTokens({ accessToken: "TOK", refreshToken: "RT", usuario: { id: "u1" } });
     global.fetch = jest.fn().mockResolvedValue(
       jsonResponse({ success: true, message: "Conta excluída com sucesso." })
     );
@@ -131,7 +131,7 @@ describe("LoginService (Fase 0)", () => {
   });
 
   test("excluirConta propaga erro da API", async () => {
-    TokenStorage.salvarTokens({ accessToken: "TOK" });
+    await TokenStorage.salvarTokens({ accessToken: "TOK" });
     global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "Falha ao excluir a conta: erro interno" }, 500));
     await expect(LoginService.excluirConta()).rejects.toThrow("Falha ao excluir a conta");
   });

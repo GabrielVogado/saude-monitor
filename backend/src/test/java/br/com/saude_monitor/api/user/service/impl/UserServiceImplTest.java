@@ -9,7 +9,9 @@ import br.com.saude_monitor.api.user.document.ConsentimentoItem;
 import br.com.saude_monitor.api.user.document.ConsentimentosDocument;
 import br.com.saude_monitor.api.user.document.Papel;
 import br.com.saude_monitor.api.user.document.UserDocument;
+import br.com.saude_monitor.api.user.dto.AtualizarConsentimentosRequest;
 import br.com.saude_monitor.api.user.dto.ConsentimentoRequest;
+import br.com.saude_monitor.api.user.dto.ConsentimentosResponse;
 import br.com.saude_monitor.api.user.dto.UserRequest;
 import br.com.saude_monitor.api.user.dto.UserResponse;
 import br.com.saude_monitor.api.user.repository.UserRepository;
@@ -27,6 +29,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,8 +41,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Testes da exclusão de conta LGPD (F0-05): cascade de dados pessoais +
- * anonimização de visitas/feedbacks + recálculo de agregados.
+ * Testes do serviço de usuários: cadastro com consentimento, exclusão de conta
+ * LGPD (F0-05 — cascade de dados pessoais, anonimização de visitas/feedbacks e
+ * recálculo de agregados) e gestão de consentimentos (E5-05 / art. 8º §5º).
  */
 class UserServiceImplTest {
 
@@ -147,6 +152,59 @@ class UserServiceImplTest {
         assertEquals("Marina Souza", ((Map<?, ?>) dados.get("usuario")).get("nome"));
         verify(mongoTemplate).find(any(Query.class), eq(VisitaDocument.class));
         verify(mongoTemplate).find(any(Query.class), eq(FeedbackDocument.class));
+    }
+
+    @Test
+    void deveRegistrarRevogacaoDeConsentimentoComDataEVersao() {
+        UserDocument user = usuario("u1");
+        user.getConsentimentos().setLocalizacao(
+                ConsentimentoItem.builder().aceito(true).data(Instant.parse("2026-08-01T12:00:00Z"))
+                        .versao("1.0").build());
+        when(userRepository.findById("u1")).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserDocument.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ConsentimentosResponse resposta = userService.atualizarConsentimentos("u1",
+                new AtualizarConsentimentosRequest(false, null, null));
+
+        assertFalse(resposta.localizacao().aceito());
+        // A versão do aviso originalmente aceito é preservada — é o comprovante da
+        // base legal sob a qual os dados foram tratados até a revogação.
+        assertEquals("1.0", resposta.localizacao().versao());
+        assertNotEquals(Instant.parse("2026-08-01T12:00:00Z"), resposta.localizacao().data());
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void deveAtualizarApenasAsFinalidadesInformadas() {
+        UserDocument user = usuario("u1");
+        user.getConsentimentos().setNotificacoes(
+                ConsentimentoItem.builder().aceito(true).data(Instant.parse("2026-08-01T12:00:00Z"))
+                        .versao("1.0").build());
+        when(userRepository.findById("u1")).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserDocument.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ConsentimentosResponse resposta = userService.atualizarConsentimentos("u1",
+                new AtualizarConsentimentosRequest(true, null, "2.0"));
+
+        assertTrue(resposta.localizacao().aceito());
+        assertEquals("2.0", resposta.localizacao().versao());
+        assertTrue(resposta.notificacoes().aceito());
+        assertEquals(Instant.parse("2026-08-01T12:00:00Z"), resposta.notificacoes().data());
+    }
+
+    @Test
+    void deveRejeitarAtualizacaoSemNenhumaFinalidade() {
+        assertThrows(ValidacaoNegocioException.class, () -> userService.atualizarConsentimentos("u1",
+                new AtualizarConsentimentosRequest(null, null, "1.0")));
+        verify(userRepository, never()).save(any(UserDocument.class));
+    }
+
+    @Test
+    void deveLancarNaoEncontradoAoAtualizarConsentimentosDeUsuarioInexistente() {
+        when(userRepository.findById("x")).thenReturn(Optional.empty());
+
+        assertThrows(RecursoNaoEncontradoException.class, () -> userService.atualizarConsentimentos("x",
+                new AtualizarConsentimentosRequest(false, null, null)));
     }
 
     @Test

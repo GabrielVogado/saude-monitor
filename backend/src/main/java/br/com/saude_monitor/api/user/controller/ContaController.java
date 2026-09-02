@@ -5,9 +5,12 @@ import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
 import br.com.saude_monitor.api.feedback.dto.FeedbackResponse;
 import br.com.saude_monitor.api.feedback.service.FeedbackService;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
+import br.com.saude_monitor.api.user.dto.AtualizarConsentimentosRequest;
+import br.com.saude_monitor.api.user.dto.ConsentimentosResponse;
 import br.com.saude_monitor.api.user.service.UserService;
 import br.com.saude_monitor.api.visita.dto.VisitaResponse;
 import br.com.saude_monitor.api.visita.service.VisitaService;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +19,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,7 +33,7 @@ import java.util.Map;
  *
  * <p>Endpoints autenticados (regra {@code anyRequest().authenticated()} do
  * {@code SecurityConfig}): histórico de visitas e feedbacks, exportação de dados
- * pessoais (art. 18 LGPD) e exclusão de conta.</p>
+ * pessoais (art. 18 LGPD), gestão de consentimentos (art. 8º §5º) e exclusão de conta.</p>
  */
 @Slf4j
 @Validated
@@ -65,6 +70,20 @@ public class ContaController {
     public ResponseEntity<Map<String, Object>> exportarDados() {
         String usuarioId = exigirUsuarioAutenticado();
         return ResponseEntity.ok(userService.exportarDados(usuarioId));
+    }
+
+    /**
+     * 🔒 Concede ou revoga consentimentos do titular (E5-05 / art. 8º §5º da LGPD).
+     *
+     * <p>Aceita atualização parcial: só as finalidades presentes no corpo mudam. A
+     * revogação no app é o par lógico da revogação no sistema operacional — o
+     * dispositivo deixa de coletar e o backend deixa de ter base legal para tratar.</p>
+     */
+    @PutMapping("/consentimentos")
+    public ResponseEntity<ConsentimentosResponse> atualizarConsentimentos(
+            @Valid @RequestBody AtualizarConsentimentosRequest request) {
+        String usuarioId = exigirUsuarioAutenticado();
+        return ResponseEntity.ok(userService.atualizarConsentimentos(usuarioId, request));
     }
 
     /**

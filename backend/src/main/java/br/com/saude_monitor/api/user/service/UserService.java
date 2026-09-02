@@ -1,5 +1,7 @@
 package br.com.saude_monitor.api.user.service;
 
+import br.com.saude_monitor.api.user.dto.AtualizarConsentimentosRequest;
+import br.com.saude_monitor.api.user.dto.ConsentimentosResponse;
 import br.com.saude_monitor.api.user.dto.UserRequest;
 import br.com.saude_monitor.api.user.dto.UserResponse;
 
@@ -8,6 +10,13 @@ import java.util.Map;
 public interface UserService {
 
     UserResponse saveUser(UserRequest request);
+
+    /**
+     * Concessão/revogação de consentimentos (E5-05 / art. 8º §5º da LGPD): grava a
+     * nova decisão do titular com data e versão do aviso, para fins de auditoria.
+     * Apenas as finalidades presentes no request são alteradas.
+     */
+    ConsentimentosResponse atualizarConsentimentos(String usuarioId, AtualizarConsentimentosRequest request);
 
     /**
      * Exportação de dados pessoais LGPD (E5-03/art. 18): devolve o perfil, consentimentos,

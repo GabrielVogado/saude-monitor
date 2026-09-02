@@ -1,6 +1,8 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  AppState,
+  Linking,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -20,6 +22,9 @@ import styles from "./css/PerfilStyle";
  * Tela Perfil → Dados e Privacidade (Épico 05 — E5-01, E5-02, E5-04).
  *
  * - E5-01: exibe e permite revogar a permissão de localização.
+ * - E5-05: a revogação leva às configurações do sistema (`Linking.openSettings`), o
+ *   app reconhece a mudança ao voltar do SO (`AppState`) e audita a decisão no
+ *   backend (`PUT /api/v1/contas/consentimentos`, art. 8º §5º da LGPD).
  * - E5-02: link à Política de Privacidade (2 toques a partir do app).
  * - E5-04: quando não há conta, orienta Cadastro/Login (conta é opcional).
  * - F0-05: botão de exclusão de conta (dados pessoais), com anonimização das
@@ -59,6 +64,41 @@ export default function PerfilScreen({ navigation }) {
 
   const permissaoConcedida = permissao === "granted";
 
+  // Espelha o estado da permissão para o listener do AppState, que é registrado uma
+  // única vez e não pode depender do valor capturado no render.
+  const permissaoRef = useRef(permissao);
+  permissaoRef.current = permissao;
+
+  /**
+   * E5-05: relê a permissão do sistema e, quando ela mudou (tipicamente porque o
+   * usuário alterou nas configurações do SO), registra a nova decisão no backend.
+   * Sem sessão ativa o serviço devolve `null` — a conta é opcional (E5-04).
+   */
+  const sincronizarPermissao = useCallback(async () => {
+    try {
+      const status = await PerfilService.permissaoLocalizacao();
+      if (status === permissaoRef.current) {
+        return;
+      }
+      setPermissao(status);
+      await PerfilService.atualizarConsentimento({ localizacao: status === "granted" });
+    } catch {
+      // Falha de rede não pode travar a tela: a permissão do SO já vale no dispositivo
+      // e a próxima sincronização (retorno ao app) tenta de novo.
+    }
+  }, []);
+
+  // Ao voltar do app de configurações do sistema, reflete a decisão sem exigir
+  // que o usuário reabra a tela.
+  useEffect(() => {
+    const inscricao = AppState.addEventListener("change", (estado) => {
+      if (estado === "active") {
+        sincronizarPermissao();
+      }
+    });
+    return () => inscricao?.remove?.();
+  }, [sincronizarPermissao]);
+
   // Rotas internas do PerfilStack (Login, Cadastro, Privacidade). Navega no próprio
   // stack — o antigo `getParent()` (Tab) não resolve essas rotas e "engolia" o toque.
   const irPara = (rota) => {
@@ -70,6 +110,8 @@ export default function PerfilScreen({ navigation }) {
     try {
       const status = await PerfilService.solicitarPermissaoLocalizacao();
       setPermissao(status);
+      // E5-05: a concessão também é auditada, não só a revogação.
+      await PerfilService.atualizarConsentimento({ localizacao: status === "granted" });
       if (status === "granted") {
         Alert.alert("Permissão concedida", "O aplicativo poderá usar sua localização para detectar visitas.");
       } else {
@@ -83,7 +125,8 @@ export default function PerfilScreen({ navigation }) {
   const revogarPermissao = () => {
     Alert.alert(
       "Revogar permissão de localização",
-      "Ao revogar, o monitoramento automático de visitas para. Você continua usando o restante do aplicativo normalmente.",
+      "Ao revogar, o monitoramento automático de visitas para. Você continua usando o restante do aplicativo normalmente."
+        + "\n\nVamos abrir as configurações do sistema para você desativar a permissão de localização.",
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -91,17 +134,19 @@ export default function PerfilScreen({ navigation }) {
           style: "destructive",
           onPress: async () => {
             try {
-              // Expo/RN não expõe desligar programaticamente a permissão do sistema;
-              // apontamos para as configurações do dispositivo (recomendado) e refletimos
-              // o estado local. E5-01/05: revogação sem bloquear o acesso ao app.
-              const status = await PerfilService.permissaoLocalizacao();
-              setPermissao(status);
+              // A revogação é registrada primeiro: mesmo que o usuário desista nas
+              // configurações do SO, a decisão manifestada no app já retira a base
+              // legal do tratamento (art. 8º §5º) — e o retorno ao app resincroniza.
+              await PerfilService.atualizarConsentimento({ localizacao: false });
+
+              // Expo/RN não desliga a permissão do sistema programaticamente: levamos
+              // o usuário direto à tela de configurações do app (E5-05).
+              await Linking.openSettings();
+            } catch {
               Alert.alert(
                 "Revogar no sistema",
-                "Para desativar a permissão de localização, use as configurações de privacidade do dispositivo. Após alterar, volte a esta tela."
+                "Não foi possível abrir as configurações. Desative a permissão de localização nas configurações de privacidade do dispositivo e volte a esta tela."
               );
-            } catch (error) {
-              Alert.alert("Erro", error.message);
             }
           },
         },

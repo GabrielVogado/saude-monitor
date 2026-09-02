@@ -56,6 +56,12 @@ class AuthControllerTest {
         }
 
         @Override
+        public br.com.saude_monitor.api.user.dto.ConsentimentosResponse atualizarConsentimentos(
+                String usuarioId, br.com.saude_monitor.api.user.dto.AtualizarConsentimentosRequest request) {
+            return br.com.saude_monitor.api.user.dto.ConsentimentosResponse.de(null);
+        }
+
+        @Override
         public Map<String, Object> exportarDados(String usuarioId) {
             return Map.of();
         }

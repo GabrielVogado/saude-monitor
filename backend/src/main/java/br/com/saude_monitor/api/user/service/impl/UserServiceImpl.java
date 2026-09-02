@@ -9,7 +9,9 @@ import br.com.saude_monitor.api.user.document.ConsentimentoItem;
 import br.com.saude_monitor.api.user.document.ConsentimentosDocument;
 import br.com.saude_monitor.api.user.document.Papel;
 import br.com.saude_monitor.api.user.document.UserDocument;
+import br.com.saude_monitor.api.user.dto.AtualizarConsentimentosRequest;
 import br.com.saude_monitor.api.user.dto.ConsentimentoRequest;
+import br.com.saude_monitor.api.user.dto.ConsentimentosResponse;
 import br.com.saude_monitor.api.user.dto.UserRequest;
 import br.com.saude_monitor.api.user.dto.UserResponse;
 import br.com.saude_monitor.api.user.repository.UserRepository;
@@ -104,6 +106,57 @@ public class UserServiceImpl implements UserService {
                 user.getCreatedAt(),
                 user.getUpdatedAt()
         );
+    }
+
+    @Override
+    public ConsentimentosResponse atualizarConsentimentos(String usuarioId, AtualizarConsentimentosRequest request) {
+        if (request == null || request.vazio()) {
+            throw new ValidacaoNegocioException(
+                    "Informe ao menos uma finalidade (localizacao ou notificacoes) para atualizar.");
+        }
+
+        UserDocument user = userRepository.findById(usuarioId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado."));
+
+        ConsentimentosDocument consentimentos = user.getConsentimentos() == null
+                ? ConsentimentosDocument.builder().build()
+                : user.getConsentimentos();
+
+        Instant now = Instant.now();
+        if (request.localizacao() != null) {
+            consentimentos.setLocalizacao(
+                    decidir(consentimentos.getLocalizacao(), request.localizacao(), request.versaoTermos(), now));
+        }
+        if (request.notificacoes() != null) {
+            consentimentos.setNotificacoes(
+                    decidir(consentimentos.getNotificacoes(), request.notificacoes(), request.versaoTermos(), now));
+        }
+
+        user.setConsentimentos(consentimentos);
+        user.setUpdatedAt(now);
+        userRepository.save(user);
+
+        // Trilha de auditoria da decisão (art. 8º §5º): registra o que mudou, sem
+        // qualquer dado pessoal além do identificador interno.
+        log.info("Consentimentos do usuário {} atualizados (LGPD): localizacao={}, notificacoes={}.",
+                usuarioId, request.localizacao(), request.notificacoes());
+
+        return ConsentimentosResponse.de(consentimentos);
+    }
+
+    /**
+     * Monta o registro da decisão. A versão do aviso é mantida quando o app não a
+     * informa — não podemos "apagar" a versão sob a qual o aceite original foi dado.
+     */
+    private ConsentimentoItem decidir(ConsentimentoItem atual, boolean aceito, String versao, Instant now) {
+        String versaoRegistrada = versao == null || versao.isBlank()
+                ? (atual == null ? null : atual.getVersao())
+                : versao;
+        return ConsentimentoItem.builder()
+                .aceito(aceito)
+                .data(now)
+                .versao(versaoRegistrada)
+                .build();
     }
 
     @Override

@@ -2,9 +2,10 @@
  * Perfil → Dados e Privacidade (Épico 05).
  *
  * Verifica o gerenciamento da sessão (usuário logado / deslogar), o controle da
- * permissão de localização (consultar/solicitar) e a exportação dos dados pessoais
- * em PDF. Alinhado aos critérios de aceite de E5-01 (permissão consultável/revogável),
- * E5-03 (exportação, art. 18 da LGPD) e E5-04 (conta opcional).
+ * permissão de localização (consultar/solicitar), a exportação dos dados pessoais
+ * em PDF e a auditoria dos consentimentos. Alinhado aos critérios de aceite de
+ * E5-01 (permissão consultável/revogável), E5-03 (exportação, art. 18 da LGPD),
+ * E5-04 (conta opcional) e E5-05 (revogação registrada, art. 8º §5º da LGPD).
  */
 import * as Location from "expo-location";
 import { File } from "expo-file-system";
@@ -14,6 +15,15 @@ import PerfilService from "../../../screens/perfil/service/PerfilService";
 import LoginService from "../../../screens/auth/service/LoginService";
 
 jest.mock("../../../screens/auth/service/LoginService");
+
+/** Resposta HTTP mínima no formato consumido pelo `request()` do serviço. */
+function respostaJson(status, corpo) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    text: async () => JSON.stringify(corpo),
+  };
+}
 
 const USUARIO_KEY = "@saude_monitor:usuario";
 const ACCESS_TOKEN_KEY = "@saude_monitor:accessToken";
@@ -119,6 +129,83 @@ describe("PerfilService (Épico 05)", () => {
         "response has status: 500"
       );
       expect(Sharing.shareAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("atualizarConsentimento (E5-05 / art. 8º §5º LGPD)", () => {
+    test("não chama a API quando não há sessão (conta é opcional)", async () => {
+      global.fetch = jest.fn();
+
+      const resultado = await PerfilService.atualizarConsentimento({ localizacao: false });
+
+      expect(resultado).toBeNull();
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    test("registra a revogação da localização com a versão dos termos", async () => {
+      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-123");
+      global.fetch = jest.fn(async () =>
+        respostaJson(200, { localizacao: { aceito: false, versao: "1.0" } })
+      );
+
+      const resposta = await PerfilService.atualizarConsentimento({ localizacao: false });
+
+      const [url, config] = global.fetch.mock.calls[0];
+      expect(url).toContain("/api/v1/contas/consentimentos");
+      expect(config.method).toBe("PUT");
+      expect(config.headers.Authorization).toBe("Bearer token-123");
+      expect(JSON.parse(config.body)).toEqual({ versaoTermos: "1.0", localizacao: false });
+      expect(resposta.localizacao.aceito).toBe(false);
+    });
+
+    test("envia apenas as finalidades informadas", async () => {
+      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-123");
+      global.fetch = jest.fn(async () => respostaJson(200, {}));
+
+      await PerfilService.atualizarConsentimento({ notificacoes: true });
+
+      expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+        versaoTermos: "1.0",
+        notificacoes: true,
+      });
+    });
+
+    test("ignora chamadas sem nenhuma finalidade booleana", async () => {
+      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-123");
+      global.fetch = jest.fn();
+
+      expect(await PerfilService.atualizarConsentimento({})).toBeNull();
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    test("renova o token e repete a chamada após 401", async () => {
+      await AsyncStorage.multiSet([
+        [ACCESS_TOKEN_KEY, "token-velho"],
+        [REFRESH_TOKEN_KEY, "refresh-1"],
+      ]);
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce(respostaJson(401, { message: "expirado" }))
+        .mockResolvedValueOnce(respostaJson(200, { localizacao: { aceito: true } }));
+      LoginService.refresh.mockImplementation(async () => {
+        await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-novo");
+      });
+
+      await PerfilService.atualizarConsentimento({ localizacao: true });
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(global.fetch.mock.calls[1][1].headers.Authorization).toBe("Bearer token-novo");
+    });
+
+    test("propaga a mensagem de erro do backend", async () => {
+      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, "token-123");
+      global.fetch = jest.fn(async () =>
+        respostaJson(400, { message: "Informe ao menos uma finalidade." })
+      );
+
+      await expect(
+        PerfilService.atualizarConsentimento({ localizacao: false })
+      ).rejects.toThrow("Informe ao menos uma finalidade.");
     });
   });
 

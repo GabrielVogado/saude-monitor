@@ -22,6 +22,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import org.springframework.http.MediaType;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,13 +32,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Testes do {@link ContaController} (standalone MockMvc) — contas do titular:
- * histórico de visitas/feedbacks, exportação (LGPD) e exclusão.
+ * histórico de visitas/feedbacks, exportação (LGPD), gestão de consentimentos
+ * (E5-05) e exclusão.
  */
 class ContaControllerTest {
 
@@ -45,6 +49,18 @@ class ContaControllerTest {
         public br.com.saude_monitor.api.user.dto.UserResponse saveUser(
                 br.com.saude_monitor.api.user.dto.UserRequest request) {
             return null;
+        }
+
+        @Override
+        public br.com.saude_monitor.api.user.dto.ConsentimentosResponse atualizarConsentimentos(
+                String usuarioId, br.com.saude_monitor.api.user.dto.AtualizarConsentimentosRequest request) {
+            var agora = java.time.Instant.parse("2026-09-01T12:00:00Z");
+            return new br.com.saude_monitor.api.user.dto.ConsentimentosResponse(
+                    new br.com.saude_monitor.api.user.dto.ConsentimentosResponse.Finalidade(
+                            Boolean.TRUE.equals(request.localizacao()), agora, "1.0"),
+                    new br.com.saude_monitor.api.user.dto.ConsentimentosResponse.Finalidade(
+                            Boolean.TRUE.equals(request.notificacoes()), agora, "1.0"),
+                    new br.com.saude_monitor.api.user.dto.ConsentimentosResponse.Finalidade(true, agora, "1.0"));
         }
 
         @Override
@@ -155,6 +171,31 @@ class ContaControllerTest {
         mockMvc.perform(delete("/api/v1/contas/exclusao"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void deveRevogarConsentimentoDeLocalizacao() throws Exception {
+        mockMvc.perform(put("/api/v1/contas/consentimentos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"localizacao": false, "versaoTermos": "1.0"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.localizacao.aceito").value(false))
+                .andExpect(jsonPath("$.localizacao.versao").value("1.0"));
+    }
+
+    @Test
+    void deveNegarAtualizacaoDeConsentimentosSemAutenticacao() throws Exception {
+        SecurityContextHolder.clearContext();
+
+        mockMvc.perform(put("/api/v1/contas/consentimentos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"notificacoes": true}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("NAO_AUTORIZADO"));
     }
 
     @Test

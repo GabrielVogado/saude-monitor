@@ -1,0 +1,64 @@
+# Mitigação temporária do cold start do Render (E8-01) enquanto a VM da Oracle
+# Cloud não sai — a região São Paulo está sem capacidade Always Free.
+#
+# O plano free do Render suspende a instância após ~15 min de ociosidade, e a
+# primeira requisição seguinte pagou 109,1 s com HTTP 503 na medição de
+# 02/09/2026. Um ping periódico impede a suspensão e elimina esse sintoma.
+# O que ele NÃO resolve é a fração de vCPU compartilhada (1 a 5 s por
+# requisição com o serviço quente) — só a troca de hospedagem resolve.
+#
+# APOSENTAR junto com o Render, assim que a migração for concluída.
+#
+# ⚠️ O `schedule` abaixo NÃO dispara hoje. O GitHub só executa workflows
+# agendados a partir da branch padrão do repositório, que é `master` — 142
+# commits atrás de `develop` e fora do git-flow do projeto. Por decisão do PO
+# em 02/09/2026, `master` não será alterada. Enquanto isso:
+#   - este workflow serve por `workflow_dispatch` (execução manual);
+#   - o ping periódico de fato fica a cargo de um monitor externo (UptimeRobot
+#     ou cron-job.org) apontado para a mesma URL;
+#   - se um dia a branch padrão mudar, o agendamento passa a valer sozinho.
+name: Keep-alive - Backend (Render)
+
+on:
+  schedule:
+    # A cada 10 minutos, das 07h às 22h de Brasília (10h–01h UTC).
+    #
+    # Deliberadamente não é 24/7: o free tier do Render dá 750 horas de
+    # instância por mês e manter o serviço acordado o tempo todo consumiria
+    # ~730, sem folga para um segundo serviço. Esta janela usa ~480 h/mês.
+    #
+    # O agendador do GitHub atrasa em horários de pico; o intervalo de 10 min
+    # dá margem antes dos 15 min de ociosidade que disparam a suspensão.
+    - cron: '*/10 10-23,0-1 * * *'
+  workflow_dispatch:
+
+# Nenhum acesso ao repositório é necessário para bater num endpoint público.
+permissions: {}
+
+jobs:
+  ping:
+    name: Manter o backend acordado
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Ping em /actuator/health
+        env:
+          URL: ${{ vars.BACKEND_HEALTH_URL || 'https://saude-monitor.onrender.com/actuator/health' }}
+        run: |
+          set -u
+          for tentativa in 1 2 3; do
+            inicio=$(date +%s)
+            http=$(curl -sS -o /tmp/health.json -w '%{http_code}' --max-time 180 "$URL") || http=000
+            duracao=$(( $(date +%s) - inicio ))
+            echo "tentativa $tentativa: http=$http em ${duracao}s"
+            if [ "$http" = "200" ]; then
+              echo "✅ HTTP 200 em ${duracao}s (tentativa $tentativa)" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 15
+          done
+          # Job vermelho aqui significa indisponibilidade real: o GitHub notifica o
+          # dono do repositório por e-mail, o que serve de alerta rudimentar
+          # até o E8-06 (métricas) existir.
+          echo "❌ sem HTTP 200 após 3 tentativas (última: $http)" >> "$GITHUB_STEP_SUMMARY"
+          exit 1

@@ -72,3 +72,6 @@ __pycache__/
 
 # Backup local (mongodump) - nao versionar
 backup-hospitais/
+
+# Segredos de deploy (VM Oracle Cloud) — nunca versionar
+deploy/oracle/.env

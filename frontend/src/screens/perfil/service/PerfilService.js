@@ -5,14 +5,15 @@ import * as Sharing from "expo-sharing";
 import { buildApiUrl } from "../../../config/api";
 
 import { fetchComTimeout } from "../../../config/http";
+import { geracaoDaSessao, renovarSessao } from "../../../config/sessao";
+import TokenStorage from "../../../services/TokenStorage";
+import LoginService from "../../auth/service/LoginService";
 
 /**
  * O PDF de exportação LGPD é montado sob demanda no servidor, então recebe
  * folga maior que o teto padrão de 20 s — mas ainda finita.
  */
 const TIMEOUT_EXPORTACAO_MS = 60000;
-import TokenStorage from "../../../services/TokenStorage";
-import LoginService from "../../auth/service/LoginService";
 
 const EXPORT_PDF_PATH = "/api/v1/contas/export/pdf";
 
@@ -28,7 +29,7 @@ const VERSAO_TERMOS = "1.0";
 async function request(path, { method = "GET", body } = {}) {
   const doFetch = async () => {
     const token = await TokenStorage.getAccessToken();
-    return fetch(buildApiUrl(path), {
+    return fetchComTimeout(buildApiUrl(path), {
       method,
       headers: {
         "Content-Type": "application/json",
@@ -38,11 +39,14 @@ async function request(path, { method = "GET", body } = {}) {
     });
   };
 
+  // Geração lida antes do 401: se ela mudar, outra requisição já renovou a
+  // sessão e esta só precisa repetir a chamada com o token novo.
+  const geracao = geracaoDaSessao();
   let response = await doFetch();
 
   if (response.status === 401 && (await TokenStorage.getRefreshToken())) {
     try {
-      await LoginService.refresh();
+      await renovarSessao(() => LoginService.refresh(), geracao);
       response = await doFetch();
     } catch {
       await LoginService.logout();
@@ -78,6 +82,7 @@ async function request(path, { method = "GET", body } = {}) {
  * serviços, que não pode ser reaproveitado aqui por se tratar de binário.
  */
 async function baixarComToken(nomeArquivo, token) {
+  const geracao = geracaoDaSessao();
   const url = buildApiUrl(EXPORT_PDF_PATH);
   const destino = new File(Paths.cache, nomeArquivo);
 
@@ -97,7 +102,7 @@ async function baixarComToken(nomeArquivo, token) {
   }
 
   try {
-    await LoginService.refresh();
+    await renovarSessao(() => LoginService.refresh(), geracao);
   } catch {
     await LoginService.logout();
     throw new Error("Sessão expirada. Faça login novamente.");

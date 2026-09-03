@@ -1,64 +1,138 @@
-# Mitigação temporária do cold start do Render (E8-01) enquanto a VM da Oracle
-# Cloud não sai — a região São Paulo está sem capacidade Always Free.
+# Mitigação temporária do cold start do Render (E8-01) enquanto a hospedagem
+# definitiva não é decidida.
 #
 # O plano free do Render suspende a instância após ~15 min de ociosidade, e a
-# primeira requisição seguinte pagou 109,1 s com HTTP 503 na medição de
-# 02/09/2026. Um ping periódico impede a suspensão e elimina esse sintoma.
-# O que ele NÃO resolve é a fração de vCPU compartilhada (1 a 5 s por
-# requisição com o serviço quente) — só a troca de hospedagem resolve.
+# primeira requisição seguinte paga o ciclo inteiro: provisionar o container,
+# subir a JVM, inicializar o contexto Spring e abrir o pool do Mongo. Medições:
+# 109,1 s (02/09/2026), 117,9 s e 116 s (03/09/2026) — consistente e
+# reprodutível. Um ping periódico impede a suspensão e elimina esse sintoma.
+#
+# O que ele NÃO resolve é a fração de vCPU compartilhada (1 a 5 s por requisição
+# com o serviço quente). Medido em 03/09/2026: com o payload da listagem 72,3%
+# menor (E8-03), o TTFB ficou igual. Só a troca de hospedagem resolve.
 #
 # APOSENTAR junto com o Render, assim que a migração for concluída.
 #
-# ⚠️ O `schedule` abaixo NÃO dispara hoje. O GitHub só executa workflows
-# agendados a partir da branch padrão do repositório, que é `master` — 142
-# commits atrás de `develop` e fora do git-flow do projeto. Por decisão do PO
-# em 02/09/2026, `master` não será alterada. Enquanto isso:
-#   - este workflow serve por `workflow_dispatch` (execução manual);
-#   - o ping periódico de fato fica a cargo de um monitor externo (UptimeRobot
-#     ou cron-job.org) apontado para a mesma URL;
-#   - se um dia a branch padrão mudar, o agendamento passa a valer sozinho.
+# ─── Ambientes ──────────────────────────────────────────────────────────────
+#
+# O ping é opt-in por ambiente, via variável de repositório. Um ambiente sem
+# variável definida é PULADO, não falha:
+#
+#   BACKEND_HEALTH_URL_DEV   -> develop        (padrão embutido, já em uso)
+#   BACKEND_HEALTH_URL_HOM   -> main           (não existe ainda)
+#   BACKEND_HEALTH_URL_PROD  -> release/<tag>  (não existe ainda)
+#
+# É opt-in por causa da cota, e a conta importa: o free tier do Render dá
+# 750 horas de instância por mês PARA A CONTA INTEIRA, não por serviço.
+#
+#   1 serviço acordado 16 h/dia  ->  ~480 h/mês  (cabe, com 270 h de folga)
+#   2 serviços                   ->  ~960 h/mês  (estoura em 28%)
+#   3 serviços                   -> ~1.440 h/mês (quase o dobro)
+#
+# Ligar um segundo ambiente exige, portanto, uma destas decisões:
+#   a) encurtar a janela do cron (12 h/dia para dois serviços; 8 h para três);
+#   b) subir o ambiente para um plano pago — que NÃO hiberna e, por isso,
+#      dispensa este workflow por completo.
+#
+# O corolário vale registrar: se produção precisar de keep-alive, é porque
+# produção está no free tier. O keep-alive é andaime de ambiente de
+# desenvolvimento, não arquitetura de produção.
 name: Keep-alive - Backend (Render)
 
 on:
   schedule:
     # A cada 10 minutos, das 07h às 22h de Brasília (10h–01h UTC).
     #
-    # Deliberadamente não é 24/7: o free tier do Render dá 750 horas de
-    # instância por mês e manter o serviço acordado o tempo todo consumiria
-    # ~730, sem folga para um segundo serviço. Esta janela usa ~480 h/mês.
+    # Deliberadamente não é 24/7: 24 h/dia consumiriam ~730 h das 750 da cota,
+    # sem folga nenhuma. Esta janela usa ~480 h/mês por ambiente ligado.
     #
     # O agendador do GitHub atrasa em horários de pico; o intervalo de 10 min
     # dá margem antes dos 15 min de ociosidade que disparam a suspensão.
+    #
+    # O `schedule` só dispara a partir da branch padrão do repositório, que
+    # passou a ser `develop` em 03/09/2026 — antes era `master`, e por isso este
+    # workflow nunca havia executado uma única vez (a API devolvia 404).
     - cron: '*/10 10-23,0-1 * * *'
   workflow_dispatch:
+    inputs:
+      ambiente:
+        description: Ambiente a acordar
+        type: choice
+        options: [todos, dev, hom, prod]
+        default: todos
 
 # Nenhum acesso ao repositório é necessário para bater num endpoint público.
 permissions: {}
 
 jobs:
   ping:
-    name: Manter o backend acordado
+    name: Acordar ${{ matrix.ambiente }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 3 tentativas x 180 s + 2 x 15 s de espera = 9 min 30 s no pior caso.
+    # 12 min dão folga para o overhead do runner sem que um job vermelho
+    # signifique "cortado pelo timeout" em vez de "serviço fora do ar".
+    timeout-minutes: 12
+    strategy:
+      # Um ambiente fora do ar não pode cancelar o ping dos outros.
+      fail-fast: false
+      matrix:
+        include:
+          - ambiente: dev
+            variavel: BACKEND_HEALTH_URL_DEV
+            padrao: https://saude-monitor.onrender.com/actuator/health
+          - ambiente: hom
+            variavel: BACKEND_HEALTH_URL_HOM
+            padrao: ''
+          - ambiente: prod
+            variavel: BACKEND_HEALTH_URL_PROD
+            padrao: ''
     steps:
       - name: Ping em /actuator/health
         env:
-          URL: ${{ vars.BACKEND_HEALTH_URL || 'https://saude-monitor.onrender.com/actuator/health' }}
+          # Mesmo idioma do cd-backend.yml, que já resolve segredos por ambiente
+          # com secrets[format(...)].
+          URL_CONFIGURADA: ${{ vars[matrix.variavel] }}
+          URL_PADRAO: ${{ matrix.padrao }}
+          AMBIENTE: ${{ matrix.ambiente }}
+          # Vazio quando o gatilho e o `schedule` (inputs so existe em dispatch).
+          ESCOLHIDO: ${{ inputs.ambiente }}
         run: |
           set -u
+
+          # O filtro do workflow_dispatch mora aqui, e nao num `if:` de job: o
+          # contexto `matrix` nao esta disponivel em `jobs.<id>.if` -- so em
+          # `runs-on`, `env` e nos steps.
+          if [ -n "${ESCOLHIDO:-}" ] && [ "$ESCOLHIDO" != "todos" ] && [ "$ESCOLHIDO" != "$AMBIENTE" ]; then
+            echo "ambiente $AMBIENTE fora da selecao ($ESCOLHIDO); nada a fazer"
+            exit 0
+          fi
+
+          URL="${URL_CONFIGURADA:-$URL_PADRAO}"
+
+          if [ -z "$URL" ]; then
+            echo "⏭️ ambiente \`$AMBIENTE\` não configurado — defina a variável de repositório \`$AMBIENTE\` para ativá-lo" >> "$GITHUB_STEP_SUMMARY"
+            echo "ambiente $AMBIENTE sem URL definida; nada a fazer"
+            exit 0
+          fi
+
           for tentativa in 1 2 3; do
             inicio=$(date +%s)
             http=$(curl -sS -o /tmp/health.json -w '%{http_code}' --max-time 180 "$URL") || http=000
             duracao=$(( $(date +%s) - inicio ))
-            echo "tentativa $tentativa: http=$http em ${duracao}s"
+            echo "[$AMBIENTE] tentativa $tentativa: http=$http em ${duracao}s"
             if [ "$http" = "200" ]; then
-              echo "✅ HTTP 200 em ${duracao}s (tentativa $tentativa)" >> "$GITHUB_STEP_SUMMARY"
+              echo "✅ \`$AMBIENTE\`: HTTP 200 em ${duracao}s (tentativa $tentativa)" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
+            # O Render devolve 503 ENQUANTO sobe, não 200. Uma tentativa única
+            # reportaria indisponibilidade quando o serviço está só acordando —
+            # foi exatamente o que a execução de 03/09/2026 registrou:
+            # tentativa 1 = 503 em 116 s, tentativa 2 = 200 em 0 s.
             sleep 15
           done
-          # Job vermelho aqui significa indisponibilidade real: o GitHub notifica o
-          # dono do repositório por e-mail, o que serve de alerta rudimentar
+
+          # Job vermelho aqui significa indisponibilidade real: o GitHub notifica
+          # o dono do repositório por e-mail, o que serve de alerta rudimentar
           # até o E8-06 (métricas) existir.
-          echo "❌ sem HTTP 200 após 3 tentativas (última: $http)" >> "$GITHUB_STEP_SUMMARY"
+          echo "❌ \`$AMBIENTE\`: sem HTTP 200 após 3 tentativas (última: $http)" >> "$GITHUB_STEP_SUMMARY"
           exit 1

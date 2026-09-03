@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {Alert, FlatList, StyleSheet, Text, View} from "react-native";
 import {SafeAreaView} from "react-native-safe-area-context";
 import HospitalService from "../../hospitais/service/HospitalService";
@@ -16,6 +16,38 @@ import {colors, typography, spacing} from "../../../theme";
  *
  * E6-02/E6-03/E6-04: tokens do DS, acessibilidade e estados de erro/retry + empty.
  */
+// ARQ-05: linha extraída e memoizada. Antes, o `onPress={() => fazerCheckin(item)}`
+// nascia dentro do renderItem inline, então toda mudança de estado da tela recriava
+// a prop de todos os cartões e re-renderizava a lista inteira. Aqui a arrow vive
+// dentro do componente memoizado e só muda quando o próprio item muda.
+const LinhaHospital = React.memo(function LinhaHospital({
+  hospital,
+  onCheckin,
+  enviandoId,
+}) {
+  // Achado do code-review: receber `desabilitado={enviandoId !== null}` fazia a prop
+  // virar em TODAS as linhas assim que qualquer check-in comecava -- o memo errava a
+  // lista inteira exatamente durante a interacao que ele existe para baratear.
+  // Recebendo o `enviandoId` cru, so a linha em envio muda de props.
+  const carregando = enviandoId === hospital.id;
+  const desabilitado = enviandoId !== null;
+  return (
+    <CSCard style={styles.card}>
+      <Text style={styles.hospitalNome}>{hospital.nome}</Text>
+      <Text style={styles.hospitalInfo}>
+        {hospital.tipoUnidade || hospital.categoria || ""}
+      </Text>
+      <CSButton
+        label="Estou aqui"
+        onPress={() => onCheckin(hospital)}
+        loading={carregando}
+        disabled={desabilitado}
+        variant="secondary"
+      />
+    </CSCard>
+  );
+});
+
 export default function CheckinManualScreen({ navigation }) {
   const [hospitais, setHospitais] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -35,58 +67,77 @@ export default function CheckinManualScreen({ navigation }) {
     carregar();
   }, []);
 
-  const fazerCheckin = async (hospital) => {
-    setEnviandoId(hospital.id);
-    setErro(null);
-    try {
-      await VisitaService.checkin({
-        hospitalId: hospital.id,
-        origem: "MANUAL",
-      });
-      navigation.goBack();
-    } catch (e) {
-      if (e.status === 409 && e.data?.candidatos?.length) {
-        tratarConflitoGeofence(e.data);
-        return;
+  const reenviarCheckinComCandidato = useCallback(
+    async (candidato) => {
+      setEnviandoId(candidato.hospitalId);
+      setErro(null);
+      try {
+        await VisitaService.checkin({
+          hospitalId: candidato.hospitalId,
+          origem: "MANUAL",
+        });
+        navigation.goBack();
+      } catch (e) {
+        setErro(e.message);
+        setEnviandoId(null);
       }
-      setErro(e.message);
-      setEnviandoId(null);
-    }
-  };
+    },
+    [navigation]
+  );
 
   /**
    * Conflito de geofences sobrepostos (E2-04/RN-05): o backend não cria a visita e
    * devolve `candidatos` (hospitais empatados em distância, ≤10m). Pergunta em 1 toque
    * qual deles é o correto e reenvia o check-in com o `hospitalId` escolhido.
    */
-  const tratarConflitoGeofence = (conflito) => {
-    Alert.alert(
-      "Qual hospital é este?",
-      conflito.message || "Encontramos mais de um hospital nesta localização.",
-      [
-        ...conflito.candidatos.map((candidato) => ({
-          text: candidato.nome,
-          onPress: () => reenviarCheckinComCandidato(candidato),
-        })),
-        { text: "Cancelar", style: "cancel", onPress: () => setEnviandoId(null) },
-      ]
-    );
-  };
+  const tratarConflitoGeofence = useCallback(
+    (conflito) => {
+      Alert.alert(
+        "Qual hospital é este?",
+        conflito.message || "Encontramos mais de um hospital nesta localização.",
+        [
+          ...conflito.candidatos.map((candidato) => ({
+            text: candidato.nome,
+            onPress: () => reenviarCheckinComCandidato(candidato),
+          })),
+          { text: "Cancelar", style: "cancel", onPress: () => setEnviandoId(null) },
+        ]
+      );
+    },
+    [reenviarCheckinComCandidato]
+  );
 
-  const reenviarCheckinComCandidato = async (candidato) => {
-    setEnviandoId(candidato.hospitalId);
-    setErro(null);
-    try {
-      await VisitaService.checkin({
-        hospitalId: candidato.hospitalId,
-        origem: "MANUAL",
-      });
-      navigation.goBack();
-    } catch (e) {
-      setErro(e.message);
-      setEnviandoId(null);
-    }
-  };
+  // ARQ-05: a cadeia inteira precisa ser estável, senão o `renderItem` memoizado
+  // abaixo mudaria de identidade a cada render e o React.memo da linha nunca acertaria.
+  // A ordem de declaração foi invertida para respeitar a dependência.
+  const fazerCheckin = useCallback(
+    async (hospital) => {
+      setEnviandoId(hospital.id);
+      setErro(null);
+      try {
+        await VisitaService.checkin({
+          hospitalId: hospital.id,
+          origem: "MANUAL",
+        });
+        navigation.goBack();
+      } catch (e) {
+        if (e.status === 409 && e.data?.candidatos?.length) {
+          tratarConflitoGeofence(e.data);
+          return;
+        }
+        setErro(e.message);
+        setEnviandoId(null);
+      }
+    },
+    [navigation, tratarConflitoGeofence]
+  );
+
+  const renderItem = useCallback(
+    ({ item }) => (
+      <LinhaHospital hospital={item} onCheckin={fazerCheckin} enviandoId={enviandoId} />
+    ),
+    [fazerCheckin, enviandoId]
+  );
 
   if (carregando) {
     return (
@@ -117,21 +168,7 @@ export default function CheckinManualScreen({ navigation }) {
         <FlatList
           data={hospitais}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <CSCard style={styles.card}>
-              <Text style={styles.hospitalNome}>{item.nome}</Text>
-              <Text style={styles.hospitalInfo}>
-                {item.tipoUnidade || item.categoria || ""}
-              </Text>
-              <CSButton
-                label="Estou aqui"
-                onPress={() => fazerCheckin(item)}
-                loading={enviandoId === item.id}
-                disabled={enviandoId !== null}
-                variant="secondary"
-              />
-            </CSCard>
-          )}
+          renderItem={renderItem}
           ListEmptyComponent={
             <CSEmptyState
               title="Nenhum hospital cadastrado"

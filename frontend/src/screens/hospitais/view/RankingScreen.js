@@ -102,7 +102,31 @@ export default function RankingScreen({ navigation }) {
     }
   };
 
-  const renderVazio = () => {
+  const abrirDetalhe = useCallback(
+    (hospital) => {
+      navigation.navigate("HospitalDetalhe", { id: hospital.id });
+    },
+    [navigation]
+  );
+
+  // ARQ-05: mesma correção da HospitaisScreen — o renderItem inline recriava a
+  // navegação por item a cada render, anulando o React.memo do CSHospitalCard.
+  const renderItem = useCallback(
+    ({ item, index }) => (
+      <View style={styles.linha}>
+        <View style={styles.posicao}>
+          <Text style={styles.posicaoTexto}>{index + 1}º</Text>
+        </View>
+        <View style={styles.cardWrapper}>
+          <CSHospitalCard hospital={item} onPress={abrirDetalhe} />
+        </View>
+      </View>
+    ),
+    [abrirDetalhe]
+  );
+
+  // Mesma correcao do ListEmptyComponent aplicada na HospitaisScreen.
+  const renderVazio = useCallback(() => {
     if (erro) {
       return (
         <CSEmptyState
@@ -122,7 +146,7 @@ export default function RankingScreen({ navigation }) {
         message="Assim que os hospitais tiverem avaliações suficientes, eles aparecem aqui."
       />
     );
-  };
+  }, [erro, carregar]);
 
   const legenda =
     ordem === "NOTA"
@@ -170,19 +194,7 @@ export default function RankingScreen({ navigation }) {
         <FlatList
           data={dados}
           keyExtractor={(item) => item.id}
-          renderItem={({ item, index }) => (
-            <View style={styles.linha}>
-              <View style={styles.posicao}>
-                <Text style={styles.posicaoTexto}>{index + 1}º</Text>
-              </View>
-              <View style={styles.cardWrapper}>
-                <CSHospitalCard
-                  hospital={item}
-                  onPress={() => navigation.navigate("HospitalDetalhe", { id: item.id })}
-                />
-              </View>
-            </View>
-          )}
+          renderItem={renderItem}
           ListEmptyComponent={renderVazio}
           ListFooterComponent={
             carregandoMais ? (

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Check, ChevronDown } from "lucide-react-native";
 import { colors, radii, spacing, touchTarget, typography } from "../theme/tokens";
@@ -18,6 +18,31 @@ export default function CSSelect({
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
+
+  // ARQ-05: extraído do JSX e memoizado — inline, o renderItem nascia de novo a cada
+  // abertura do seletor e a cada mudança de `value`, recriando todas as opções.
+  const renderOption = useCallback(
+    ({ item }) => {
+      const isSelected = item.value === value;
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ selected: isSelected }}
+          onPress={() => {
+            onSelect(item.value);
+            setOpen(false);
+          }}
+          style={({ pressed }) => [styles.option, pressed && styles.pressed]}
+        >
+          <Text style={[styles.optionLabel, isSelected && styles.optionLabelSelected]}>
+            {item.label}
+          </Text>
+          {isSelected ? <Check size={20} color={colors.secondary} /> : null}
+        </Pressable>
+      );
+    },
+    [value, onSelect]
+  );
 
   return (
     <View style={styles.wrapper}>
@@ -54,28 +79,7 @@ export default function CSSelect({
             <FlatList
               data={options}
               keyExtractor={(item) => String(item.value)}
-              renderItem={({ item }) => {
-                const isSelected = item.value === value;
-                return (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: isSelected }}
-                    onPress={() => {
-                      onSelect(item.value);
-                      setOpen(false);
-                    }}
-                    style={({ pressed }) => [
-                      styles.option,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text style={[styles.optionLabel, isSelected && styles.optionLabelSelected]}>
-                      {item.label}
-                    </Text>
-                    {isSelected ? <Check size={20} color={colors.secondary} /> : null}
-                  </Pressable>
-                );
-              }}
+              renderItem={renderOption}
             />
           </View>
         </Pressable>

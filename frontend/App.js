@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import {createStackNavigator} from "@react-navigation/stack";
+import {createNativeStackNavigator} from "@react-navigation/native-stack";
 import {createBottomTabNavigator} from "@react-navigation/bottom-tabs";
 import {NavigationContainer} from "@react-navigation/native";
 import {SafeAreaProvider} from "react-native-safe-area-context";
@@ -23,7 +23,7 @@ import NotificacoesScreen from "./src/screens/perfil/view/NotificacoesScreen.js"
 import {colors} from "./src/theme";
 import { agendarLembrete, pendenciaAtual } from "./src/screens/feedback/service/FeedbackNotificationService";
 
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // Stack da aba Início (E6-01): a Home é a âncora do geofencing/visita ativa (E2-07).

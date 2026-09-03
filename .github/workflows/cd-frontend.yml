@@ -1,4 +1,24 @@
-name: CD - Frontend (Netlify)
+# Publicacao do frontend web (export do Expo).
+#
+# ATENCAO -- estado real em 03/09/2026: NAO HA PROVEDOR DE PUBLICACAO
+# CONFIGURADO. Os segredos NETLIFY_AUTH_TOKEN_* e NETLIFY_SITE_ID_* nunca
+# existiram no repositorio (`gh secret list` lista apenas EXPO_TOKEN,
+# RENDER_API_KEY_DEV e RENDER_SERVICE_ID_DEV).
+#
+# Isso passou despercebido por 36 execucoes porque a action do Netlify, sem
+# credenciais, imprime "Netlify credentials not provided, not deployable" e
+# encerra com CODIGO 0 -- o job fica VERDE sem publicar nada. Uma esteira que
+# reporta sucesso sem entregar e pior do que uma quebrada: a quebrada avisa.
+#
+# O passo "Verificar credenciais" abaixo torna esse estado explicito, no mesmo
+# idioma que o cd-mobile-eas.yml ja usa para o EXPO_TOKEN. Enquanto nao houver
+# provedor definido, o build web CONTINUA rodando -- ele tem valor proprio,
+# porque prova que o `expo export --platform web` nao quebrou -- e a publicacao
+# e PULADA com aviso, em vez de simulada.
+#
+# Quando o provedor for escolhido, trocar o passo de deploy e definir os
+# segredos por ambiente.
+name: CD - Frontend (Web)
 
 on:
   push:
@@ -52,7 +72,24 @@ jobs:
       - name: Build web (export Expo)
         run: npx expo export --platform web
 
-      - name: Deploy no Netlify (${{ needs.resolve-env.outputs.env }})
+      - name: Verificar credenciais de publicação
+        id: credenciais
+        env:
+          TOKEN: ${{ secrets[format('NETLIFY_AUTH_TOKEN_{0}', needs.resolve-env.outputs.env)] }}
+          SITE: ${{ secrets[format('NETLIFY_SITE_ID_{0}', needs.resolve-env.outputs.env)] }}
+          AMBIENTE: ${{ needs.resolve-env.outputs.env }}
+        run: |
+          if [ -z "${TOKEN:-}" ] || [ -z "${SITE:-}" ]; then
+            echo "configurado=nao" >> "$GITHUB_OUTPUT"
+            echo "⚠️ Build web validado, **publicação não executada**: nenhum provedor configurado para o ambiente \`$AMBIENTE\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "AVISO: sem credenciais de publicacao para $AMBIENTE; o artefato foi construido mas nao publicado"
+          else
+            echo "configurado=sim" >> "$GITHUB_OUTPUT"
+            echo "credenciais presentes para $AMBIENTE"
+          fi
+
+      - name: Publicar (${{ needs.resolve-env.outputs.env }})
+        if: steps.credenciais.outputs.configurado == 'sim'
         uses: nwtgck/actions-netlify@v3
         with:
           publish-dir: frontend/dist

@@ -30,3 +30,4 @@ O agente **propõe**; quem decide o que vira regra é o PO.
 |---|---|---|
 | [OBS-001](./OBS-001-skill-pela-linguagem-do-arquivo.md) | Skill escolhida pela proximidade da instalação, não pela linguagem do arquivo | ✅ Aplicada (via UPD-002) — registro reconstituído em 03/09/2026 |
 | [OBS-002](./OBS-002-ativacao-de-skills-por-dominio.md) | Skills não são ativadas conforme a área de atuação | ✅ Aplicada (UPD-002) |
+| [OBS-003](./OBS-003-skill-anunciada-nao-e-skill-ativada.md) | Skill anunciada não é skill ativada, e o portão de `code-review` foi pulado | 🟡 Parcialmente aplicada (UPD-003) |

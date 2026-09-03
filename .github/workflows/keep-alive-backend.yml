@@ -68,7 +68,8 @@ jobs:
   ping:
     name: Acordar ${{ matrix.ambiente }}
     runs-on: ubuntu-latest
-    # 3 tentativas x 180 s + 2 x 15 s de espera = 9 min 30 s no pior caso.
+    # 3 tentativas x 180 s + 2 x 15 s de espera = 9 min 30 s no pior caso (a espera
+    # nao roda apos a ultima tentativa).
     # 12 min dão folga para o overhead do runner sem que um job vermelho
     # signifique "cortado pelo timeout" em vez de "serviço fora do ar".
     timeout-minutes: 12
@@ -88,30 +89,35 @@ jobs:
             padrao: ''
     steps:
       - name: Ping em /actuator/health
+        # O contexto `matrix` nao existe em jobs.<id>.if, mas EXISTE aqui, em
+        # steps.<n>.if. Com o filtro no shell, as pernas nao selecionadas rodavam e
+        # reportavam verde -- indistinguivel de um ping bem-sucedido. Assim elas
+        # aparecem como "skipped".
+        if: >-
+          ${{ github.event_name != 'workflow_dispatch'
+              || inputs.ambiente == 'todos'
+              || inputs.ambiente == matrix.ambiente }}
         env:
           # Mesmo idioma do cd-backend.yml, que já resolve segredos por ambiente
           # com secrets[format(...)].
           URL_CONFIGURADA: ${{ vars[matrix.variavel] }}
           URL_PADRAO: ${{ matrix.padrao }}
           AMBIENTE: ${{ matrix.ambiente }}
-          # Vazio quando o gatilho e o `schedule` (inputs so existe em dispatch).
-          ESCOLHIDO: ${{ inputs.ambiente }}
+          # Nome da variavel de repositorio deste ambiente, para a mensagem de skip
+          # poder cita-lo. Sem isto ela mandava criar uma variavel chamada "hom".
+          VARIAVEL: ${{ matrix.variavel }}
+          # 'true' apenas em execucao manual -- evita repetir o aviso de ambiente nao
+          # configurado nas ~96 execucoes agendadas por dia.
+          MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           set -u
-
-          # O filtro do workflow_dispatch mora aqui, e nao num `if:` de job: o
-          # contexto `matrix` nao esta disponivel em `jobs.<id>.if` -- so em
-          # `runs-on`, `env` e nos steps.
-          if [ -n "${ESCOLHIDO:-}" ] && [ "$ESCOLHIDO" != "todos" ] && [ "$ESCOLHIDO" != "$AMBIENTE" ]; then
-            echo "ambiente $AMBIENTE fora da selecao ($ESCOLHIDO); nada a fazer"
-            exit 0
-          fi
-
           URL="${URL_CONFIGURADA:-$URL_PADRAO}"
 
           if [ -z "$URL" ]; then
-            echo "⏭️ ambiente \`$AMBIENTE\` não configurado — defina a variável de repositório \`$AMBIENTE\` para ativá-lo" >> "$GITHUB_STEP_SUMMARY"
-            echo "ambiente $AMBIENTE sem URL definida; nada a fazer"
+            if [ "$MANUAL" = "true" ]; then
+              echo "⏭️ ambiente \`$AMBIENTE\` não configurado — defina a variável de repositório \`$VARIAVEL\` para ativá-lo" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo "ambiente $AMBIENTE sem URL definida (defina $VARIAVEL para ativar); nada a fazer"
             exit 0
           fi
 
@@ -128,7 +134,8 @@ jobs:
             # reportaria indisponibilidade quando o serviço está só acordando —
             # foi exatamente o que a execução de 03/09/2026 registrou:
             # tentativa 1 = 503 em 116 s, tentativa 2 = 200 em 0 s.
-            sleep 15
+            # A espera só faz sentido se ainda há tentativa pela frente.
+            [ "$tentativa" -lt 3 ] && sleep 15
           done
 
           # Job vermelho aqui significa indisponibilidade real: o GitHub notifica

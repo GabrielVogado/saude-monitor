@@ -9,12 +9,12 @@ Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gr
 | CI (build + testes) | GitHub Actions | Gratuito (2000 min/mês) |
 | Backend (Spring Boot) | Render (free web service) | Gratuito |
 | Banco (MongoDB) | MongoDB Atlas (M0) | Gratuito |
-| Frontend (Expo web) | Netlify | Gratuito |
+| Frontend (Expo web) | — **sem provedor definido** | — |
 | Imagem Docker | GitHub Container Registry (GHCR) | Gratuito |
 
 ## Ambientes
 
-| Ambiente | Branch/Tag | Backend (Render) | Frontend (Netlify) | Banco (Atlas) |
+| Ambiente | Branch/Tag | Backend (Render) | Frontend web | Banco (Atlas) |
 |----------|-----------|------------------|--------------------|---------------|
 | **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | site dev | `saude_monitor_dev` |
 | **hom** (homologação) | `main` | `saude-monitor-backend-hom` | site hom | `saude_monitor_hom` |
@@ -24,9 +24,9 @@ Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gr
 
 ```
 push/PR → CI (build+teste backend e frontend)
-push em develop → CD dev (Docker → GHCR:dev → Render dev + Netlify dev)
-push em main    → CD hom (Docker → GHCR:hom → Render hom + Netlify hom)
-push em release/<tag> → CD prod (Docker → GHCR:<tag> → Render prod + Netlify prod)
+push em develop → CD dev (Docker → GHCR:dev → Render dev)
+push em main    → CD hom (Docker → GHCR:hom → Render hom)
+push em release/<tag> → CD prod (Docker → GHCR:<tag> → Render prod)
 ```
 
 ## Passo a passo
@@ -46,10 +46,12 @@ push em release/<tag> → CD prod (Docker → GHCR:<tag> → Render prod + Netli
 4. Preencha as variáveis de ambiente de cada um (ver `backend/.env.example`).
 5. Anote os **Service IDs** de cada ambiente.
 
-### 3. Netlify (frontend, gratuito)
-1. Crie conta em https://www.netlify.com
-2. Gere um **Auth Token** em User Settings → Applications → New access token.
-3. Crie **3 sites** (dev, hom, prod) e anote os **Site IDs**.
+### 3. Frontend web — sem provedor (03/09/2026)
+
+Não há hospedagem configurada para o frontend web. A esteira `cd-frontend.yml` foi
+**removida**: os segredos `NETLIFY_*` nunca existiram, então ela ficava verde sem
+publicar nada, em 36 execuções. O build `npx expo export --platform web` continua
+sendo validado pelo `ci.yml`. A distribuição hoje é o **APK**, via `cd-mobile-eas.yml`.
 
 ### 4. Secrets no GitHub
 No repositório: **Settings → Secrets and variables → Actions → New repository secret**.
@@ -59,8 +61,6 @@ Cada secret tem sufixo `_DEV`, `_HOM` ou `_PROD`:
 |--------|-------|
 | `RENDER_API_KEY_DEV` / `_HOM` / `_PROD` | API Key do Render (pode ser a mesma) |
 | `RENDER_SERVICE_ID_DEV` / `_HOM` / `_PROD` | ID do serviço do backend em cada ambiente |
-| `NETLIFY_AUTH_TOKEN_DEV` / `_HOM` / `_PROD` | Token de acesso do Netlify (pode ser o mesmo) |
-| `NETLIFY_SITE_ID_DEV` / `_HOM` / `_PROD` | ID do site em cada ambiente |
 
 ### 5. Variáveis de ambiente no Render
 Em cada Web Service, configure (ver `backend/.env.example`):
@@ -82,7 +82,6 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 |---------|---------|------|
 | `.github/workflows/ci.yml` | push/PR em develop/main | Build + testes backend e frontend |
 | `.github/workflows/cd-backend.yml` | push develop/main + tag v* | Docker → GHCR → deploy Render (dev/hom/prod) |
-| `.github/workflows/cd-frontend.yml` | push develop/main + tag v* | Build web → deploy Netlify (dev/hom/prod) |
 | `.github/workflows/release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da main |
 
 ## Observações

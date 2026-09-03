@@ -2,7 +2,7 @@ name: CD - Backend (Render)
 
 on:
   push:
-    branches: [develop, main, 'release/**']
+    branches: [develop, master, 'release/**']
     paths:
       - 'backend/**'
       - '.github/workflows/cd-backend.yml'
@@ -13,9 +13,27 @@ env:
   IMAGE_NAME: gabrielvogado/saude-monitor-backend
 jobs:
   # Mapeia a branch para o ambiente de destino.
-  #   develop     -> dev (desenvolvimento)
-  #   main        -> hom (homologação)
-  #   release/<tag> -> prod (produção)
+  #   develop       -> dev  (desenvolvimento)
+  #   master        -> prod (produção contínua, imagem `:prod`)
+  #   release/<tag> -> prod (produção, imagem `:<tag>`)
+  #
+  # ⚠️ BLOQUEIO CONHECIDO, a resolver quando o ambiente de produção for criado
+  # (pendência P-006). Os dois destinos acima usam o MESMO `RENDER_SERVICE_ID_PROD`,
+  # mas publicam tags de imagem diferentes -- e o POST em /v1/services/<id>/deploys
+  # manda `{}`, ou seja, redeploya a imagem em que o serviço está fixado, e não a que
+  # acabou de ser construída. Consequência: um push em `release/1.0.0` constrói a
+  # `:1.0.0`, dispara o deploy, e o serviço sobe a `:prod` -- a "versão fixada" que os
+  # documentos prometem seria construída e nunca implantada.
+  #
+  # Não foi corrigido aqui de propósito. As duas saídas são passar `imageUrl` no corpo
+  # do POST ou usar service IDs separados, e ambas mudam o único caminho de deploy que
+  # hoje funciona (o de `dev`) sem que este PR possa exercitá-lo: o `paths: backend/**`
+  # impede o CD de rodar num PR que não toca o backend. Corrigir às cegas o caminho que
+  # funciona, para consertar um que ainda não existe, é o negócio errado.
+  #
+  # O degrau de homologação saiu do mapeamento porque não existe: não há branch nem
+  # ambiente. Quando o ambiente de homologação for criado, ele volta com a branch
+  # correspondente.
   resolve-env:
     runs-on: ubuntu-latest
     outputs:
@@ -27,9 +45,9 @@ jobs:
           if [[ "${{ github.ref }}" == refs/heads/release/* ]]; then
             echo "env=prod" >> "$GITHUB_OUTPUT"
             echo "tag=${GITHUB_REF#refs/heads/release/}" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "env=hom" >> "$GITHUB_OUTPUT"
-            echo "tag=hom" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            echo "env=prod" >> "$GITHUB_OUTPUT"
+            echo "tag=prod" >> "$GITHUB_OUTPUT"
           else
             echo "env=dev" >> "$GITHUB_OUTPUT"
             echo "tag=dev" >> "$GITHUB_OUTPUT"
@@ -43,6 +61,31 @@ jobs:
       contents: read
       packages: write
     steps:
+      # PRIMEIRO passo de proposito. Antes vinha depois do build: a promocao gastava
+      # a compilacao inteira para so entao falhar, e deixava no GHCR uma imagem
+      # `:prod` que nunca foi implantada nem validada -- que seria a primeira coisa
+      # que o servico de producao pegaria quando fosse criado.
+      #
+      # Uma promocao para producao que nao entrega e o pior caso do falso-verde: o
+      # commit fica na branch de producao, o job fica verde e nada foi publicado.
+      # Por isso este passo FALHA, em vez de pular com aviso -- ao contrario do caso
+      # de um ambiente opcional, aqui a ausencia da credencial e um bloqueio real.
+      - name: Verificar credenciais do ambiente (${{ needs.resolve-env.outputs.env }})
+        env:
+          RENDER_API_KEY: ${{ secrets[format('RENDER_API_KEY_{0}', needs.resolve-env.outputs.env)] }}
+          RENDER_SERVICE_ID: ${{ secrets[format('RENDER_SERVICE_ID_{0}', needs.resolve-env.outputs.env)] }}
+          AMBIENTE: ${{ needs.resolve-env.outputs.env }}
+        run: |
+          if [ -z "${RENDER_API_KEY:-}" ] || [ -z "${RENDER_SERVICE_ID:-}" ]; then
+            AMB_MAIUSCULO=$(echo "$AMBIENTE" | tr '[:lower:]' '[:upper:]')
+            echo "ERRO: o ambiente '$AMBIENTE' nao tem credenciais configuradas."
+            echo "Defina os secrets RENDER_API_KEY_${AMB_MAIUSCULO} e RENDER_SERVICE_ID_${AMB_MAIUSCULO}"
+            echo "em Settings > Secrets and variables > Actions, e crie o Web Service correspondente no Render."
+            echo "Hoje so o ambiente 'dev' esta configurado."
+            exit 1
+          fi
+          echo "credenciais presentes para $AMBIENTE"
+
       - name: Checkout
         uses: actions/checkout@v4
 

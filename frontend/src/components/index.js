@@ -8,6 +8,4 @@ export { default as CSEmptyState } from "./CSEmptyState";
 export { default as CSLoading, CSLoadingList } from "./CSLoading";
 export { default as CSRatingStars } from "./CSRatingStars";
 export { default as CSChip } from "./CSChip";
-export { default as CSSelect } from "./CSSelect";
 export { default as CSHospitalCard } from "./CSHospitalCard";
-export { default as CSGeoStatusCard } from "./CSGeoStatusCard";

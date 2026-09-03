@@ -68,8 +68,12 @@ async function confirmarEntrada(hospitalId, posicao) {
   } catch (erro) {
     // Conflito de geofences sobrepostos (HTTP 409, E2-04): a tarefa de background não
     // tem UI para perguntar "qual hospital é este?" — o usuário resolve manualmente ao
-    // abrir o app (card de visita ativa ausente + `CheckinManualScreen`, que já trata o
-    // 409). Demais erros (rede, hospital inativo) seguem o mesmo caminho: sem retry aqui.
+    // abrir o app e tocar em "Check-in" no card do hospital, na aba Hospitais, que trata
+    // o 409 exibindo os candidatos (HospitaisScreen). Este comentário citava a
+    // `CheckinManualScreen`, tela que ficou órfã na revisão de navegação e foi removida
+    // em 03/09/2026 — o caminho de recuperação descrito aqui apontava para algo que já
+    // não era alcançável.
+    // Demais erros (rede, hospital inativo) seguem o mesmo caminho: sem retry aqui.
     if (erro?.status !== 409) {
       // eslint-disable-next-line no-console
       console.warn("GeofencingTaskService: falha ao confirmar entrada", erro?.message);

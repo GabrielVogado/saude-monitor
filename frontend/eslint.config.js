@@ -111,6 +111,15 @@ module.exports = [
         beforeEach: "readonly",
         afterAll: "readonly",
         afterEach: "readonly",
+        // Globais do CommonJS/Node. A suíte roda no Jest, não no bundle do app: um
+        // teste que inspeciona a árvore de arquivos (barrel.test.js) precisa de
+        // `require`, `__dirname` e `process`, e sem declará-los o `no-undef` os
+        // acusaria como variáveis inexistentes.
+        require: "readonly",
+        module: "writable",
+        __dirname: "readonly",
+        __filename: "readonly",
+        process: "readonly",
       },
     },
     rules: {

@@ -18,8 +18,56 @@
 
 | # | Data | Origem | O que mudou | PR | Estado |
 |---|---|---|---|---|---|
-| **M-001** | — | *(não registrada)* | Item 1 do Observer — anterior a esta sessão; as pastas `skill-observations/` e `skill-updates/` não existiam ainda, então nada foi persistido. **Pendente de reconstituição pelo PO.** | — | 🔴 Pendente |
+| **M-001** | 02/09/2026 | [OBS-001](../../skill-observations/OBS-001-skill-pela-linguagem-do-arquivo.md) | Skill escolhida pela linguagem do arquivo, não pela proximidade da instalação: correção de backend chama `java`, não `expo-skills` | — (aplicada via #63) | ✅ Aplicada — registro reconstituído em 03/09/2026 |
 | **M-002** | 03/09/2026 | [OBS-002](../../skill-observations/OBS-002-ativacao-de-skills-por-dominio.md) → [UPD-002](../../skill-updates/UPD-002-matriz-de-roteamento-de-skills.md) | Matriz de roteamento de skills por área + hook `SessionStart` que a injeta em toda sessão | #63 | ✅ Aplicada |
+
+---
+
+## M-001 — Skill pela linguagem do arquivo (item 1 do Observer)
+
+**Data do fato:** 02/09/2026 · **PR:** nenhum — ver "Por que não houve PR" abaixo ·
+**Registro reconstituído em:** 03/09/2026
+
+### Observação do PO
+
+> "para as correções de back end não seria melhor chamar a skill de java ao invés
+> da skill de expo?"
+
+### Diagnóstico
+
+O agente aplicava `expo-skills` também sobre correções de **backend** — Gradle +
+Spring Boot 4.0.4 sobre Java 25. A skill `java` existia e era adequada, mas estava no
+diretório **global**, enquanto `expo-skills` era a única instalada no diretório **do
+projeto**. Proximidade venceu adequação. O `CLAUDE.md` da época pedia "o skill mais
+adequado" sem dizer qual serve para qual parte do sistema.
+
+### O que entrou
+
+Nada de imediato — e é justamente esse o problema que o item 2 corrigiu. A regra só
+virou artefato quando a matriz do [UPD-002](../../skill-updates/UPD-002-matriz-de-roteamento-de-skills.md)
+foi criada, um dia depois:
+
+| Onde a regra do item 1 vive hoje | O quê |
+|---|---|
+| `.claude/skills-roteamento.md`, linha `backend/` | `java` como skill obrigatória da área |
+| `.claude/skills-roteamento.md`, seção "skills que NÃO se aplicam" | Bloqueia a variante do mesmo erro: ativar `quarkus` por semelhança de "backend Java" |
+
+### Por que não houve PR
+
+O item 1 aconteceu em 02/09; `skill-observations/`, `skill-updates/` e este histórico
+nasceram em 03/09, no commit `3d2b9e6`. Verificado:
+`git log --all -- CLAUDE.md .claude/` devolve **apenas os dois commits de 03/09**. O
+item 1 não gerou PR nem commit — o `CLAUDE.md` da época era arquivo não versionado na
+máquina do PO e foi sobrescrito pela reescrita do item 2.
+
+### Proveniência
+
+Reconstituído do banco local do claude-mem (`~/.claude-mem/claude-mem.db`):
+`user_prompts#63` (a citação literal, 2026-09-02T23:25:33Z) e `observations#712-714`
+(a decisão registrada e o inventário de skills que a fundamentou). Os 75 prompts do
+histórico foram filtrados por `skill`, `CLAUDE.md` e `agente`: entre o início do
+projeto e o item 2, o prompt #63 é a **única** correção do PO ao comportamento do
+agente.
 
 ---
 
@@ -107,6 +155,8 @@ branch local, sem PR e sem nunca terem sido enviados ao `origin`.
 
 | # | O que | Origem | Estado |
 |---|---|---|---|
-| **P-001** | Reconstituir o **item 1** do Observer (`OBS-001` / `M-001`) — o conteúdo nunca foi persistido porque as pastas do ciclo não existiam. Depende do PO informar qual era a observação. | PO | 🔴 Aguardando PO |
+| **P-001** | ~~Reconstituir o **item 1** do Observer~~ — reconstituído em 03/09/2026 a partir do banco do claude-mem, com citação literal do PO. Ver [OBS-001](../../skill-observations/OBS-001-skill-pela-linguagem-do-arquivo.md) e M-001 acima. | PO | ✅ Fechada |
 | **P-002** | O hook `SessionStart` só passa a valer **a partir da próxima sessão** (ou depois de abrir `/hooks` uma vez): o watcher de configuração só observa diretórios que já tinham arquivo de settings no início da sessão. | UPD-002 | 🟡 Ação do PO |
 | **P-003** | 3 achados do `code-review` no portão de cobertura entregue por #60, fora do escopo de #63: (a) `frontend/jest.setup-after-env.js` — `asyncUtilTimeout: 5000` igual ao `testTimeout` padrão, então a folga nunca é usada e o erro vira "Exceeded timeout" opaco; (b) `frontend/jest.config.js` — `collectCoverageFrom` omite `App.js` (191 linhas, listeners de notificação), inflando a linha de base; (c) `PerfilScreen.test.js` — comentário justificativo factualmente errado sobre o que é pintado durante o carregamento. | `code-review` de 03/09/2026 | 🟡 Vira PR próprio |
+| **P-004** | O git-flow documentado não é o do repositório. O `Documentos/git-flow/MANUAL.md` §3 descreve `feature/* → develop → main → release/<tag>`, com `main` = homologação. No `origin` existem **só `develop` e `master`**; não há branch `main`, não há nenhuma `release/*`, e o default do repo é `master`. Consequência: `develop` está **158 commits à frente** de `master`, cujo último merge foi o PR #10, em 19/08/2026 — 50 PRs entraram em develop desde então sem promoção, e nunca houve release. Ou o manual é corrigido para `master`, ou as duas etapas (hom e prod) precisam ser criadas. | Auditoria de PRs, 03/09/2026 | 🟡 Decisão do PO |
+| **P-005** | A branch `feature/e8-01-migracao-cloud-run` tem o commit `d2aabc8` (626 linhas: workflow `cd-backend-cloudrun.yml`, `deploy/cloudrun/`, `application.properties`, `De-Para`) e **existe apenas na máquina local** — nunca foi enviada ao `origin`. A migração está parada **por decisão do PO** ("Não vamos migrar para o Google Cloud Run agora, vamos terminar de consertar o sistema. Irei pesquisar hospedagens melhores", 02/09 21:16), então não cabe PR. Cabe **push da branch como backup**, para o trabalho não depender de uma máquina só. Efeito colateral enquanto isso: o `De-Para` no `develop` ainda registra **Oracle Cloud** como alvo do E8-01, porque a correção está nesse commit não publicado. | Auditoria de PRs, 03/09/2026 | 🟡 Aguardando aval do PO |

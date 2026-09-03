@@ -28,5 +28,5 @@ O agente **propõe**; quem decide o que vira regra é o PO.
 
 | ID | Assunto | Estado |
 |---|---|---|
-| OBS-001 | *(não registrada — ver nota no histórico)* | Pendente de registro |
+| [OBS-001](./OBS-001-skill-pela-linguagem-do-arquivo.md) | Skill escolhida pela proximidade da instalação, não pela linguagem do arquivo | ✅ Aplicada (via UPD-002) — registro reconstituído em 03/09/2026 |
 | [OBS-002](./OBS-002-ativacao-de-skills-por-dominio.md) | Skills não são ativadas conforme a área de atuação | ✅ Aplicada (UPD-002) |

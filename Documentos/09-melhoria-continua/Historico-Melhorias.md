@@ -151,6 +151,48 @@ branch local, sem PR e sem nunca terem sido enviados ao `origin`.
 
 ---
 
+### Correção da esteira do #61 (03/09/2026)
+
+O job **Frontend (Expo Web)** do PR #61 falhava no `npm ci`, antes de chegar ao lint
+ou aos testes: `Missing: @emnapi/core@1.11.3 from lock file`.
+
+**Causa:** divergência de versão do npm entre a máquina de desenvolvimento e a
+esteira — local `npm 11.6.1`, esteira `npm 10.8.2` (o `setup-node@v4` do workflow usa
+`node-version: '20'`, que hoje entrega node 20.20.2 + npm 10.8.2). O
+`eslint-config-expo`, que entrou nesse mesmo PR, arrasta
+`unrs-resolver → @napi-rs/wasm-runtime@1.2.3`, um pacote *optional* que declara
+`@emnapi/core` e `@emnapi/runtime` como **peerDependencies**. O npm 11 resolve esses
+peers sem gravá-los no topo do lock; o npm 10.8.2 os exige lá. O lock gerado pelo npm
+11 é válido para o npm 11 e inválido para o npm 10 — e a esteira roda o npm 10.
+
+**Correção:** lock regerado com o próprio npm da esteira
+(`npx npm@10.8.2 install --package-lock-only`). O diff é só metadado — entram as duas
+entradas `@emnapi/*` que faltavam e ajustam-se flags `"peer"` — sem mudança de versão
+ou de *integrity* de nenhum pacote já existente. Commit `007eea5`.
+
+**Verificação** (a falha foi reproduzida localmente antes da correção):
+
+| Comando | Antes | Depois |
+|---|---|---|
+| `npx npm@10.8.2 ci --dry-run` | `EUSAGE` — Missing @emnapi/core, @emnapi/runtime | `added 35 packages` |
+| `npm ci --dry-run` (npm 11.6.1) | `added 33 packages` | `added 35 packages` |
+| `npm run lint` | — | 0 erros, 18 avisos (no teto de `--max-warnings 18`) |
+| `npm test` | — | 27 suítes, 207 testes, verdes |
+
+O lock passou a servir **as duas versões de npm**, então não foi preciso mexer no
+workflow. Fica registrada a armadilha: um `npm install` rodado com npm 11 volta a
+remover essas entradas e quebra o `npm ci` de novo. Enquanto o workflow usar
+`node-version: '20'`, regerar o lock com `npm@10.8.2`.
+
+O mesmo lock foi levado para a branch do **#62** (merge `11224b7`), que é empilhado
+sobre o #61 e quebraria do mesmo jeito assim que a esteira rodasse nele.
+
+> **Nota de rastreabilidade (regra D-03):** este registro vive no PR #63, e não no
+> #61, porque o próprio arquivo `Historico-Melhorias.md` nasce no #63 — ele ainda não
+> existe no `develop`, então o #61 não teria onde escrever.
+
+---
+
 ## Pendências abertas
 
 | # | O que | Origem | Estado |

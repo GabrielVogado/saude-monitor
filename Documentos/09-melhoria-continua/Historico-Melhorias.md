@@ -200,7 +200,7 @@ aberta.
 
 | Item | Estado |
 |---|---|
-| `lobehub-react` sai da coluna de `frontend/` e vai para "skills que NÃO se aplicam" — verificado que `@lobehub/ui`, antd, `antd-style`, Next.js e `react-router-dom` não existem no `package.json` | ✅ Aplicado no Anexo A |
+| `lobehub-react` sai da coluna de `frontend/` e vai para "skills que NÃO se aplicam" — verificado que `@lobehub/ui`, antd, `antd-style`, Next.js e `react-router-dom` não existem no `package.json` | ✅ Aplicado **nos dois lugares**: na matriz viva `.claude/skills-roteamento.md` (local, não versionada) e no Anexo A versionado. Ver a ressalva no [UPD-003](../../skill-updates/UPD-003-portao-verificavel-e-escopo-de-skills.md) sobre o custo de a regra viver em dois arquivos |
 | Trocar "anunciar" por "invocar" na redação da matriz | 🟡 Proposto |
 | Hook `PreToolUse` que bloqueia `gh pr create` sem `code-review` na sessão | 🟡 Proposto — esbarra na decisão de não versionar `.claude/`; ver UPD-003 |
 

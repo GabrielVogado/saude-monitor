@@ -20,9 +20,9 @@ O projeto possui **3 ambientes isolados**, cada um com seu próprio backend, fro
 
 | Ambiente | Branch | Backend (Render) | Frontend web | Banco (Atlas) |
 |----------|--------|------------------|--------------------|---------------|
-| **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | site dev | `saude_monitor_dev` |
-| **hom** (homologação) | `main` | `saude-monitor-backend-hom` | site hom | `saude_monitor_hom` |
-| **prod** (produção) | `release/<tag>` | `saude-monitor-backend-prod` | site prod | `saude_monitor_prod` |
+| **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | — (sem provedor) | `saude_monitor_dev` |
+| **hom** (homologação) | `main` | `saude-monitor-backend-hom` | — (sem provedor) | `saude_monitor_hom` |
+| **prod** (produção) | `release/<tag>` | `saude-monitor-backend-prod` | — (sem provedor) | `saude_monitor_prod` |
 
 > **Regra de ouro:** cada ambiente usa **banco de dados separado** e **JWT_SECRET diferente**. Nunca compartilhe dados entre ambientes.
 

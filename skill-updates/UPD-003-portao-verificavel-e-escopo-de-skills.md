@@ -19,7 +19,7 @@ encontrados só depois do merge.
 > aplica sozinha.** Lá o gatilho foi o hook `SessionStart`, que entrega a regra.
 > Falta o gatilho que **cobra** a regra.
 
-## 1. `lobehub-react` sai da matriz de `frontend/` — ✅ aplicado
+## 1. `lobehub-react` sai da matriz de `frontend/` — ✅ aplicado, com ressalva
 
 Verificado no `package.json` do projeto: `@lobehub/ui`, `antd`, `antd-style`, `next`
 e `react-router-dom` — **nenhuma existe**. A skill descreve um stack React web que
@@ -27,9 +27,18 @@ este repositório não usa; o projeto é Expo/React Native com React Navigation.
 
 Move-se para a seção **"skills que NÃO se aplicam"**, junto de `quarkus` (o backend
 é Spring Boot, não Quarkus) e `awesome-llm-apps-fullstack-developer` (não há camada
-de LLM). Aplicado no Anexo A do
-[`Historico-Melhorias.md`](../Documentos/09-melhoria-continua/Historico-Melhorias.md),
-que é a cópia versionada da matriz.
+de LLM). > ⚠️ **A correção teve de acontecer em dois lugares, e só um deles é versionado.**
+> A matriz **viva** — a que o hook `SessionStart` injeta em toda sessão — é
+> `.claude/skills-roteamento.md`, que **não entra no repositório** por decisão do PO.
+> Ela foi corrigida na máquina; o Anexo A do
+> [`Historico-Melhorias.md`](../Documentos/09-melhoria-continua/Historico-Melhorias.md)
+> é a cópia versionada e também foi.
+>
+> Isso expõe uma consequência da decisão de não versionar `.claude/` que não estava
+> registrada: **toda alteração de regra passa a exigir dois passos, e um deles não é
+> auditável em PR.** Se os dois divergirem, vale o que está na máquina — e ninguém
+> descobre pelo repositório. O próprio `code-review` deste PR pegou a divergência,
+> que teria feito a próxima sessão receber a regra antiga.
 
 Com a saída dela, a coluna de complementares de `frontend/` fica só com `run`
 (confirmar a mudança na tela real).

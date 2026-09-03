@@ -16,9 +16,9 @@ Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gr
 
 | Ambiente | Branch/Tag | Backend (Render) | Frontend web | Banco (Atlas) |
 |----------|-----------|------------------|--------------------|---------------|
-| **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | site dev | `saude_monitor_dev` |
-| **hom** (homologação) | `main` | `saude-monitor-backend-hom` | site hom | `saude_monitor_hom` |
-| **prod** (produção) | `release/<tag>` | `saude-monitor-backend-prod` | site prod | `saude_monitor_prod` |
+| **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | — (sem provedor) | `saude_monitor_dev` |
+| **hom** (homologação) | `main` | `saude-monitor-backend-hom` | — (sem provedor) | `saude_monitor_hom` |
+| **prod** (produção) | `release/<tag>` | `saude-monitor-backend-prod` | — (sem provedor) | `saude_monitor_prod` |
 
 ## Fluxo
 
@@ -82,7 +82,9 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 |---------|---------|------|
 | `.github/workflows/ci.yml` | push/PR em develop/main | Build + testes backend e frontend |
 | `.github/workflows/cd-backend.yml` | push develop/main + tag v* | Docker → GHCR → deploy Render (dev/hom/prod) |
-| `.github/workflows/release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da main |
+| `.github/workflows/cd-mobile-eas.yml` | push develop/main/release + caminho `frontend/**` | Build do APK no EAS |
+| `.github/workflows/keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` contra a hibernação do Render (E8-01) |
+| `.github/workflows/release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da main. ⚠️ **Não executável hoje** — a branch `main` não existe |
 
 ## Observações
 

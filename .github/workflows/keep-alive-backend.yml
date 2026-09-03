@@ -19,8 +19,8 @@
 # variável definida é PULADO, não falha:
 #
 #   BACKEND_HEALTH_URL_DEV   -> develop        (padrão embutido, já em uso)
-#   BACKEND_HEALTH_URL_HOM   -> main           (não existe ainda)
-#   BACKEND_HEALTH_URL_PROD  -> release/<tag>  (não existe ainda)
+#   BACKEND_HEALTH_URL_HOM   -> (sem branch)   (não existe ainda)
+#   BACKEND_HEALTH_URL_PROD  -> master         (não existe ainda)
 #
 # É opt-in por causa da cota, e a conta importa: o free tier do Render dá
 # 750 horas de instância por mês PARA A CONTA INTEIRA, não por serviço.

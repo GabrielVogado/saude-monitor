@@ -2,7 +2,7 @@ name: CD - Mobile (EAS Build)
 
 on:
   push:
-    branches: [develop, main, 'release/**']
+    branches: [develop, master, 'release/**']
     paths:
       - 'frontend/**'
       - '.github/workflows/cd-mobile-eas.yml'
@@ -10,9 +10,12 @@ on:
 
 jobs:
   # Mapeia a branch para o perfil de build do EAS.
-  #   develop     -> preview (APK interno)
-  #   main        -> preview (APK interno)
+  #   develop       -> preview (APK interno)
+  #   master        -> preview (APK interno)
   #   release/<tag> -> production (AAB para loja)
+  #
+  # `master` continua em preview de proposito: o AAB de loja sai de uma versao
+  # fixada (release/<tag>), nao de todo commit promovido.
   resolve-profile:
     runs-on: ubuntu-latest
     outputs:

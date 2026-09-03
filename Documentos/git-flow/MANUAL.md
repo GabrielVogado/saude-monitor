@@ -21,8 +21,12 @@ O projeto possui **3 ambientes isolados**, cada um com seu próprio backend, fro
 | Ambiente | Branch | Backend (Render) | Frontend web | Banco (Atlas) |
 |----------|--------|------------------|--------------------|---------------|
 | **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | — (sem provedor) | `saude_monitor_dev` |
-| **hom** (homologação) | `main` | `saude-monitor-backend-hom` | — (sem provedor) | `saude_monitor_hom` |
-| **prod** (produção) | `release/<tag>` | `saude-monitor-backend-prod` | — (sem provedor) | `saude_monitor_prod` |
+| **prod** (produção) | `master` · `release/<tag>` | `saude-monitor-backend-prod` ⚠️ *não criado* | — (sem provedor) | `saude_monitor_prod` ⚠️ *não criado* |
+
+> ⚠️ **Só o ambiente `dev` existe hoje.** O `saude-monitor-backend-dev` é o único Web
+> Service no Render, e é o único com secrets configurados. Homologação deixou de ser
+> um degrau do fluxo porque não tem branch nem ambiente — ela volta ao documento
+> quando for criada.
 
 > **Regra de ouro:** cada ambiente usa **banco de dados separado** e **JWT_SECRET diferente**. Nunca compartilhe dados entre ambientes.
 
@@ -31,8 +35,8 @@ O projeto possui **3 ambientes isolados**, cada um com seu próprio backend, fro
 ## 3. Fluxo de Desenvolvimento (Gitflow)
 
 ```
-feature/* ──► develop ──► main ──► release/<tag>
-   (dev)        (dev)      (hom)      (prod)
+feature/* ──► develop ──► master ──► release/<tag>
+ (trabalho)      (dev)      (prod)    (prod, versão fixada)
 ```
 
 ### 3.1 Nova funcionalidade
@@ -53,16 +57,22 @@ feature/* ──► develop ──► main ──► release/<tag>
    ```
 2. Desenvolva, commite e abra PR para `develop`.
 
-### 3.3 Promoção para homologação
-1. Abra um **Pull Request** de `develop` → `main`.
-2. Após merge, o **ambiente hom** é atualizado automaticamente.
+### 3.3 Promoção para produção
+1. Abra um **Pull Request** de `develop` → `master`.
+2. O CI roda no PR (desde 03/09/2026 — antes disso `master` não tinha CI nenhuma).
+3. Após merge, o **ambiente prod** é atualizado automaticamente.
+
+> ⚠️ **Hoje isso falha de propósito.** O ambiente de produção não existe e os secrets
+> `RENDER_API_KEY_PROD` / `RENDER_SERVICE_ID_PROD` não estão configurados; o
+> `cd-backend.yml` interrompe o deploy com mensagem explícita em vez de ficar verde
+> sem publicar. Criar o Web Service e os secrets é o que destrava a promoção.
 
 ### 3.4 Release de produção
-1. Teste em **homologação**.
+1. Valide em **produção contínua** (`master`) antes de fixar a versão.
 2. No GitHub: **Actions → Release - Gerar branch de produção → Run workflow**, informando a versão (ex.: `1.0.0`).
-3. O workflow cria a branch **`release/1.0.0`** a partir da `main`.
+3. O workflow cria a branch **`release/1.0.0`** a partir da `master`.
 4. O push da branch `release/1.0.0` dispara o deploy do **ambiente prod**.
-5. Após validar em produção, faça merge de `release/1.0.0` de volta em `main` (e `develop`).
+5. Após validar em produção, faça merge de `release/1.0.0` de volta em `master` (e `develop`).
 
 ---
 
@@ -72,11 +82,11 @@ feature/* ──► develop ──► main ──► release/<tag>
 
 | Workflow | Gatilho | Ação |
 |----------|---------|------|
-| `ci.yml` | push/PR em `develop`/`main` | Build + testes do backend e frontend |
-| `cd-backend.yml` | push em `develop`, `main`, `release/**` | Docker → GHCR → deploy Render (dev/hom/prod) |
-| `cd-mobile-eas.yml` | push em `develop`, `main`, `release/**` (caminho `frontend/**`) | Build do APK no EAS |
+| `ci.yml` | push/PR em `develop`/`master` | Build + testes do backend e frontend |
+| `cd-backend.yml` | push em `develop`, `master`, `release/**` | Docker → GHCR → deploy Render. **Falha com mensagem explícita** se o ambiente não tiver secrets |
+| `cd-mobile-eas.yml` | push em `develop`, `master`, `release/**` (caminho `frontend/**`) | Build do APK no EAS |
 | `keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` para impedir a hibernação do Render (E8-01) |
-| `release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `main`. ⚠️ **Não executável hoje** — a branch `main` não existe (pendência P-004) |
+| `release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
 
 > **Removidas em 03/09/2026** (PR de limpeza de esteiras mortas):
 >
@@ -94,7 +104,7 @@ feature/* ──► develop ──► main ──► release/<tag>
 | Branch | Ambiente | Tag da imagem GHCR |
 |--------|----------|--------------------|
 | `develop` | `dev` | `dev` |
-| `main` | `hom` | `hom` |
+| `master` | `prod` | `prod` |
 | `release/<tag>` | `prod` | `<tag>` (ex.: `1.0.0`) |
 
 ### 4.3 Secrets do GitHub
@@ -114,10 +124,10 @@ Cada secret tem sufixo por ambiente (`_DEV`, `_HOM`, `_PROD`):
 1. Crie um cluster **M0** (free tier).
 2. Crie um usuário com senha.
 3. Libere o IP `0.0.0.0/0` (ou o IP do Render).
-4. Crie 3 bancos: `saude_monitor_dev`, `saude_monitor_hom`, `saude_monitor_prod`.
+4. Crie os bancos por ambiente. Hoje existe apenas o `saude_monitor_dev`; `saude_monitor_prod` entra quando produção for criada.
 
 ### 5.2 Render (backend)
-1. Crie 3 Web Services apontando para as imagens GHCR (`:dev`, `:hom`, `:<tag>`).
+1. Crie um Web Service por ambiente, apontando para as imagens GHCR (`:dev`, `:prod`, `:<tag>`). Hoje existe apenas o de `dev`.
 2. Configure as variáveis de ambiente (ver `backend/.env.example`).
 3. Anote os **Service IDs**.
 

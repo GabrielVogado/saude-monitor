@@ -2,7 +2,7 @@ name: CD - Backend (Render)
 
 on:
   push:
-    branches: [develop, main, 'release/**']
+    branches: [develop, master, 'release/**']
     paths:
       - 'backend/**'
       - '.github/workflows/cd-backend.yml'
@@ -13,9 +13,13 @@ env:
   IMAGE_NAME: gabrielvogado/saude-monitor-backend
 jobs:
   # Mapeia a branch para o ambiente de destino.
-  #   develop     -> dev (desenvolvimento)
-  #   main        -> hom (homologação)
-  #   release/<tag> -> prod (produção)
+  #   develop       -> dev  (desenvolvimento)
+  #   master        -> prod (produção)
+  #   release/<tag> -> prod (produção, versão fixada)
+  #
+  # O degrau de homologação saiu do mapeamento porque não existe: não há branch nem
+  # ambiente. Quando o ambiente de homologação for criado, ele volta com a branch
+  # correspondente.
   resolve-env:
     runs-on: ubuntu-latest
     outputs:
@@ -27,9 +31,9 @@ jobs:
           if [[ "${{ github.ref }}" == refs/heads/release/* ]]; then
             echo "env=prod" >> "$GITHUB_OUTPUT"
             echo "tag=${GITHUB_REF#refs/heads/release/}" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "env=hom" >> "$GITHUB_OUTPUT"
-            echo "tag=hom" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            echo "env=prod" >> "$GITHUB_OUTPUT"
+            echo "tag=prod" >> "$GITHUB_OUTPUT"
           else
             echo "env=dev" >> "$GITHUB_OUTPUT"
             echo "tag=dev" >> "$GITHUB_OUTPUT"
@@ -61,6 +65,26 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.resolve-env.outputs.tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      # Uma promocao para producao que nao entrega e o pior caso do falso-verde: o
+      # commit fica na branch de producao, o job fica verde e nada foi publicado.
+      # Por isso este passo FALHA, em vez de pular com aviso -- ao contrario do caso
+      # de um ambiente opcional, aqui a ausencia da credencial e um bloqueio real.
+      - name: Verificar credenciais do ambiente (${{ needs.resolve-env.outputs.env }})
+        env:
+          RENDER_API_KEY: ${{ secrets[format('RENDER_API_KEY_{0}', needs.resolve-env.outputs.env)] }}
+          RENDER_SERVICE_ID: ${{ secrets[format('RENDER_SERVICE_ID_{0}', needs.resolve-env.outputs.env)] }}
+          AMBIENTE: ${{ needs.resolve-env.outputs.env }}
+        run: |
+          if [ -z "${RENDER_API_KEY:-}" ] || [ -z "${RENDER_SERVICE_ID:-}" ]; then
+            AMB_MAIUSCULO=$(echo "$AMBIENTE" | tr '[:lower:]' '[:upper:]')
+            echo "ERRO: o ambiente '$AMBIENTE' nao tem credenciais configuradas."
+            echo "Defina os secrets RENDER_API_KEY_${AMB_MAIUSCULO} e RENDER_SERVICE_ID_${AMB_MAIUSCULO}"
+            echo "em Settings > Secrets and variables > Actions, e crie o Web Service correspondente no Render."
+            echo "Hoje so o ambiente 'dev' esta configurado."
+            exit 1
+          fi
+          echo "credenciais presentes para $AMBIENTE"
 
       - name: Disparar deploy no Render (${{ needs.resolve-env.outputs.env }})
         env:

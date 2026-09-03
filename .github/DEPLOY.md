@@ -17,16 +17,17 @@ Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gr
 | Ambiente | Branch/Tag | Backend (Render) | Frontend web | Banco (Atlas) |
 |----------|-----------|------------------|--------------------|---------------|
 | **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | — (sem provedor) | `saude_monitor_dev` |
-| **hom** (homologação) | `main` | `saude-monitor-backend-hom` | — (sem provedor) | `saude_monitor_hom` |
-| **prod** (produção) | `release/<tag>` | `saude-monitor-backend-prod` | — (sem provedor) | `saude_monitor_prod` |
+| **prod** (produção) | `master` · `release/<tag>` | `saude-monitor-backend-prod` ⚠️ *não criado* | — (sem provedor) | `saude_monitor_prod` ⚠️ *não criado* |
+
+> ⚠️ **Só o ambiente `dev` existe hoje** — é o único Web Service no Render e o único com secrets.
 
 ## Fluxo
 
 ```
 push/PR → CI (build+teste backend e frontend)
-push em develop → CD dev (Docker → GHCR:dev → Render dev)
-push em main    → CD hom (Docker → GHCR:hom → Render hom)
-push em release/<tag> → CD prod (Docker → GHCR:<tag> → Render prod)
+push em develop → CD dev  (Docker → GHCR:dev  → Render dev)
+push em master  → CD prod (Docker → GHCR:prod → Render prod)
+push em release/<tag> → CD prod (Docker → GHCR:<tag> → Render prod, versao fixada)
 ```
 
 ## Passo a passo
@@ -37,12 +38,12 @@ push em release/<tag> → CD prod (Docker → GHCR:<tag> → Render prod)
 3. Em "Database Access", crie um usuário com senha.
 4. Em "Network Access", libere o IP `0.0.0.0/0` (ou o IP do Render).
 5. Copie a string de conexão: `cluster0.xxxxx.mongodb.net`.
-6. Crie 3 bancos: `saude_monitor_dev`, `saude_monitor_hom`, `saude_monitor_prod`.
+6. Crie os bancos por ambiente. Hoje existe apenas `saude_monitor_dev`.
 
 ### 2. Render (backend, gratuito)
 1. Crie conta em https://render.com
 2. Gere um **API Key** em Account Settings → API Keys.
-3. Crie **3 Web Services** (ou use o `render.yaml` via Blueprint) apontando para as imagens GHCR (`:dev`, `:hom`, `:v*`).
+3. Crie um Web Service por ambiente (ou use o `render.yaml` via Blueprint) apontando para as imagens GHCR (`:dev`, `:prod`, `:<tag>`). Hoje existe apenas o de `dev`.
 4. Preencha as variáveis de ambiente de cada um (ver `backend/.env.example`).
 5. Anote os **Service IDs** de cada ambiente.
 
@@ -70,21 +71,21 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 - `APP_SEED_ENABLED=false`
 
 ### 6. Gerar release de produção
-1. Faça merge de `develop` → `main` (homologação é deployada automaticamente).
-2. Teste em homologação.
+1. Faça merge de `develop` → `master` (produção contínua é deployada automaticamente).
+2. Valide em produção contínua antes de fixar a versão.
 3. No GitHub, **Actions → Release - Gerar branch de produção → Run workflow**, informando a versão (ex.: `1.0.0`).
-4. A branch `release/1.0.0` é criada a partir da `main` e dispara o deploy de produção.
-5. Após validar em produção, faça merge de `release/1.0.0` de volta em `main` (e `develop`).
+4. A branch `release/1.0.0` é criada a partir da `master` e dispara o deploy da versão fixada.
+5. Após validar, faça merge de `release/1.0.0` de volta em `master` (e `develop`).
 
 ## Workflows
 
 | Arquivo | Gatilho | Ação |
 |---------|---------|------|
-| `.github/workflows/ci.yml` | push/PR em develop/main | Build + testes backend e frontend |
-| `.github/workflows/cd-backend.yml` | push develop/main + tag v* | Docker → GHCR → deploy Render (dev/hom/prod) |
-| `.github/workflows/cd-mobile-eas.yml` | push develop/main/release + caminho `frontend/**` | Build do APK no EAS |
+| `.github/workflows/ci.yml` | push/PR em develop/master | Build + testes backend e frontend |
+| `.github/workflows/cd-backend.yml` | push develop/master/release | Docker → GHCR → deploy Render. Falha com mensagem explícita se o ambiente não tiver secrets |
+| `.github/workflows/cd-mobile-eas.yml` | push develop/master/release + caminho `frontend/**` | Build do APK no EAS |
 | `.github/workflows/keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` contra a hibernação do Render (E8-01) |
-| `.github/workflows/release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da main. ⚠️ **Não executável hoje** — a branch `main` não existe |
+| `.github/workflows/release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
 
 ## Observações
 

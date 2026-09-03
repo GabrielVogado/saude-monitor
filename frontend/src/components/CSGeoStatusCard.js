@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from "react";
-import {StyleSheet, Text, View} from "react-native";
+import {StyleSheet, Text} from "react-native";
 import CSCard from "./CSCard";
 import CSButton from "./CSButton";
 import {colors, typography, spacing} from "../theme";

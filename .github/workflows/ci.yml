@@ -69,7 +69,16 @@ jobs:
         run: npm ci
 
       - name: Typecheck
+        # Atenção: este passo não verifica o código. O `tsconfig.json` tem
+        # `checkJs: false` e o projeto é 100% `.js` — o `tsc` não tem o que
+        # olhar. Fica no lugar porque vira gate de verdade quando o ARQ-11
+        # (tipagem incremental) começar. Quem verifica hoje é o lint abaixo.
         run: npm run typecheck
+
+      - name: Lint (ESLint)
+        # Erro reprova o PR. Aviso também, quando passa do piso congelado em
+        # `package.json` — mesma lógica do piso de cobertura (E8-13 / ENG-02).
+        run: npm run lint
 
       - name: Testes (Jest) com cobertura
         # O piso configurado em `jest.config.js` reprova o PR quando a cobertura

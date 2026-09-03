@@ -77,7 +77,9 @@ async function confirmarEntrada(hospitalId, posicao) {
   }
 }
 
-async function confirmarSaida(hospitalId) {
+// O `hospitalId` chega da região do geofence, mas o checkout usa a visita ativa
+// guardada em memória: quem manda é o registro aberto, não a região que disparou.
+async function confirmarSaida(_hospitalId) {
   if (!visitaAtivaId) {
     return;
   }

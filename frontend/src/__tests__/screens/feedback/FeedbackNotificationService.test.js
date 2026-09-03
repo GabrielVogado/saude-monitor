@@ -50,6 +50,18 @@ describe("FeedbackNotificationService (Épico 03)", () => {
     expect(await pendenciaAtual()).toBeNull();
   });
 
+  test("concluirFeedback de outra visita não apaga a pendência guardada", async () => {
+    await agendarFeedback({ visitaId: "v1", hospitalNome: "UPA" });
+    const pendencia = await pendenciaAtual();
+
+    await concluirFeedback("v2");
+
+    expect(Notifications.cancelScheduledNotificationAsync).not.toHaveBeenCalledWith(
+      pendencia.pedidoId
+    );
+    expect(await pendenciaAtual()).not.toBeNull();
+  });
+
   test("agendarFeedback agenda o pedido entre 1 e 5 min após a saída (E3-01)", async () => {
     const agora = Date.now();
     jest.setSystemTime(agora);

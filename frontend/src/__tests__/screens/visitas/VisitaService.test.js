@@ -2,11 +2,11 @@
  * Ciclo de vida de visitas (Épico 02) — VisitaService.
  * Contrato §3.3: checkin/checkout/heartbeat e busca de ativa/histórico.
  */
-process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
-
 import VisitaService from "../../../screens/visitas/service/VisitaService";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../../screens/auth/service/LoginService";
+
+process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
 
 jest.mock("../../../screens/auth/service/LoginService");
 

@@ -56,9 +56,15 @@ describe("PerfilScreen (E5-05 — revogação nativa)", () => {
 
   async function renderizar() {
     render(<PerfilScreen navigation={NAVEGACAO} />);
-    // "Dados e Privacidade" é o cabeçalho, pintado já durante o carregamento
-    // inicial: esperar por ele deixava o teste seguir com a tela ainda vazia.
-    // O card "Minha conta" só existe depois que o perfil chega.
+    // Espera pelo card "Minha conta", e não pelo cabeçalho: o cabeçalho é
+    // "Perfil e Privacidade" (o `Text` de `styles.headerTitle`), fica FORA do
+    // `ScrollView` e é pintado durante o carregamento — esperar por ele deixaria o
+    // teste seguir antes de o perfil chegar. Dentro do `ScrollView`, o carregamento
+    // inicial pinta apenas <CSLoadingList count={2} />.
+    //
+    // (O comentário anterior dizia que o cabeçalho era "Dados e Privacidade". Errado
+    // duas vezes: esse texto é um título de card, renderizado só depois do
+    // carregamento — logo, esperar por ele seria seguro —, e não é o cabeçalho.)
     await screen.findByText("Minha conta");
   }
 

@@ -105,7 +105,7 @@ A v1.0 catalogou 48 itens em 7 categorias e **não tinha nenhum item de desempen
 | Backend — dados | Índices declarados: 2× `2dsphere` (geofence, localização), 4× compound, únicos esparsos (CNES/CNPJ), TTL na blacklist de refresh |
 | Backend — processos | 4 jobs `@Scheduled` (agregação 15min, expiração de visita, GPS interrompido, feedback sem resposta) |
 | Frontend | 16 telas · 14 componentes `CS*` · 24 suítes · **166 testes verdes** |
-| Infra | 5 workflows (`ci`, `cd-backend`, `cd-frontend`, `cd-mobile-eas`, `release`) · Docker multi-stage Temurin 25 · `render.yaml` |
+| Infra | 5 workflows (`ci`, `cd-backend`, `cd-mobile-eas`, `keep-alive-backend`, `release`) · Docker multi-stage Temurin 25 · `render.yaml` — `cd-frontend` e `cd-backend-oracle` removidos em 03/09/2026 por não terem função |
 
 ### 2.2 Estórias do backlog × status real (atualizado pós-S8)
 

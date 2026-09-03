@@ -10,7 +10,7 @@ O **Clinical Sanctuary** detecta automaticamente a entrada e saída de usuários
 
 - **Backend:** Spring Boot 4 (Java 25) + MongoDB, empacotado em Docker.
 - **Frontend:** React Native / Expo 55 (web via `react-native-web` + APK mobile).
-- **CI/CD:** GitHub Actions + Render (backend) + Netlify (frontend) + MongoDB Atlas (banco).
+- **CI/CD:** GitHub Actions + Render (backend) + EAS (APK) + MongoDB Atlas (banco). **O frontend web não tem provedor de publicação** — ver §4.1.
 
 ---
 
@@ -18,11 +18,11 @@ O **Clinical Sanctuary** detecta automaticamente a entrada e saída de usuários
 
 O projeto possui **3 ambientes isolados**, cada um com seu próprio backend, frontend e banco de dados.
 
-| Ambiente | Branch | Backend (Render) | Frontend (Netlify) | Banco (Atlas) |
+| Ambiente | Branch | Backend (Render) | Frontend web | Banco (Atlas) |
 |----------|--------|------------------|--------------------|---------------|
-| **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | site dev | `saude_monitor_dev` |
-| **hom** (homologação) | `main` | `saude-monitor-backend-hom` | site hom | `saude_monitor_hom` |
-| **prod** (produção) | `release/<tag>` | `saude-monitor-backend-prod` | site prod | `saude_monitor_prod` |
+| **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | — (sem provedor) | `saude_monitor_dev` |
+| **hom** (homologação) | `main` | `saude-monitor-backend-hom` | — (sem provedor) | `saude_monitor_hom` |
+| **prod** (produção) | `release/<tag>` | `saude-monitor-backend-prod` | — (sem provedor) | `saude_monitor_prod` |
 
 > **Regra de ouro:** cada ambiente usa **banco de dados separado** e **JWT_SECRET diferente**. Nunca compartilhe dados entre ambientes.
 
@@ -74,8 +74,20 @@ feature/* ──► develop ──► main ──► release/<tag>
 |----------|---------|------|
 | `ci.yml` | push/PR em `develop`/`main` | Build + testes do backend e frontend |
 | `cd-backend.yml` | push em `develop`, `main`, `release/**` | Docker → GHCR → deploy Render (dev/hom/prod) |
-| `cd-frontend.yml` | push em `develop`, `main`, `release/**` | Build web → deploy Netlify (dev/hom/prod) |
-| `release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `main` |
+| `cd-mobile-eas.yml` | push em `develop`, `main`, `release/**` (caminho `frontend/**`) | Build do APK no EAS |
+| `keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` para impedir a hibernação do Render (E8-01) |
+| `release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `main`. ⚠️ **Não executável hoje** — a branch `main` não existe (pendência P-004) |
+
+> **Removidas em 03/09/2026** (PR de limpeza de esteiras mortas):
+>
+> - `cd-frontend.yml` — publicava no Netlify, mas os segredos `NETLIFY_*` nunca
+>   existiram: a action encerrava com código 0 e o job ficava verde **sem publicar
+>   nada**, em 36 execuções. O único passo com valor, `npx expo export --platform web`,
+>   **já é executado pelo `ci.yml`**. Quando houver provedor de publicação para o
+>   frontend web, a esteira é reescrita para ele.
+> - `cd-backend-oracle.yml` — zero execuções desde a criação. Fazia deploy por SSH
+>   numa VM Oracle Cloud que não existe: São Paulo está sem capacidade Always Free, e
+>   a migração está parada por decisão do PO.
 
 ### 4.2 Mapeamento de ambiente (lógica do `resolve-env`)
 
@@ -93,8 +105,6 @@ Cada secret tem sufixo por ambiente (`_DEV`, `_HOM`, `_PROD`):
 |--------|-----------|
 | `RENDER_API_KEY_DEV/HOM/PROD` | API Key do Render |
 | `RENDER_SERVICE_ID_DEV/HOM/PROD` | ID do serviço do backend no Render |
-| `NETLIFY_AUTH_TOKEN_DEV/HOM/PROD` | Token de acesso do Netlify |
-| `NETLIFY_SITE_ID_DEV/HOM/PROD` | ID do site no Netlify |
 
 ---
 
@@ -111,9 +121,12 @@ Cada secret tem sufixo por ambiente (`_DEV`, `_HOM`, `_PROD`):
 2. Configure as variáveis de ambiente (ver `backend/.env.example`).
 3. Anote os **Service IDs**.
 
-### 5.3 Netlify (frontend)
-1. Crie 3 sites (dev, hom, prod).
-2. Anote os **Site IDs**.
+### 5.3 Frontend web — sem provedor definido
+
+Não há hospedagem configurada para o frontend web. O `ci.yml` valida que o
+`npx expo export --platform web` continua funcionando, mas o artefato não é
+publicado em lugar nenhum. A distribuição hoje é o **APK**, gerado pelo
+`cd-mobile-eas.yml`.
 
 ### 5.4 Variáveis de ambiente do backend
 

@@ -20,6 +20,7 @@
 |---|---|---|---|---|---|
 | **M-001** | 02/09/2026 | [OBS-001](../../skill-observations/OBS-001-skill-pela-linguagem-do-arquivo.md) | Skill escolhida pela linguagem do arquivo, não pela proximidade da instalação: correção de backend chama `java`, não `expo-skills` | — (aplicada via #63) | ✅ Aplicada — registro reconstituído em 03/09/2026 |
 | **M-002** | 03/09/2026 | [OBS-002](../../skill-observations/OBS-002-ativacao-de-skills-por-dominio.md) → [UPD-002](../../skill-updates/UPD-002-matriz-de-roteamento-de-skills.md) | Matriz de roteamento de skills por área + hook `SessionStart` que a injeta em toda sessão | #63 | ✅ Aplicada |
+| **M-003** | 03/09/2026 | [OBS-003](../../skill-observations/OBS-003-skill-anunciada-nao-e-skill-ativada.md) → [UPD-003](../../skill-updates/UPD-003-portao-verificavel-e-escopo-de-skills.md) | Anunciar ≠ ativar; portão de `code-review` pulado em 3 PRs; `lobehub-react` sai da matriz de `frontend/` | #68 | 🟡 Parcial — item 1 aplicado, 2 e 3 dependem do PO |
 
 ---
 
@@ -150,6 +151,61 @@ regra foi seguida manualmente.
 
 ---
 
+## M-003 — Anunciar não é ativar, e portão não rodado é portão inexistente
+
+**Data:** 03/09/2026 · **PR:** #68
+
+### Observação do PO
+
+> "ative as skills necessarias para a conclusão das melhorias. Ate agora não vi
+> nenhuma de java sendo ativada quando há modificação no backend. Esta seguindo o
+> plano obrigatorio de CLAUDE.md?"
+
+### Diagnóstico
+
+Três respostas, e uma delas absolve o agente:
+
+1. **A `java` não ter sido ativada estava correto.** Nenhum dos 9 commits da sessão
+   tocou `backend/` — verificado um a um. A matriz define a área pelos arquivos do
+   diff, e não houve `.java`.
+2. **As skills foram anunciadas, não ativadas.** O agente escreveu "Ativando
+   `expo-skills`" e "Ativando `software-architect`" sem invocar nenhuma.
+3. **O portão de `code-review` foi pulado** nos PRs #64, #65 e #66.
+
+### O padrão que apareceu quatro vezes no mesmo dia
+
+| # | Onde | O sinal | A realidade |
+|---|---|---|---|
+| 1 | `keep-alive-backend.yml` | Documentado como mitigação ativa do E8-01 | Nunca executou — o `schedule` só roda a partir da branch padrão, e a API devolvia 404 |
+| 2 | `De-Para` | E8-01 marcado 🟡 mitigado | A mitigação não existia |
+| 3 | `cd-frontend.yml` | 36 execuções verdes | Nenhuma publicou: os segredos nunca existiram e a action encerra com código 0 |
+| 4 | Transcript do agente | "Ativando `expo-skills`" | Zero invocações |
+
+**Em todos, o sinal verde foi confundido com o resultado.** É o mesmo defeito de
+raciocínio, em quatro superfícies diferentes.
+
+### O custo, medido
+
+O portão rodado retroativamente sobre #65 e #66 devolveu **8 achados, 2 de
+severidade alta**, em código já mergeado — inclusive a constatação de que o PR que
+existia para corrigir um falso-verde **não o corrigiu**: apenas escreveu um aviso ao
+lado dele.
+
+Na rodada seguinte, com o portão rodado **antes** do PR (#67), ele pegou um defeito
+de correção que teria sido mergeado: o closure congelado da recursão do check-in
+furava o guard de "visita ativa" e permitia abrir uma segunda visita com uma já
+aberta.
+
+### O que entrou
+
+| Item | Estado |
+|---|---|
+| `lobehub-react` sai da coluna de `frontend/` e vai para "skills que NÃO se aplicam" — verificado que `@lobehub/ui`, antd, `antd-style`, Next.js e `react-router-dom` não existem no `package.json` | ✅ Aplicado **nos dois lugares**: na matriz viva `.claude/skills-roteamento.md` (local, não versionada) e no Anexo A versionado. Ver a ressalva no [UPD-003](../../skill-updates/UPD-003-portao-verificavel-e-escopo-de-skills.md) sobre o custo de a regra viver em dois arquivos |
+| Trocar "anunciar" por "invocar" na redação da matriz | 🟡 Proposto |
+| Hook `PreToolUse` que bloqueia `gh pr create` sem `code-review` na sessão | 🟡 Proposto — esbarra na decisão de não versionar `.claude/`; ver UPD-003 |
+
+---
+
 ## Entregas de código desta sessão (03/09/2026)
 
 Aplicação da regra "um PR por tarefa concluída". Dois commits estavam prontos na
@@ -234,7 +290,7 @@ do usuário.
 | Área tocada | Skills obrigatórias | Complementares |
 |---|---|---|
 | `backend/` — Spring Boot 4, Java 25, MongoDB | `java` | `software-architect` (mudança estrutural ou novo ADR) · `security-review` (autenticação, JWT, LGPD, endpoint público) |
-| `frontend/` — Expo 55, React Native, `react-native-web` | `expo-skills` | `lobehub-react` (componente, hook ou estado React) · `run` (confirmar na tela real) |
+| `frontend/` — Expo 55, React Native, `react-native-web` | `expo-skills` | `run` (confirmar na tela real) |
 | `deploy/`, `.github/workflows/`, `render.yaml` | `software-architect` | `update-config` |
 | `Documentos/` | — | `software-architect` (decisão arquitetural, ADR, De-Para) |
 | `.claude/`, `CLAUDE.md`, hooks, permissões | `update-config` | `fewer-permission-prompts` · `claude-automation-recommender` |
@@ -250,3 +306,4 @@ do usuário.
 
 - `quarkus` — o backend é **Spring Boot 4**, não Quarkus. Não ativar por semelhança de "backend Java".
 - `awesome-llm-apps-fullstack-developer` — o produto não tem camada de LLM.
+- `lobehub-react` — **removida da coluna de `frontend/` em 03/09/2026** ([OBS-003](../../skill-observations/OBS-003-skill-anunciada-nao-e-skill-ativada.md)). O conteúdo dela é `@lobehub/ui`, antd, Next.js App Router e `react-router-dom`; verificado no `package.json` que **nenhuma das cinco existe**. O projeto é Expo/React Native com React Navigation e componentes próprios (`CS*`).

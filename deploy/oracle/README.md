@@ -74,9 +74,21 @@ docker compose logs -f backend
 
 *Network Access → Add IP Address* → IP público da VM. Como agora existe IP fixo, dá para **remover o `0.0.0.0/0`** que o Render exigia por não ter endereço estável. É ganho de segurança direto.
 
-## 6. Deploy automatizado
+## 6. Deploy automatizado — ⚠️ REMOVIDO EM 03/09/2026
 
-O workflow [`cd-backend-oracle.yml`](../../.github/workflows/cd-backend-oracle.yml) builda em runner ARM nativo e publica em `ghcr.io/gabrielvogado/saude-monitor-backend:<ambiente>-arm64`, tag separada da imagem x86 que o Render ainda consome. Secrets necessários:
+> O workflow `cd-backend-oracle.yml` **não existe mais**. Foi removido por não ter
+> executado uma única vez desde a criação: fazia deploy por SSH numa VM que nunca
+> chegou a ser criada — São Paulo está sem capacidade Always Free, e a migração está
+> parada por decisão do PO em 02/09/2026.
+>
+> Os artefatos de infraestrutura desta pasta (`docker-compose.yml`, `Caddyfile`, e as
+> instruções das seções 1 a 5) **foram mantidos**: descrevem o provisionamento da VM,
+> que continua válido se a migração for retomada. O que se perdeu foi só a automação
+> de entrega, que é barata de reescrever e cara de manter apontando para o nada.
+>
+> A descrição abaixo fica como registro do que a esteira fazia.
+
+O workflow buildava em runner ARM nativo e publicava em `ghcr.io/gabrielvogado/saude-monitor-backend:<ambiente>-arm64`, tag separada da imagem x86 que o Render consome. Secrets que ele exigia:
 
 | Secret | Conteúdo |
 |---|---|
@@ -84,7 +96,7 @@ O workflow [`cd-backend-oracle.yml`](../../.github/workflows/cd-backend-oracle.y
 | `OCI_SSH_USER` | `ubuntu` |
 | `OCI_SSH_KEY` | chave **privada** correspondente à pública da VM |
 
-O gatilho é manual (`workflow_dispatch`) de propósito. Só vira `push` quando a virada estiver validada.
+O gatilho era manual (`workflow_dispatch`) de propósito; só viraria `push` depois da virada validada.
 
 Se o *package* GHCR estiver privado, a VM precisa autenticar uma vez:
 `docker login ghcr.io -u <usuário> -p <PAT com read:packages>`. Torná-lo público evita isso.

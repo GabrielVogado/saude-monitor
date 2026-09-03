@@ -16,7 +16,7 @@ O **Clinical Sanctuary** detecta automaticamente a entrada e saída de usuários
 
 ## 2. Ambientes
 
-O projeto possui **3 ambientes isolados**, cada um com seu próprio backend, frontend e banco de dados.
+O projeto prevê ambientes isolados por branch, cada um com seu próprio backend e banco. **Hoje só o `dev` existe** — os demais entram quando forem criados.
 
 | Ambiente | Branch | Backend (Render) | Frontend web | Banco (Atlas) |
 |----------|--------|------------------|--------------------|---------------|
@@ -60,6 +60,12 @@ feature/* ──► develop ──► master ──► release/<tag>
 ### 3.3 Promoção para produção
 1. Abra um **Pull Request** de `develop` → `master`.
 2. O CI roda no PR (desde 03/09/2026 — antes disso `master` não tinha CI nenhuma).
+
+> ⚠️ **A `master` não tem proteção de branch.** A `develop` exige os checks
+> `Backend (Spring Boot)` e `Frontend (Expo Web)` desde 02/09/2026; a `master`, não —
+> um PR com CI vermelho ainda pode ser mergeado na branch de produção. Aplicar os
+> mesmos dois checks obrigatórios à `master` é ação de configuração do repositório,
+> não de código, e depende do PO.
 3. Após merge, o **ambiente prod** é atualizado automaticamente.
 
 > ⚠️ **Hoje isso falha de propósito.** O ambiente de produção não existe e os secrets
@@ -83,7 +89,7 @@ feature/* ──► develop ──► master ──► release/<tag>
 | Workflow | Gatilho | Ação |
 |----------|---------|------|
 | `ci.yml` | push/PR em `develop`/`master` | Build + testes do backend e frontend |
-| `cd-backend.yml` | push em `develop`, `master`, `release/**` | Docker → GHCR → deploy Render. **Falha com mensagem explícita** se o ambiente não tiver secrets |
+| `cd-backend.yml` | push em `develop`, `master`, `release/**` (caminho `backend/**`) | Docker → GHCR → deploy Render. **Falha com mensagem explícita** se o ambiente não tiver secrets |
 | `cd-mobile-eas.yml` | push em `develop`, `master`, `release/**` (caminho `frontend/**`) | Build do APK no EAS |
 | `keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` para impedir a hibernação do Render (E8-01) |
 | `release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
@@ -109,12 +115,12 @@ feature/* ──► develop ──► master ──► release/<tag>
 
 ### 4.3 Secrets do GitHub
 
-Cada secret tem sufixo por ambiente (`_DEV`, `_HOM`, `_PROD`):
+Cada secret tem sufixo por ambiente (`_DEV`, `_PROD`):
 
 | Secret | Descrição |
 |--------|-----------|
-| `RENDER_API_KEY_DEV/HOM/PROD` | API Key do Render |
-| `RENDER_SERVICE_ID_DEV/HOM/PROD` | ID do serviço do backend no Render |
+| `RENDER_API_KEY_DEV/PROD` | API Key do Render. O sufixo `_HOM` saiu na P-004: o `resolve-env` só emite `dev` ou `prod`, então um secret `_HOM` nunca seria lido |
+| `RENDER_SERVICE_ID_DEV/PROD` | ID do serviço do backend no Render. Hoje só `_DEV` está configurado |
 
 ---
 

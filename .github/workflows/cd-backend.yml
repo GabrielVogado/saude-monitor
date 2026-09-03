@@ -14,8 +14,22 @@ env:
 jobs:
   # Mapeia a branch para o ambiente de destino.
   #   develop       -> dev  (desenvolvimento)
-  #   master        -> prod (produção)
-  #   release/<tag> -> prod (produção, versão fixada)
+  #   master        -> prod (produção contínua, imagem `:prod`)
+  #   release/<tag> -> prod (produção, imagem `:<tag>`)
+  #
+  # ⚠️ BLOQUEIO CONHECIDO, a resolver quando o ambiente de produção for criado
+  # (pendência P-006). Os dois destinos acima usam o MESMO `RENDER_SERVICE_ID_PROD`,
+  # mas publicam tags de imagem diferentes -- e o POST em /v1/services/<id>/deploys
+  # manda `{}`, ou seja, redeploya a imagem em que o serviço está fixado, e não a que
+  # acabou de ser construída. Consequência: um push em `release/1.0.0` constrói a
+  # `:1.0.0`, dispara o deploy, e o serviço sobe a `:prod` -- a "versão fixada" que os
+  # documentos prometem seria construída e nunca implantada.
+  #
+  # Não foi corrigido aqui de propósito. As duas saídas são passar `imageUrl` no corpo
+  # do POST ou usar service IDs separados, e ambas mudam o único caminho de deploy que
+  # hoje funciona (o de `dev`) sem que este PR possa exercitá-lo: o `paths: backend/**`
+  # impede o CD de rodar num PR que não toca o backend. Corrigir às cegas o caminho que
+  # funciona, para consertar um que ainda não existe, é o negócio errado.
   #
   # O degrau de homologação saiu do mapeamento porque não existe: não há branch nem
   # ambiente. Quando o ambiente de homologação for criado, ele volta com a branch
@@ -47,25 +61,11 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Login no GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build e push da imagem
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.resolve-env.outputs.tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-
+      # PRIMEIRO passo de proposito. Antes vinha depois do build: a promocao gastava
+      # a compilacao inteira para so entao falhar, e deixava no GHCR uma imagem
+      # `:prod` que nunca foi implantada nem validada -- que seria a primeira coisa
+      # que o servico de producao pegaria quando fosse criado.
+      #
       # Uma promocao para producao que nao entrega e o pior caso do falso-verde: o
       # commit fica na branch de producao, o job fica verde e nada foi publicado.
       # Por isso este passo FALHA, em vez de pular com aviso -- ao contrario do caso
@@ -85,6 +85,25 @@ jobs:
             exit 1
           fi
           echo "credenciais presentes para $AMBIENTE"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e push da imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.resolve-env.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
       - name: Disparar deploy no Render (${{ needs.resolve-env.outputs.env }})
         env:

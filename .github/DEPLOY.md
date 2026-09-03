@@ -1,6 +1,6 @@
 # Deploy CI/CD — Clinical Sanctuary (MVP, 100% gratuito)
 
-Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gratuitos, com **3 ambientes separados**.
+Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gratuitos, com ambientes separados por branch (hoje **só `dev` existe** — ver a tabela abaixo).
 
 ## Arquitetura
 
@@ -56,12 +56,12 @@ sendo validado pelo `ci.yml`. A distribuição hoje é o **APK**, via `cd-mobile
 
 ### 4. Secrets no GitHub
 No repositório: **Settings → Secrets and variables → Actions → New repository secret**.
-Cada secret tem sufixo `_DEV`, `_HOM` ou `_PROD`:
+Cada secret tem sufixo `_DEV` ou `_PROD`:
 
 | Secret | Valor |
 |--------|-------|
-| `RENDER_API_KEY_DEV` / `_HOM` / `_PROD` | API Key do Render (pode ser a mesma) |
-| `RENDER_SERVICE_ID_DEV` / `_HOM` / `_PROD` | ID do serviço do backend em cada ambiente |
+| `RENDER_API_KEY_DEV` / `_PROD` | API Key do Render (pode ser a mesma). O sufixo `_HOM` deixou de existir: depois da P-004 o `resolve-env` só emite `dev` ou `prod`, e um secret `_HOM` nunca seria lido |
+| `RENDER_SERVICE_ID_DEV` / `_PROD` | ID do serviço do backend em cada ambiente. Hoje só `_DEV` está configurado |
 
 ### 5. Variáveis de ambiente no Render
 Em cada Web Service, configure (ver `backend/.env.example`):
@@ -82,7 +82,7 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 | Arquivo | Gatilho | Ação |
 |---------|---------|------|
 | `.github/workflows/ci.yml` | push/PR em develop/master | Build + testes backend e frontend |
-| `.github/workflows/cd-backend.yml` | push develop/master/release | Docker → GHCR → deploy Render. Falha com mensagem explícita se o ambiente não tiver secrets |
+| `.github/workflows/cd-backend.yml` | push develop/master/release **+ caminho `backend/**`** | Docker → GHCR → deploy Render. Falha com mensagem explícita se o ambiente não tiver secrets |
 | `.github/workflows/cd-mobile-eas.yml` | push develop/master/release + caminho `frontend/**` | Build do APK no EAS |
 | `.github/workflows/keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` contra a hibernação do Render (E8-01) |
 | `.github/workflows/release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |

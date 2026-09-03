@@ -240,7 +240,7 @@ Três decisões do Product Owner reordenam este backlog. Ficam registradas aqui 
 
 | # | Critério | Situação real | Fecha em |
 |---|---|---|---|
-| 1 | Código revisado e mergeado na branch principal | ✅ **Atendido** — todo código entra por PR revisado; `develop` = dev, `main` = homologação, `release/<tag>` = produção | — |
+| 1 | Código revisado e mergeado na branch principal | ✅ **Atendido** — todo código entra por PR revisado; `develop` = dev, `master` = produção, `release/<tag>` = produção com versão fixada (corrigido na P-004, 03/09/2026 — a branch `main` nunca existiu neste repositório) | — |
 | 2 | Testes unitários dos serviços críticos (visita, agregação, auth) com cobertura ≥ 70% nas regras de negócio | ⚠️ **Não verificável** — existem 118 testes no backend e 166 no frontend, mas **a cobertura nunca foi medida**; não há ferramenta configurada | E8-08 |
 | 3 | Contratos de API documentados (OpenAPI) e testados via testes de integração | 🔴 **Não atendido** — sem OpenAPI e sem testes de integração com contexto Spring completo | E8-09, E8-10 |
 | 4 | Verificação de acessibilidade (WCAG AA) nas telas novas | 🟡 **Parcial** — implementada, nunca auditada | V-07 |

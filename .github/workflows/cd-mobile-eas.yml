@@ -1,8 +1,21 @@
+# ⚠️ RESTRITO AO AAB DE LOJA desde 03/09/2026.
+#
+# Este workflow disparava a cada push em `frontend/**`. Foram 18 builds em agosto e 20
+# nos três primeiros dias de setembro, contra os 30/mês do free tier do EAS — a cota
+# foi consumida por builds automáticos que ninguém pediu, e o projeto ficou sem
+# conseguir gerar APK.
+#
+# O APK interno passou para o `cd-mobile-apk.yml`, que constrói com Gradle no próprio
+# GitHub Actions: `frontend/android/` está versionado por inteiro e o repositório é
+# público, então não custa cota nem minutos.
+#
+# O EAS fica para o que só ele faz bem: o AAB assinado para a Play Store, a partir de
+# uma versão fixada. É raro, e é onde os créditos rendem.
 name: CD - Mobile (EAS Build)
 
 on:
   push:
-    branches: [develop, main, 'release/**']
+    branches: ['release/**']
     paths:
       - 'frontend/**'
       - '.github/workflows/cd-mobile-eas.yml'
@@ -10,9 +23,11 @@ on:
 
 jobs:
   # Mapeia a branch para o perfil de build do EAS.
-  #   develop     -> preview (APK interno)
-  #   main        -> preview (APK interno)
   #   release/<tag> -> production (AAB para loja)
+  #
+  # develop e master saíram do gatilho: o APK interno deles é feito pelo
+  # cd-mobile-apk.yml, com Gradle e sem cota. O perfil `preview` só é alcançável
+  # agora por workflow_dispatch a partir de uma branch que não seja release/*.
   resolve-profile:
     runs-on: ubuntu-latest
     outputs:

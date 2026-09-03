@@ -80,7 +80,3 @@ deploy/oracle/.env
 coverage/
 frontend/coverage/
 backend/build/
-
-# Configuracao local do Claude Code (por maquina) - nao versionar
-.claude/settings.local.json
-.claude/.headroom_wrap_*

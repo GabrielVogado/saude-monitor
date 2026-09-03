@@ -4,6 +4,14 @@
 - **Data:** 03/09/2026
 - **Estado:** ✅ Aplicada
 
+> ⚠️ **Atualização de 03/09/2026.** Por decisão do PO, os arquivos de configuração
+> do agente descritos abaixo (`CLAUDE.md`, `.claude/**`) **não são versionados** —
+> não são relevantes para o desenvolvimento do sistema. Eles existem e funcionam na
+> máquina do PO, mas ficaram fora do PR #63 e entraram no `.gitignore`. A matriz está
+> transcrita no **Anexo A** do
+> [`Historico-Melhorias.md`](../Documentos/09-melhoria-continua/Historico-Melhorias.md),
+> para a regra não depender de uma máquina só.
+
 ## Problema a resolver
 
 O `CLAUDE.md` mandava ativar "o agente/skill **mais adequado**" (singular) e não

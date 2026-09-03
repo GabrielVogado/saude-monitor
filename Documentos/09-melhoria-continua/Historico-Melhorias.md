@@ -99,6 +99,22 @@ regra vivia só em documento, sem nenhum ponto do fluxo em que fosse cobrada.
 | `.claude/CLAUDE.md` | Era cópia literal do `CLAUDE.md` da raiz e chegava **duplicado** ao contexto de toda sessão; reduzido a um ponteiro |
 | `skill-observations/`, `skill-updates/` | **Novas.** Estrutura do ciclo de melhoria, com README e índice em cada uma |
 
+> ### ⚠️ Atualização de 03/09/2026 — o que **não** foi versionado
+>
+> **Decisão do PO:** *"o que não for relevante para o desenvolvimento do sistema não
+> deve ser mergeado, não deve subir para repositório remoto — skills, pasta `.claude`
+> e etc."* Os arquivos `CLAUDE.md`, `.claude/CLAUDE.md`, `.claude/settings.json`,
+> `.claude/hooks/roteamento-skills.js`, `.claude/skills-roteamento.md` e
+> `.claude/skills/expo-skills/SKILL.md` são **configuração do agente**, não do
+> sistema: não entram em build, imagem Docker ou bundle do Expo. Saíram do PR #63 e
+> passaram para o `.gitignore`; vivem apenas na máquina do PO.
+>
+> A **documentação do processo** — este histórico, `skill-observations/` e
+> `skill-updates/` — foi mantida por decisão expressa do PO.
+>
+> Para que a regra não dependa de uma máquina só (foi exatamente assim que o item 1
+> se perdeu), a matriz está transcrita no **Anexo A**, no fim deste documento.
+
 ### Decisões de implementação
 
 - **Node em vez de `jq`** no hook — `jq` não está no `PATH` das máquinas do
@@ -202,3 +218,35 @@ sobre o #61 e quebraria do mesmo jeito assim que a esteira rodasse nele.
 | **P-003** | 3 achados do `code-review` no portão de cobertura entregue por #60, fora do escopo de #63: (a) `frontend/jest.setup-after-env.js` — `asyncUtilTimeout: 5000` igual ao `testTimeout` padrão, então a folga nunca é usada e o erro vira "Exceeded timeout" opaco; (b) `frontend/jest.config.js` — `collectCoverageFrom` omite `App.js` (191 linhas, listeners de notificação), inflando a linha de base; (c) `PerfilScreen.test.js` — comentário justificativo factualmente errado sobre o que é pintado durante o carregamento. | `code-review` de 03/09/2026 | 🟡 Vira PR próprio |
 | **P-004** | O git-flow documentado não é o do repositório. O `Documentos/git-flow/MANUAL.md` §3 descreve `feature/* → develop → main → release/<tag>`, com `main` = homologação. No `origin` existem **só `develop` e `master`**; não há branch `main`, não há nenhuma `release/*`, e o default do repo é `master`. Consequência: `develop` está **158 commits à frente** de `master`, cujo último merge foi o PR #10, em 19/08/2026 — 50 PRs entraram em develop desde então sem promoção, e nunca houve release. Ou o manual é corrigido para `master`, ou as duas etapas (hom e prod) precisam ser criadas. | Auditoria de PRs, 03/09/2026 | 🟡 Decisão do PO |
 | **P-005** | A branch `feature/e8-01-migracao-cloud-run` tem o commit `d2aabc8` (626 linhas: workflow `cd-backend-cloudrun.yml`, `deploy/cloudrun/`, `application.properties`, `De-Para`) e **existe apenas na máquina local** — nunca foi enviada ao `origin`. A migração está parada **por decisão do PO** ("Não vamos migrar para o Google Cloud Run agora, vamos terminar de consertar o sistema. Irei pesquisar hospedagens melhores", 02/09 21:16), então não cabe PR. Cabe **push da branch como backup**, para o trabalho não depender de uma máquina só. Efeito colateral enquanto isso: o `De-Para` no `develop` ainda registra **Oracle Cloud** como alvo do E8-01, porque a correção está nesse commit não publicado. | Auditoria de PRs, 03/09/2026 | 🟡 Aguardando aval do PO |
+
+---
+
+## Anexo A — Matriz de roteamento de skills (transcrição)
+
+> O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**
+> (ver a atualização de 03/09/2026 na seção M-002). Esta transcrição existe para que
+> a regra sobreviva à perda da máquina — a lição do item 1.
+
+**Regra:** ativar **uma skill por área tocada pela tarefa — não uma por tarefa**. A
+área é determinada pelos arquivos que a tarefa vai tocar, não pelo assunto da frase
+do usuário.
+
+| Área tocada | Skills obrigatórias | Complementares |
+|---|---|---|
+| `backend/` — Spring Boot 4, Java 25, MongoDB | `java` | `software-architect` (mudança estrutural ou novo ADR) · `security-review` (autenticação, JWT, LGPD, endpoint público) |
+| `frontend/` — Expo 55, React Native, `react-native-web` | `expo-skills` | `lobehub-react` (componente, hook ou estado React) · `run` (confirmar na tela real) |
+| `deploy/`, `.github/workflows/`, `render.yaml` | `software-architect` | `update-config` |
+| `Documentos/` | — | `software-architect` (decisão arquitetural, ADR, De-Para) |
+| `.claude/`, `CLAUDE.md`, hooks, permissões | `update-config` | `fewer-permission-prompts` · `claude-automation-recommender` |
+| Gráfico, painel ou relatório visual | `dataviz` | — |
+| Integração com LLM / API Claude | `claude-api` | — |
+
+**Portões, independentes da área:**
+
+- Antes de abrir qualquer PR: `code-review` sobre o diff.
+- Se o diff toca autenticação, tokens, dados pessoais ou endpoint público: `security-review`.
+
+**Skills que NÃO se aplicam a este repositório:**
+
+- `quarkus` — o backend é **Spring Boot 4**, não Quarkus. Não ativar por semelhança de "backend Java".
+- `awesome-llm-apps-fullstack-developer` — o produto não tem camada de LLM.

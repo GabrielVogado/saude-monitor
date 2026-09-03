@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Building2 } from "lucide-react-native";
 import { colors, radii, shadows, spacing, typography } from "../theme/tokens";
@@ -26,7 +26,7 @@ const CATEGORIA_LABEL = {
  * botão compacto de check-in manual no próprio card (sem abrir o detalhe). O controle
  * fica fora do Pressable que abre o detalhe para evitar duas navegações no mesmo toque.
  */
-export default function CSHospitalCard({
+function CSHospitalCard({
   hospital,
   onPress,
   distanciaKm,
@@ -35,6 +35,13 @@ export default function CSHospitalCard({
   checkinAtivo,
   checkinDesabilitado = false,
 }) {
+  // ARQ-05: o card devolve o proprio `hospital` ao chamador. Antes, a tela precisava
+  // criar `onPress={() => abrirDetalhe(item)}` por item, o que gerava uma prop nova a
+  // cada render e anularia qualquer memoizacao. Compativel com quem ainda passa uma
+  // arrow sem parametro -- o argumento e simplesmente ignorado.
+  const aoTocar = useCallback(() => onPress?.(hospital), [onPress, hospital]);
+  const aoTocarCheckin = useCallback(() => onCheckin?.(hospital), [onCheckin, hospital]);
+
   const indicadores = hospital?.indicadores;
   const temIndicadores =
     indicadores?.notaMedia !== null &&
@@ -52,7 +59,7 @@ export default function CSHospitalCard({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${hospital?.nome}, ${categoriaLabel || tipoLabel}`}
-        onPress={onPress}
+        onPress={aoTocar}
         style={({ pressed }) => [styles.detailsButton, pressed && styles.pressed]}
       >
         <View style={styles.avatar}>
@@ -106,7 +113,7 @@ export default function CSHospitalCard({
               : `Fazer check-in em ${hospital?.nome}`
           }
           disabled={checkinLoading || checkinDesabilitado}
-          onPress={onCheckin}
+          onPress={aoTocarCheckin}
           style={({ pressed }) => [
             styles.checkinButton,
             checkinAtivo && styles.checkinButtonActive,
@@ -228,3 +235,8 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 });
+
+// ARQ-05: memoizado. Listas de hospitais re-renderizavam todos os cards a cada
+// mudanca de estado da tela (busca, filtro, visita ativa). Com o contrato de
+// callback acima estabilizado, o memo passa a acertar.
+export default React.memo(CSHospitalCard);

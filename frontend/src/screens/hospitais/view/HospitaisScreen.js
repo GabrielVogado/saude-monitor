@@ -99,59 +99,85 @@ export default function HospitaisScreen({ navigation }) {
     }, [atualizarVisitaAtiva])
   );
 
-  const abrirDetalhe = (hospital) => {
-    navigation.navigate("HospitalDetalhe", { id: hospital.id });
-  };
-
-  const tratarConflitoGeofence = (conflito) => {
-    setCheckinEnviandoId(null);
-    Alert.alert(
-      "Qual hospital é este?",
-      conflito.message || "Encontramos mais de um hospital nesta localização.",
-      [
-        ...conflito.candidatos.map((candidato) => ({
-          text: candidato.nome,
-          onPress: () => fazerCheckin({ id: candidato.hospitalId, nome: candidato.nome }),
-        })),
-        { text: "Cancelar", style: "cancel" },
-      ]
-    );
-  };
-
-  const fazerCheckin = async (hospital) => {
-    if (visitaAtiva) {
-      if (visitaAtiva.hospitalId === hospital.id) {
-        navigation.navigate("HospitalDetalhe", { id: hospital.id });
-      } else {
-        Alert.alert(
-          "Check-in ativo",
-          "Finalize o check-in atual antes de iniciar uma visita em outro hospital."
-        );
-      }
-      return;
-    }
-
-    setCheckinEnviandoId(hospital.id);
-    setErro(null);
-    try {
-      const resposta = await VisitaService.checkin({
-        hospitalId: hospital.id,
-        origem: "MANUAL",
-      });
-      setVisitaAtiva({ ...resposta, origem: "MANUAL" });
-      // Redireciona ao detalhe do hospital, que exibe o temporizador + checkout
-      // (específico do check-in manual).
-      setCheckinEnviandoId(null);
+  const abrirDetalhe = useCallback(
+    (hospital) => {
       navigation.navigate("HospitalDetalhe", { id: hospital.id });
-    } catch (e) {
-      setCheckinEnviandoId(null);
-      if (e.status === 409 && e.data?.candidatos?.length) {
-        tratarConflitoGeofence(e.data);
+    },
+    [navigation]
+  );
+
+  // ARQ-05: `fazerCheckin` e `tratarConflitoGeofence` se chamavam mutuamente, o que
+  // impediria memoizar as duas (dependência circular entre dois useCallback). A
+  // expressão de função nomeada `checkin` resolve a recursão sem ref auxiliar nem
+  // efeito, e o tratamento do 409 passa a viver no único lugar que o dispara.
+  const fazerCheckin = useCallback(
+    async function checkin(hospital) {
+      if (visitaAtiva) {
+        if (visitaAtiva.hospitalId === hospital.id) {
+          navigation.navigate("HospitalDetalhe", { id: hospital.id });
+        } else {
+          Alert.alert(
+            "Check-in ativo",
+            "Finalize o check-in atual antes de iniciar uma visita em outro hospital."
+          );
+        }
         return;
       }
-      Alert.alert("Check-in", e.message || "Não foi possível fazer o check-in.");
-    }
-  };
+
+      setCheckinEnviandoId(hospital.id);
+      setErro(null);
+      try {
+        const resposta = await VisitaService.checkin({
+          hospitalId: hospital.id,
+          origem: "MANUAL",
+        });
+        setVisitaAtiva({ ...resposta, origem: "MANUAL" });
+        // Redireciona ao detalhe do hospital, que exibe o temporizador + checkout
+        // (específico do check-in manual).
+        setCheckinEnviandoId(null);
+        navigation.navigate("HospitalDetalhe", { id: hospital.id });
+      } catch (e) {
+        setCheckinEnviandoId(null);
+        if (e.status === 409 && e.data?.candidatos?.length) {
+          const conflito = e.data;
+          Alert.alert(
+            "Qual hospital é este?",
+            conflito.message || "Encontramos mais de um hospital nesta localização.",
+            [
+              ...conflito.candidatos.map((candidato) => ({
+                text: candidato.nome,
+                onPress: () => checkin({ id: candidato.hospitalId, nome: candidato.nome }),
+              })),
+              { text: "Cancelar", style: "cancel" },
+            ]
+          );
+          return;
+        }
+        Alert.alert("Check-in", e.message || "Não foi possível fazer o check-in.");
+        }
+    },
+    [navigation, visitaAtiva]
+  );
+
+  // ARQ-05: extraido do JSX e memoizado. Inline, ele criava uma funcao nova a cada
+  // render da tela, e com ela um `onPress`/`onCheckin` novo por item -- o que anularia
+  // o React.memo do CSHospitalCard por identidade de prop.
+  const renderItem = useCallback(
+    ({ item }) => (
+      <CSHospitalCard
+        hospital={item}
+        onPress={abrirDetalhe}
+        onCheckin={fazerCheckin}
+        checkinLoading={checkinEnviandoId === item.id}
+        checkinAtivo={visitaAtiva?.hospitalId === item.id}
+        checkinDesabilitado={
+          (checkinEnviandoId !== null && checkinEnviandoId !== item.id) ||
+          (visitaAtiva !== null && visitaAtiva.hospitalId !== item.id)
+        }
+      />
+    ),
+    [abrirDetalhe, fazerCheckin, checkinEnviandoId, visitaAtiva]
+  );
 
   const renderVazio = () => {
     const temFiltro = busca.trim() || tipo;
@@ -228,19 +254,7 @@ export default function HospitaisScreen({ navigation }) {
         <FlatList
           data={dados}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <CSHospitalCard
-              hospital={item}
-              onPress={() => abrirDetalhe(item)}
-              onCheckin={() => fazerCheckin(item)}
-              checkinLoading={checkinEnviandoId === item.id}
-              checkinAtivo={visitaAtiva?.hospitalId === item.id}
-              checkinDesabilitado={
-                (checkinEnviandoId !== null && checkinEnviandoId !== item.id) ||
-                (visitaAtiva !== null && visitaAtiva.hospitalId !== item.id)
-              }
-            />
-          )}
+          renderItem={renderItem}
           ListEmptyComponent={renderVazio}
           contentContainerStyle={styles.listContent}
           refreshControl={

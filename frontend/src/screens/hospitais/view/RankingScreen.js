@@ -102,6 +102,29 @@ export default function RankingScreen({ navigation }) {
     }
   };
 
+  const abrirDetalhe = useCallback(
+    (hospital) => {
+      navigation.navigate("HospitalDetalhe", { id: hospital.id });
+    },
+    [navigation]
+  );
+
+  // ARQ-05: mesma correção da HospitaisScreen — o renderItem inline recriava a
+  // navegação por item a cada render, anulando o React.memo do CSHospitalCard.
+  const renderItem = useCallback(
+    ({ item, index }) => (
+      <View style={styles.linha}>
+        <View style={styles.posicao}>
+          <Text style={styles.posicaoTexto}>{index + 1}º</Text>
+        </View>
+        <View style={styles.cardWrapper}>
+          <CSHospitalCard hospital={item} onPress={abrirDetalhe} />
+        </View>
+      </View>
+    ),
+    [abrirDetalhe]
+  );
+
   const renderVazio = () => {
     if (erro) {
       return (
@@ -170,19 +193,7 @@ export default function RankingScreen({ navigation }) {
         <FlatList
           data={dados}
           keyExtractor={(item) => item.id}
-          renderItem={({ item, index }) => (
-            <View style={styles.linha}>
-              <View style={styles.posicao}>
-                <Text style={styles.posicaoTexto}>{index + 1}º</Text>
-              </View>
-              <View style={styles.cardWrapper}>
-                <CSHospitalCard
-                  hospital={item}
-                  onPress={() => navigation.navigate("HospitalDetalhe", { id: item.id })}
-                />
-              </View>
-            </View>
-          )}
+          renderItem={renderItem}
           ListEmptyComponent={renderVazio}
           ListFooterComponent={
             carregandoMais ? (

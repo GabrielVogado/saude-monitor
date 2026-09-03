@@ -125,7 +125,7 @@ S0 (Segurança)
 
 ### 2.6 Definition of Done (DoD) do sprint
 
-- [x] Código revisado e mergeado na `main`.
+- [x] Código revisado e mergeado na branch de integração (`develop`; a promoção para produção é `develop → master` — ver P-004).
 - [x] Testes unitários de auth e erro com cobertura ≥ 70%.
 - [x] Testes de integração para fluxo de login/logout/refresh/exclusão.
 - [x] Documentação de setup de segurança no `README.md`.

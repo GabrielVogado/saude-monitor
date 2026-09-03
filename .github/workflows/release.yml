@@ -10,7 +10,7 @@ on:
 
 jobs:
   branch:
-    name: Criar branch release/${{ inputs.version }} a partir da main
+    name: Criar branch release/${{ inputs.version }} a partir da master
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -18,13 +18,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: master
           fetch-depth: 0
 
-      - name: Validar que está na main
+      - name: Validar que está na master
         run: |
-          if [[ "$(git rev-parse --abbrev-ref HEAD)" != "main" ]]; then
-            echo "A release só pode ser gerada a partir da main."
+          if [[ "$(git rev-parse --abbrev-ref HEAD)" != "master" ]]; then
+            echo "A release só pode ser gerada a partir da master."
             exit 1
           fi
 

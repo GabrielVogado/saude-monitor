@@ -94,6 +94,9 @@ Documentos/
 │   ├── relatorio_auditoria_tecnica.md        ← 11 problemas de arquitetura frontend (v3.1)
 │   └── adrs.md                               ← ADR-001..010, todos em status Proposto (v3.1)
 │
+├── 09-melhoria-continua/                     ← melhorias de processo e de comportamento do agente
+│   └── Historico-Melhorias.md                ← o que entrou, quando, por qual PR e com que efeito
+│
 ├── De-Para-Backlog-Features.md               ← status estória × feature (fonte de verdade de status)
 │
 └── _historico/                               ← documentos das fases anteriores (preservados, não editar)

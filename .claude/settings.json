@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/roteamento-skills.js\"",
+            "timeout": 10,
+            "statusMessage": "Carregando matriz de roteamento de skills"
+          }
+        ]
+      }
+    ]
+  }
+}

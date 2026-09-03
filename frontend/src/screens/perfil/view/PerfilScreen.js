@@ -13,7 +13,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Bell, LogIn, MapPin, History, ShieldCheck, Trash2, UserPlus } from "lucide-react-native";
 import PerfilService from "../service/PerfilService";
 import LoginService from "../../auth/service/LoginService";
-import CSLoading, { CSLoadingList } from "../../../components/CSLoading";
+import { CSLoadingList } from "../../../components/CSLoading";
 import CSEmptyState from "../../../components/CSEmptyState";
 import { colors } from "../../../theme";
 import styles from "./css/PerfilStyle";

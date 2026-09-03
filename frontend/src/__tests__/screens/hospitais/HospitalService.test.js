@@ -2,12 +2,12 @@
  * Cliente de Hospitais (Épico 01) — listagem pública, sugestão, auth e retry 401.
  * Contrato §3.2: GET /api/v1/hospitais (público F-03), POST /api/v1/hospitais/sugestoes (E1-05 P2).
  */
-process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
-
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../../screens/auth/service/LoginService";
 import { reiniciarControleDeRenovacao } from "../../../config/sessao";
+
+process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
 
 jest.mock("../../../screens/auth/service/LoginService");
 

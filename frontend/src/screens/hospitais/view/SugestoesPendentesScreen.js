@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -9,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { CheckCircle, Clock, MapPinOff, XCircle } from "lucide-react-native";
+import { CheckCircle, Clock, MapPin, MapPinOff, XCircle } from "lucide-react-native";
 import { CSHeader, CSEmptyState, CSLoadingList, CSBadge } from "../../../components";
 import { colors, spacing, typography } from "../../../theme/tokens";
 import HospitalService from "../service/HospitalService";

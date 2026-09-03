@@ -3,10 +3,10 @@
  * Contrato §3.4: POST /api/v1/feedbacks (🔓 anônimo), GET /api/v1/visitas/{id}/feedback
  * e PUT /api/v1/feedbacks/{id}; dedupe único por visita (RN-12).
  */
-process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
-
 import FeedbackService from "../../../screens/feedback/service/FeedbackService";
 import TokenStorage from "../../../services/TokenStorage";
+
+process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, text: async () => JSON.stringify(body), json: async () => body };

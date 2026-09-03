@@ -63,10 +63,11 @@ frontend/*.tsbuildinfo
 google-services.json
 GoogleService-Info.plist
 
-# Epico 01 - dados e scripts de ETL ja executados (nao versionar)
+# Epico 01 - scripts de ETL ja executados (nao versionar)
 etl/
-multiplas_camadas_saude_14/
-multiplas_camadas_saude_14_csv/
+# Os dados geoespaciais de origem (multiplas_camadas_saude_14/ e _csv/) voltaram ao
+# versionamento em 03/09/2026 por decisao do PO -- "deve subir por enquanto", ate a
+# troca da estrategia de carga para backup de banco.
 __pycache__/
 *.pyc
 
@@ -96,7 +97,6 @@ CLAUDE.md
 .gradle/
 frontend/android/.gradle/
 frontend/android/app/build/
-frontend/android/app/src/main/jni/
 
 # Logs e artefatos avulsos de sessao
 logs/
@@ -104,6 +104,5 @@ run_logs.txt
 screenshot_emulator.png
 pr_body_retrofit.txt
 
-# Dados geoespaciais brutos (fonte do seed; ficam fora do repositorio por volume)
-multiplas_camadas_saude_14/
-multiplas_camadas_saude_14_csv/
+# Travas temporarias do LibreOffice sobre os .dbf geoespaciais
+.~lock.*#

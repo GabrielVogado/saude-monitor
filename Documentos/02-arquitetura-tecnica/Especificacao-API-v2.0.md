@@ -345,7 +345,8 @@ Registra entrada (automática via geofence ou manual).
   "hospitalId": "652c9f3e1a2b3c4d5e6f7080",
   "origem": "GEOFENCE",
   "posicao": { "type": "Point", "coordinates": [-46.627, -23.555] },
-  "dispositivoId": "android-uuid-123" 
+  "dispositivoId": "android-uuid-123",
+  "ocorridoEm": "2026-08-07T14:03:00Z"
 }
 ```
 **201 Created**
@@ -359,8 +360,10 @@ Registra entrada (automática via geofence ou manual).
 ```
 **Regras:** valida se ponto está dentro do geofence (`$geoIntersects`) quando `origem=GEOFENCE`; se já existe visita `EM_ATENDIMENTO` no mesmo hospital, retorna a existente (idempotente); `dispositivoId` permite visita anônima (sem login).
 
+> **`ocorridoEm` (opcional, OPS-05 — 03/09/2026):** momento real da entrada, enviado quando o check-in foi detectado **sem internet** e ficou na fila offline do aplicativo. Sem ele, o evento reenviado registraria a hora em que a conexão voltou, e o tempo de permanência passaria a medir a rede do aparelho em vez da fila do hospital. O campo é opcional e **não é confiável** (o endpoint é público, OPS-03): o servidor só o aceita no passado recente — dentro da janela de 24h da RN-04, nunca no futuro além de 5 min de tolerância de relógio. Fora disso vale o relógio do servidor.
+
 #### `POST /api/v1/visitas/{id}/checkout` 🔒
-Registra saída. **Request:** `{ "posicao": {...} }` → **200**
+Registra saída. **Request:** `{ "posicao": {...}, "gpsIndisponivel": false, "encerramentoManual": false, "ocorridoEm": "2026-08-07T16:45:00Z" }` → **200**
 ```json
 {
   "id": "652c9f3e1a2b3c4d5e6f7082",
@@ -369,6 +372,7 @@ Registra saída. **Request:** `{ "posicao": {...} }` → **200**
   "status": "FINALIZADA"
 }
 ```
+> **`ocorridoEm` (opcional, OPS-05):** mesmas regras do check-in, com uma restrição a mais — a saída nunca é anterior à entrada. Um relógio atrasado no aparelho produziria duração negativa, que envenenaria a mediana de permanência (RN-15); nesse caso o servidor usa a própria entrada.
 
 #### `POST /api/v1/visitas/{id}/heartbeat` 🔒
 Sinal de vida da visita (RN-23). O app envia a cada **30 minutos** enquanto a visita está ativa (também serve de fallback quando o app está em primeiro plano). Atualiza `ultimoHeartbeat`; se a visita estava `SUSPEITA` (2h sem heartbeat), retorna ao status `EM_ATENDIMENTO`. **200** `{ "status": "EM_ATENDIMENTO", "ultimoHeartbeat": "2026-08-07T16:30:00Z" }`

@@ -4,7 +4,7 @@ import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { buildApiUrl } from "../../../config/api";
 
-import { fetchComTimeout } from "../../../config/http";
+import { fetchComRetry, fetchComTimeout } from "../../../config/http";
 import { geracaoDaSessao, renovarSessao } from "../../../config/sessao";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../auth/service/LoginService";
@@ -29,7 +29,7 @@ const VERSAO_TERMOS = "1.0";
 async function request(path, { method = "GET", body } = {}) {
   const doFetch = async () => {
     const token = await TokenStorage.getAccessToken();
-    return fetchComTimeout(buildApiUrl(path), {
+    return fetchComRetry(buildApiUrl(path), {
       method,
       headers: {
         "Content-Type": "application/json",
@@ -113,6 +113,10 @@ async function baixarComToken(nomeArquivo, token) {
 
 /** Fallback web: baixa o PDF como blob e delega o salvamento ao navegador. */
 async function baixarNoNavegador(nomeArquivo, token) {
+  // Sem retry de propósito (OPS-05): o teto desta chamada já é de 60 s, e uma
+  // repetição por timeout dobraria a espera de quem está com a tela aberta
+  // olhando. A tela oferece o botão de tentar de novo — aqui quem decide é o
+  // usuário, não o cliente HTTP.
   const resposta = await fetchComTimeout(
     buildApiUrl(EXPORT_PDF_PATH),
     { headers: { Authorization: `Bearer ${token}` } },

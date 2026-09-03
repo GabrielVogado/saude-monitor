@@ -59,7 +59,8 @@ jest.mock("react-native-safe-area-context", () => {
   };
 });
 
-// react-native-gesture-handler: módulo nativo (install/handlers) via @react-navigation/stack;
+// react-native-gesture-handler: módulo nativo (install/handlers) exigido por
+// react-native-screens e pelo bottom-tabs; o stack JS saiu no ARQ-04;
 // mock simples para renderizar no Jest.
 jest.mock("react-native-gesture-handler", () => {
   const React = require("react");

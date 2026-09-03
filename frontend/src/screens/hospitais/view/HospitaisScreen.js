@@ -99,6 +99,16 @@ export default function HospitaisScreen({ navigation }) {
     }, [atualizarVisitaAtiva])
   );
 
+  // ARQ-05 / code-review de 03/09/2026: a expressão de função nomeada `checkin` abaixo
+  // congela o closure. Se a visita ativa chegar (buscarAtiva resolvendo) DEPOIS que o
+  // alerta de conflito 409 apareceu, o toque no candidato reentraria com
+  // `visitaAtiva === null` e furaria o guard de "check-in ativo", abrindo uma segunda
+  // visita. O ref carrega o valor corrente para dentro da recursão.
+  const visitaAtivaRef = useRef(visitaAtiva);
+  useEffect(() => {
+    visitaAtivaRef.current = visitaAtiva;
+  }, [visitaAtiva]);
+
   const abrirDetalhe = useCallback(
     (hospital) => {
       navigation.navigate("HospitalDetalhe", { id: hospital.id });
@@ -112,8 +122,9 @@ export default function HospitaisScreen({ navigation }) {
   // efeito, e o tratamento do 409 passa a viver no único lugar que o dispara.
   const fazerCheckin = useCallback(
     async function checkin(hospital) {
-      if (visitaAtiva) {
-        if (visitaAtiva.hospitalId === hospital.id) {
+      const ativa = visitaAtivaRef.current;
+      if (ativa) {
+        if (ativa.hospitalId === hospital.id) {
           navigation.navigate("HospitalDetalhe", { id: hospital.id });
         } else {
           Alert.alert(
@@ -154,9 +165,13 @@ export default function HospitaisScreen({ navigation }) {
           return;
         }
         Alert.alert("Check-in", e.message || "Não foi possível fazer o check-in.");
-        }
+      }
     },
-    [navigation, visitaAtiva]
+    // `visitaAtiva` sai da lista de propósito: o guard passou a ler o ref, então a
+    // função não precisa mais ser recriada a cada mudança de visita -- fica estável
+    // para o renderItem memoizado abaixo. O exhaustive-deps confirma que é dependência
+    // desnecessária.
+    [navigation]
   );
 
   // ARQ-05: extraido do JSX e memoizado. Inline, ele criava uma funcao nova a cada
@@ -179,7 +194,11 @@ export default function HospitaisScreen({ navigation }) {
     [abrirDetalhe, fazerCheckin, checkinEnviandoId, visitaAtiva]
   );
 
-  const renderVazio = () => {
+  // ARQ-05 / achado do code-review: o ListEmptyComponent e renderizado como
+  // <ListEmptyComponent /> pelo VirtualizedList, entao identidade nova = TIPO novo de
+  // elemento, e o React desmonta e remonta a subarvore inteira. Sem isto, cada tecla
+  // digitada numa busca sem resultado reconstruia o estado vazio do zero.
+  const renderVazio = useCallback(() => {
     const temFiltro = busca.trim() || tipo;
 
     if (erro) {
@@ -213,7 +232,7 @@ export default function HospitaisScreen({ navigation }) {
         onAction={() => navigation.navigate("SugerirHospital")}
       />
     );
-  };
+  }, [busca, tipo, erro, carregar, navigation]);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>

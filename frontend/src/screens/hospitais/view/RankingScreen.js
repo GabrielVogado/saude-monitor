@@ -125,7 +125,8 @@ export default function RankingScreen({ navigation }) {
     [abrirDetalhe]
   );
 
-  const renderVazio = () => {
+  // Mesma correcao do ListEmptyComponent aplicada na HospitaisScreen.
+  const renderVazio = useCallback(() => {
     if (erro) {
       return (
         <CSEmptyState
@@ -145,7 +146,7 @@ export default function RankingScreen({ navigation }) {
         message="Assim que os hospitais tiverem avaliações suficientes, eles aparecem aqui."
       />
     );
-  };
+  }, [erro, carregar]);
 
   const legenda =
     ordem === "NOTA"

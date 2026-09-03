@@ -23,9 +23,14 @@ import {colors, typography, spacing} from "../../../theme";
 const LinhaHospital = React.memo(function LinhaHospital({
   hospital,
   onCheckin,
-  carregando,
-  desabilitado,
+  enviandoId,
 }) {
+  // Achado do code-review: receber `desabilitado={enviandoId !== null}` fazia a prop
+  // virar em TODAS as linhas assim que qualquer check-in comecava -- o memo errava a
+  // lista inteira exatamente durante a interacao que ele existe para baratear.
+  // Recebendo o `enviandoId` cru, so a linha em envio muda de props.
+  const carregando = enviandoId === hospital.id;
+  const desabilitado = enviandoId !== null;
   return (
     <CSCard style={styles.card}>
       <Text style={styles.hospitalNome}>{hospital.nome}</Text>
@@ -129,12 +134,7 @@ export default function CheckinManualScreen({ navigation }) {
 
   const renderItem = useCallback(
     ({ item }) => (
-      <LinhaHospital
-        hospital={item}
-        onCheckin={fazerCheckin}
-        carregando={enviandoId === item.id}
-        desabilitado={enviandoId !== null}
-      />
+      <LinhaHospital hospital={item} onCheckin={fazerCheckin} enviandoId={enviandoId} />
     ),
     [fazerCheckin, enviandoId]
   );

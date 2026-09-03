@@ -20,8 +20,10 @@ module.exports = {
   ],
   clearMocks: true,
 
-  // Cobertura (DOD-01 / E8-08). Mede o código de produção: testes, estilos e o
-  // ponto de entrada do Expo não dizem nada sobre a qualidade da suíte.
+  // Cobertura (DOD-01 / E8-08). Mede o código de produção: testes e estilos não
+  // dizem nada sobre a qualidade da suíte. O ponto de entrada do Expo que continua
+  // fora é o `index.js` (9 linhas, só `registerRootComponent`) — o `App.js` NÃO é
+  // ponto de entrada nesse sentido, e por isso entra; ver o comentário abaixo.
   collectCoverageFrom: [
     "src/**/*.js",
     // App.js entra porque a exclusao inflava a linha de base: sao 191 linhas com a

@@ -80,3 +80,30 @@ deploy/oracle/.env
 coverage/
 frontend/coverage/
 backend/build/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Limpeza de 03/09/2026 — o que nao e relevante para o desenvolvimento do sistema
+# nao sobe para o repositorio (decisao do PO)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Configuracao de agentes de IA (por maquina, nao afeta build/imagem/bundle)
+.claude/
+CLAUDE.md
+.opencode/
+.spec/
+
+# Cache e saida de build
+.gradle/
+frontend/android/.gradle/
+frontend/android/app/build/
+frontend/android/app/src/main/jni/
+
+# Logs e artefatos avulsos de sessao
+logs/
+run_logs.txt
+screenshot_emulator.png
+pr_body_retrofit.txt
+
+# Dados geoespaciais brutos (fonte do seed; ficam fora do repositorio por volume)
+multiplas_camadas_saude_14/
+multiplas_camadas_saude_14_csv/

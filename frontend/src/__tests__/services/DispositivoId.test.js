@@ -2,10 +2,10 @@
  * Identificação anônima de dispositivo (modo sem login — §3.3).
  * Garante que o id é gerado uma única vez e reutilizado entre chamadas.
  */
-process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
-
 import DispositivoId from "../../services/DispositivoId";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
 
 describe("DispositivoId (modo anônimo)", () => {
   beforeEach(async () => {

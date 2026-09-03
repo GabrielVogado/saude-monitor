@@ -153,9 +153,20 @@ export async function feedbackAvaliavel() {
   return true;
 }
 
-/** Conclui o fluxo: remove a pendência e cancela pedido/lembrete pendentes. */
+/**
+ * Conclui o fluxo: remove a pendência e cancela pedido/lembrete pendentes.
+ *
+ * O `visitaId` era recebido e ignorado (achado do lint, E8-13): responder o
+ * feedback de uma visita apagava a pendência guardada, fosse ela de qual visita
+ * fosse. Na prática só existe uma pendência por vez, mas quando as duas se
+ * conhecem e discordam, o certo é não mexer — cancelar a notificação de outra
+ * visita faria o usuário nunca ser lembrado dela.
+ */
 export async function concluirFeedback(visitaId) {
   const pendencia = await pendenciaAtual();
+  if (pendencia && visitaId && pendencia.visitaId && pendencia.visitaId !== visitaId) {
+    return;
+  }
   if (pendencia) {
     await Promise.all(
       [pendencia.pedidoId, pendencia.lembreteId]

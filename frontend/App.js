@@ -3,7 +3,6 @@ import {createStackNavigator} from "@react-navigation/stack";
 import {createBottomTabNavigator} from "@react-navigation/bottom-tabs";
 import {NavigationContainer} from "@react-navigation/native";
 import {SafeAreaProvider} from "react-native-safe-area-context";
-import {Text} from "react-native";
 import * as Notifications from "expo-notifications";
 import {Building2, Home as HomeIcon, Map as MapIcon, User as UserIcon} from "lucide-react-native";
 import HomeScreen from "./src/screens/home/view/HomeScreen.js";
@@ -21,7 +20,7 @@ import PerfilScreen from "./src/screens/perfil/view/PerfilScreen.js";
 import HistoricoScreen from "./src/screens/perfil/view/HistoricoScreen.js";
 import PrivacidadeScreen from "./src/screens/perfil/view/PrivacidadeScreen.js";
 import NotificacoesScreen from "./src/screens/perfil/view/NotificacoesScreen.js";
-import {colors, spacing} from "./src/theme";
+import {colors} from "./src/theme";
 import { agendarLembrete, pendenciaAtual } from "./src/screens/feedback/service/FeedbackNotificationService";
 
 const Stack = createStackNavigator();

@@ -13,7 +13,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | Aplicativo (Fase 0 + Épicos 1–6) | 42 | 43 | **98%** |
 | Painel Administrativo Web (Épico 7) | 0 | 9 | 0% (adiado) |
 | **Total do backlog** | **42** | **52** | **81%** |
-| Épico 8 — Estabilização e Desempenho (novo, v2.1) | 3 | 15 | 20% |
+| Épico 8 — Estabilização e Desempenho (novo, v2.1) | 4 | 15 | 27% |
 
 > ⚠️ **Entregue ≠ utilizável.** As 42 estórias abaixo estão implementadas e cobertas por teste em CI, mas o sistema **não passou por validação em campo** e apresenta lentidão transversal de origem confirmada na infraestrutura (109 s na primeira abertura, 1–5 s por requisição com o serviço quente). Ver `Features-MVP-v2.1.md` §2.1 e o **Épico 8** do `Backlog-MVP-v2.1.md`.
 
@@ -116,7 +116,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **E8-02** | Cumprir o orçamento de latência do RNF-02 | Cross | 🔴 Pendente — **P0**, medido em 1,9–4,9 s (orçamento: 300 ms p95) |
 | **E8-03** | Enxugar o payload da listagem de hospitais | **F-01**, **F-07** | ✅ Entregue (02/09/2026) — o `geofence` era 73,6% do corpo (27.849 de 37.838 B). Substituído por `localizacao` + `raioMetros`; cliente reconstrói o círculo. Estimado 35,7 KB → ~11 KB (−70%), **medição pós-deploy pendente** |
 | **E8-04** | Estados de carregamento/erro com timeout explícito | **F-08** | ✅ Entregue (02/09/2026) — `frontend/src/config/http.js` impõe timeout de 20 s nas 7 chamadas de rede do app (60 s na exportação LGPD, que gera PDF no servidor) e classifica a falha em **sem internet** (estado de rede lido via `expo-network`), **servidor indisponível** e **servidor demorou a responder**. 14 testes em `__tests__/config/http.test.js`; suíte do frontend em 186 testes |
-| **E8-05** | Inventário dos bugs observados em uso | Cross | 🔴 Pendente — **P0**, depende de insumo do Product Owner |
+| **E8-05** | Inventário dos bugs observados em uso | Cross | 🔴 Pendente — **P0**, depende de insumo do Product Owner. O inventário já tem 2 entradas achadas por ferramenta (E8-13), ambas corrigidas: **BUG-01** `SugestoesPendentesScreen` — `MapPin` não importado, `ReferenceError` ao desenhar qualquer item da fila de moderação (E1-06), severidade alta, tela inutilizável; **BUG-02** `concluirFeedback(visitaId)` — parâmetro ignorado, responder um feedback apagava a pendência de outra visita, severidade média. Falta o que só o PO tem: os defeitos vistos em uso real, com passo de reprodução, evidência e severidade |
 | **E8-06** | Métricas de latência e erro por endpoint | Cross | 🔴 Pendente |
 | **E8-07** | Crash reporting no app | Cross | 🔴 Pendente |
 | **E8-08** | Medição de cobertura de testes (DoD ≥ 70%) | Cross | 🟡 Parcial (02/09/2026) — cobertura medida e com piso na esteira: JaCoCo no backend (**67,49%** de instruções, **51,78%** de *branches*, piso 65%/50%) e `coverageThreshold` no Jest (**71,83%** de *statements*, **61,35%** de *branches*, piso 70%/58%). Relatórios publicados como artefato do CI. Falta subir os pisos até o DoD de 70% nas regras de negócio |
@@ -124,7 +124,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **E8-10** | Testes de integração com contexto Spring | Cross | 🔴 Pendente |
 | **E8-11** | Analytics de produto (funil, retenção) | Cross | 🔴 Pendente |
 | **E8-12** | CI rodando `npm test` no frontend | Cross | ✅ Entregue — step `Testes (Jest)` no job de frontend do `ci.yml` (`npm test -- --ci --maxWorkers=2`), **171 testes** em ~20 s. `develop` passou a ter proteção de branch com os checks `Backend (Spring Boot)` e `Frontend (Expo Web)` **obrigatórios**, sem revisão obrigatória e com bypass de administrador permitido |
-| **E8-13** | Lint no frontend (o `typecheck` atual não verifica nada) | Cross | 🔴 Pendente |
+| **E8-13** | Lint no frontend (o `typecheck` atual não verifica nada) | Cross | ✅ Entregue (02/09/2026) — ESLint 9 + `eslint-config-expo` com `eslint.config.js` comentado regra a regra; `npm run lint` roda no `ci.yml` depois do typecheck e reprova o PR por erro **ou** por aviso acima do piso congelado (18), mesma lógica do piso de cobertura. **Encontrou defeito de produção na primeira execução:** `SugestoesPendentesScreen` importava `MapPinOff` e renderizava `<MapPin />` — `ReferenceError` ao desenhar qualquer item da fila de moderação (E1-06). A tela era uma das 7 sem teste (ENG-05); ganhou 4 testes, sendo o primeiro a regressão do defeito. Segundo achado: `concluirFeedback(visitaId)` recebia o id e o ignorava, apagando a pendência guardada fosse ela de qual visita fosse. Também foram removidos 8 imports mortos. Sobram 18 avisos das regras da geração React Compiler (`refs`, `set-state-in-effect`, `purity`), catalogados como dívida ARQ-03 |
 | **E8-14** | Encerrar divergências de contrato (`password`/`senha`, `users`/`usuarios`) | **F-02** | 🔴 Pendente — abertas desde 20/08/2026 |
 | **E8-15** | Retenção de dados (LGPD art. 16) e teste de restauração de backup | **F-09** | 🔴 Pendente |
 

@@ -3,9 +3,9 @@
  * Contrato §3.1: POST /api/v1/auth/registro com consentimento LGPD obrigatório
  * (termos de uso com versão vigente; backend rejeita com 400 sem aceite).
  */
-process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
-
 import UserService from "../../../screens/user/service/UserService";
+
+process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
 
 function jsonResponse(body, status = 201) {
   return { ok: status < 400, status, text: async () => JSON.stringify(body), json: async () => body };

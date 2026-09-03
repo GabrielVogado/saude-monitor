@@ -4,10 +4,10 @@ import {SafeAreaView} from "react-native-safe-area-context";
 import HospitalService from "../../hospitais/service/HospitalService";
 import VisitaService from "../service/VisitaService";
 import CSButton from "../../../components/CSButton";
-import CSLoading from "../../../components/CSLoading";
+import { CSLoading } from "../../../components/CSLoading";
 import CSCard from "../../../components/CSCard";
 import CSEmptyState from "../../../components/CSEmptyState";
-import {colors, typography, spacing, radii} from "../../../theme";
+import {colors, typography, spacing} from "../../../theme";
 
 /**
  * Check-in manual (E2-06): fallback quando o GPS está desligado ou a permissão de

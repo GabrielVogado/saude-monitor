@@ -66,6 +66,12 @@ async function confirmarEntrada(hospitalId, posicao) {
       visitaAtivaHospitalId = hospitalId;
     }
   } catch (erro) {
+    // Aparelho sem internet: o check-in foi para a fila offline (OPS-05) e sai
+    // quando a conexão voltar, com o horário real da entrada. Não é falha.
+    if (erro?.enfileirado) {
+      return;
+    }
+
     // Conflito de geofences sobrepostos (HTTP 409, E2-04): a tarefa de background não
     // tem UI para perguntar "qual hospital é este?" — o usuário resolve manualmente ao
     // abrir o app (card de visita ativa ausente + `CheckinManualScreen`, que já trata o
@@ -84,8 +90,7 @@ async function confirmarSaida(_hospitalId) {
     return;
   }
 
-  try {
-    await VisitaService.checkout(visitaAtivaId, {});
+  const encerrarLocalmente = () => {
     // Épico 03 — E3-01: pede o feedback ~1–5 min após a saída automática por geofence.
     agendarFeedback({
       visitaId: visitaAtivaId,
@@ -95,7 +100,20 @@ async function confirmarSaida(_hospitalId) {
     });
     visitaAtivaId = null;
     visitaAtivaHospitalId = null;
+  };
+
+  try {
+    await VisitaService.checkout(visitaAtivaId, {});
+    encerrarLocalmente();
   } catch (erro) {
+    // Sem internet, o checkout ficou na fila offline (OPS-05) com o horário real
+    // da saída: a entrega está garantida, então o app pode encerrar a visita
+    // localmente. Insistir aqui só reenfileiraria o mesmo evento.
+    if (erro?.enfileirado) {
+      encerrarLocalmente();
+      return;
+    }
+
     // eslint-disable-next-line no-console
     console.warn("GeofencingTaskService: falha ao confirmar saída", erro?.message);
   }

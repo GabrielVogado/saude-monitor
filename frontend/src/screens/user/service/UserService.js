@@ -1,6 +1,6 @@
 import {buildApiUrl} from "../../../config/api";
 
-import { classificarErroDeRede, fetchComTimeout } from "../../../config/http";
+import { classificarErroDeRede, fetchComRetry } from "../../../config/http";
 
 class UserService {
 	/**
@@ -24,7 +24,7 @@ class UserService {
 		let response;
 
 		try {
-			response = await fetchComTimeout(cadastroUrl, {
+			response = await fetchComRetry(cadastroUrl, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",

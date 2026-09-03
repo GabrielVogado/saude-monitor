@@ -2,9 +2,12 @@
  * Ciclo de vida de visitas (Épico 02) — VisitaService.
  * Contrato §3.3: checkin/checkout/heartbeat e busca de ativa/histórico.
  */
+import * as Network from "expo-network";
+
 import VisitaService from "../../../screens/visitas/service/VisitaService";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../../screens/auth/service/LoginService";
+import { itensDaFila, limparFila } from "../../../config/filaOffline";
 
 process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
 
@@ -116,6 +119,100 @@ describe("VisitaService (Épico 02)", () => {
     expect(LoginService.refresh).toHaveBeenCalledTimes(1);
     expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(resp.id).toBe("v1");
+  });
+
+  /**
+   * OPS-05 — o caminho que a lacuna OPS-01 descreve: o check-in do geofencing
+   * dispara em segundo plano, sem tela e sem usuário. Se ele falha por falta de
+   * internet e ninguém guarda o evento, a visita se perde em silêncio.
+   */
+  describe("fila offline (OPS-05)", () => {
+    const semInternet = () => {
+      Network.getNetworkStateAsync.mockResolvedValue({
+        isConnected: false,
+        isInternetReachable: false,
+      });
+      global.fetch = jest.fn().mockRejectedValue(new TypeError("Network request failed"));
+    };
+
+    beforeEach(async () => {
+      await limparFila();
+    });
+
+    afterEach(() => {
+      Network.getNetworkStateAsync.mockResolvedValue({
+        isConnected: true,
+        isInternetReachable: true,
+      });
+    });
+
+    test("check-in sem internet vai para a fila em vez de se perder", async () => {
+      semInternet();
+
+      await expect(
+        VisitaService.checkin({ hospitalId: "h1", origem: "GEOFENCE" })
+      ).rejects.toMatchObject({ enfileirado: true });
+
+      const [item] = await itensDaFila();
+      expect(item).toMatchObject({ chave: "checkin:h1", tipo: "checkin" });
+      expect(item.corpo.hospitalId).toBe("h1");
+      expect(item.ocorridoEm).toEqual(expect.any(String));
+    });
+
+    test("checkout sem internet guarda a visita e o momento da saída", async () => {
+      semInternet();
+
+      await expect(VisitaService.checkout("v1", {})).rejects.toMatchObject({
+        enfileirado: true,
+      });
+
+      const [item] = await itensDaFila();
+      expect(item).toMatchObject({ chave: "checkout:v1", tipo: "checkout" });
+      expect(item.corpo.visitaId).toBe("v1");
+    });
+
+    test("a mensagem promete o que a fila cumpre, em vez de anunciar falha", async () => {
+      semInternet();
+
+      await expect(
+        VisitaService.checkin({ hospitalId: "h1", origem: "GEOFENCE" })
+      ).rejects.toThrow(/será enviado assim que a conexão voltar/);
+    });
+
+    test("falha de servidor não enfileira: aí existe o que repetir agora", async () => {
+      global.fetch = jest.fn().mockRejectedValue(new TypeError("Network request failed"));
+
+      await expect(
+        VisitaService.checkin({ hospitalId: "h1", origem: "GEOFENCE" })
+      ).rejects.not.toMatchObject({ enfileirado: true });
+
+      expect(await itensDaFila()).toHaveLength(0);
+    });
+
+    test("o reenvio leva o `ocorridoEm`, para a visita não registrar a hora da reconexão", async () => {
+      const ocorridoEm = "2026-09-03T10:15:00.000Z";
+
+      await VisitaService.enviarEventoOffline({
+        tipo: "checkin",
+        corpo: { hospitalId: "h1", origem: "GEOFENCE" },
+        ocorridoEm,
+      });
+
+      expect(JSON.parse(chamadas[0].body).ocorridoEm).toBe(ocorridoEm);
+    });
+
+    test("o reenvio do checkout endereça a visita guardada", async () => {
+      await VisitaService.enviarEventoOffline({
+        tipo: "checkout",
+        corpo: { visitaId: "v9", gpsIndisponivel: true },
+        ocorridoEm: "2026-09-03T10:15:00.000Z",
+      });
+
+      expect(chamadas[0].url).toContain("/api/v1/visitas/v9/checkout");
+      const corpo = JSON.parse(chamadas[0].body);
+      expect(corpo.visitaId).toBeUndefined();
+      expect(corpo.gpsIndisponivel).toBe(true);
+    });
   });
 
   test("erro de conflito 409 preserva status/corpo (dedupe geofence, E2-04)", async () => {

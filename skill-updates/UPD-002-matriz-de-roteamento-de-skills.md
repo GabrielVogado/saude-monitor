@@ -60,6 +60,12 @@ Decisões de implementação:
 > foi criado agora, o hook passa a valer a partir da **próxima sessão** (ou depois
 > de abrir `/hooks` uma vez).
 
+- `code-review` (média) rodado sobre o diff completo desta proposta — o próprio
+  portão que ela institui. Achado no escopo: o `$schema` do `settings.json` apontava
+  para o meta-schema do JSON Schema em vez do schema do Claude Code
+  (`https://json.schemastore.org/claude-code-settings.json`), o que deixaria erros de
+  digitação em `hooks`/`SessionStart` passarem sem validação no editor. Corrigido.
+
 ## Custo e risco
 
 - **Custo:** ~40 linhas injetadas por sessão, uma vez.

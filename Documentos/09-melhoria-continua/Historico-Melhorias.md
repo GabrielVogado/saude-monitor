@@ -64,6 +64,18 @@ regra vivia só em documento, sem nenhum ponto do fluxo em que fosse cobrada.
 
 - *Pipe-test* do hook (`echo '{}' | node ...`): JSON válido, exit 0.
 - `settings.json`: comando alcançável em `hooks.SessionStart[].hooks[].command`.
+- `code-review` (severidade média) rodado sobre o próprio diff deste PR — o portão
+  que a melhoria institui, aplicado a ela mesma. **1 achado no escopo**, corrigido no
+  commit seguinte: o `$schema` do `settings.json` apontava para o *meta-schema* do
+  JSON Schema (`json-schema.org/draft/2020-12/schema`) em vez do schema do Claude
+  Code (`json.schemastore.org/claude-code-settings.json`) — o editor validaria o
+  arquivo como se fosse um documento de schema, e erros de digitação em
+  `hooks`/`SessionStart` (justamente o que o arquivo existe para declarar) passariam
+  sem validação.
+- O mesmo `code-review` levantou **3 achados fora do escopo deste PR**, no portão de
+  cobertura que já entrou por #60 (`jest.setup-after-env.js`, `jest.config.js`,
+  `PerfilScreen.test.js`). Não foram corrigidos aqui para não misturar tarefas —
+  ver a seção **Pendências abertas** no fim deste documento.
 
 ### Pendência que depende do PO
 
@@ -88,3 +100,13 @@ branch local, sem PR e sem nunca terem sido enviados ao `origin`.
 > **#62 é empilhado sobre #61.** Os dois commits viviam na mesma branch local;
 > foram separados para respeitar "um PR por tarefa". Após o merge de #61 o GitHub
 > reaponta #62 para `develop` automaticamente.
+
+---
+
+## Pendências abertas
+
+| # | O que | Origem | Estado |
+|---|---|---|---|
+| **P-001** | Reconstituir o **item 1** do Observer (`OBS-001` / `M-001`) — o conteúdo nunca foi persistido porque as pastas do ciclo não existiam. Depende do PO informar qual era a observação. | PO | 🔴 Aguardando PO |
+| **P-002** | O hook `SessionStart` só passa a valer **a partir da próxima sessão** (ou depois de abrir `/hooks` uma vez): o watcher de configuração só observa diretórios que já tinham arquivo de settings no início da sessão. | UPD-002 | 🟡 Ação do PO |
+| **P-003** | 3 achados do `code-review` no portão de cobertura entregue por #60, fora do escopo de #63: (a) `frontend/jest.setup-after-env.js` — `asyncUtilTimeout: 5000` igual ao `testTimeout` padrão, então a folga nunca é usada e o erro vira "Exceeded timeout" opaco; (b) `frontend/jest.config.js` — `collectCoverageFrom` omite `App.js` (191 linhas, listeners de notificação), inflando a linha de base; (c) `PerfilScreen.test.js` — comentário justificativo factualmente errado sobre o que é pintado durante o carregamento. | `code-review` de 03/09/2026 | 🟡 Vira PR próprio |

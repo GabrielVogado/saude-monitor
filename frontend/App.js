@@ -4,6 +4,8 @@ import {createBottomTabNavigator} from "@react-navigation/bottom-tabs";
 import {NavigationContainer} from "@react-navigation/native";
 import {SafeAreaProvider} from "react-native-safe-area-context";
 import * as Notifications from "expo-notifications";
+import * as Network from "expo-network";
+import {AppState} from "react-native";
 import {Building2, Home as HomeIcon, Map as MapIcon, User as UserIcon} from "lucide-react-native";
 import HomeScreen from "./src/screens/home/view/HomeScreen.js";
 import LoginScreen from "./src/screens/auth/view/LoginScreen.js";
@@ -22,6 +24,7 @@ import PrivacidadeScreen from "./src/screens/perfil/view/PrivacidadeScreen.js";
 import NotificacoesScreen from "./src/screens/perfil/view/NotificacoesScreen.js";
 import {colors} from "./src/theme";
 import { agendarLembrete, pendenciaAtual } from "./src/screens/feedback/service/FeedbackNotificationService";
+import { sincronizar } from "./src/services/SincronizacaoOffline";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -176,6 +179,35 @@ export default function App() {
 
         const subscricao = Notifications.addNotificationResponseReceivedListener(tratarResposta);
         return () => subscricao.remove();
+    }, []);
+
+    useEffect(() => {
+        // OPS-05: check-in e checkout registrados sem internet ficam na fila
+        // offline. Os dois momentos em que vale tentar de novo são a volta ao
+        // primeiro plano e o retorno da conexão — o segundo cobre o aparelho que
+        // ficou aberto na tela enquanto o sinal voltava.
+        const tentar = () => { sincronizar().catch(() => {}); };
+
+        tentar();
+
+        const inscricaoApp = AppState.addEventListener("change", (estado) => {
+            if (estado === "active") {
+                tentar();
+            }
+        });
+
+        // Disponível a partir do expo-network 6; a chamada é opcional para não
+        // quebrar em plataforma sem suporte (web) nem no ambiente de teste.
+        const inscricaoRede = Network.addNetworkStateListener?.((estado) => {
+            if (estado?.isConnected) {
+                tentar();
+            }
+        });
+
+        return () => {
+            inscricaoApp.remove();
+            inscricaoRede?.remove?.();
+        };
     }, []);
 
     return (

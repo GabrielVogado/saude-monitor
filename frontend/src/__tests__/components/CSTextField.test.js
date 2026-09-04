@@ -72,9 +72,22 @@ describe("CSTextField", () => {
     const onChangeText = jest.fn();
     render(<CSTextField label="E-mail" value="" onChangeText={onChangeText} />);
 
-    fireEvent.changeText(screen.getByLabelText("E-mail"), "ana@exemplo.com");
+    const campo = screen.getByLabelText("E-mail");
+    fireEvent.changeText(campo, "ana@exemplo.com");
 
     expect(onChangeText).toHaveBeenCalledWith("ana@exemplo.com");
+
+    // A asserção acima é necessária mas NÃO é suficiente — mesmo motivo já
+    // documentado no teste do botão da `LoginScreen`, só que no outro sentido: o
+    // `fireEvent` do RNTL sobe a árvore e encontra o handler no próprio elemento
+    // `<CSTextField onChangeText={...}>`, então o mock é chamado mesmo que o
+    // componente nunca repasse a prop ao `TextInput`. Verificado por mutação:
+    // removendo `onChangeText={onChangeText}` do `TextInput`, a asserção acima
+    // continuava verde enquanto no aparelho o campo ficava mudo — digitar não
+    // mudaria nada, e o formulário inteiro ficaria sem entrada. Por isso, e só por
+    // isso, este teste desce até a prop do nó host: é o único ponto onde o defeito
+    // é observável.
+    expect(campo.props.onChangeText).toBe(onChangeText);
   });
 
   test("a borda fica neutra em repouso, primária no foco e volta ao perder o foco", () => {

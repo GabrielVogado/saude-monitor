@@ -293,11 +293,10 @@ sobre o #61 e quebraria do mesmo jeito assim que a esteira rodasse nele.
 
 ### Diagnóstico
 
-A Onda 1 fechou a meta anterior — "todos os componentes em 90%", 12 de 12 — mas só em
-*statements*, *functions* e *lines*: em *branches* a pasta `components` está em 76,19%,
-e `components/index.js` em 0/0/0/0. Pela régua das quatro métricas a meta antiga nem
-estava cumprida — e mesmo
-assim entregou garantia falsa. O `code-review` provou **por mutação** que 3 dos 19
+A Onda 1 fechou a meta anterior — "todos os componentes em 90%" — mas só em
+*statements*, *functions* e *lines*: em *branches* a pasta `components` está em 76,19%.
+Pela régua das quatro métricas a meta antiga nem estava cumprida — e mesmo assim
+entregou garantia falsa. O `code-review` provou **por mutação** que 3 dos 19
 testes novos passavam com o código de produção quebrado:
 
 | Teste | Mutação aplicada | Resultado antes da correção |
@@ -332,6 +331,27 @@ O mesmo `code-review` achou o **BUG-03**: o controle "Esqueci minha senha"
 nenhum `onPress`. A tela tinha acabado de ser certificada a 100% em todas as métricas
 sem que nada notasse um botão que não faz nada. Registrado no inventário do E8-05 por
 decisão do PO — implementar recuperação de senha é feature nova, não escopo de teste.
+
+### Terceira passada — auditoria pedida pelo PO (04/09/2026)
+
+O PO pediu explicitamente uma verificação de que "as correções realmente estão
+implementadas e não houve falsos positivos". A auditoria aplicou **25 mutações** ao
+código de produção da Onda 1 e rodou a suíte contra cada uma. **24 morreram** — as dez
+correções das duas passadas anteriores estão de fato ativas, inclusive a nota sobre o
+`fireEvent.press` recusar o toque por `accessibilityState.disabled`. O que a auditoria
+achou de novo:
+
+| Achado | Natureza | Desfecho |
+|---|---|---|
+| `CSTextField` — "digitar propaga o texto ao chamador" | **Teste vacuoso.** Sobrevivia à remoção de `onChangeText={onChangeText}` do `TextInput`: o `fireEvent` do RNTL sobe a árvore e acha o handler no elemento composto `<CSTextField>`, então o mock é chamado mesmo sem repasse. No aparelho, o campo ficaria mudo | Corrigido — desce até `campo.props.onChangeText`; mutação passou a matar |
+| `filaOffline.test.js` — "preserva o `ocorridoEm` informado" | **Bomba-relógio.** Data absoluta `2026-09-03T10:15:00.000Z` num teste que lê de volta pelo `itensDaFila()`, que descarta itens acima de `VALIDADE_MS` (24h). Passou no CI em 03/09 e começou a falhar sozinho em 04/09. Veio da OPS-05 (#75) e **deixou a `develop` vermelha** | Corrigido — data relativa (`Date.now() - 1h`); mutação (ignorar o `ocorridoEm` informado) passou a matar |
+| "12 de 12 componentes" (3 documentos) | **Afirmação falsa.** A pasta tem 11 componentes `CS*` mais o barril. Nenhuma leitura fecha em 12/12 | Corrigido para 11 |
+| "`components/index.js` em 0/0/0/0" | **Diagnóstico errado.** Módulo só de reexportação: `total: 0` nas quatro métricas, `pct: 100` no `coverage-summary.json`. Não há statement a cobrir e nenhuma onda pode elevá-lo. A causa alegada também é falsa — 7 telas de produção importam o barril | Corrigido; item retirado da fila das ondas |
+| "245 testes em 31 suítes" · "9 testes" na `LoginScreen` | Números defasados | Corrigidos para os medidos |
+
+**Lição de processo:** data absoluta em teste que atravessa lógica de expiração é a
+mesma família do teste vacuoso — o teste deixa de falar sobre o comportamento e passa a
+falar sobre o relógio. Entra na régua junto com a validação por mutação.
 
 ---
 

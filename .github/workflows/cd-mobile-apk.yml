@@ -20,6 +20,10 @@
 name: CD - Mobile (APK via Gradle)
 
 on:
+  # TEMPORARIO -- revalidacao apos a reescrita do passo de keystore. REMOVIDO a seguir.
+  push:
+    branches: [feature/apk-sem-eas]
+
   # Manual de proposito. O gatilho automatico foi exatamente o que estourou a cota
   # do EAS; um APK e artefato que se pede, nao que se produz a cada merge.
   workflow_dispatch:
@@ -74,7 +78,18 @@ jobs:
       # A variante `release` assina com `signingConfigs.debug` (android/app/build.gradle),
       # e o debug.keystore e ignorado pelo .gitignore (`*.keystore`). Sem ele o Gradle
       # falha na assinatura.
+      # ATENCAO ao conteudo do secret: o build.gradle fixa storePassword `android`,
+      # alias `androiddebugkey` e keyPassword `android` (android/app/build.gradle), e a
+      # variante release reusa esse signingConfig. Uma keystore de upload/release com
+      # senha e alias proprios PASSA neste passo e so quebra no Gradle, com o erro
+      # opaco "Keystore was tampered with, or password was incorrect".
+      # ATENCAO ao conteudo do secret: o android/app/build.gradle fixa storePassword
+      # `android`, alias `androiddebugkey` e keyPassword `android`, e a variante release
+      # reusa esse signingConfig. Uma keystore de upload/release com senha e alias
+      # proprios PASSA neste passo e so quebra la no Gradle, com o erro opaco
+      # "Keystore was tampered with, or password was incorrect".
       - name: Preparar keystore
+        id: keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
@@ -83,28 +98,36 @@ jobs:
 
           if [ -n "${KEYSTORE_BASE64:-}" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > "$DESTINO"
+            echo "sufixo=" >> "$GITHUB_OUTPUT"
             echo "✅ Keystore do secret \`ANDROID_KEYSTORE_BASE64\` — assinatura estável entre builds." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
           # Receita padrao do debug.keystore do Android: as credenciais sao publicas e
-          # estao fixadas no build.gradle (senha `android`, alias `androiddebugkey`).
-          keytool -genkeypair -v -keystore "$DESTINO" \
-            -storepass android -alias androiddebugkey -keypass android \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US" >/dev/null
+          # estao fixadas no build.gradle.
+          keytool -genkeypair -v -keystore "$DESTINO"             -storepass android -alias androiddebugkey -keypass android             -keyalg RSA -keysize 2048 -validity 10000             -dname "CN=Android Debug,O=Android,C=US" >/dev/null
+
+          # O aviso abaixo vai para o resumo do job -- que ninguem le ao baixar o
+          # artefato. Por isso o estado tambem entra no NOME do arquivo baixado.
+          echo "sufixo=-ASSINATURA-EFEMERA" >> "$GITHUB_OUTPUT"
 
           {
             echo "⚠️ **Keystore gerada nesta execução.** O secret \`ANDROID_KEYSTORE_BASE64\` não está definido."
             echo ""
-            echo "A chave é diferente a cada build, então **APKs de execuções distintas não se atualizam entre si**:"
-            echo "instalar por cima falha com \"app não instalado\" e é preciso desinstalar a versão anterior antes."
+            echo "A chave muda a cada build, então **APKs de execuções distintas não se atualizam entre si**:"
+            echo "instalar por cima falha com \"app não instalado\" e é preciso desinstalar a versão anterior."
             echo ""
-            echo "Para ter assinatura estável, guarde a keystore como secret:"
+            echo "Para assinatura estável, guarde a keystore como secret:"
             echo '```'
-            echo 'base64 -w0 frontend/android/app/debug.keystore   # no Windows: certutil -encode'
-            echo '# cole em Settings > Secrets and variables > Actions > ANDROID_KEYSTORE_BASE64'
+            echo '# Linux/macOS'
+            echo 'base64 -w0 frontend/android/app/debug.keystore'
+            echo ''
+            echo '# Windows (PowerShell). NAO use `certutil -encode`: ele emite PEM com'
+            echo '# cabecalhos -----BEGIN/END-----, que o `base64 -d` deste passo rejeita.'
+            echo '[Convert]::ToBase64String([IO.File]::ReadAllBytes("frontend/android/app/debug.keystore"))'
             echo '```'
+            echo ""
+            echo "Cole em **Settings > Secrets and variables > Actions > ANDROID_KEYSTORE_BASE64**."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build do APK
@@ -126,7 +149,11 @@ jobs:
         id: apk
         run: |
           set -euo pipefail
-          CAMINHO=$(find android/app/build/outputs/apk -name "*.apk" | head -1)
+          # `-print -quit` em vez de `| head -1`: com `set -euo pipefail`, o head
+          # fechava o pipe e o find morria com SIGPIPE (141), abortando o passo antes
+          # do ramo de erro abaixo -- que ficava inalcancavel. O `|| true` cobre o caso
+          # de o diretorio nem existir, para a mensagem util ser a que aparece.
+          CAMINHO=$(find android/app/build/outputs/apk -name "*.apk" -print -quit 2>/dev/null || true)
           if [ -z "$CAMINHO" ]; then
             echo "ERRO: nenhum APK foi produzido pelo Gradle."
             exit 1
@@ -138,7 +165,7 @@ jobs:
       - name: Publicar o APK
         uses: actions/upload-artifact@v4
         with:
-          name: apk-${{ inputs.variante || 'release' }}-${{ github.sha }}
+          name: apk-${{ inputs.variante || 'release' }}${{ steps.keystore.outputs.sufixo }}-${{ github.sha }}
           path: ${{ steps.apk.outputs.caminho }}
           retention-days: 30
           if-no-files-found: error

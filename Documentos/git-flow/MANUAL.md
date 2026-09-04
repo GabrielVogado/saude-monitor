@@ -10,7 +10,7 @@ O **Clinical Sanctuary** detecta automaticamente a entrada e saída de usuários
 
 - **Backend:** Spring Boot 4 (Java 25) + MongoDB, empacotado em Docker.
 - **Frontend:** React Native / Expo 55 (web via `react-native-web` + APK mobile).
-- **CI/CD:** GitHub Actions + Render (backend) + EAS (APK) + MongoDB Atlas (banco). **O frontend web não tem provedor de publicação** — ver §4.1.
+- **CI/CD:** GitHub Actions + Render (backend) + Gradle no Actions (APK) + EAS (AAB de loja) + MongoDB Atlas (banco). **O frontend web não tem provedor de publicação** — ver §4.1.
 
 ---
 
@@ -91,7 +91,7 @@ feature/* ──► develop ──► master ──► release/<tag>
 | `ci.yml` | push/PR em `develop`/`master` | Build + testes do backend e frontend |
 | `cd-backend.yml` | push em `develop`, `master`, `release/**` (caminho `backend/**`) | Docker → GHCR → deploy Render. **Falha com mensagem explícita** se o ambiente não tiver secrets |
 | `cd-mobile-apk.yml` | **manual** (`workflow_dispatch`, variante release/debug) | Build do **APK interno** com Gradle no próprio Actions. Publica o APK como artefato do run (30 dias) |
-| `cd-mobile-eas.yml` | push em `release/**` (caminho `frontend/**`) | Build do **AAB de loja** no EAS |
+| `cd-mobile-eas.yml` | push em `release/**` (**sem** filtro de caminho — ver nota) | Build do **AAB de loja** no EAS |
 | `keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` para impedir a hibernação do Render (E8-01) |
 | `release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
 
@@ -121,6 +121,18 @@ feature/* ──► develop ──► master ──► release/<tag>
 >
 > O EAS ficou com o **AAB de loja** em `release/<tag>`, que é raro e é onde os créditos
 > rendem.
+>
+> ⚠️ **Sem filtro de `paths` no `cd-mobile-eas.yml`, de propósito.** O `release.yml` cria
+> a branch com `git checkout -b` + `git push`, **sem nenhum commit novo** — e um push de
+> criação de branch não carrega diff que case com `paths`. Com o filtro, o workflow não
+> dispararia nunca: a release seria gerada, nenhum AAB sairia, e nada reportaria falha.
+> Isso passava despercebido enquanto os pushes em `develop` também disparavam o EAS.
+>
+> ⚠️ **O `cd-backend.yml` ainda tem essa armadilha** (`paths: backend/**`): criar
+> `release/1.0.0` também não dispara o deploy de produção. Não foi corrigido aqui porque
+> remover o filtro faria o backend reconstruir a cada push em `develop`. Registrado na
+> **P-006**, junto da colisão de tag de imagem — as duas se resolvem quando o ambiente de
+> produção for criado.
 >
 > **Assinatura:** a variante `release` assina com `signingConfigs.debug`, e o
 > `debug.keystore` não é versionado (`.gitignore`: `*.keystore`). O workflow usa o
@@ -165,7 +177,7 @@ Cada secret tem sufixo por ambiente (`_DEV`, `_PROD`):
 Não há hospedagem configurada para o frontend web. O `ci.yml` valida que o
 `npx expo export --platform web` continua funcionando, mas o artefato não é
 publicado em lugar nenhum. A distribuição hoje é o **APK**, gerado pelo
-`cd-mobile-eas.yml`.
+`cd-mobile-apk.yml`, com Gradle no próprio GitHub Actions — sem cota do EAS.
 
 ### 5.4 Variáveis de ambiente do backend
 
@@ -219,5 +231,5 @@ curl -X POST http://localhost:8080/api/v1/visitas/<ID>/checkout \
 ## 7. Observações
 
 - O **Render free** "dorme" após ~15 min de inatividade e acorda na primeira requisição (~30s).
-- O **frontend web** é o build do Expo; o **APK mobile** é gerado localmente via `expo run:android`.
+- O **frontend web** é o build do Expo. O **APK mobile** sai do `cd-mobile-apk.yml` (Actions, manual) ou, localmente, de `npm run build:apk` / `expo run:android --variant release`.
 - Para o frontend web apontar para o backend correto, configure `expo.extra.apiBaseUrlWeb` em `frontend/app.json` (o `api.js` já lê essa variável).

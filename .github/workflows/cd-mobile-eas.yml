@@ -15,10 +15,14 @@ name: CD - Mobile (EAS Build)
 
 on:
   push:
+    # SEM filtro de `paths`, de proposito. Com ele, este workflow nao dispararia
+    # NUNCA: o release.yml cria a branch com `git checkout -b` + `git push`, sem
+    # nenhum commit novo, e um push de criacao de branch nao carrega diff que case
+    # com `paths`. Antes isso passava despercebido porque os pushes em develop e
+    # master mantinham o EAS exercitado; agora `release/**` e o unico gatilho, e o
+    # filtro o tornaria letra morta -- a release seria gerada, nenhum AAB sairia, e
+    # nada reportaria falha.
     branches: ['release/**']
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/cd-mobile-eas.yml'
   workflow_dispatch:
 
 jobs:
@@ -37,9 +41,16 @@ jobs:
         run: |
           if [[ "${{ github.ref }}" == refs/heads/release/* ]]; then
             echo "profile=production" >> "$GITHUB_OUTPUT"
-          else
-            echo "profile=preview" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          # Fora de release/*, o perfil seria `preview` -- exatamente o APK interno
+          # que o cd-mobile-apk.yml produz de graca. Rodar aqui gastaria um credito
+          # do EAS para obter o mesmo artefato, que e como a cota foi consumida ate
+          # 03/09/2026. A politica do workflow passa a ser cobrada por ele mesmo.
+          echo "ERRO: este workflow existe so para o AAB de loja, a partir de release/*."
+          echo "Para APK interno use 'CD - Mobile (APK via Gradle)', que nao gasta cota."
+          echo "Ref recebida: ${{ github.ref }}"
+          exit 1
 
   eas-build:
     name: EAS Build (${{ needs.resolve-profile.outputs.profile }})

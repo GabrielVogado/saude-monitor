@@ -3,6 +3,28 @@
 Estes JSON são importáveis em **Settings → Rules → Rulesets → New ruleset →
 Import a ruleset**.
 
+## ⚠️ Estes arquivos não fazem nada sozinhos
+
+**O GitHub não lê esta pasta.** Não existe convenção `.github/rulesets/` — diferente de
+`.github/workflows/`, que é lida de verdade. O JSON aqui é **backup e documentação**; a
+regra só passa a existir quando alguém a importa nas *Settings* do repositório.
+
+Consequências que valem dizer em voz alta:
+
+- **Quem clona ou faz fork não é afetado.** Rulesets são configuração de servidor,
+  deste repositório. Não viajam num `git clone` nem num fork. No fork de outra pessoa,
+  ela cria branch, reescreve histórico e faz `push --force` à vontade.
+- **Antes das regras, existe a permissão.** Só quem tem acesso de escrita consegue
+  empurrar para cá — hoje, apenas o dono. As regras só têm a quem se aplicar quando
+  alguém *tem* permissão.
+- **A única peça deste conjunto que viaja com o código** é o
+  `.github/workflows/pr-origem-master.yml`. Num fork ele até roda, mas só reprova um
+  check lá; não impede nada.
+
+O que muda de fato, depois de importar: `git push origin develop` (e `master`) passa a
+ser recusado, e toda mudança entra por PR. Como só o dono tem acesso, o efeito real é
+protegê-lo do próprio descuido — um `push --force` na branch errada às onze da noite.
+
 ## Por que ficam versionados
 
 Em 03/09/2026 descobrimos que **nem `develop` nem `master` estavam protegidas**, embora

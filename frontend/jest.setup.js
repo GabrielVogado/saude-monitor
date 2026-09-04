@@ -4,11 +4,54 @@
  * serviços possam ser testados sem device/emulador.
  */
 
-// fetch global é fornecido pelo jest-expo/node; garantimos que exista como spy
-// substituível por cada teste via global.fetch.
-if (!global.fetch) {
-  global.fetch = jest.fn();
-}
+/**
+ * `global.fetch` é SEMPRE substituído — a atribuição não é condicional.
+ *
+ * A versão anterior era `if (!global.fetch) { global.fetch = jest.fn(); }`, com o
+ * comentário "fetch global é fornecido pelo jest-expo/node; garantimos que exista
+ * como spy". A partir do Node 18 existe `fetch` nativo, então o guard **nunca
+ * disparava**: o fetch real sobrevivia e o spy nunca era instalado. Qualquer teste
+ * que esquecesse de montar o próprio mock passava a fazer HTTP de verdade, em
+ * silêncio — sem falhar, só lento e instável.
+ *
+ * Foi o que aconteceu com o `App.test.js`: ele montava o `App` real e disparava
+ * `GET /api/v1/visitas/ativas` contra `192.168.0.10:8080`, um host que não responde
+ * no ambiente de teste. Cada chamada armava o temporizador de 20 s do
+ * `fetchComTimeout` e abria um socket TCP que sobreviviam ao fim do teste — origem
+ * do aviso "A worker process has failed to exit gracefully". Custava ~40 s de
+ * parede por execução e trazia o relógio da rede para dentro das asserções.
+ *
+ * O padrão rejeita com um erro identificável em vez de devolver uma resposta
+ * boazinha: teste que toca a rede sem dizer o que espera dela não está testando o
+ * app, está testando a rede.
+ *
+ * ATENÇÃO ao que isto **não** garante: não é um portão. O erro só reprova o teste
+ * se chegar até uma asserção. Código de produção que trata falha de rede — que é
+ * quase todo ele aqui — engole o erro e a suíte segue verde; medido no
+ * `App.test.js`, que passa nos dois cenários. O ganho real é outro e é o que
+ * importa: nenhuma requisição de verdade sai, então acabam o socket pendurado, o
+ * temporizador órfão e o tempo de parede esperando host morto. Para transformar
+ * isso em portão seria preciso afirmar sobre a chamada no próprio teste.
+ *
+ * O erro é um `Error` comum de propósito — `classificarErroDeRede` repassa o que
+ * não é falha de rede, e o `fetchComRetry` só repete `ErroDeConexao`. Um
+ * `TypeError("Network request failed")` aqui viraria `ErroDeConexao`, dispararia o
+ * backoff da OPS-05 e deixaria um novo timer pendurado: trocaria um vazamento por
+ * outro. Verificado — foi o que aconteceu na sondagem que levantou este defeito.
+ *
+ * Cada suíte que precisa de rede instala o seu: `global.fetch = jest.fn(...)`.
+ * `clearMocks` do jest.config.js usa `mockClear()`, que zera as chamadas e
+ * PRESERVA a implementação — este padrão sobrevive entre os testes.
+ */
+global.fetch = jest.fn(async (url, config) => {
+  const metodo = String(config?.method || "GET").toUpperCase();
+
+  throw new Error(
+    `fetch não mockado: ${metodo} ${url}\n` +
+      "Este teste tentou usar a rede real. Instale um mock explícito " +
+      "(`global.fetch = jest.fn(...)`) declarando a resposta que o teste espera."
+  );
+});
 
 // expo-constants: hostUri controlável pelos testes (config/api).
 jest.mock("expo-constants", () => {

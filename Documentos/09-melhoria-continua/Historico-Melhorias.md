@@ -348,6 +348,7 @@ achou de novo:
 | "12 de 12 componentes" (3 documentos) | **Afirmação falsa.** A pasta tem 11 componentes `CS*` mais o barril. Nenhuma leitura fecha em 12/12 | Corrigido para 11 |
 | "`components/index.js` em 0/0/0/0" | **Diagnóstico errado.** Módulo só de reexportação: `total: 0` nas quatro métricas, `pct: 100` no `coverage-summary.json`. Não há statement a cobrir e nenhuma onda pode elevá-lo. A causa alegada também é falsa — 7 telas de produção importam o barril | Corrigido; item retirado da fila das ondas |
 | "245 testes em 31 suítes" · "9 testes" na `LoginScreen` | Números defasados | Corrigidos para os medidos |
+| `jest.setup.js` — `if (!global.fetch) { global.fetch = jest.fn(); }` | **Guard inerte.** O Node 20 tem `fetch` nativo, então a condição nunca era verdadeira e o spy nunca era instalado: o `fetch` real sobrevivia. O `App.test.js` (única suíte sem mock próprio, das 34) montava o `App` e disparava **HTTP de verdade** contra `192.168.0.10:8080`. Sockets TCP e os temporizadores de 20 s do `fetchComTimeout` sobreviviam ao teste — origem única do aviso *"A worker process has failed to exit gracefully"*, ~40 s de parede por execução e não-determinismo | Corrigido — atribuição incondicional, com padrão que rejeita em vez de ir à rede; `App.test.js` declara a resposta que espera. Suíte da tela: ~50 s → **9 s**; aviso eliminado |
 
 **Lição de processo:** data absoluta em teste que atravessa lógica de expiração é a
 mesma família do teste vacuoso — o teste deixa de falar sobre o comportamento e passa a

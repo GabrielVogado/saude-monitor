@@ -58,14 +58,36 @@ feature/* ──► develop ──► master ──► release/<tag>
 2. Desenvolva, commite e abra PR para `develop`.
 
 ### 3.3 Promoção para produção
-1. Abra um **Pull Request** de `develop` → `master`.
+1. Abra um **Pull Request** de `develop` → `master`. **Só de `develop`:** o check
+   `Origem do PR (master)` reprova qualquer outra origem. `master` é produção, e um PR
+   de feature direto para lá pularia a integração — ninguém teria visto aquele código
+   conviver com o resto antes de ir ao ar.
 2. O CI roda no PR (desde 03/09/2026 — antes disso `master` não tinha CI nenhuma).
 
-> ⚠️ **A `master` não tem proteção de branch.** A `develop` exige os checks
-> `Backend (Spring Boot)` e `Frontend (Expo Web)` desde 02/09/2026; a `master`, não —
-> um PR com CI vermelho ainda pode ser mergeado na branch de produção. Aplicar os
-> mesmos dois checks obrigatórios à `master` é ação de configuração do repositório,
-> não de código, e depende do PO.
+> ⚠️ **Nem `develop` nem `master` estão protegidas hoje** (verificado pela API em
+> 03/09/2026 — sem proteção clássica e sem ruleset). A `develop` teve proteção a partir
+> de 02/09, mas ela sumiu quando o repositório foi tornado privado por alguns minutos:
+> proteção de branch não existe em repositório privado no plano Free, e voltar a
+> público **não restaura**.
+>
+> Enquanto isso, **um PR com CI vermelho pode ser mergeado nas duas branches**.
+>
+> **Regras da `master`, decididas em 03/09/2026:** só aceita PR vindo da `develop`, e
+> só o dono do repositório pode mergear.
+>
+> A restrição de origem não existe como regra nativa — virou o check
+> `Origem do PR (master)`. Já a exclusividade do merge **não precisou de regra**: o
+> repositório é pessoal e tem um único colaborador, então ninguém mais tem acesso de
+> escrita. Exigir aprovação foi cogitado e descartado: o GitHub não deixa o autor
+> aprovar o próprio PR, então, com um desenvolvedor só, isso deixaria a `master`
+> impossível de mergear sem acionar o bypass a cada promoção — atrito com aparência de
+> rigor. Se um colaborador for adicionado, a exigência passa a fazer sentido; o
+> [README dos rulesets](../../.github/rulesets/README.md) registra o que mudar.
+>
+> Os rulesets para reimportar estão versionados em
+> [`.github/rulesets/`](../../.github/rulesets/) — importar em
+> *Settings → Rules → Rulesets → New ruleset → Import a ruleset*. Ver o README de lá
+> para os dois passos que o import não faz sozinho.
 3. Após merge, o **ambiente prod** é atualizado automaticamente.
 
 > ⚠️ **Hoje isso falha de propósito.** O ambiente de produção não existe e os secrets

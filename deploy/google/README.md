@@ -33,7 +33,7 @@ credencial do GCP via Workload Identity Federation, e a troca so e aceita para
 
 Duas identidades, de proposito:
 
-- `github-actions-deployer@` — constroi e implanta. Nao le secrets.
+- `saude-monitor-gitdeploy@` — constroi e implanta. Nao le secrets.
 - `saude-monitor-run@` — identidade de execucao do container. Le os secrets, nao
   implanta nada.
 

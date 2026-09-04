@@ -13,7 +13,7 @@ REGION="southamerica-east1"
 GAR_REPOSITORY="saude-monitor-google"
 GITHUB_REPO="GabrielVogado/saude-monitor"
 
-DEPLOYER_SA="github-actions-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
+DEPLOYER_SA="saude-monitor-gitdeploy@${PROJECT_ID}.iam.gserviceaccount.com"
 RUNTIME_SA="saude-monitor-run@${PROJECT_ID}.iam.gserviceaccount.com"
 POOL="github-pool"
 PROVIDER="github-provider"
@@ -36,7 +36,7 @@ gcloud artifacts repositories create "$GAR_REPOSITORY" \
 
 echo "== 3/7 Service accounts =="
 gcloud iam service-accounts describe "$DEPLOYER_SA" >/dev/null 2>&1 || \
-gcloud iam service-accounts create github-actions-deployer \
+gcloud iam service-accounts create saude-monitor-gitdeploy \
   --display-name="Deployer do GitHub Actions"
 gcloud iam service-accounts describe "$RUNTIME_SA" >/dev/null 2>&1 || \
 gcloud iam service-accounts create saude-monitor-run \

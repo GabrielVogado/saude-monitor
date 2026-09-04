@@ -293,7 +293,10 @@ sobre o #61 e quebraria do mesmo jeito assim que a esteira rodasse nele.
 
 ### Diagnóstico
 
-A Onda 1 fechou a meta anterior — "todos os componentes em 90%", 12 de 12 — e mesmo
+A Onda 1 fechou a meta anterior — "todos os componentes em 90%", 12 de 12 — mas só em
+*statements*, *functions* e *lines*: em *branches* a pasta `components` está em 76,19%,
+e `components/index.js` em 0/0/0/0. Pela régua das quatro métricas a meta antiga nem
+estava cumprida — e mesmo
 assim entregou garantia falsa. O `code-review` provou **por mutação** que 3 dos 19
 testes novos passavam com o código de produção quebrado:
 

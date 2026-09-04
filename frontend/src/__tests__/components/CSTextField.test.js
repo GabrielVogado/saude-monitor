@@ -23,15 +23,26 @@ import { colors } from "../../theme/tokens";
  * react-native-web/RNTL fica envolto em nós intermediários, e fixar um nível
  * tornaria o teste refém da árvore interna da biblioteca em vez do componente.
  */
-function corDaBorda() {
-  let no = screen.getByLabelText("E-mail").parent;
+function bordaDoCampo(rotulo = "E-mail") {
+  let no = screen.getByLabelText(rotulo).parent;
   while (no) {
     const estilos = [].concat(no.props?.style).flat(Infinity).filter(Boolean);
     const comBorda = estilos.filter((e) => e && e.borderColor !== undefined);
-    if (comBorda.length) return comBorda[comBorda.length - 1].borderColor;
+    if (comBorda.length) {
+      const efetivo = comBorda[comBorda.length - 1];
+      return { cor: efetivo.borderColor, espessura: efetivo.borderWidth };
+    }
     no = no.parent;
   }
-  return undefined;
+  return {};
+}
+
+/** Açúcar para os testes que só falam de cor. */
+const corDaBorda = (rotulo) => bordaDoCampo(rotulo).cor;
+
+/** Lê os estilos efetivos de um nó, achatados. */
+function estilosDe(no) {
+  return [].concat(no.props?.style).flat(Infinity).filter(Boolean);
 }
 
 describe("CSTextField", () => {
@@ -83,7 +94,10 @@ describe("CSTextField", () => {
     fireEvent(screen.getByLabelText("E-mail"), "focus");
 
     // Mesmo focado, a borda continua vermelha: o estado de erro vence.
-    expect(corDaBorda()).toBe(colors.error);
+    // A espessura entra na asserção porque cor sem espessura é borda invisível —
+    // com `borderWidth: 0` o campo em erro não pinta nada, que é exatamente a falha
+    // que este arquivo existe para impedir.
+    expect(bordaDoCampo()).toEqual({ cor: colors.error, espessura: 2 });
   });
 
   test("com erro, a mensagem aparece e a dica NÃO — só um dos dois é pintado", () => {
@@ -97,8 +111,16 @@ describe("CSTextField", () => {
       />
     );
 
-    expect(screen.getByText("E-mail inválido")).toBeTruthy();
+    const mensagem = screen.getByText("E-mail inválido");
+    expect(mensagem).toBeTruthy();
     expect(screen.queryByText("Use seu e-mail corporativo")).toBeNull();
+
+    // Presença não basta: pintada com o token de dica, a mensagem sai no cinza
+    // `onSurfaceVariant` e o erro de validação passa a se ler como sugestão.
+    expect(estilosDe(mensagem).map((e) => e.color)).toContain(colors.onErrorContainer);
+
+    // Sem `accessibilityLiveRegion`, quem usa leitor de tela deixa de ouvir o erro.
+    expect(mensagem.props.accessibilityLiveRegion).toBe("polite");
   });
 
   test("sem erro, a dica é exibida", () => {
@@ -149,6 +171,25 @@ describe("CSTextField", () => {
     expect(screen.getByLabelText("Senha").props.secureTextEntry).toBe(true);
 
     rerender(<CSTextField label="Senha" value="" onChangeText={jest.fn()} multiline />);
-    expect(screen.getByLabelText("Senha").props.multiline).toBe(true);
+    const campo = screen.getByLabelText("Senha");
+    expect(campo.props.multiline).toBe(true);
+
+    // `multiline` na prop sem os estilos correspondentes é multilinha só no nome: o
+    // container continua centralizando e o input fica sem `minHeight`, então um
+    // endereço de duas linhas desaba numa linha só, centralizada.
+    expect(estilosDe(campo).map((e) => e.minHeight)).toContain(96);
+    const container = campo.parent;
+    expect(
+      estilosDe(container).concat(estilosDe(container.parent)).map((e) => e.alignItems)
+    ).toContain("flex-start");
+  });
+
+  test("o padrão de autoCapitalize é `none` — e-mail não pode virar caixa alta", () => {
+    // O default fica na assinatura do componente (`autoCapitalize = "none"`) e nada
+    // o exercitava. Trocado para "sentences", o campo de e-mail passa a enviar
+    // "Ana@exemplo.com" e o login falha contra backend sensível a caixa.
+    render(<CSTextField label="E-mail" value="" onChangeText={jest.fn()} />);
+
+    expect(screen.getByLabelText("E-mail").props.autoCapitalize).toBe("none");
   });
 });

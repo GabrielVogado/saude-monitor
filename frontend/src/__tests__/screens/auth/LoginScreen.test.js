@@ -9,7 +9,7 @@
  * credencial inválida, erro sem mensagem e sucesso — mais os dois `navigate` da tela.
  */
 import React from "react";
-import { Alert, KeyboardAvoidingView } from "react-native";
+import { Alert, KeyboardAvoidingView, TouchableOpacity } from "react-native";
 import { render, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import LoginScreen from "../../../screens/auth/view/LoginScreen";
 import LoginService from "../../../screens/auth/service/LoginService";
@@ -40,6 +40,26 @@ describe("LoginScreen", () => {
 
   test("campo vazio nem chega a chamar o serviço", async () => {
     renderizar();
+
+    tocarEntrar();
+
+    expect(LoginService.login).not.toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalledWith(
+      "Atencao",
+      "Preencha e-mail/usuario e senha."
+    );
+  });
+
+  test.each([
+    ["só o e-mail preenchido", "ana@exemplo.com", ""],
+    ["só a senha preenchida", "", "segredo123"],
+  ])("com %s o guard barra — é `||`, não `&&`", async (_caso, email, senha) => {
+    // Os dois testes de guard originais esvaziavam AMBOS os campos, então nada
+    // distinguia `||` de `&&`: trocar o operador mantinha a suíte verde com o ramo
+    // contando como 100% coberto. Com `&&`, preencher só o e-mail faz o app enviar
+    // `password: ""` para /api/v1/auth/login em vez de avisar o usuário.
+    renderizar();
+    preencherCredenciais(email, senha);
 
     tocarEntrar();
 
@@ -119,12 +139,38 @@ describe("LoginScreen", () => {
     );
   });
 
-  test("o botão volta a ficar disponível depois da falha — o `finally` solta o loading", async () => {
-    LoginService.login.mockRejectedValueOnce(new Error("Servidor indisponível."));
+  test("o botão trava durante a requisição e volta depois da falha", async () => {
+    let liberar;
+    LoginService.login.mockImplementationOnce(
+      () => new Promise((_, rejeitar) => { liberar = () => rejeitar(new Error("Servidor indisponível.")); })
+    );
     renderizar();
     preencherCredenciais();
 
     tocarEntrar();
+
+    // Com a requisição em voo o botão precisa travar: sem isso, um toque duplo em
+    // conexão lenta dispara dois POST /auth/login e cunha dois pares de tokens. A
+    // suíte anterior só olhava o estado DEPOIS da falha.
+    const emVoo = await screen.findByLabelText("Entrando no sistema");
+    expect(emVoo.props.accessibilityState).toEqual({ disabled: true, busy: true });
+
+    fireEvent.press(emVoo);
+    expect(LoginService.login).toHaveBeenCalledTimes(1);
+
+    // A asserção acima é necessária mas NÃO é suficiente, e vale registrar por quê:
+    // o `fireEvent.press` do RNTL recusa o toque quando `accessibilityState.disabled`
+    // é `true`, independentemente da prop `disabled`. Ou seja, a simulação confunde o
+    // metadado com o comportamento — removendo `disabled={loading}` o teste acima
+    // continuaria verde, enquanto no aparelho real o toque dispararia o segundo
+    // POST. Verificado por mutação. Por isso, e só por isso, este teste desce até a
+    // prop: é o único ponto onde o defeito é observável.
+    const botao = screen
+      .UNSAFE_getAllByType(TouchableOpacity)
+      .find((no) => no.props.accessibilityLabel === "Entrando no sistema");
+    expect(botao.props.disabled).toBe(true);
+
+    liberar();
     await waitFor(() => expect(Alert.alert).toHaveBeenCalled());
 
     // Se o `finally` não rodasse, o rótulo continuaria "Entrando no sistema" e o

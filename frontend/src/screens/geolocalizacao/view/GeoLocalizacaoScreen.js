@@ -110,16 +110,77 @@ function GeolocalizacaoContent({ navigation }) {
     [hospitais]
   );
 
-  // Toque no polígono abre o detalhe do hospital (aba Hospitais → HospitalDetalhe).
+  /**
+   * BUG-04 — o mapa precisa ser DESTRUÍDO, não apenas escondido, antes de sair da tela.
+   *
+   * Navegar direto daqui congelava o app (ANR de 30 a 40 s, 8 ocorrências registradas
+   * entre 02/09 e 04/09/2026). A corrida, medida no logcat do S24 Ultra:
+   *
+   *   14:40:04.115  dedo sobe
+   *   14:40:04.140  navigation.navigate      → React Navigation esconde a aba Mapa
+   *   14:40:04.166  surfaceDestroyed         → a thread de renderização GL é encerrada
+   *   14:40:04.330  handleMessage TAP        → o Android entrega o toque CONFIRMADO,
+   *                                            164 ms depois do teardown
+   *
+   * Esse toque atrasado (o Android segura ~215 ms para distinguir de duplo-toque) cai
+   * no `AnnotationManager` do MapLibre, que chama `queryRenderedFeatures` — uma JNI
+   * **síncrona** que enfileira trabalho na thread de renderização e bloqueia a thread
+   * principal esperando o resultado. Sem renderizador, o `future` nunca é cumprido e
+   * não há timeout: a UI trava até o usuário matar o app.
+   *
+   * A saída está no próprio MapLibre. `NativeMapView.queryRenderedFeatures` começa com
+   * `if (checkState(...)) return new ArrayList<>();`, e `checkState` devolve `true`
+   * quando o campo `destroyed` está marcado (verificado no bytecode do
+   * `android-sdk-opengl-13.2.0.aar`). Esconder a view **não** marca esse campo — mata o
+   * renderizador e deixa o mapa se julgando vivo, que é exatamente o estado que trava.
+   * Desmontar marca: `onDropViewInstance` → `dispose()` → `onDestroy()`.
+   *
+   * Por isso a ordem aqui é explícita e não temporal: desmonta o `<Map>`, e só no efeito
+   * seguinte — depois de o desmonte estar comprometido na árvore — é que navega. Não
+   * dependemos de adivinhar o atraso do duplo-toque; dependemos de uma ordem que nós
+   * controlamos. A margem medida é de 164 ms contra ~16 ms de um quadro.
+   */
+  const [mapaMontado, setMapaMontado] = useState(true);
+  const hospitalPendente = useRef(null);
+
   const abrirHospital = (hospitalId) => {
     if (!hospitalId) {
       return;
     }
+
+    // Só desmonta se houver para onde ir. Desmontar primeiro e descobrir depois que a
+    // navegação não acontece deixaria a tela SEM MAPA e sem saída: quem remonta é o
+    // evento `focus`, que exige a tela ter perdido o foco antes — e ela não perde se a
+    // navegação não ocorreu. O usuário ficaria olhando um buraco entre o cabeçalho e a
+    // caixa de informações até trocar de aba.
+    if (typeof navigation?.navigate !== "function") {
+      return;
+    }
+
+    hospitalPendente.current = hospitalId;
+    setMapaMontado(false);
+  };
+
+  useEffect(() => {
+    if (mapaMontado || !hospitalPendente.current) {
+      return;
+    }
+
+    const id = hospitalPendente.current;
+    hospitalPendente.current = null;
     navigation?.navigate?.("Hospitais", {
       screen: "HospitalDetalhe",
-      params: { id: hospitalId },
+      params: { id },
     });
-  };
+  }, [mapaMontado, navigation]);
+
+  // Remonta o mapa ao voltar para a aba. Usa o listener do `navigation` em vez de
+  // `useFocusEffect` de propósito: o hook exige um NavigationContainer em volta, e esta
+  // tela é renderizada isolada nos testes.
+  useEffect(() => {
+    const remover = navigation?.addListener?.("focus", () => setMapaMontado(true));
+    return () => remover?.();
+  }, [navigation]);
 
   const aoTocarGeofence = (evento) => {
     const feature = evento?.features?.[0];
@@ -155,11 +216,17 @@ function GeolocalizacaoContent({ navigation }) {
     );
   }, [hospitais]);
 
+  // `mapaMontado` entra nas dependências porque o remonte cria uma `<Camera>` NOVA, com
+  // `initialViewState` de volta em BRASIL_REGION (zoom 3, o país inteiro). Sem re-rodar
+  // o enquadramento aqui, quem aproximasse o próprio bairro, tocasse num hospital e
+  // voltasse encontraria o mapa zerado — e ainda rebaixando tiles. As outras
+  // dependências não bastam: a identidade de `hospitais` não muda no desmonte/remonte,
+  // então o efeito não dispararia sozinho.
   useEffect(() => {
-    if (hospitais.length > 0) {
+    if (mapaMontado && hospitais.length > 0) {
       enquadrarHospitais();
     }
-  }, [hospitais, enquadrarHospitais]);
+  }, [mapaMontado, hospitais, enquadrarHospitais]);
 
   useEffect(() => {
     iniciarMonitoramento();
@@ -170,11 +237,13 @@ function GeolocalizacaoContent({ navigation }) {
 
   // Centraliza no GPS apenas quando não há hospitais enquadrados (ex.: base sem
   // cadastro); com hospitais, o usuário usa o botão "Centralizar no meu GPS".
+  // Mesmo motivo do efeito acima: sem `mapaMontado` na lista, a base sem hospitais
+  // cadastrados voltaria do detalhe enquadrando o Brasil em vez da posição do usuário.
   useEffect(() => {
-    if (coordenadas && hospitais.length === 0) {
+    if (mapaMontado && coordenadas && hospitais.length === 0) {
       centralizar();
     }
-  }, [coordenadas, regionAtual, hospitais.length]);
+  }, [mapaMontado, coordenadas, regionAtual, hospitais.length]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -200,6 +269,8 @@ function GeolocalizacaoContent({ navigation }) {
         )}
       </View>
 
+      {/* Desmontado de propósito antes de navegar — ver o comentário do `abrirHospital`. */}
+      {mapaMontado ? (
       <Map style={styles.map} mapStyle={OSM_RASTER_STYLE}>
         <Camera ref={cameraRef} initialViewState={getInitialViewState(BRASIL_REGION)} />
 
@@ -260,6 +331,12 @@ function GeolocalizacaoContent({ navigation }) {
           </Marker>
         )}
       </Map>
+      ) : (
+        // Placeholder do mesmo tamanho: o `<Map>` ocupa `flex: 1`, e removê-lo sem
+        // reserva faz a caixa de informações saltar para junto do cabeçalho no quadro
+        // anterior à transição de tela. Em aparelho lento isso se vê como um piscar.
+        <View style={styles.map} />
+      )}
 
       <View style={styles.infoBox}>
         {carregando && (

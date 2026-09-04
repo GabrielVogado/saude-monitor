@@ -61,11 +61,18 @@ feature/* ──► develop ──► master ──► release/<tag>
 1. Abra um **Pull Request** de `develop` → `master`.
 2. O CI roda no PR (desde 03/09/2026 — antes disso `master` não tinha CI nenhuma).
 
-> ⚠️ **A `master` não tem proteção de branch.** A `develop` exige os checks
-> `Backend (Spring Boot)` e `Frontend (Expo Web)` desde 02/09/2026; a `master`, não —
-> um PR com CI vermelho ainda pode ser mergeado na branch de produção. Aplicar os
-> mesmos dois checks obrigatórios à `master` é ação de configuração do repositório,
-> não de código, e depende do PO.
+> ⚠️ **Nem `develop` nem `master` estão protegidas hoje** (verificado pela API em
+> 03/09/2026 — sem proteção clássica e sem ruleset). A `develop` teve proteção a partir
+> de 02/09, mas ela sumiu quando o repositório foi tornado privado por alguns minutos:
+> proteção de branch não existe em repositório privado no plano Free, e voltar a
+> público **não restaura**.
+>
+> Enquanto isso, **um PR com CI vermelho pode ser mergeado nas duas branches**.
+>
+> Os rulesets para reimportar estão versionados em
+> [`.github/rulesets/`](../../.github/rulesets/) — importar em
+> *Settings → Rules → Rulesets → New ruleset → Import a ruleset*. Ver o README de lá
+> para os dois passos que o import não faz sozinho.
 3. Após merge, o **ambiente prod** é atualizado automaticamente.
 
 > ⚠️ **Hoje isso falha de propósito.** O ambiente de produção não existe e os secrets

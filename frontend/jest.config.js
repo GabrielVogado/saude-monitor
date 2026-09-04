@@ -39,15 +39,21 @@ module.exports = {
 
   /**
    * Piso de cobertura no patamar medido hoje, arredondado para baixo: a porta
-   * existe para impedir regressão, não para reprovar o código atual. Elevar o
-   * número é decisão consciente de sprint.
+   * existe para impedir regressão, não para reprovar o código atual.
+   *
+   * O piso sobe a cada onda de cobertura, como o teto de avisos do lint (E8-13):
+   * ganho que não vira piso não está protegido — apagar os testes novos voltaria a
+   * passar no CI. Meta do PO (04/09/2026): **90% em todo o frontend**, medida nas
+   * quatro métricas. Onda 1 (componentes) fechou em 78,81/66,94/76,96/79,40.
+   *
+   * Histórico: 70/58/65/70 (E8-08, 02/09) → 78/66/76/79 (Onda 1, 04/09) → 90 (meta).
    */
   coverageThreshold: {
     global: {
-      statements: 70,
-      branches: 58,
-      functions: 65,
-      lines: 70,
+      statements: 78,
+      branches: 66,
+      functions: 76,
+      lines: 79,
     },
   },
 };

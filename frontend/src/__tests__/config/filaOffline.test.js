@@ -53,7 +53,14 @@ describe("OPS-05 — fila offline", () => {
   });
 
   it("preserva o `ocorridoEm` informado, para o reenvio manter a hora real", async () => {
-    const quando = "2026-09-03T10:15:00.000Z";
+    // Data RELATIVA, não absoluta. Com o literal "2026-09-03T10:15:00.000Z" este
+    // teste era uma bomba-relógio: passou enquanto o carimbo tinha menos de 24h e
+    // começou a falhar sozinho quando o relógio cruzou o `VALIDADE_MS`, porque o
+    // `itensDaFila()` passou a descartar o item como vencido e `[0]` virou
+    // `undefined`. Uma hora atrás é dentro da validade e continua distinguível do
+    // "agora" — que é o que a asserção precisa para provar que o `ocorridoEm`
+    // informado foi preservado, e não sobrescrito pela hora do enfileiramento.
+    const quando = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
     await enfileirar({
       chave: "checkout:v1",

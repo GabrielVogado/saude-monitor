@@ -1,5 +1,5 @@
 import { buildApiUrl } from "../../../config/api";
-import { classificarErroDeRede, fetchComTimeout } from "../../../config/http";
+import { classificarErroDeRede, fetchComRetry, fetchComTimeout } from "../../../config/http";
 import TokenStorage from "../../../services/TokenStorage";
 
 const BASE_PATH = "/api/v1/auth";
@@ -10,16 +10,20 @@ const BASE_PATH = "/api/v1/auth";
  * - `POST /api/v1/auth/refresh` → rotaciona o par de tokens
  * - `POST /api/v1/auth/logout` → revoga o refresh token no servidor (blacklist)
  */
-async function post(path, body) {
+async function post(path, body, { idempotente = false } = {}) {
   const url = buildApiUrl(path);
 
   let response;
   try {
-    response = await fetchComTimeout(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    response = await fetchComRetry(
+      url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+      { idempotente }
+    );
   } catch (error) {
     throw await classificarErroDeRede(error, url);
   }
@@ -56,7 +60,12 @@ class LoginService {
       rememberDevice: Boolean(rememberDevice),
     };
 
-    const response = await post(`${BASE_PATH}/login`, payload);
+    // O login é a primeira requisição do app e por isso a que mais encontra o
+    // servidor hibernado (PERF-04). Repetir é seguro: autenticar duas vezes
+    // apenas emite um novo par de tokens. O `refresh` fica de fora de propósito
+    // — ele **rotaciona** o refresh token, e uma repetição depois de o servidor
+    // já ter rotacionado enviaria um token morto e derrubaria a sessão.
+    const response = await post(`${BASE_PATH}/login`, payload, { idempotente: true });
 
     if (response.usuario?.papel === "ADMIN") {
       throw new Error(

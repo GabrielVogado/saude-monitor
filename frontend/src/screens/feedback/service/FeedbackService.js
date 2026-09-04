@@ -1,5 +1,5 @@
 import { buildApiUrl } from "../../../config/api";
-import { classificarErroDeRede, fetchComTimeout } from "../../../config/http";
+import { classificarErroDeRede, fetchComRetry } from "../../../config/http";
 import { geracaoDaSessao, renovarSessao } from "../../../config/sessao";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../auth/service/LoginService";
@@ -34,7 +34,7 @@ async function request(path, { method = "GET", body, headers = {} } = {}) {
 
     let response;
     try {
-      response = await fetchComTimeout(url, config);
+      response = await fetchComRetry(url, config);
     } catch (error) {
       throw await classificarErroDeRede(error, url);
     }

@@ -64,6 +64,14 @@ public class VisitaServiceImpl implements VisitaService {
     private static final double LIMITE_EMPATE_METROS = 10.0;
     /** Janela sem sinal de posição a partir da qual a visita é encerrada como GPS_INTERROMPIDO (RN-06/E2-05). */
     private static final Duration LIMITE_GPS_INTERROMPIDO = Duration.ofMinutes(10);
+    /**
+     * Idade máxima aceita para o {@code ocorridoEm} informado pelo aplicativo (OPS-05).
+     * É a mesma janela em que a visita expira por falta de sinal de vida (RN-04): um evento
+     * mais antigo que isso não reconstrói nada, só criaria registro sem correspondência.
+     */
+    private static final Duration LIMITE_EVENTO_OFFLINE = Duration.ofHours(24);
+    /** Folga para relógio adiantado do aparelho antes de descartar um {@code ocorridoEm} futuro. */
+    private static final Duration TOLERANCIA_RELOGIO = Duration.ofMinutes(5);
 
     private static final List<StatusVisita> STATUS_ATIVOS = List.of(StatusVisita.EM_ATENDIMENTO, StatusVisita.SUSPEITA);
 
@@ -100,11 +108,14 @@ public class VisitaServiceImpl implements VisitaService {
         }
 
         Instant agora = Instant.now();
+        // A entrada é o momento do evento (que pode ter ficado na fila offline, OPS-05);
+        // `criadoEm` e o heartbeat são do recebimento, porque é agora que o servidor soube.
+        Instant entrada = resolverMomento(request.ocorridoEm(), agora);
         VisitaDocument.VisitaDocumentBuilder builder = VisitaDocument.builder()
                 .usuarioId(usuarioId)
                 .dispositivoId(request.dispositivoId())
                 .hospitalId(hospitalId)
-                .entrada(agora)
+                .entrada(entrada)
                 .status(StatusVisita.EM_ATENDIMENTO)
                 .tipoPermanencia(TipoPermanencia.ATENDIMENTO)
                 .ultimoHeartbeat(agora)
@@ -112,8 +123,8 @@ public class VisitaServiceImpl implements VisitaService {
                 .criadoEm(agora);
 
         if (request.posicao() != null) {
-            builder.pontosAmostrais(List.of(toPontoAmostral(request.posicao(), agora)));
-            builder.ultimaPosicaoEm(agora);
+            builder.pontosAmostrais(List.of(toPontoAmostral(request.posicao(), entrada)));
+            builder.ultimaPosicaoEm(entrada);
         }
 
         VisitaDocument salva = visitaRepository.save(builder.build());
@@ -127,15 +138,22 @@ public class VisitaServiceImpl implements VisitaService {
         Instant agora = Instant.now();
         boolean gpsIndisponivel = Boolean.TRUE.equals(request.gpsIndisponivel());
 
-        visita.setSaida(agora);
-        visita.setDuracaoMinutos((int) Duration.between(visita.getEntrada(), agora).toMinutes());
+        // Saída nunca antes da entrada: um `ocorridoEm` da fila offline com relógio errado
+        // produziria duração negativa, que envenenaria a mediana de permanência (RN-15).
+        Instant saida = resolverMomento(request.ocorridoEm(), agora);
+        if (saida.isBefore(visita.getEntrada())) {
+            saida = visita.getEntrada();
+        }
+
+        visita.setSaida(saida);
+        visita.setDuracaoMinutos((int) Duration.between(visita.getEntrada(), saida).toMinutes());
         visita.setStatus(gpsIndisponivel ? StatusVisita.GPS_INTERROMPIDO : StatusVisita.FINALIZADA);
         if (Boolean.TRUE.equals(request.encerramentoManual())) {
             visita.setEncerramentoManual(true);
         }
         if (request.posicao() != null) {
-            visita.getPontosAmostrais().add(toPontoAmostral(request.posicao(), agora));
-            visita.setUltimaPosicaoEm(agora);
+            visita.getPontosAmostrais().add(toPontoAmostral(request.posicao(), saida));
+            visita.setUltimaPosicaoEm(saida);
         }
 
         VisitaDocument salva = visitaRepository.save(visita);
@@ -356,6 +374,33 @@ public class VisitaServiceImpl implements VisitaService {
             throw new NaoAutorizadoException("Usuário não autenticado.");
         }
         return usuarioId;
+    }
+
+    /**
+     * Resolve o momento de um evento de visita.
+     *
+     * <p>O aplicativo informa {@code ocorridoEm} quando o evento foi detectado sem internet e
+     * ficou na fila offline (OPS-05) — é o único jeito de a visita registrar a hora real da
+     * entrada, e não a da reconexão. O campo vem de um endpoint público (OPS-03), então não é
+     * confiável: só é aceito no passado recente, dentro da mesma janela de 24h em que uma
+     * visita ainda faz sentido. Fora disso, ou ausente, vale o relógio do servidor.</p>
+     *
+     * <p>O limite não impede fraude — quem chama o endpoint já podia registrar uma visita
+     * falsa esperando o tempo passar. Ele impede que um relógio errado no aparelho, que é o
+     * caso comum, produza permanência de dias ou negativa nos indicadores (RN-15).</p>
+     */
+    private Instant resolverMomento(Instant ocorridoEm, Instant agora) {
+        if (ocorridoEm == null) {
+            return agora;
+        }
+        if (ocorridoEm.isAfter(agora.plus(TOLERANCIA_RELOGIO))) {
+            return agora;
+        }
+        if (ocorridoEm.isBefore(agora.minus(LIMITE_EVENTO_OFFLINE))) {
+            return agora;
+        }
+        // Relógio levemente adiantado, dentro da tolerância: não deixa o evento no futuro.
+        return ocorridoEm.isAfter(agora) ? agora : ocorridoEm;
     }
 
     private PontoAmostralDocument toPontoAmostral(PosicaoDto dto, Instant em) {

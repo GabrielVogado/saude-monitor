@@ -1,6 +1,12 @@
 import { buildApiUrl } from "../../../config/api";
 
-import { classificarErroDeRede, fetchComTimeout } from "../../../config/http";
+import {
+  ErroEnfileirado,
+  ErroSemInternet,
+  classificarErroDeRede,
+  fetchComRetry,
+} from "../../../config/http";
+import { enfileirar } from "../../../config/filaOffline";
 import { geracaoDaSessao, renovarSessao } from "../../../config/sessao";
 import TokenStorage from "../../../services/TokenStorage";
 import DispositivoId from "../../../services/DispositivoId";
@@ -22,8 +28,11 @@ async function authHeaders() {
  * Cliente HTTP compartilhado, com tratamento de erro pt-BR, envelope de erro
  * padronizado (Especificacao-API-v2.0 §1.1) e renovação automática do token
  * (401 → refresh → retry único). Replica o padrão de `HospitalService.js`.
+ *
+ * `idempotente` marca as chamadas que podem ser repetidas pelo backoff (OPS-05)
+ * mesmo não sendo GET — ver `fetchComRetry`.
  */
-async function request(path, { method = "GET", body, headers = {} } = {}) {
+async function request(path, { method = "GET", body, headers = {}, idempotente } = {}) {
   const doFetch = async () => {
     const url = buildApiUrl(path);
     const config = {
@@ -41,7 +50,7 @@ async function request(path, { method = "GET", body, headers = {} } = {}) {
 
     let response;
     try {
-      response = await fetchComTimeout(url, config);
+      response = await fetchComRetry(url, config, { idempotente });
     } catch (error) {
       throw await classificarErroDeRede(error, url);
     }
@@ -102,6 +111,20 @@ function buildQuery(params = {}) {
   return query ? `?${query}` : "";
 }
 
+/**
+ * Guarda o evento na fila offline (OPS-05) e devolve o erro que a tela — ou a
+ * tarefa de background — deve propagar.
+ *
+ * Chamado somente quando a falha foi por falta de internet, isto é, quando a
+ * requisição não chegou a sair do aparelho. Nesse caso o reenvio é seguro: não
+ * existe a dúvida de "o servidor chegou a receber?" que impediria repetir.
+ */
+async function guardarOffline({ chave, tipo, corpo }) {
+  await enfileirar({ chave, tipo, corpo });
+
+  return new ErroEnfileirado();
+}
+
 class VisitaService {
   /**
    * Registra entrada (E2-01/E2-06). `origem` = "GEOFENCE" | "MANUAL".
@@ -117,18 +140,80 @@ class VisitaService {
     } else if (!(await TokenStorage.getAccessToken())) {
       corpo.dispositivoId = await DispositivoId.obter();
     }
-    return request(`${BASE_PATH}/checkin`, {
-      method: "POST",
-      body: corpo,
-    });
+    try {
+      // Repetível apesar de POST: o backend resolve o check-in pela visita ativa
+      // do usuário/dispositivo e devolve a existente em vez de criar outra
+      // (§3.3/RN-03), então a repetição do backoff não duplica visita.
+      return await request(`${BASE_PATH}/checkin`, {
+        method: "POST",
+        body: corpo,
+        idempotente: true,
+      });
+    } catch (erro) {
+      if (erro instanceof ErroSemInternet) {
+        // OPS-01: este é o caminho do geofencing em segundo plano, sem tela e
+        // sem usuário. Sem a fila, a visita se perderia em silêncio.
+        throw await guardarOffline({
+          chave: `checkin:${hospitalId}`,
+          tipo: "checkin",
+          corpo,
+        });
+      }
+      throw erro;
+    }
   }
 
   /** Registra saída (E2-02/E2-05). `gpsIndisponivel` encerra como GPS_INTERROMPIDO. */
-  static checkout(id, { posicao, gpsIndisponivel, encerramentoManual } = {}) {
-    return request(`${BASE_PATH}/${id}/checkout`, {
-      method: "POST",
-      body: { posicao, gpsIndisponivel, encerramentoManual },
-    });
+  static async checkout(id, { posicao, gpsIndisponivel, encerramentoManual } = {}) {
+    const corpo = { posicao, gpsIndisponivel, encerramentoManual };
+
+    try {
+      // Repetível pelo mesmo motivo do check-in: o checkout é endereçado à
+      // visita, e a segunda chegada encontra a visita já encerrada (409).
+      return await request(`${BASE_PATH}/${id}/checkout`, {
+        method: "POST",
+        body: corpo,
+        idempotente: true,
+      });
+    } catch (erro) {
+      if (erro instanceof ErroSemInternet) {
+        throw await guardarOffline({
+          chave: `checkout:${id}`,
+          tipo: "checkout",
+          corpo: { visitaId: id, ...corpo },
+        });
+      }
+      throw erro;
+    }
+  }
+
+  /**
+   * Reenvia um item da fila offline (OPS-05). Usado apenas pelo
+   * `SincronizacaoOffline`; não enfileira de novo em caso de falha, porque o
+   * item já está na fila — quem decide mantê-lo ou descartá-lo é o sincronizador.
+   *
+   * O `ocorridoEm` carrega o momento real do evento, não o do reenvio: sem ele a
+   * visita registraria a hora em que a internet voltou.
+   */
+  static enviarEventoOffline(item) {
+    if (item?.tipo === "checkin") {
+      return request(`${BASE_PATH}/checkin`, {
+        method: "POST",
+        body: { ...item.corpo, ocorridoEm: item.ocorridoEm },
+        idempotente: true,
+      });
+    }
+
+    if (item?.tipo === "checkout") {
+      const { visitaId, ...dados } = item.corpo || {};
+      return request(`${BASE_PATH}/${visitaId}/checkout`, {
+        method: "POST",
+        body: { ...dados, ocorridoEm: item.ocorridoEm },
+        idempotente: true,
+      });
+    }
+
+    return Promise.reject(new Error(`Evento desconhecido na fila offline: ${item?.tipo}`));
   }
 
   /** Sinal de vida da visita ativa (E2-09); posição opcional renova o sinal de GPS (E2-05). */

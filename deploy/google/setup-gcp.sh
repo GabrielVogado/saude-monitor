@@ -24,7 +24,9 @@ echo "== 1/7 APIs =="
 gcloud services enable \
   run.googleapis.com \
   artifactregistry.googleapis.com \
+  iam.googleapis.com \
   iamcredentials.googleapis.com \
+  sts.googleapis.com \
   secretmanager.googleapis.com \
   cloudresourcemanager.googleapis.com
 

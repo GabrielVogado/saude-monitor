@@ -2,6 +2,10 @@
 
 Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gratuitos, com ambientes separados por branch (hoje **só `dev` existe** — ver a tabela abaixo).
 
+> **Atencao (04/09/2026):** o backend migrou do Render para o **Google Cloud Run**.
+> Este guia ainda descreve o Render como caminho principal e sera revisado. A
+> referencia vigente para o backend e [`deploy/google/README.md`](../deploy/google/README.md).
+
 ## Arquitetura
 
 | Componente | Serviço | Custo |
@@ -83,7 +87,8 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 | Arquivo | Gatilho | Ação |
 |---------|---------|------|
 | `.github/workflows/ci.yml` | push/PR em develop/master | Build + testes backend e frontend |
-| `.github/workflows/cd-backend.yml` | push develop/master/release **+ caminho `backend/**`** | Docker → GHCR → deploy Render. Falha com mensagem explícita se o ambiente não tiver secrets |
+| `.github/workflows/cd-backend-google.yml` | push develop/master/release **+ caminho `backend/**`** | Docker -> Artifact Registry -> deploy no Google Cloud Run (southamerica-east1). Autenticacao por Workload Identity Federation. Ver `deploy/google/README.md` |
+| `.github/workflows/cd-backend-render.yml` | **pausado** -- so `workflow_dispatch` | Docker → GHCR → deploy Render. Falha com mensagem explícita se o ambiente não tiver secrets |
 | `.github/workflows/cd-mobile-apk.yml` | push `develop`/`master` (caminho `frontend/**`) + manual | APK interno com Gradle no Actions — sem cota do EAS. Artefato do run, 30 dias |
 | `.github/workflows/cd-mobile-eas.yml` | **só manual** (`workflow_dispatch`, **a partir de `release/*`** — outras refs são recusadas) | AAB de loja no EAS |
 | `.github/workflows/keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` contra a hibernação do Render (E8-01) |

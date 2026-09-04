@@ -96,9 +96,12 @@ jobs:
           service: ${{ env.SERVICE_NAME }}${{ needs.resolve-env.outputs.service_suffix }}
           region: ${{ env.REGION }}
           image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
-          env_vars: |
-            MONGO_DATABASE=saude_monitor_${{ needs.resolve-env.outputs.env }}
-            MONGO_AUTH_DB=admin
+          # Sem env_vars de Mongo de proposito. Em application.properties a linha e
+          # `spring.mongodb.uri=${MONGO_URI:mongodb://...${MONGO_DATABASE:...}...}`:
+          # MONGO_DATABASE e MONGO_AUTH_DB so sao lidos DENTRO do default usado quando
+          # MONGO_URI nao existe. Como o deploy sempre fornece MONGO_URI, defini-los
+          # aqui nao teria efeito nenhum -- e sugeriria um isolamento dev/prod que na
+          # verdade depende so do banco embutido em cada URI.
           secrets: |
             MONGO_URI=saude-monitor-mongo-uri${{ needs.resolve-env.outputs.secret_suffix }}:latest
             JWT_SECRET=saude-monitor-jwt-secret${{ needs.resolve-env.outputs.secret_suffix }}:latest
@@ -111,10 +114,16 @@ jobs:
             --memory=1Gi
             --cpu=1
             --min-instances=0
-            --max-instances=2
+            --max-instances=1
             --timeout=60s
+          # --max-instances=1 nao e escolha de capacidade, e trava de seguranca:
+          # SeedRunner.java:57 le `hospitalRepository.count()` e so pula o seed se der
+          # diferente de zero. No Render, instancia unica, a corrida era inalcancavel.
+          # No Cloud Run, dois cold starts simultaneos contra a colecao vazia passam
+          # os dois pelo check e importam o DBF/SHP duas vezes. Subir esse limite exige
+          # antes tornar o seed idempotente (lock ou indice unico por codigoCnes).
 
-      - name: Smoke test do /actuator/health
+      - name: Smoke test (aplicacao e banco)
         env:
           URL: ${{ steps.deploy.outputs.url }}
         run: |
@@ -130,4 +139,24 @@ jobs:
           done
           echo "ERRO: /actuator/health nao respondeu 200 em 6 tentativas."
           [ -s /tmp/health.json ] && cat /tmp/health.json
+          exit 1
+
+      # /actuator/health sozinho nao serve de porteiro: application.properties
+      # desliga o indicador do Mongo (management.health.mongo[db].enabled=false),
+      # entao ele responde 200 com MONGO_URI errada ou inalcancavel. Este passo
+      # bate num endpoint que le a colecao de verdade -- GET /api/v1/hospitais e
+      # permitAll em SecurityConfig.java:60.
+      - name: Smoke test do acesso ao MongoDB
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          URL_HOSPITAIS="$URL/api/v1/hospitais?page=0&size=1"
+          HTTP_CODE=$(curl -sS --max-time 30 -o /tmp/hospitais.json -w '%{http_code}' "$URL_HOSPITAIS" || echo "000")
+          echo "GET /api/v1/hospitais -> HTTP $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ]; then
+            head -c 400 /tmp/hospitais.json
+            exit 0
+          fi
+          echo "ERRO: a aplicacao subiu mas nao consegue ler o MongoDB."
+          [ -s /tmp/hospitais.json ] && head -c 800 /tmp/hospitais.json
           exit 1

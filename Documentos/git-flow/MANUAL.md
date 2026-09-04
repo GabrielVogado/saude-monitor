@@ -58,7 +58,10 @@ feature/* ──► develop ──► master ──► release/<tag>
 2. Desenvolva, commite e abra PR para `develop`.
 
 ### 3.3 Promoção para produção
-1. Abra um **Pull Request** de `develop` → `master`.
+1. Abra um **Pull Request** de `develop` → `master`. **Só de `develop`:** o check
+   `Origem do PR (master)` reprova qualquer outra origem. `master` é produção, e um PR
+   de feature direto para lá pularia a integração — ninguém teria visto aquele código
+   conviver com o resto antes de ir ao ar.
 2. O CI roda no PR (desde 03/09/2026 — antes disso `master` não tinha CI nenhuma).
 
 > ⚠️ **Nem `develop` nem `master` estão protegidas hoje** (verificado pela API em
@@ -68,6 +71,13 @@ feature/* ──► develop ──► master ──► release/<tag>
 > público **não restaura**.
 >
 > Enquanto isso, **um PR com CI vermelho pode ser mergeado nas duas branches**.
+>
+> **Regras da `master`, decididas em 03/09/2026:** exige aprovação do PO e só aceita PR
+> vindo da `develop`. A segunda não existe como regra nativa — virou o check
+> `Origem do PR (master)`. A primeira tem uma ressalva importante: o GitHub não deixa o
+> autor aprovar o próprio PR, então, com um desenvolvedor só, a exigência **depende do
+> bypass de administrador** para que a `master` continue mergeável. O efeito real é
+> transformar a promoção em ato deliberado, não em portão guardado por terceiro.
 >
 > Os rulesets para reimportar estão versionados em
 > [`.github/rulesets/`](../../.github/rulesets/) — importar em

@@ -1,0 +1,51 @@
+# A `master` so aceita PR vindo da `develop`.
+#
+# Nao existe regra nativa para isso -- nem em ruleset nem em branch protection. O
+# GitHub sabe restringir QUEM faz o merge e QUAIS checks precisam passar, mas nao DE
+# ONDE o PR vem. Entao a restricao vira um check, e o ruleset da master o exige.
+#
+# Por que a regra existe: `master` e producao. Um PR de uma feature direto para la
+# pularia a integracao em develop -- ninguem teria visto aquele codigo conviver com o
+# resto antes de ele ir ao ar. A promocao para producao e sempre `develop -> master`.
+name: PR para master
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  origem:
+    name: Origem do PR (master)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verificar a branch de origem
+        env:
+          ORIGEM: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          if [ "$ORIGEM" = "develop" ]; then
+            echo "✅ PR vindo de \`develop\` — promoção válida." >> "$GITHUB_STEP_SUMMARY"
+            echo "origem: $ORIGEM -- ok"
+            exit 0
+          fi
+
+          {
+            echo "❌ **A \`master\` só aceita PR vindo da \`develop\`.**"
+            echo ""
+            echo "Origem deste PR: \`$ORIGEM\`"
+            echo ""
+            echo "\`master\` é produção. Um PR de feature direto para lá pularia a integração:"
+            echo "ninguém teria visto esse código conviver com o resto antes de ir ao ar."
+            echo ""
+            echo "O caminho é \`$ORIGEM\` → \`develop\` → \`master\`."
+            echo ""
+            echo "Em emergência, quem tem bypass de administrador no ruleset pode mergear"
+            echo "assim mesmo — mas é ato deliberado, e fica registrado como tal."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "ERRO: a master so aceita PR de develop. Origem recebida: $ORIGEM"
+          exit 1

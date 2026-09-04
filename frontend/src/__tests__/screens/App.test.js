@@ -79,6 +79,30 @@ jest.mock("react-native-gesture-handler", () => {
   };
 });
 
+/**
+ * O `App` real monta a aba inicial, que consulta a visita ativa (E2-07) — este
+ * smoke test precisa declarar o que a rede responde, senão cai no `fetch` que
+ * falha alto do `jest.setup.js`.
+ *
+ * Antes de 04/09/2026 nada era declarado aqui e, como o guard `if (!global.fetch)`
+ * do setup era inerte no Node 20, esta suíte fazia **HTTP real** contra
+ * `192.168.0.10:8080`. Os sockets e os temporizadores de 20 s do `fetchComTimeout`
+ * sobreviviam ao fim do teste: era a origem única do aviso "A worker process has
+ * failed to exit gracefully" e de ~40 s de espera por execução da suíte inteira.
+ *
+ * A resposta é "sem visita ativa", que é o estado de quem abre o app pela primeira
+ * vez — o caminho que este smoke test deve exercitar.
+ */
+beforeEach(() => {
+  global.fetch = jest.fn(async () => ({
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    json: async () => null,
+    text: async () => "",
+  }));
+});
+
 describe("App — Bottom Tabs (E6-01)", () => {
   it("monta o app e exibe as 4 abas (Início, Hospitais, Mapa, Perfil)", () => {
     render(<App />);

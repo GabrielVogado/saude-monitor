@@ -21,7 +21,7 @@
 | **M-001** | 02/09/2026 | [OBS-001](../../skill-observations/OBS-001-skill-pela-linguagem-do-arquivo.md) | Skill escolhida pela linguagem do arquivo, não pela proximidade da instalação: correção de backend chama `java`, não `expo-skills` | — (aplicada via #63) | ✅ Aplicada — registro reconstituído em 03/09/2026 |
 | **M-002** | 03/09/2026 | [OBS-002](../../skill-observations/OBS-002-ativacao-de-skills-por-dominio.md) → [UPD-002](../../skill-updates/UPD-002-matriz-de-roteamento-de-skills.md) | Matriz de roteamento de skills por área + hook `SessionStart` que a injeta em toda sessão | #63 | ✅ Aplicada |
 | **M-003** | 03/09/2026 | [OBS-003](../../skill-observations/OBS-003-skill-anunciada-nao-e-skill-ativada.md) → [UPD-003](../../skill-updates/UPD-003-portao-verificavel-e-escopo-de-skills.md) | Anunciar ≠ ativar; portão de `code-review` pulado em 3 PRs; `lobehub-react` sai da matriz de `frontend/` | #68 | 🟡 Parcial — item 1 aplicado, 2 e 3 dependem do PO |
-| **M-004** | 04/09/2026 | Observação direta do PO (§ M-004) | Régua de 90% para **todo** o frontend + validação por mutação como parte de escrever teste + piso do `coverageThreshold` sobe a cada onda (70/58/65/70 → 78/66/76/79 → 90) | (Onda 1) | ✅ Aplicada |
+| **M-004** | 04/09/2026 | Observação direta do PO (§ M-004) | Régua de 90% para **todo** o frontend + validação por mutação como parte de escrever teste + piso do `coverageThreshold` sobe a cada onda (70/58/65/70 → 78/66/76/79 → 79/67/77/80 → 90) | (Onda 1) | ✅ Aplicada |
 
 ---
 
@@ -318,7 +318,7 @@ ramo que ninguém checava.
    código que o teste alega proteger e confirmar que o teste falha. Sobreviveu à
    mutação, é teste vacuoso — reescrever, não contabilizar.
 3. **Piso do `coverageThreshold` sobe a cada onda**, como o teto de avisos do lint
-   (E8-13): 70/58/65/70 → **78/66/76/79** → 90. Ganho que não vira piso não está
+   (E8-13): 70/58/65/70 → 78/66/76/79 → **79/67/77/80** → 90. Ganho que não vira piso não está
    protegido; apagar os testes novos voltaria a passar no CI.
 4. **Ondas por risco, não por facilidade.** A próxima é o `GeofencingTaskService`
    (17,6% de statements, **6,9% de branches**) — o check-in automático por geofence,
@@ -348,6 +348,7 @@ achou de novo:
 | "12 de 12 componentes" (3 documentos) | **Afirmação falsa.** A pasta tem 11 componentes `CS*` mais o barril. Nenhuma leitura fecha em 12/12 | Corrigido para 11 |
 | "`components/index.js` em 0/0/0/0" | **Diagnóstico errado.** Módulo só de reexportação: `total: 0` nas quatro métricas, `pct: 100` no `coverage-summary.json`. Não há statement a cobrir e nenhuma onda pode elevá-lo. A causa alegada também é falsa — 7 telas de produção importam o barril | Corrigido; item retirado da fila das ondas |
 | "245 testes em 31 suítes" · "9 testes" na `LoginScreen` | Números defasados | Corrigidos para os medidos |
+| `jest.setup.js` — `if (!global.fetch) { global.fetch = jest.fn(); }` | **Guard inerte.** O Node 20 tem `fetch` nativo, então a condição nunca era verdadeira e o spy nunca era instalado: o `fetch` real sobrevivia. O `App.test.js` (única suíte sem mock próprio, das 34) montava o `App` e disparava **HTTP de verdade** contra `192.168.0.10:8080`. Sockets TCP e os temporizadores de 20 s do `fetchComTimeout` sobreviviam ao teste — origem única do aviso *"A worker process has failed to exit gracefully"*, ~40 s de parede por execução e não-determinismo | Corrigido — atribuição incondicional, com padrão que rejeita em vez de ir à rede; `App.test.js` declara a resposta que espera. Suíte da tela: ~50 s → **9 s**; aviso eliminado |
 
 **Lição de processo:** data absoluta em teste que atravessa lógica de expiração é a
 mesma família do teste vacuoso — o teste deixa de falar sobre o comportamento e passa a

@@ -44,16 +44,26 @@ module.exports = {
    * O piso sobe a cada onda de cobertura, como o teto de avisos do lint (E8-13):
    * ganho que não vira piso não está protegido — apagar os testes novos voltaria a
    * passar no CI. Meta do PO (04/09/2026): **90% em todo o frontend**, medida nas
-   * quatro métricas. Onda 1 (componentes) fechou em 78,81/66,94/76,96/79,40.
+   * quatro métricas.
    *
-   * Histórico: 70/58/65/70 (E8-08, 02/09) → 78/66/76/79 (Onda 1, 04/09) → 90 (meta).
+   * Histórico: 70/58/65/70 (E8-08, 02/09) → 78/66/76/79 (Onda 1, 04/09) →
+   * 79/67/77/80 (pós-merge da OPS-05 #75, 04/09) → 90 (meta).
+   *
+   * FOLGA REAL neste patamar, medida em 79,77/67,96/77,90/80,28:
+   *
+   *   statements 0,77pp · branches 0,96pp · functions 0,90pp · **lines 0,28pp**
+   *
+   * `lines` é o gargalo: 0,28pp de 1.674 linhas são ~5 linhas. Um punhado de
+   * linhas novas sem teste reprova o CI — o que é a intenção da porta, mas cobra
+   * disciplina de quem abrir o próximo PR. Se reprovar por margem e não por
+   * regressão, o caminho é cobrir as linhas novas, não baixar o piso.
    */
   coverageThreshold: {
     global: {
-      statements: 78,
-      branches: 66,
-      functions: 76,
-      lines: 79,
+      statements: 79,
+      branches: 67,
+      functions: 77,
+      lines: 80,
     },
   },
 };

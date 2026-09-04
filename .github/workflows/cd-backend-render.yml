@@ -1,11 +1,20 @@
 name: CD - Backend (Render)
 
+# PAUSADO em 04/09/2026 -- a publicacao do backend migrou para o Google Cloud
+# Run (`cd-backend-google.yml`). O gatilho `push` foi removido de proposito: com
+# ele, todo push em `backend/**` continuaria construindo e publicando no Render,
+# competindo com o Cloud Run pelo mesmo backend e mantendo viva uma instancia
+# `plan: free` que ninguem consome.
+#
+# O workflow NAO foi apagado: enquanto o Cloud Run nao estiver validado, o Render
+# e o caminho de rollback. Continua acionavel sob demanda por `workflow_dispatch`.
+# Para religar o automatico, restaurar o bloco `push:` abaixo.
 on:
-  push:
-    branches: [develop, master, 'release/**']
-    paths:
-      - 'backend/**'
-      - '.github/workflows/cd-backend.yml'
+  # push:
+  #   branches: [develop, master, 'release/**']
+  #   paths:
+  #     - 'backend/**'
+  #     - '.github/workflows/cd-backend-render.yml'
   workflow_dispatch:
 
 env:

@@ -14,18 +14,14 @@
 #
 # O EAS continua, restrito ao AAB de loja em release/<tag> -- que e onde os creditos
 # rendem, e e raro.
+# VALIDADO em 03/09/2026, antes do merge: run 33818555520, 21 min 13 s, APK de 23 MB
+# publicado como artefato. A validacao usou um gatilho de push temporario, ja removido
+# -- um workflow novo so aceita workflow_dispatch depois de estar na branch padrao.
 name: CD - Mobile (APK via Gradle)
 
 on:
   # Manual de proposito. O gatilho automatico foi exatamente o que estourou a cota
   # do EAS; um APK e artefato que se pede, nao que se produz a cada merge.
-  # TEMPORARIO -- so para validar este workflow antes do PR. Um workflow novo so
-  # aceita workflow_dispatch depois de estar na branch padrao, entao a unica forma de
-  # exercita-lo antes do merge e um gatilho de push na propria branch. REMOVIDO no
-  # commit seguinte.
-  push:
-    branches: [feature/apk-sem-eas]
-
   workflow_dispatch:
     inputs:
       variante:

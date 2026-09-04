@@ -90,7 +90,8 @@ feature/* ──► develop ──► master ──► release/<tag>
 |----------|---------|------|
 | `ci.yml` | push/PR em `develop`/`master` | Build + testes do backend e frontend |
 | `cd-backend.yml` | push em `develop`, `master`, `release/**` (caminho `backend/**`) | Docker → GHCR → deploy Render. **Falha com mensagem explícita** se o ambiente não tiver secrets |
-| `cd-mobile-eas.yml` | push em `develop`, `master`, `release/**` (caminho `frontend/**`) | Build do APK no EAS |
+| `cd-mobile-apk.yml` | **manual** (`workflow_dispatch`, variante release/debug) | Build do **APK interno** com Gradle no próprio Actions. Publica o APK como artefato do run (30 dias) |
+| `cd-mobile-eas.yml` | push em `release/**` (caminho `frontend/**`) | Build do **AAB de loja** no EAS |
 | `keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` para impedir a hibernação do Render (E8-01) |
 | `release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
 
@@ -104,6 +105,28 @@ feature/* ──► develop ──► master ──► release/<tag>
 > - `cd-backend-oracle.yml` — zero execuções desde a criação. Fazia deploy por SSH
 >   numa VM Oracle Cloud que não existe: São Paulo está sem capacidade Always Free, e
 >   a migração está parada por decisão do PO.
+
+> ### Por que o APK saiu do EAS (03/09/2026)
+>
+> O `cd-mobile-eas.yml` disparava a **cada push** em `frontend/**`. Foram **18 builds
+> em agosto e 20 nos três primeiros dias de setembro**, contra os **30/mês** do free
+> tier — a cota foi consumida por builds automáticos que ninguém pediu, e o projeto
+> ficou sem conseguir gerar APK.
+>
+> O projeto não precisa do EAS para isso: `frontend/android/` está versionado por
+> inteiro e o repositório é **público**, então minutos de Actions são gratuitos e
+> ilimitados. O `cd-mobile-apk.yml` constrói com Gradle, é **manual** de propósito — um
+> APK é artefato que se pede, não que se produz a cada merge — e foi validado antes do
+> merge: 21 min 13 s, APK de 23 MB.
+>
+> O EAS ficou com o **AAB de loja** em `release/<tag>`, que é raro e é onde os créditos
+> rendem.
+>
+> **Assinatura:** a variante `release` assina com `signingConfigs.debug`, e o
+> `debug.keystore` não é versionado (`.gitignore`: `*.keystore`). O workflow usa o
+> secret `ANDROID_KEYSTORE_BASE64` quando existir; sem ele, gera uma keystore e avisa
+> no resumo do job que a chave muda a cada execução — APKs de runs diferentes não se
+> atualizam entre si, é preciso desinstalar antes.
 
 ### 4.2 Mapeamento de ambiente (lógica do `resolve-env`)
 

@@ -1,21 +1,42 @@
+# ⚠️ RESTRITO AO AAB DE LOJA em 03/09/2026.
+#
+# Este workflow disparava a cada push em `frontend/**`. Foram 18 builds em agosto e 20
+# nos três primeiros dias de setembro, contra os 30/mês do free tier do EAS — a cota
+# foi consumida por builds automáticos que ninguém pediu, e o projeto ficou sem
+# conseguir gerar APK.
+#
+# O APK interno passou para o `cd-mobile-apk.yml`, que constrói com Gradle no próprio
+# GitHub Actions: `frontend/android/` está versionado por inteiro e o repositório é
+# público, então não custa cota nem minutos.
+#
+# O EAS fica para o que só ele faz bem: o AAB assinado para a Play Store, a partir de
+# uma versão fixada. É raro, e é onde os créditos rendem.
 name: CD - Mobile (EAS Build)
 
 on:
-  push:
-    branches: [develop, master, 'release/**']
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/cd-mobile-eas.yml'
+  # SO MANUAL, por decisao do PO em 03/09/2026. Publicar na loja e ato deliberado --
+  # ninguem quer um AAB porque uma branch nasceu.
+  #
+  # De quebra, some uma armadilha que um gatilho em `release/**` teria: o release.yml
+  # faz checkout com actions/checkout@v4 (persist-credentials padrao) e empurra a
+  # branch com o GITHUB_TOKEN -- e a REGRA DE RECURSAO do GitHub nao cria execucao de
+  # workflow nenhuma para push feito com esse token. Nao e questao de filtro de
+  # `paths` nem de a branch nascer sem commit: NADA dispararia, e o silencio pareceria
+  # normal. Sem gatilho automatico, ninguem espera por um disparo que nao vem.
   workflow_dispatch:
 
 jobs:
   # Mapeia a branch para o perfil de build do EAS.
-  #   develop       -> preview (APK interno)
-  #   master        -> preview (APK interno)
   #   release/<tag> -> production (AAB para loja)
   #
-  # `master` continua em preview de proposito: o AAB de loja sai de uma versao
-  # fixada (release/<tag>), nao de todo commit promovido.
+  # develop e master saíram do gatilho: o APK interno deles é feito pelo
+  # cd-mobile-apk.yml, com Gradle.
+  #
+  # O perfil `preview` ficou INALCANÇÁVEL de propósito — a guarda logo abaixo recusa
+  # qualquer ref que não seja release/*. Ele produzia exatamente o APK interno que o
+  # Gradle agora entrega de graça, e era por ali que a cota escorria. Consequência a
+  # registrar: o bloco `preview` do frontend/eas.json virou configuração morta; fica
+  # como está caso a política mude, mas nenhum caminho o alcança hoje.
   resolve-profile:
     runs-on: ubuntu-latest
     outputs:
@@ -25,9 +46,16 @@ jobs:
         run: |
           if [[ "${{ github.ref }}" == refs/heads/release/* ]]; then
             echo "profile=production" >> "$GITHUB_OUTPUT"
-          else
-            echo "profile=preview" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          # Fora de release/*, o perfil seria `preview` -- exatamente o APK interno
+          # que o cd-mobile-apk.yml produz de graca. Rodar aqui gastaria um credito
+          # do EAS para obter o mesmo artefato, que e como a cota foi consumida ate
+          # 03/09/2026. A politica do workflow passa a ser cobrada por ele mesmo.
+          echo "ERRO: este workflow existe so para o AAB de loja, a partir de release/*."
+          echo "Para APK interno use 'CD - Mobile (APK via Gradle)', que nao gasta cota."
+          echo "Ref recebida: ${{ github.ref }}"
+          exit 1
 
   eas-build:
     name: EAS Build (${{ needs.resolve-profile.outputs.profile }})

@@ -10,7 +10,7 @@ O **Clinical Sanctuary** detecta automaticamente a entrada e saída de usuários
 
 - **Backend:** Spring Boot 4 (Java 25) + MongoDB, empacotado em Docker.
 - **Frontend:** React Native / Expo 55 (web via `react-native-web` + APK mobile).
-- **CI/CD:** GitHub Actions + Render (backend) + EAS (APK) + MongoDB Atlas (banco). **O frontend web não tem provedor de publicação** — ver §4.1.
+- **CI/CD:** GitHub Actions + Render (backend) + Gradle no Actions (APK) + EAS (AAB de loja) + MongoDB Atlas (banco). **O frontend web não tem provedor de publicação** — ver §4.1.
 
 ---
 
@@ -90,7 +90,8 @@ feature/* ──► develop ──► master ──► release/<tag>
 |----------|---------|------|
 | `ci.yml` | push/PR em `develop`/`master` | Build + testes do backend e frontend |
 | `cd-backend.yml` | push em `develop`, `master`, `release/**` (caminho `backend/**`) | Docker → GHCR → deploy Render. **Falha com mensagem explícita** se o ambiente não tiver secrets |
-| `cd-mobile-eas.yml` | push em `develop`, `master`, `release/**` (caminho `frontend/**`) | Build do APK no EAS |
+| `cd-mobile-apk.yml` | push em `develop`/`master` (caminho `frontend/**`) **+ manual** | Build do **APK interno** com Gradle no próprio Actions. Publica o APK como artefato do run (30 dias) |
+| `cd-mobile-eas.yml` | **só manual** (`workflow_dispatch`, a partir de `release/*`) | Build do **AAB de loja** no EAS |
 | `keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` para impedir a hibernação do Render (E8-01) |
 | `release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
 
@@ -104,6 +105,53 @@ feature/* ──► develop ──► master ──► release/<tag>
 > - `cd-backend-oracle.yml` — zero execuções desde a criação. Fazia deploy por SSH
 >   numa VM Oracle Cloud que não existe: São Paulo está sem capacidade Always Free, e
 >   a migração está parada por decisão do PO.
+
+> ### Por que o APK saiu do EAS (03/09/2026)
+>
+> O `cd-mobile-eas.yml` disparava a **cada push** em `frontend/**`. Foram **18 builds
+> em agosto e 20 nos três primeiros dias de setembro**, contra os **30/mês** do free
+> tier — a cota foi consumida por builds automáticos que ninguém pediu, e o projeto
+> ficou sem conseguir gerar APK.
+>
+> O projeto não precisa do EAS para isso: `frontend/android/` está versionado por
+> inteiro e o repositório é **público**, então minutos de Actions são gratuitos e
+> ilimitados. O `cd-mobile-apk.yml` constrói com Gradle e roda **automaticamente** em
+> `develop` e `master` (ver a decisão logo abaixo), além do disparo manual. Validado
+> antes do merge: 21 min 13 s, APK de 23 MB.
+>
+> O EAS ficou com o **AAB de loja** em `release/<tag>`, que é raro e é onde os créditos
+> rendem.
+>
+> **Decisão de 03/09/2026:** o EAS ficou **só manual**, e o APK do Gradle ficou
+> **automático** em `develop` e `master`. A divisão é por custo: publicar na loja é ato
+> deliberado e consome crédito; um APK de teste não custa nada e é mais útil pronto.
+>
+> Isso também eliminou uma armadilha que um gatilho em `release/**` teria, e cuja causa
+> real só apareceu na segunda passada do `code-review`: o `release.yml` faz checkout com
+> `actions/checkout@v4` e empurra a branch com o **`GITHUB_TOKEN`** — e a **regra de
+> recursão** do GitHub não cria execução de workflow nenhuma para push feito com esse
+> token. Não é questão de filtro de `paths` nem de a branch nascer sem commit:
+> **nada dispararia**, e o silêncio pareceria normal. Sem gatilho automático, ninguém
+> fica esperando por um disparo que não vem.
+>
+> ⚠️ **Precondição para o APK automático ser confortável:** o secret
+> `ANDROID_KEYSTORE_BASE64`. Sem ele cada build gera uma keystore nova, e instalar um
+> APK por cima do anterior falha com "app não instalado" — o testador desinstala e
+> perde login, `dispositivoId` e feedback pendente. Automatizar sem o secret entrega
+> esse incômodo com mais frequência. O nome do artefato avisa quando é o caso
+> (`-ASSINATURA-EFEMERA`).
+>
+> ⚠️ **O `cd-backend.yml` ainda tem essa armadilha** (`paths: backend/**`): criar
+> `release/1.0.0` também não dispara o deploy de produção. Não foi corrigido aqui porque
+> remover o filtro faria o backend reconstruir a cada push em `develop`. Registrado na
+> **P-006**, junto da colisão de tag de imagem — as duas se resolvem quando o ambiente de
+> produção for criado.
+>
+> **Assinatura:** a variante `release` assina com `signingConfigs.debug`, e o
+> `debug.keystore` não é versionado (`.gitignore`: `*.keystore`). O workflow usa o
+> secret `ANDROID_KEYSTORE_BASE64` quando existir; sem ele, gera uma keystore e avisa
+> no resumo do job que a chave muda a cada execução — APKs de runs diferentes não se
+> atualizam entre si, é preciso desinstalar antes.
 
 ### 4.2 Mapeamento de ambiente (lógica do `resolve-env`)
 
@@ -142,7 +190,7 @@ Cada secret tem sufixo por ambiente (`_DEV`, `_PROD`):
 Não há hospedagem configurada para o frontend web. O `ci.yml` valida que o
 `npx expo export --platform web` continua funcionando, mas o artefato não é
 publicado em lugar nenhum. A distribuição hoje é o **APK**, gerado pelo
-`cd-mobile-eas.yml`.
+`cd-mobile-apk.yml`, com Gradle no próprio GitHub Actions — sem cota do EAS.
 
 ### 5.4 Variáveis de ambiente do backend
 
@@ -196,5 +244,5 @@ curl -X POST http://localhost:8080/api/v1/visitas/<ID>/checkout \
 ## 7. Observações
 
 - O **Render free** "dorme" após ~15 min de inatividade e acorda na primeira requisição (~30s).
-- O **frontend web** é o build do Expo; o **APK mobile** é gerado localmente via `expo run:android`.
+- O **frontend web** é o build do Expo. O **APK mobile** sai do `cd-mobile-apk.yml` (Actions, manual) ou, localmente, de `npm run build:apk` / `expo run:android --variant release`.
 - Para o frontend web apontar para o backend correto, configure `expo.extra.apiBaseUrlWeb` em `frontend/app.json` (o `api.js` já lê essa variável).

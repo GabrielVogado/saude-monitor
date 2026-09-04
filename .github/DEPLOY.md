@@ -52,7 +52,7 @@ push em release/<tag> → CD prod (Docker → GHCR:<tag> → Render prod, versao
 Não há hospedagem configurada para o frontend web. A esteira `cd-frontend.yml` foi
 **removida**: os segredos `NETLIFY_*` nunca existiram, então ela ficava verde sem
 publicar nada, em 36 execuções. O build `npx expo export --platform web` continua
-sendo validado pelo `ci.yml`. A distribuição hoje é o **APK**, via `cd-mobile-eas.yml`.
+sendo validado pelo `ci.yml`. A distribuição hoje é o **APK**, via `cd-mobile-apk.yml` (Gradle no Actions, automático em `develop`/`master` e também manual, sem cota do EAS).
 
 ### 4. Secrets no GitHub
 No repositório: **Settings → Secrets and variables → Actions → New repository secret**.
@@ -61,6 +61,7 @@ Cada secret tem sufixo `_DEV` ou `_PROD`:
 | Secret | Valor |
 |--------|-------|
 | `RENDER_API_KEY_DEV` / `_PROD` | API Key do Render (pode ser a mesma). O sufixo `_HOM` deixou de existir: depois da P-004 o `resolve-env` só emite `dev` ou `prod`, e um secret `_HOM` nunca seria lido |
+| `ANDROID_KEYSTORE_BASE64` | *(opcional)* keystore do APK em base64. Sem ela o `cd-mobile-apk.yml` gera uma a cada build, e a assinatura deixa de ser estável |
 | `RENDER_SERVICE_ID_DEV` / `_PROD` | ID do serviço do backend em cada ambiente. Hoje só `_DEV` está configurado |
 
 ### 5. Variáveis de ambiente no Render
@@ -74,7 +75,7 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 1. Faça merge de `develop` → `master` (produção contínua é deployada automaticamente).
 2. Valide em produção contínua antes de fixar a versão.
 3. No GitHub, **Actions → Release - Gerar branch de produção → Run workflow**, informando a versão (ex.: `1.0.0`).
-4. A branch `release/1.0.0` é criada a partir da `master` e dispara o deploy da versão fixada.
+4. A branch `release/1.0.0` é criada a partir da `master`. **Nada dispara sozinho**, e a razão não é o filtro de `paths`: o `release.yml` empurra a branch com o `GITHUB_TOKEN`, e a regra de recursão do GitHub não cria execução de workflow para push feito com esse token. O AAB sai por execução manual do `cd-mobile-eas.yml` a partir dessa branch; o deploy do backend depende da P-006.
 5. Após validar, faça merge de `release/1.0.0` de volta em `master` (e `develop`).
 
 ## Workflows
@@ -83,14 +84,15 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 |---------|---------|------|
 | `.github/workflows/ci.yml` | push/PR em develop/master | Build + testes backend e frontend |
 | `.github/workflows/cd-backend.yml` | push develop/master/release **+ caminho `backend/**`** | Docker → GHCR → deploy Render. Falha com mensagem explícita se o ambiente não tiver secrets |
-| `.github/workflows/cd-mobile-eas.yml` | push develop/master/release + caminho `frontend/**` | Build do APK no EAS |
+| `.github/workflows/cd-mobile-apk.yml` | push `develop`/`master` (caminho `frontend/**`) + manual | APK interno com Gradle no Actions — sem cota do EAS. Artefato do run, 30 dias |
+| `.github/workflows/cd-mobile-eas.yml` | **só manual** (`workflow_dispatch`, **a partir de `release/*`** — outras refs são recusadas) | AAB de loja no EAS |
 | `.github/workflows/keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` contra a hibernação do Render (E8-01) |
 | `.github/workflows/release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
 
 ## Observações
 
 - O **Render free** "dorme" após ~15 min de inatividade e acorda na primeira requisição (pode demorar ~30s). Ideal para testes.
-- O **frontend web** é o build do Expo (`react-native-web`). O app mobile (APK) continua sendo gerado localmente via `expo run:android`.
+- O **frontend web** é o build do Expo (`react-native-web`). O APK mobile sai do `cd-mobile-apk.yml` (Actions, automático nas branches de integração e produção, ou manual) e também localmente, via `expo run:android --variant release`.
 - Para o frontend web apontar para o backend correto por ambiente, adicione em `frontend/app.json` → `expo.extra`:
   ```json
   "extra": {

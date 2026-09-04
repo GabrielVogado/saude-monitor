@@ -2,10 +2,7 @@ name: CD - Backend (Google Cloud Run)
 
 on:
   push:
-    # TEMPORARIO -- retirar antes do merge. A branch esta aqui so para exercitar
-    # o pipeline uma vez contra o servico de dev; sem isso, o primeiro deploy real
-    # so aconteceria depois do merge, direto em develop.
-    branches: [develop, master, 'release/**', 'infra/cd-backend-google-cloud-run']
+    branches: [develop, master, 'release/**']
     paths:
       - 'backend/**'
       - '.github/workflows/cd-backend-google.yml'

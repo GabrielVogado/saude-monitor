@@ -12,20 +12,30 @@
 # desativa IPO/LTO por causa do NDK 27), e o repositorio e PUBLICO, entao minutos de
 # Actions sao gratuitos e ilimitados.
 #
-# O EAS continua, restrito ao AAB de loja em release/<tag> -- que e onde os creditos
-# rendem, e e raro.
+# O EAS continua, so para o AAB de loja e SO POR EXECUCAO MANUAL -- que e onde os
+# creditos rendem, e e raro.
 # VALIDADO em 03/09/2026, antes do merge: run 33818555520, 21 min 13 s, APK de 23 MB
 # publicado como artefato. A validacao usou um gatilho de push temporario, ja removido
 # -- um workflow novo so aceita workflow_dispatch depois de estar na branch padrao.
 name: CD - Mobile (APK via Gradle)
 
 on:
-  # TEMPORARIO -- revalidacao apos a reescrita do passo de keystore. REMOVIDO a seguir.
+  # Automatico por decisao do PO em 04/09/2026: toda entrega nas branches de
+  # integracao e de producao deixa um APK pronto para baixar, sem ninguem precisar
+  # lembrar de pedir. O que estourou a cota do EAS nao foi o automatismo em si -- foi
+  # ele custando credito. Aqui nao custa: o repositorio e publico.
+  #
+  # PRECONDICAO para isso ser confortavel: o secret ANDROID_KEYSTORE_BASE64. Sem ele
+  # cada build gera uma keystore nova, e instalar um APK por cima do anterior falha
+  # com "app nao instalado" -- o testador precisa desinstalar e perde login,
+  # dispositivoId e feedback pendente. Automatizar sem o secret entrega o incomodo
+  # mais vezes. O nome do artefato avisa quando e esse o caso.
   push:
-    branches: [feature/apk-sem-eas]
+    branches: [develop, master]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/cd-mobile-apk.yml'
 
-  # Manual de proposito. O gatilho automatico foi exatamente o que estourou a cota
-  # do EAS; um APK e artefato que se pede, nao que se produz a cada merge.
   workflow_dispatch:
     inputs:
       variante:
@@ -36,6 +46,13 @@ on:
 
 permissions:
   contents: read
+
+# Uma sequencia de merges enfileiraria varios builds de ~21 min, e so o ultimo
+# interessa. O dispatch manual fica de fora do cancelamento: quem pediu um APK
+# especifico nao quer ve-lo morrer porque alguem mergeou depois.
+concurrency:
+  group: apk-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   apk:

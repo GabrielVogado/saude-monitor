@@ -90,8 +90,8 @@ feature/* ──► develop ──► master ──► release/<tag>
 |----------|---------|------|
 | `ci.yml` | push/PR em `develop`/`master` | Build + testes do backend e frontend |
 | `cd-backend.yml` | push em `develop`, `master`, `release/**` (caminho `backend/**`) | Docker → GHCR → deploy Render. **Falha com mensagem explícita** se o ambiente não tiver secrets |
-| `cd-mobile-apk.yml` | **manual** (`workflow_dispatch`, variante release/debug) | Build do **APK interno** com Gradle no próprio Actions. Publica o APK como artefato do run (30 dias) |
-| `cd-mobile-eas.yml` | push em `release/**` (**sem** filtro de caminho — ver nota) | Build do **AAB de loja** no EAS |
+| `cd-mobile-apk.yml` | push em `develop`/`master` (caminho `frontend/**`) **+ manual** | Build do **APK interno** com Gradle no próprio Actions. Publica o APK como artefato do run (30 dias) |
+| `cd-mobile-eas.yml` | **só manual** (`workflow_dispatch`, a partir de `release/*`) | Build do **AAB de loja** no EAS |
 | `keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` para impedir a hibernação do Render (E8-01) |
 | `release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
 
@@ -122,11 +122,22 @@ feature/* ──► develop ──► master ──► release/<tag>
 > O EAS ficou com o **AAB de loja** em `release/<tag>`, que é raro e é onde os créditos
 > rendem.
 >
-> ⚠️ **Sem filtro de `paths` no `cd-mobile-eas.yml`, de propósito.** O `release.yml` cria
-> a branch com `git checkout -b` + `git push`, **sem nenhum commit novo** — e um push de
-> criação de branch não carrega diff que case com `paths`. Com o filtro, o workflow não
-> dispararia nunca: a release seria gerada, nenhum AAB sairia, e nada reportaria falha.
-> Isso passava despercebido enquanto os pushes em `develop` também disparavam o EAS.
+> **Decisão de 04/09/2026:** o EAS ficou **só manual**, e o APK do Gradle ficou
+> **automático** em `develop` e `master`. A divisão é por custo: publicar na loja é ato
+> deliberado e consome crédito; um APK de teste não custa nada e é mais útil pronto.
+>
+> Isso também resolveu uma fragilidade que o `code-review` pegou: com gatilho em
+> `release/**`, o `release.yml` cria a branch **sem commit novo**, e um push de criação
+> de branch não carrega diff — qualquer filtro de `paths` tornaria o workflow letra
+> morta, e sem filtro ele dispararia sozinho numa branch recém-criada. Sem gatilho
+> automático, o problema deixa de existir.
+>
+> ⚠️ **Precondição para o APK automático ser confortável:** o secret
+> `ANDROID_KEYSTORE_BASE64`. Sem ele cada build gera uma keystore nova, e instalar um
+> APK por cima do anterior falha com "app não instalado" — o testador desinstala e
+> perde login, `dispositivoId` e feedback pendente. Automatizar sem o secret entrega
+> esse incômodo com mais frequência. O nome do artefato avisa quando é o caso
+> (`-ASSINATURA-EFEMERA`).
 >
 > ⚠️ **O `cd-backend.yml` ainda tem essa armadilha** (`paths: backend/**`): criar
 > `release/1.0.0` também não dispara o deploy de produção. Não foi corrigido aqui porque

@@ -75,7 +75,7 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 1. Faça merge de `develop` → `master` (produção contínua é deployada automaticamente).
 2. Valide em produção contínua antes de fixar a versão.
 3. No GitHub, **Actions → Release - Gerar branch de produção → Run workflow**, informando a versão (ex.: `1.0.0`).
-4. A branch `release/1.0.0` é criada a partir da `master`. Dispara o **AAB no EAS**; o deploy do backend **não** dispara, porque o `cd-backend.yml` filtra por `paths: backend/**` e a criação da branch não carrega diff (P-006).
+4. A branch `release/1.0.0` é criada a partir da `master`. **Nada dispara sozinho:** o AAB sai por execução manual do `cd-mobile-eas.yml` a partir dessa branch, e o deploy do backend não dispara porque o `cd-backend.yml` filtra por `paths: backend/**` e a criação da branch não carrega diff (P-006).
 5. Após validar, faça merge de `release/1.0.0` de volta em `master` (e `develop`).
 
 ## Workflows
@@ -84,8 +84,8 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 |---------|---------|------|
 | `.github/workflows/ci.yml` | push/PR em develop/master | Build + testes backend e frontend |
 | `.github/workflows/cd-backend.yml` | push develop/master/release **+ caminho `backend/**`** | Docker → GHCR → deploy Render. Falha com mensagem explícita se o ambiente não tiver secrets |
-| `.github/workflows/cd-mobile-apk.yml` | **manual** (`workflow_dispatch`) | APK interno com Gradle no Actions — sem cota do EAS. Artefato do run, 30 dias |
-| `.github/workflows/cd-mobile-eas.yml` | push `release/**` (**sem** filtro de caminho: a criação da branch não carrega diff) | AAB de loja no EAS |
+| `.github/workflows/cd-mobile-apk.yml` | push `develop`/`master` (caminho `frontend/**`) + manual | APK interno com Gradle no Actions — sem cota do EAS. Artefato do run, 30 dias |
+| `.github/workflows/cd-mobile-eas.yml` | **só manual** (`workflow_dispatch`) | AAB de loja no EAS |
 | `.github/workflows/keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` contra a hibernação do Render (E8-01) |
 | `.github/workflows/release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
 

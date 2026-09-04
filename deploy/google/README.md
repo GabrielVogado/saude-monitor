@@ -41,9 +41,22 @@ Duas identidades, de proposito:
 
 Nao-sensivel, via `env_vars` do workflow: `MONGO_DATABASE`, `MONGO_AUTH_DB`.
 
-Sensivel, via Secret Manager (`secrets` do workflow): `MONGO_URI`, `JWT_SECRET`,
-`ADMIN_EMAIL`, `ADMIN_SENHA`. Nunca em `env_vars` -- valores ali ficam legiveis
-em texto claro na especificacao da revisao para qualquer um com `viewer`.
+Sensivel, via Secret Manager (`secrets` do workflow): `MONGO_URI` e `JWT_SECRET`
+-- os nomes conforme existem no projeto, sem sufixo em `dev` e com `_PROD` em
+producao. Nunca em `env_vars`: valores ali ficam legiveis em texto claro na
+especificacao da revisao para qualquer um com `viewer`.
+
+**`ADMIN_EMAIL` e `ADMIN_SENHA` nao existem no Secret Manager.** Enquanto for
+assim, o deploy passa `APP_SEEDADMIN_ENABLED=false` e nenhum admin e criado.
+Sem isso, `application.properties:70-71` cairia em `admin@saude.com` /
+`admin123` num servico com `--allow-unauthenticated`. Para ligar o seed:
+
+```bash
+printf 'SEU_EMAIL' | gcloud secrets create ADMIN_EMAIL --data-file=- --replication-policy=automatic
+gcloud secrets create ADMIN_SENHA --data-file=- --replication-policy=automatic   # cole a senha e Ctrl+D
+```
+
+e entao trocar `APP_SEEDADMIN_ENABLED=false` por essas duas entradas em `secrets:`.
 
 ## Pontos em aberto
 

@@ -38,17 +38,17 @@ jobs:
             echo "env=prod" >> "$GITHUB_OUTPUT"
             echo "tag=${GITHUB_REF#refs/heads/release/}" >> "$GITHUB_OUTPUT"
             echo "service_suffix=" >> "$GITHUB_OUTPUT"
-            echo "secret_suffix=-prod" >> "$GITHUB_OUTPUT"
+            echo "secret_suffix=_PROD" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
             echo "env=prod" >> "$GITHUB_OUTPUT"
             echo "tag=prod" >> "$GITHUB_OUTPUT"
             echo "service_suffix=" >> "$GITHUB_OUTPUT"
-            echo "secret_suffix=-prod" >> "$GITHUB_OUTPUT"
+            echo "secret_suffix=_PROD" >> "$GITHUB_OUTPUT"
           else
             echo "env=dev" >> "$GITHUB_OUTPUT"
             echo "tag=dev" >> "$GITHUB_OUTPUT"
             echo "service_suffix=-dev" >> "$GITHUB_OUTPUT"
-            echo "secret_suffix=-dev" >> "$GITHUB_OUTPUT"
+            echo "secret_suffix=" >> "$GITHUB_OUTPUT"
           fi
 
   build-and-deploy:
@@ -102,11 +102,20 @@ jobs:
           # MONGO_URI nao existe. Como o deploy sempre fornece MONGO_URI, defini-los
           # aqui nao teria efeito nenhum -- e sugeriria um isolamento dev/prod que na
           # verdade depende so do banco embutido em cada URI.
+          # Nomes conforme existem no Secret Manager do projeto (verificado em
+          # 04/09/2026): MONGO_URI e JWT_SECRET, sem sufixo. O ambiente prod usa
+          # o sufixo _PROD e ainda nao tem secret criado -- o deploy em master vai
+          # falhar de proposito, em vez de subir com credencial de dev.
           secrets: |
-            MONGO_URI=saude-monitor-mongo-uri${{ needs.resolve-env.outputs.secret_suffix }}:latest
-            JWT_SECRET=saude-monitor-jwt-secret${{ needs.resolve-env.outputs.secret_suffix }}:latest
-            ADMIN_EMAIL=saude-monitor-admin-email${{ needs.resolve-env.outputs.secret_suffix }}:latest
-            ADMIN_SENHA=saude-monitor-admin-senha${{ needs.resolve-env.outputs.secret_suffix }}:latest
+            MONGO_URI=MONGO_URI${{ needs.resolve-env.outputs.secret_suffix }}:latest
+            JWT_SECRET=JWT_SECRET${{ needs.resolve-env.outputs.secret_suffix }}:latest
+          # O seed de admin fica DESLIGADO ate existirem os secrets ADMIN_EMAIL e
+          # ADMIN_SENHA. application.properties:70-71 cai em `admin@saude.com` /
+          # `admin123` quando eles faltam -- e este servico e publico
+          # (--allow-unauthenticated). Um admin com senha conhecida num endpoint
+          # aberto e pior do que nao ter admin nenhum.
+          env_vars: |
+            APP_SEEDADMIN_ENABLED=false
           flags: >-
             --allow-unauthenticated
             --service-account=saude-monitor-run@${{ env.PROJECT_ID }}.iam.gserviceaccount.com

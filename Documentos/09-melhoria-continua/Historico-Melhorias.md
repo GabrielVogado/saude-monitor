@@ -21,7 +21,7 @@
 | **M-001** | 02/09/2026 | [OBS-001](../../skill-observations/OBS-001-skill-pela-linguagem-do-arquivo.md) | Skill escolhida pela linguagem do arquivo, não pela proximidade da instalação: correção de backend chama `java`, não `expo-skills` | — (aplicada via #63) | ✅ Aplicada — registro reconstituído em 03/09/2026 |
 | **M-002** | 03/09/2026 | [OBS-002](../../skill-observations/OBS-002-ativacao-de-skills-por-dominio.md) → [UPD-002](../../skill-updates/UPD-002-matriz-de-roteamento-de-skills.md) | Matriz de roteamento de skills por área + hook `SessionStart` que a injeta em toda sessão | #63 | ✅ Aplicada |
 | **M-003** | 03/09/2026 | [OBS-003](../../skill-observations/OBS-003-skill-anunciada-nao-e-skill-ativada.md) → [UPD-003](../../skill-updates/UPD-003-portao-verificavel-e-escopo-de-skills.md) | Anunciar ≠ ativar; portão de `code-review` pulado em 3 PRs; `lobehub-react` sai da matriz de `frontend/` | #68 | 🟡 Parcial — item 1 aplicado, 2 e 3 dependem do PO |
-| **M-004** | 04/09/2026 | Observação direta do PO (§ M-004) | Régua de 90% para **todo** o frontend + validação por mutação como parte de escrever teste + piso do `coverageThreshold` sobe a cada onda (70/58/65/70 → 78/66/76/79 → 90) | (Onda 1) | ✅ Aplicada |
+| **M-004** | 04/09/2026 | Observação direta do PO (§ M-004) | Régua de 90% para **todo** o frontend + validação por mutação como parte de escrever teste + piso do `coverageThreshold` sobe a cada onda (70/58/65/70 → 78/66/76/79 → 79/67/77/80 → 90) | (Onda 1) | ✅ Aplicada |
 
 ---
 
@@ -318,7 +318,7 @@ ramo que ninguém checava.
    código que o teste alega proteger e confirmar que o teste falha. Sobreviveu à
    mutação, é teste vacuoso — reescrever, não contabilizar.
 3. **Piso do `coverageThreshold` sobe a cada onda**, como o teto de avisos do lint
-   (E8-13): 70/58/65/70 → **78/66/76/79** → 90. Ganho que não vira piso não está
+   (E8-13): 70/58/65/70 → 78/66/76/79 → **79/67/77/80** → 90. Ganho que não vira piso não está
    protegido; apagar os testes novos voltaria a passar no CI.
 4. **Ondas por risco, não por facilidade.** A próxima é o `GeofencingTaskService`
    (17,6% de statements, **6,9% de branches**) — o check-in automático por geofence,

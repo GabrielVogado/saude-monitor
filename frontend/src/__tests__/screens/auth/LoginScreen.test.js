@@ -9,7 +9,7 @@
  * credencial inválida, erro sem mensagem e sucesso — mais os dois `navigate` da tela.
  */
 import React from "react";
-import { Alert } from "react-native";
+import { Alert, KeyboardAvoidingView } from "react-native";
 import { render, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import LoginScreen from "../../../screens/auth/view/LoginScreen";
 import LoginService from "../../../screens/auth/service/LoginService";
@@ -136,17 +136,30 @@ describe("LoginScreen", () => {
     await waitFor(() => expect(LoginService.login).toHaveBeenCalledTimes(2));
   });
 
-  test("no Android o teclado encolhe a tela em vez de empurrar o conteúdo", () => {
+  test("o KeyboardAvoidingView usa `height` no Android e `padding` no iOS", () => {
     // Único ramo de plataforma da tela (`Platform.OS === "ios" ? "padding" : "height"`).
-    // O preset do jest-expo já roda como iOS, então este é o lado que a suíte nunca
-    // exercitava. Errar aqui esconde o botão Entrar atrás do teclado — e num dos dois
-    // sistemas o defeito passa despercebido.
+    // Errar aqui esconde o botão Entrar atrás do teclado, e num dos dois sistemas o
+    // defeito passa despercebido — o preset do jest-expo roda como iOS, então o lado
+    // Android é o que a suíte nunca exercitaria por acidente.
+    //
+    // O teste lê a prop `behavior` de fato. A versão anterior apenas conferia que o
+    // botão Entrar existia: fixar `behavior="padding"` no código deixava a suíte
+    // inteira verde, ou seja, o único ramo que ela dizia proteger era exatamente o
+    // que não era verificado.
     const { Platform } = require("react-native");
     const original = Platform.OS;
-    Platform.OS = "android";
+
+    const comportamentoPara = (plataforma) => {
+      Platform.OS = plataforma;
+      const { UNSAFE_getByType, unmount } = renderizar();
+      const behavior = UNSAFE_getByType(KeyboardAvoidingView).props.behavior;
+      unmount();
+      return behavior;
+    };
+
     try {
-      renderizar();
-      expect(screen.getByLabelText("Entrar no sistema")).toBeTruthy();
+      expect(comportamentoPara("android")).toBe("height");
+      expect(comportamentoPara("ios")).toBe("padding");
     } finally {
       Platform.OS = original;
     }

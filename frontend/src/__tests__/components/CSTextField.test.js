@@ -43,9 +43,18 @@ describe("CSTextField", () => {
   });
 
   test("sem label, nenhum texto de rótulo é renderizado", () => {
+    // A asserção precisa ser sobre a AUSÊNCIA do rótulo. Conferir só que o campo
+    // existe não distingue `{label ? <Text/> : null}` de um `<Text>` incondicional:
+    // com o rótulo vazando como "UNDEFINED" na tela, a versão anterior deste teste
+    // continuava verde.
     render(<CSTextField value="" onChangeText={jest.fn()} placeholder="Busque" />);
 
     expect(screen.getByPlaceholderText("Busque")).toBeTruthy();
+    // A asserção é sobre texto visível, não sobre o tipo do nó: interrogar
+    // `UNSAFE_queryAllByType(Text)` prenderia o teste à árvore interna do RNTL. O
+    // placeholder não é um nó de texto, então a tela deve estar literalmente sem
+    // nenhum texto renderizado.
+    expect(screen.queryAllByText(/./)).toHaveLength(0);
   });
 
   test("digitar propaga o texto ao chamador", () => {
@@ -106,9 +115,15 @@ describe("CSTextField", () => {
   });
 
   test("sem erro e sem dica, nenhuma linha de apoio é renderizada", () => {
+    // Procurar por "E-mail inválido" não provava nada: sem a prop `error`, essa
+    // string jamais apareceria, com ou sem o ramo `: null`. A asserção real é sobre
+    // a contagem — o único texto da árvore deve ser o rótulo. Qualquer linha de
+    // apoio vazando pelo terceiro ramo do ternário vira um segundo `<Text>`.
     render(<CSTextField label="E-mail" value="" onChangeText={jest.fn()} />);
 
-    expect(screen.queryByText("E-mail inválido")).toBeNull();
+    // O único texto visível deve ser o rótulo. Qualquer linha de apoio vazando pelo
+    // terceiro ramo do ternário aparece aqui como um segundo texto.
+    expect(screen.queryAllByText(/./).map((no) => no.props.children)).toEqual(["E-MAIL"]);
   });
 
   test("ícone e elemento à direita são renderizados quando fornecidos", () => {

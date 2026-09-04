@@ -21,6 +21,7 @@
 | **M-001** | 02/09/2026 | [OBS-001](../../skill-observations/OBS-001-skill-pela-linguagem-do-arquivo.md) | Skill escolhida pela linguagem do arquivo, não pela proximidade da instalação: correção de backend chama `java`, não `expo-skills` | — (aplicada via #63) | ✅ Aplicada — registro reconstituído em 03/09/2026 |
 | **M-002** | 03/09/2026 | [OBS-002](../../skill-observations/OBS-002-ativacao-de-skills-por-dominio.md) → [UPD-002](../../skill-updates/UPD-002-matriz-de-roteamento-de-skills.md) | Matriz de roteamento de skills por área + hook `SessionStart` que a injeta em toda sessão | #63 | ✅ Aplicada |
 | **M-003** | 03/09/2026 | [OBS-003](../../skill-observations/OBS-003-skill-anunciada-nao-e-skill-ativada.md) → [UPD-003](../../skill-updates/UPD-003-portao-verificavel-e-escopo-de-skills.md) | Anunciar ≠ ativar; portão de `code-review` pulado em 3 PRs; `lobehub-react` sai da matriz de `frontend/` | #68 | 🟡 Parcial — item 1 aplicado, 2 e 3 dependem do PO |
+| **M-004** | 04/09/2026 | Observação direta do PO (§ M-004) | Régua de 90% para **todo** o frontend + validação por mutação como parte de escrever teste + piso do `coverageThreshold` sobe a cada onda (70/58/65/70 → 78/66/76/79 → 90) | (Onda 1) | ✅ Aplicada |
 
 ---
 
@@ -276,6 +277,58 @@ sobre o #61 e quebraria do mesmo jeito assim que a esteira rodasse nele.
 | **P-005** | ~~A branch `feature/e8-01-migracao-cloud-run` existe só na máquina local~~ — **encerrada em 03/09/2026 por decisão do PO:** *"Cloud Run não entra nesse escopo, delete."* A branch foi apagada (`d2aabc8`, 626 linhas: workflow `cd-backend-cloudrun.yml`, `deploy/cloudrun/`, `application.properties`, `De-Para`). Nunca chegou ao `origin`, então nada foi removido do repositório remoto. O commit sobrevive no reflog local por ~90 dias, recuperável com `git checkout d2aabc8`. **Consequência registrada:** com a Oracle Cloud inviável (São Paulo sem capacidade Always Free, região *home* imutável) e o Cloud Run fora de escopo, **o destino da migração fica em aberto** — o que mantém o **E8-02** bloqueado. **Uma linha do commit apagado pode valer resgate à parte:** `server.port=${PORT:8080}` no `application.properties`, que torna a porta configurável por variável de ambiente. Não é específica de Cloud Run — vários provedores injetam `PORT`. Não foi resgatada aqui porque alteraria o único caminho de deploy que hoje funciona (`dev` no Render) sem que este PR possa exercitá-lo. | PO | ✅ Fechada |
 | **P-006** | Com `master` e `release/<tag>` mapeados para o mesmo ambiente `prod`, os dois usam o mesmo `RENDER_SERVICE_ID_PROD` mas publicam tags de imagem diferentes — e o `POST /v1/services/<id>/deploys` manda `{}`, redeployando a imagem em que o serviço está fixado, não a recém-construída. Consequência: `release/1.0.0` construiria a `:1.0.0` e o serviço subiria a `:prod` — a "versão fixada" nunca seria implantada. As saídas são passar `imageUrl` no corpo do POST ou usar service IDs separados; as duas mudam o único caminho de deploy que hoje funciona (`dev`), e este PR não pode exercitá-las porque o `paths: backend/**` impede o CD de rodar. **Resolver quando o ambiente de produção for criado.** ➕ **Segundo defeito no mesmo caminho, achado em 03/09/2026:** o `cd-backend.yml` filtra por `paths: backend/**`, e o `release.yml` cria a branch com `git checkout -b` + `git push`, **sem commit novo** — um push de criação de branch não carrega diff que case com `paths`, então **criar `release/1.0.0` não dispara o deploy de produção**. ⚠️ **Correção da causa, 03/09/2026:** a primeira redação culpava o filtro de `paths`. O motivo real é outro e mais profundo — o `release.yml` empurra a branch com o **`GITHUB_TOKEN`**, e a **regra de recursão** do GitHub não cria execução de workflow para push feito com esse token. Isso invalida a saída que este registro propunha: **um gatilho `create:` também não funcionaria**, pelo mesmo motivo — quem implementasse a partir da nota anterior construiria a correção, não veria nada disparar e teria de rediagnosticar do zero. As saídas reais são um PAT (ou token de GitHub App) no `release.yml`, ou disparar o deploy por `workflow_dispatch` a partir da branch de release. | `code-review` da P-004, 03/09/2026 | 🟡 Bloqueada até prod existir |
 | **P-007** | Proteção de branch. ⚠️ **O estado real é pior do que a primeira redação dizia:** ela afirmava que só a `master` estava desprotegida. Verificado pela API em 03/09/2026: **`develop` e `master` estão ambas sem proteção e sem ruleset** — um PR com CI vermelho pode ser mergeado nas duas. O `De-Para` registrava desde 02/09 que a `develop` exigia os dois checks; a causa provável do sumiço é o repositório ter sido tornado **privado** por alguns minutos em 03/09 (proteção de branch não existe em repositório privado no plano Free, e voltar a público não restaura). O portão que o E8-12 entregou está desligado, e a documentação afirmava o contrário — corrigido. **Entregue para resolver:** os rulesets versionados em [`.github/rulesets/`](../../.github/rulesets/), importáveis em Settings → Rules → Rulesets → Import. Faltam dois passos que o import não faz: adicionar o bypass de administrador (se desejado) e conferir que os nomes dos checks batem com os jobs do `ci.yml`. | `code-review` da P-004, 03/09/2026 | 🟡 Ação do PO |
+
+---
+
+## M-004 — Cobertura que não falha quando o código quebra não é cobertura
+
+**Data:** 04/09/2026 · **PR:** (Onda 1 de cobertura do frontend)
+
+### Observação do PO
+
+> "Os testes no Front end deve alcançar o minimo e 90%, Todo o front deve alcançar
+> 90%. Os testes não devem ser testes para passar e aumentar covarage, devem ser
+> testes reais com aplicações reais que irão testar de fato o comportamento do
+> sistema e mante-lo seguro e com boa qualidade."
+
+### Diagnóstico
+
+A Onda 1 fechou a meta anterior — "todos os componentes em 90%", 12 de 12 — e mesmo
+assim entregou garantia falsa. O `code-review` provou **por mutação** que 3 dos 19
+testes novos passavam com o código de produção quebrado:
+
+| Teste | Mutação aplicada | Resultado antes da correção |
+|---|---|---|
+| `LoginScreen` — ramo de plataforma | `behavior={Platform.OS === "ios" ? "padding" : "height"}` → `behavior="padding"` | ✅ passava — e era esse teste que levava a tela a **100% de branches** |
+| `CSTextField` — "sem label, nenhum rótulo" | `{label ? <Text/> : null}` → `<Text>` incondicional | ✅ passava, com o rótulo vazando como "VAZADO" na tela |
+| `CSTextField` — "sem erro e sem dica" | `) : null}` → `) : <Text>linha vazada</Text>}` | ✅ passava |
+
+O padrão: os três **cobriam** o ramo sem **verificar** o ramo. O contador de cobertura
+não distingue as duas coisas — ele conta linha executada, não comportamento garantido.
+O caso da `LoginScreen` é o mais claro: o número dizia 100% exatamente sobre o único
+ramo que ninguém checava.
+
+### O que mudou
+
+1. **Régua do PO:** 90% em **todo** o frontend, nas quatro métricas — não só nos
+   componentes. Estado na virada: 78,81 / 66,94 / 76,96 / 79,40.
+2. **Validação por mutação vira parte de escrever teste.** Quebrar deliberadamente o
+   código que o teste alega proteger e confirmar que o teste falha. Sobreviveu à
+   mutação, é teste vacuoso — reescrever, não contabilizar.
+3. **Piso do `coverageThreshold` sobe a cada onda**, como o teto de avisos do lint
+   (E8-13): 70/58/65/70 → **78/66/76/79** → 90. Ganho que não vira piso não está
+   protegido; apagar os testes novos voltaria a passar no CI.
+4. **Ondas por risco, não por facilidade.** A próxima é o `GeofencingTaskService`
+   (17,6% de statements, **6,9% de branches**) — o check-in automático por geofence,
+   que roda em background, sem ninguém olhando a tela.
+
+### Efeito colateral útil
+
+O mesmo `code-review` achou o **BUG-03**: o controle "Esqueci minha senha"
+(`LoginScreen.js:132`) tem `accessibilityRole="button"` e `accessibilityLabel`, e
+nenhum `onPress`. A tela tinha acabado de ser certificada a 100% em todas as métricas
+sem que nada notasse um botão que não faz nada. Registrado no inventário do E8-05 por
+decisão do PO — implementar recuperação de senha é feature nova, não escopo de teste.
 
 ---
 

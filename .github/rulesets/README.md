@@ -27,7 +27,7 @@ novo, é reimportar.
 | `strict_required_status_checks_policy` | ❌ | ✅ | Em `master`, o PR precisa estar **atualizado com a base** antes do merge. Em `develop` seria atrito diário sem ganho |
 | `allowed_merge_methods` | merge, squash, rebase | **só merge** | Em produção, o histórico precisa preservar o commit de merge para rastrear o que foi promovido |
 | `do_not_enforce_on_create` | ✅ | ✅ | A criação da branch não é bloqueada por falta de checks |
-| **Aprovação exigida** | 0 | **1** | Decisão do PO em 03/09/2026: promoção para produção passa pela aprovação dele. **Leia a ressalva abaixo — em repositório de um dono só, isso se auto-bloqueia sem bypass** |
+| **Aprovação exigida** | 0 | 0 | Ver "Quem pode mergear" abaixo — a exclusividade já vem da permissão do repositório, não de uma regra |
 | **Check `Origem do PR (master)`** | — | ✅ | A `master` só aceita PR vindo da `develop` |
 
 ## A `master` só aceita PR da `develop`
@@ -44,23 +44,46 @@ todo PR que aponta para `master` e falha se a origem não for `develop`. O rules
 pularia a integração em `develop` — ninguém teria visto aquele código conviver com o
 resto antes de ele ir ao ar.
 
-## ⚠️ A aprovação exigida na `master` se auto-bloqueia sem bypass
+## Quem pode mergear na `master`
 
-**O GitHub não permite que o autor aprove o próprio PR.** Como o projeto tem um
-desenvolvedor só, e todo PR sai da conta dele, exigir 1 aprovação significa que
-**nenhum PR pode ser mergeado** — não há quem aprove.
+**Só o dono do repositório — e isso não depende de nenhuma regra.**
 
-Com o bypass de administrador configurado, o efeito real é outro e mais útil: o botão
-de merge deixa de ficar verde sozinho, e a promoção passa a exigir um
-*"merge without waiting for requirements"* consciente. Vira **passo deliberado**, e
-fica registrado como tal no histórico do PR.
+Verificado em 03/09/2026:
 
-É um redutor de velocidade honesto, não um portão que outra pessoa guarda. Se um dia
-houver um segundo revisor, a regra passa a valer no sentido pleno sem nenhuma
-alteração.
+```
+colaboradores: GabrielVogado — permissao: admin
+repositorio pessoal (fora de organizacao)
+```
 
-> **Consequência prática:** sem adicionar o bypass, a `master` fica **impossível de
-> mergear**. O passo 1 abaixo deixa de ser opcional para ela.
+Há **um único colaborador**, e o repositório é pessoal. Ninguém mais tem acesso de
+escrita, então ninguém mais consegue mergear coisa alguma — em `master` ou em
+qualquer outro lugar. A exigência "só eu aceito PR para a master" já está satisfeita
+pela permissão, e nenhum ruleset a torna mais verdadeira.
+
+### Por que NÃO exigimos aprovação
+
+A primeira versão deste ruleset exigia 1 aprovação na `master`. Foi revertido, e vale
+registrar o porquê:
+
+**O GitHub não permite que o autor aprove o próprio PR.** Com um desenvolvedor só,
+todo PR sai da conta do dono — logo, não existe quem aprove. O resultado prático não
+seria proteção: seria a `master` **impossível de mergear** sem acionar o bypass a cada
+promoção. Uma regra que só se cumpre desligando a regra não é uma regra; é atrito com
+aparência de rigor.
+
+O que efetivamente protege a `master` são os três checks obrigatórios e a restrição de
+origem — coisas que uma máquina verifica e que ninguém contorna por distração.
+
+### O que muda se um colaborador for adicionado
+
+Aí a exclusividade deixa de ser automática, e passa a valer a pena:
+
+1. Subir `required_approving_review_count` para 1 — com um segundo revisor, a
+   aprovação passa a significar algo.
+2. Adicionar o dono a `bypass_actors` e manter os demais sob a regra, para que só ele
+   possa promover em caráter excepcional.
+
+Enquanto o repositório tiver um colaborador só, as duas mudanças seriam teatro.
 
 ## ⚠️ Dois passos que o import não faz por você
 
@@ -73,8 +96,9 @@ alteração.
    saída se o CI quebrar por causa externa (aconteceu em 03/09, no `npm ci` do PR
    #61).
 
-   Na **`master` é obrigatório**, pela ressalva da aprovação acima — sem bypass ela
-   fica impossível de mergear.
+   Na `master` vale o mesmo raciocínio. Com a aprovação de volta a 0, ela **não** é
+   obrigatória — o bypass ali serve só para emergência, como promover com um check
+   externo fora do ar.
 
 2. **Os nomes dos checks precisam bater exatamente** com os nomes dos jobs do
    `ci.yml`: `Backend (Spring Boot)` e `Frontend (Expo Web)`. Se um job for renomeado,

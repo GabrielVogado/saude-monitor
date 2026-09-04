@@ -72,12 +72,17 @@ feature/* ──► develop ──► master ──► release/<tag>
 >
 > Enquanto isso, **um PR com CI vermelho pode ser mergeado nas duas branches**.
 >
-> **Regras da `master`, decididas em 03/09/2026:** exige aprovação do PO e só aceita PR
-> vindo da `develop`. A segunda não existe como regra nativa — virou o check
-> `Origem do PR (master)`. A primeira tem uma ressalva importante: o GitHub não deixa o
-> autor aprovar o próprio PR, então, com um desenvolvedor só, a exigência **depende do
-> bypass de administrador** para que a `master` continue mergeável. O efeito real é
-> transformar a promoção em ato deliberado, não em portão guardado por terceiro.
+> **Regras da `master`, decididas em 03/09/2026:** só aceita PR vindo da `develop`, e
+> só o dono do repositório pode mergear.
+>
+> A restrição de origem não existe como regra nativa — virou o check
+> `Origem do PR (master)`. Já a exclusividade do merge **não precisou de regra**: o
+> repositório é pessoal e tem um único colaborador, então ninguém mais tem acesso de
+> escrita. Exigir aprovação foi cogitado e descartado: o GitHub não deixa o autor
+> aprovar o próprio PR, então, com um desenvolvedor só, isso deixaria a `master`
+> impossível de mergear sem acionar o bypass a cada promoção — atrito com aparência de
+> rigor. Se um colaborador for adicionado, a exigência passa a fazer sentido; o
+> [README dos rulesets](../../.github/rulesets/README.md) registra o que mudar.
 >
 > Os rulesets para reimportar estão versionados em
 > [`.github/rulesets/`](../../.github/rulesets/) — importar em

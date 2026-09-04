@@ -115,22 +115,24 @@ feature/* ──► develop ──► master ──► release/<tag>
 >
 > O projeto não precisa do EAS para isso: `frontend/android/` está versionado por
 > inteiro e o repositório é **público**, então minutos de Actions são gratuitos e
-> ilimitados. O `cd-mobile-apk.yml` constrói com Gradle, é **manual** de propósito — um
-> APK é artefato que se pede, não que se produz a cada merge — e foi validado antes do
-> merge: 21 min 13 s, APK de 23 MB.
+> ilimitados. O `cd-mobile-apk.yml` constrói com Gradle e roda **automaticamente** em
+> `develop` e `master` (ver a decisão logo abaixo), além do disparo manual. Validado
+> antes do merge: 21 min 13 s, APK de 23 MB.
 >
 > O EAS ficou com o **AAB de loja** em `release/<tag>`, que é raro e é onde os créditos
 > rendem.
 >
-> **Decisão de 04/09/2026:** o EAS ficou **só manual**, e o APK do Gradle ficou
+> **Decisão de 03/09/2026:** o EAS ficou **só manual**, e o APK do Gradle ficou
 > **automático** em `develop` e `master`. A divisão é por custo: publicar na loja é ato
 > deliberado e consome crédito; um APK de teste não custa nada e é mais útil pronto.
 >
-> Isso também resolveu uma fragilidade que o `code-review` pegou: com gatilho em
-> `release/**`, o `release.yml` cria a branch **sem commit novo**, e um push de criação
-> de branch não carrega diff — qualquer filtro de `paths` tornaria o workflow letra
-> morta, e sem filtro ele dispararia sozinho numa branch recém-criada. Sem gatilho
-> automático, o problema deixa de existir.
+> Isso também eliminou uma armadilha que um gatilho em `release/**` teria, e cuja causa
+> real só apareceu na segunda passada do `code-review`: o `release.yml` faz checkout com
+> `actions/checkout@v4` e empurra a branch com o **`GITHUB_TOKEN`** — e a **regra de
+> recursão** do GitHub não cria execução de workflow nenhuma para push feito com esse
+> token. Não é questão de filtro de `paths` nem de a branch nascer sem commit:
+> **nada dispararia**, e o silêncio pareceria normal. Sem gatilho automático, ninguém
+> fica esperando por um disparo que não vem.
 >
 > ⚠️ **Precondição para o APK automático ser confortável:** o secret
 > `ANDROID_KEYSTORE_BASE64`. Sem ele cada build gera uma keystore nova, e instalar um

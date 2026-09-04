@@ -1,4 +1,4 @@
-# ⚠️ RESTRITO AO AAB DE LOJA desde 03/09/2026.
+# ⚠️ RESTRITO AO AAB DE LOJA em 03/09/2026.
 #
 # Este workflow disparava a cada push em `frontend/**`. Foram 18 builds em agosto e 20
 # nos três primeiros dias de setembro, contra os 30/mês do free tier do EAS — a cota
@@ -14,14 +14,15 @@
 name: CD - Mobile (EAS Build)
 
 on:
-  # SO MANUAL, por decisao do PO em 04/09/2026. Publicar na loja e ato deliberado --
+  # SO MANUAL, por decisao do PO em 03/09/2026. Publicar na loja e ato deliberado --
   # ninguem quer um AAB porque uma branch nasceu.
   #
-  # De quebra, some a fragilidade que o code-review pegou: com gatilho em
-  # `release/**`, o `release.yml` cria a branch sem commit novo, e um push de criacao
-  # de branch nao carrega diff. Qualquer filtro de `paths` tornaria o workflow letra
-  # morta, e sem filtro ele dispararia numa branch recem-criada sem que ninguem
-  # tivesse pedido. Sem gatilho automatico, o problema deixa de existir.
+  # De quebra, some uma armadilha que um gatilho em `release/**` teria: o release.yml
+  # faz checkout com actions/checkout@v4 (persist-credentials padrao) e empurra a
+  # branch com o GITHUB_TOKEN -- e a REGRA DE RECURSAO do GitHub nao cria execucao de
+  # workflow nenhuma para push feito com esse token. Nao e questao de filtro de
+  # `paths` nem de a branch nascer sem commit: NADA dispararia, e o silencio pareceria
+  # normal. Sem gatilho automatico, ninguem espera por um disparo que nao vem.
   workflow_dispatch:
 
 jobs:
@@ -29,8 +30,13 @@ jobs:
   #   release/<tag> -> production (AAB para loja)
   #
   # develop e master saíram do gatilho: o APK interno deles é feito pelo
-  # cd-mobile-apk.yml, com Gradle e sem cota. O perfil `preview` só é alcançável
-  # agora por workflow_dispatch a partir de uma branch que não seja release/*.
+  # cd-mobile-apk.yml, com Gradle.
+  #
+  # O perfil `preview` ficou INALCANÇÁVEL de propósito — a guarda logo abaixo recusa
+  # qualquer ref que não seja release/*. Ele produzia exatamente o APK interno que o
+  # Gradle agora entrega de graça, e era por ali que a cota escorria. Consequência a
+  # registrar: o bloco `preview` do frontend/eas.json virou configuração morta; fica
+  # como está caso a política mude, mas nenhum caminho o alcança hoje.
   resolve-profile:
     runs-on: ubuntu-latest
     outputs:

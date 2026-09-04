@@ -20,7 +20,7 @@
 name: CD - Mobile (APK via Gradle)
 
 on:
-  # Automatico por decisao do PO em 04/09/2026: toda entrega nas branches de
+  # Automatico por decisao do PO em 03/09/2026: toda entrega nas branches de
   # integracao e de producao deixa um APK pronto para baixar, sem ninguem precisar
   # lembrar de pedir. O que estourou a cota do EAS nao foi o automatismo em si -- foi
   # ele custando credito. Aqui nao custa: o repositorio e publico.
@@ -30,6 +30,12 @@ on:
   # com "app nao instalado" -- o testador precisa desinstalar e perde login,
   # dispositivoId e feedback pendente. Automatizar sem o secret entrega o incomodo
   # mais vezes. O nome do artefato avisa quando e esse o caso.
+  # SEM gatilho de pull_request, e a contrapartida fica registrada: o ci.yml valida
+  # so o `expo export --platform web`, entao o build NATIVO (Gradle/NDK) e exercitado
+  # pela primeira vez DEPOIS do merge. Uma mudanca que quebre o nativo deixa a develop
+  # vermelha em vez de ser barrada no PR. Adicionar `pull_request` custaria ~21 min por
+  # PR de frontend -- gratuito em repositorio publico, mas e decisao do PO, nao efeito
+  # colateral de um PR de infraestrutura.
   push:
     branches: [develop, master]
     paths:
@@ -48,11 +54,14 @@ permissions:
   contents: read
 
 # Uma sequencia de merges enfileiraria varios builds de ~21 min, e so o ultimo
-# interessa. O dispatch manual fica de fora do cancelamento: quem pediu um APK
-# especifico nao quer ve-lo morrer porque alguem mergeou depois.
+# interessa. O `event_name` no grupo ja isola push de dispatch -- um push nunca
+# cancelaria um APK que alguem pediu a mao. O `cancel-in-progress` condicional que
+# havia aqui era redundante com isso, e tinha um efeito nao pretendido: SERIALIZAVA
+# dois dispatches na mesma ref, deixando o segundo esperando ~21 min sem indicacao de
+# fila.
 concurrency:
   group: apk-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  cancel-in-progress: true
 
 jobs:
   apk:
@@ -95,11 +104,6 @@ jobs:
       # A variante `release` assina com `signingConfigs.debug` (android/app/build.gradle),
       # e o debug.keystore e ignorado pelo .gitignore (`*.keystore`). Sem ele o Gradle
       # falha na assinatura.
-      # ATENCAO ao conteudo do secret: o build.gradle fixa storePassword `android`,
-      # alias `androiddebugkey` e keyPassword `android` (android/app/build.gradle), e a
-      # variante release reusa esse signingConfig. Uma keystore de upload/release com
-      # senha e alias proprios PASSA neste passo e so quebra no Gradle, com o erro
-      # opaco "Keystore was tampered with, or password was incorrect".
       # ATENCAO ao conteudo do secret: o android/app/build.gradle fixa storePassword
       # `android`, alias `androiddebugkey` e keyPassword `android`, e a variante release
       # reusa esse signingConfig. Uma keystore de upload/release com senha e alias
@@ -170,7 +174,13 @@ jobs:
           # fechava o pipe e o find morria com SIGPIPE (141), abortando o passo antes
           # do ramo de erro abaixo -- que ficava inalcancavel. O `|| true` cobre o caso
           # de o diretorio nem existir, para a mensagem util ser a que aparece.
-          CAMINHO=$(find android/app/build/outputs/apk -name "*.apk" -print -quit 2>/dev/null || true)
+          # Escopado a variante construida, e nao a `outputs/apk` inteira: o
+          # android/.gitignore DES-ignora `app/build/outputs/apk/**` de proposito
+          # (Epico 02), entao um APK versionado no passado seria restaurado pelo
+          # checkout e o find poderia devolve-lo em vez do recem-construido -- um APK
+          # obsoleto publicado como se fosse novo.
+          VARIANTE="${{ inputs.variante || 'release' }}"
+          CAMINHO=$(find "android/app/build/outputs/apk/$VARIANTE" -name "*.apk" -newer android/gradlew -print -quit 2>/dev/null || true)
           if [ -z "$CAMINHO" ]; then
             echo "ERRO: nenhum APK foi produzido pelo Gradle."
             exit 1
@@ -182,7 +192,9 @@ jobs:
       - name: Publicar o APK
         uses: actions/upload-artifact@v4
         with:
-          name: apk-${{ inputs.variante || 'release' }}${{ steps.keystore.outputs.sufixo }}-${{ github.sha }}
+          # A branch entra no nome: com gatilho em develop E master, dois artefatos
+          # so com o sha seriam indistinguiveis para quem baixa.
+          name: apk-${{ github.ref_name }}-${{ inputs.variante || 'release' }}${{ steps.keystore.outputs.sufixo }}-${{ github.sha }}
           path: ${{ steps.apk.outputs.caminho }}
           retention-days: 30
           if-no-files-found: error

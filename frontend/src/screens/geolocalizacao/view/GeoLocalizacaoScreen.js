@@ -292,7 +292,11 @@ function GeolocalizacaoContent({ navigation }) {
        * Basta um ancestral recortando para conter tudo: `overflow: "hidden"` neste
        * container faz o `dispatchDraw` do RN limitar o canvas à área do mapa, e o
        * recorte do canvas é herdado por toda a subárvore — nenhum descendente o
-       * desfaz. É o mesmo arranjo que o `HospitalDetalheScreen` já usa (`mapContainer`).
+       * desfaz. Quem sustenta a correção é esse mecanismo, e não a analogia com o
+       * `HospitalDetalheScreen`: aquela tela tem um container parecido (`mapContainer`,
+       * lá por causa do border-radius) e nunca mostrou o defeito, mas também usa
+       * `androidView="texture"`, um marcador só e câmera enquadrada na carga — a
+       * imunidade dela tem mais de uma explicação candidata.
        *
        * O container também substitui o placeholder que existia aqui: ele tem `flex: 1`
        * e permanece montado quando o `<Map>` sai (ver `abrirHospital`), então a caixa

@@ -176,6 +176,10 @@ jobs:
 
       - name: Localizar o APK
         id: apk
+        env:
+          # Via env, e nao interpolado direto no shell: nome de branch e dado
+          # controlado por quem abre a branch.
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           # `-print -quit` em vez de `| head -1`: com `set -euo pipefail`, o head
@@ -197,12 +201,23 @@ jobs:
           TAMANHO=$(du -h "$CAMINHO" | cut -f1)
           echo "📦 APK \`${{ inputs.variante || 'release' }}\` — $TAMANHO — \`$CAMINHO\`" >> "$GITHUB_STEP_SUMMARY"
 
+          # `/` e caractere PROIBIDO em nome de artefato do upload-artifact. Como o
+          # nome carrega a branch, todo `workflow_dispatch` a partir de uma branch do
+          # padrao do projeto (`infra/`, `feature/`, `bugfix/`) falhava no ultimo
+          # passo -- depois de compilar o APK inteiro. Medido em 05/09/2026, run
+          # 33932396994: "Build do APK" e "Localizar o APK" verdes, "Publicar o APK"
+          # vermelho com `Contains the following character: Forward slash /`.
+          # Nunca havia aparecido porque o gatilho automatico so roda em `develop` e
+          # `master`, que nao tem barra. Nao ha funcao `replace` nas expressoes do
+          # Actions; a troca tem de ser feita aqui, no shell.
+          echo "ref_sanitizada=$(printf '%s' "$REF_NAME" | tr '/' '-')" >> "$GITHUB_OUTPUT"
+
       - name: Publicar o APK
         uses: actions/upload-artifact@v4
         with:
           # A branch entra no nome: com gatilho em develop E master, dois artefatos
           # so com o sha seriam indistinguiveis para quem baixa.
-          name: apk-${{ github.ref_name }}-${{ inputs.variante || 'release' }}${{ steps.keystore.outputs.sufixo }}-${{ github.sha }}
+          name: apk-${{ steps.apk.outputs.ref_sanitizada }}-${{ inputs.variante || 'release' }}${{ steps.keystore.outputs.sufixo }}-${{ github.sha }}
           path: ${{ steps.apk.outputs.caminho }}
           retention-days: 30
           if-no-files-found: error

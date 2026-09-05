@@ -155,7 +155,15 @@ jobs:
         env:
           # O bundle JS embutido no APK precisa saber para onde falar. Mesma URL que o
           # scripts/build-apk.js usa no build local.
-          EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL || 'https://saude-monitor.onrender.com' }}
+          #
+          # ESTA linha e quem decide o destino do APK, nao o `frontend/app.json`:
+          # `src/config/api.js` le `process.env.EXPO_PUBLIC_API_BASE_URL` PRIMEIRO e
+          # so cai em `extra.apiBaseUrlAndroid` se ela estiver vazia. Como o padrao
+          # abaixo nunca esta vazio, o `app.json` jamais e consultado num APK gerado
+          # aqui -- mudar so o `app.json` produziria um APK ainda apontando para o
+          # Render, com o diff parecendo correto. Os dois foram virados juntos de
+          # proposito.
+          EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL || 'https://saude-monitor-backend-dev-uly57kmmia-rj.a.run.app' }}
         working-directory: frontend/android
         run: |
           set -euo pipefail

@@ -13,6 +13,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.gabrielvogado.saudemonitor",
       "infoPlist": {
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Permita acesso a sua localizacao em segundo plano para detectar automaticamente sua entrada e saida de hospitais."
       }
@@ -42,8 +43,8 @@
     "extra": {
       "apiBaseUrl": "http://localhost:8080",
       "apiBaseUrlWeb": "http://localhost:8080",
-      "apiBaseUrlAndroid": "https://saude-monitor.onrender.com",
-      "apiBaseUrlIos": "http://localhost:8080",
+      "apiBaseUrlAndroid": "https://saude-monitor-backend-dev-uly57kmmia-rj.a.run.app",
+      "apiBaseUrlIos": "https://saude-monitor-backend-dev-uly57kmmia-rj.a.run.app",
       "eas": {
         "projectId": "79a251af-ec86-43d0-80d1-5fe06ae0ea0b"
       }

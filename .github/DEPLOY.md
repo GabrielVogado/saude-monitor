@@ -91,7 +91,7 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 | `.github/workflows/cd-backend-render.yml` | **pausado** -- so `workflow_dispatch` | Docker → GHCR → deploy Render. Falha com mensagem explícita se o ambiente não tiver secrets |
 | `.github/workflows/cd-mobile-apk.yml` | push `develop`/`master` (caminho `frontend/**`) + manual | APK interno com Gradle no Actions — sem cota do EAS. Artefato do run, 30 dias |
 | `.github/workflows/cd-mobile-eas.yml` | **só manual** (`workflow_dispatch`, **a partir de `release/*`** — outras refs são recusadas) | AAB de loja no EAS |
-| `.github/workflows/keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` contra a hibernação do Render (E8-01) |
+| `.github/workflows/keep-alive-backend.yml` | **desligado** (04/09/2026) — só `workflow_dispatch` | Ping em `/actuator/health` contra a hibernação do Render. Perdeu o objeto com a virada para o Cloud Run; o `cron` está comentado. Ver ADR-011 |
 | `.github/workflows/release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
 
 ## Observações

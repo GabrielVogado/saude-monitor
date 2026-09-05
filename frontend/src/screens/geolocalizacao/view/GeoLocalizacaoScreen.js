@@ -269,74 +269,104 @@ function GeolocalizacaoContent({ navigation }) {
         )}
       </View>
 
-      {/* Desmontado de propósito antes de navegar — ver o comentário do `abrirHospital`. */}
-      {mapaMontado ? (
-      <Map style={styles.map} mapStyle={OSM_RASTER_STYLE}>
-        <Camera ref={cameraRef} initialViewState={getInitialViewState(BRASIL_REGION)} />
+      {/*
+       * BUG-05 — o recorte do mapa é NOSSO, porque o MapLibre desliga o dele.
+       *
+       * Ao arrastar o mapa, os nomes dos hospitais apareciam por cima do cabeçalho e
+       * da caixa de informações — cobrindo justamente os chips de raio, que ficavam
+       * ilegíveis e sem alvo visível.
+       *
+       * Não é acidente de estilo nosso: é o que a biblioteca faz de propósito. Cada
+       * marcador é uma View Android comum, filha direta da MapView, posicionada por
+       * coordenada absoluta em `MarkerViewManager.updateMarkerPosition`
+       * (`view.x = screenPos.x - ...`, linhas 74-75 do `MarkerViewManager.kt` da
+       * 11.3.6). `screenPos` vem da projeção do mapa e fica NEGATIVO — ou maior que a
+       * altura — assim que o ponto sai da viewport. E o `addMarker` (linhas 40-42)
+       * desliga o recorte que conteria isso:
+       *
+       *     mapView.clipChildren = false
+       *     mapView.clipToPadding = false
+       *     mapView.clipToOutline = false
+       *
+       * Sem clipping na MapView, o desenho do marcador escapa para o resto da tela.
+       * Basta um ancestral recortando para conter tudo: `overflow: "hidden"` neste
+       * container faz o `dispatchDraw` do RN limitar o canvas à área do mapa, e o
+       * recorte do canvas é herdado por toda a subárvore — nenhum descendente o
+       * desfaz. Quem sustenta a correção é esse mecanismo, e não a analogia com o
+       * `HospitalDetalheScreen`: aquela tela tem um container parecido (`mapContainer`,
+       * lá por causa do border-radius) e nunca mostrou o defeito, mas também usa
+       * `androidView="texture"`, um marcador só e câmera enquadrada na carga — a
+       * imunidade dela tem mais de uma explicação candidata.
+       *
+       * O container também substitui o placeholder que existia aqui: ele tem `flex: 1`
+       * e permanece montado quando o `<Map>` sai (ver `abrirHospital`), então a caixa
+       * de informações não salta para junto do cabeçalho no quadro da transição.
+       */}
+      <View style={styles.mapContainer} testID="mapa-container">
+        {/* Desmontado de propósito antes de navegar — ver o comentário do `abrirHospital`. */}
+        {mapaMontado ? (
+          <Map style={styles.map} mapStyle={OSM_RASTER_STYLE}>
+            <Camera ref={cameraRef} initialViewState={getInitialViewState(BRASIL_REGION)} />
 
-        {!coordenadas && !hospitais.length && (
-          <Marker lngLat={[BRASIL_REGION.longitude, BRASIL_REGION.latitude]}>
-            <View style={styles.markerDot} />
-          </Marker>
-        )}
+            {!coordenadas && !hospitais.length && (
+              <Marker lngLat={[BRASIL_REGION.longitude, BRASIL_REGION.latitude]}>
+                <View style={styles.markerDot} />
+              </Marker>
+            )}
 
-        {geofencesFeatureCollection.features.length > 0 && (
-          <GeoJSONSource
-            id="geofences-hospitais"
-            testID="geofences-hospitais"
-            data={geofencesFeatureCollection}
-            onPress={aoTocarGeofence}
-          >
-            <Layer
-              id="geofences-preenchimento"
-              type="fill"
-              paint={{ "fill-color": colors.primary, "fill-opacity": 0.18 }}
-            />
-            <Layer
-              id="geofences-contorno"
-              type="line"
-              paint={{ "line-color": colors.primary, "line-width": 2 }}
-            />
-          </GeoJSONSource>
-        )}
-
-        {hospitais.map((hospital) => {
-          const centroide = centroDoHospital(hospital);
-          if (!centroide) {
-            return null;
-          }
-          return (
-            <Marker key={hospital.id} lngLat={[centroide.longitude, centroide.latitude]}>
-              <View
-                style={styles.hospitalMarker}
-                accessibilityRole="button"
-                accessibilityLabel={`Abrir detalhe de ${hospital.nome}`}
-                onStartShouldSetResponder={() => true}
-                onResponderRelease={() => abrirHospital(hospital.id)}
+            {geofencesFeatureCollection.features.length > 0 && (
+              <GeoJSONSource
+                id="geofences-hospitais"
+                testID="geofences-hospitais"
+                data={geofencesFeatureCollection}
+                onPress={aoTocarGeofence}
               >
-                <View style={styles.hospitalDot} />
-                <View style={styles.hospitalLabelBox}>
-                  <Text style={styles.hospitalLabel} numberOfLines={1}>
-                    {hospital.nome}
-                  </Text>
-                </View>
-              </View>
-            </Marker>
-          );
-        })}
+                <Layer
+                  id="geofences-preenchimento"
+                  type="fill"
+                  paint={{ "fill-color": colors.primary, "fill-opacity": 0.18 }}
+                />
+                <Layer
+                  id="geofences-contorno"
+                  type="line"
+                  paint={{ "line-color": colors.primary, "line-width": 2 }}
+                />
+              </GeoJSONSource>
+            )}
 
-        {coordenadas && (
-          <Marker lngLat={[coordenadas.longitude, coordenadas.latitude]}>
-            <View style={styles.userDot} />
-          </Marker>
-        )}
-      </Map>
-      ) : (
-        // Placeholder do mesmo tamanho: o `<Map>` ocupa `flex: 1`, e removê-lo sem
-        // reserva faz a caixa de informações saltar para junto do cabeçalho no quadro
-        // anterior à transição de tela. Em aparelho lento isso se vê como um piscar.
-        <View style={styles.map} />
-      )}
+            {hospitais.map((hospital) => {
+              const centroide = centroDoHospital(hospital);
+              if (!centroide) {
+                return null;
+              }
+              return (
+                <Marker key={hospital.id} lngLat={[centroide.longitude, centroide.latitude]}>
+                  <View
+                    style={styles.hospitalMarker}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Abrir detalhe de ${hospital.nome}`}
+                    onStartShouldSetResponder={() => true}
+                    onResponderRelease={() => abrirHospital(hospital.id)}
+                  >
+                    <View style={styles.hospitalDot} />
+                    <View style={styles.hospitalLabelBox}>
+                      <Text style={styles.hospitalLabel} numberOfLines={1}>
+                        {hospital.nome}
+                      </Text>
+                    </View>
+                  </View>
+                </Marker>
+              );
+            })}
+
+            {coordenadas && (
+              <Marker lngLat={[coordenadas.longitude, coordenadas.latitude]}>
+                <View style={styles.userDot} />
+              </Marker>
+            )}
+          </Map>
+        ) : null}
+      </View>
 
       <View style={styles.infoBox}>
         {carregando && (
@@ -427,6 +457,11 @@ const styles = StyleSheet.create({
     gap: spacing.s2,
     marginTop: spacing.s2,
   },
+  // `overflow: "hidden"` não é enfeite: é o único recorte da subárvore do mapa.
+  // Ver o comentário do JSX (BUG-05) — o MapLibre desliga o clipping da MapView
+  // para poder posicionar marcadores fora dela, e sem este container os rótulos
+  // dos hospitais vazam por cima do cabeçalho e da caixa de informações.
+  mapContainer: { flex: 1, overflow: "hidden" },
   map: { flex: 1 },
   infoBox: {
     backgroundColor: colors.surface,

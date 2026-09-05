@@ -6,7 +6,7 @@
  * ao backend (`GET /api/v1/hospitais?latitude&longitude&raioKm`) quando há GPS.
  */
 import React from "react";
-import { act, render, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, render, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import GeoLocalizacaoScreen from "../../../screens/geolocalizacao/view/GeoLocalizacaoScreen";
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
 import { useGeolocalizacao } from "../../../screens/geolocalizacao/service/GeoLocalizacaoService";
@@ -262,6 +262,40 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
 
     expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
     expect(screen.queryByTestId("geofences-hospitais")).not.toBeNull();
+  });
+
+  test("BUG-05: o mapa fica dentro de um container que recorta o que vaza", async () => {
+    // O rótulo de cada hospital é uma View Android comum, filha da MapView, posicionada
+    // por coordenada absoluta (`MarkerViewManager.updateMarkerPosition`). Quando o ponto
+    // sai da viewport a coordenada fica negativa — e a própria biblioteca desliga o
+    // recorte que conteria o desenho (`mapView.clipChildren = false`, no `addMarker`).
+    // Arrastando o mapa, os nomes apareciam por cima do cabeçalho e da caixa de
+    // informações, cobrindo os chips de raio.
+    //
+    // As DUAS asserções são necessárias. Só o `overflow` deixaria passar um container
+    // vazio ao lado do mapa; só o aninhamento deixaria passar um container que não
+    // recorta. Verificado por mutação: apagar qualquer uma das duas mantinha o teste
+    // verde com o defeito de volta na tela.
+    renderizar();
+
+    const container = await screen.findByTestId("mapa-container");
+    expect(container).toHaveStyle({ overflow: "hidden" });
+    expect(within(container).getByTestId("geofences-hospitais")).toBeTruthy();
+  });
+
+  test("BUG-05: o container do mapa continua reservando o espaço com o mapa desmontado", async () => {
+    // O container também é o placeholder que o BUG-04 exigia: sem ele montado durante a
+    // navegação, a caixa de informações salta para junto do cabeçalho no quadro da
+    // transição — piscada visível em aparelho lento.
+    renderizar();
+    const fonte = await screen.findByTestId("geofences-hospitais");
+
+    act(() => {
+      fonte.props.onPress({ features: [{ properties: { id: "h1" } }] });
+    });
+
+    await waitFor(() => expect(screen.queryByTestId("geofences-hospitais")).toBeNull());
+    expect(screen.getByTestId("mapa-container")).toHaveStyle({ flex: 1 });
   });
 
   test("falha ao carregar hospitais exibe mensagem sem derrubar o mapa", async () => {

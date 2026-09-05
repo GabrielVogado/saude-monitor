@@ -66,8 +66,10 @@ GoogleService-Info.plist
 # Epico 01 - scripts de ETL ja executados (nao versionar)
 etl/
 # Os dados geoespaciais de origem (multiplas_camadas_saude_14/ e _csv/) voltaram ao
-# versionamento em 03/09/2026 por decisao do PO -- "deve subir por enquanto", ate a
-# troca da estrategia de carga para backup de banco.
+# versionamento em 03/09/2026 ("deve subir por enquanto") e foram REMOVIDOS em
+# 05/09/2026 por decisao do PO -- a delecao e permanente. Sem regra de ignore de
+# proposito: se as pastas reaparecerem, e melhor que o `git status` mostre do que
+# some-las em silencio.
 __pycache__/
 *.pyc
 

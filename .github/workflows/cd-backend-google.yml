@@ -1,0 +1,173 @@
+name: CD - Backend (Google Cloud Run)
+
+on:
+  push:
+    branches: [develop, master, 'release/**']
+    paths:
+      - 'backend/**'
+      - '.github/workflows/cd-backend-google.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: cd-backend-google-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: 'project-300769db-2135-4560-a83'
+  PROJECT_NUMBER: '767615581088'
+  REGION: 'southamerica-east1'
+  GAR_REPOSITORY: 'saude-monitor-google'
+  SERVICE_NAME: 'saude-monitor-backend'
+
+jobs:
+  resolve-env:
+    name: Resolver Ambiente
+    runs-on: ubuntu-latest
+    outputs:
+      env: ${{ steps.resolve.outputs.env }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      service_suffix: ${{ steps.resolve.outputs.service_suffix }}
+      secret_suffix: ${{ steps.resolve.outputs.secret_suffix }}
+    steps:
+      - id: resolve
+        run: |
+          if [[ "${{ github.ref }}" == refs/heads/release/* ]]; then
+            echo "env=prod" >> "$GITHUB_OUTPUT"
+            echo "tag=${GITHUB_REF#refs/heads/release/}" >> "$GITHUB_OUTPUT"
+            echo "service_suffix=" >> "$GITHUB_OUTPUT"
+            echo "secret_suffix=_PROD" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            echo "env=prod" >> "$GITHUB_OUTPUT"
+            echo "tag=prod" >> "$GITHUB_OUTPUT"
+            echo "service_suffix=" >> "$GITHUB_OUTPUT"
+            echo "secret_suffix=_PROD" >> "$GITHUB_OUTPUT"
+          else
+            echo "env=dev" >> "$GITHUB_OUTPUT"
+            echo "tag=dev" >> "$GITHUB_OUTPUT"
+            echo "service_suffix=-dev" >> "$GITHUB_OUTPUT"
+            echo "secret_suffix=" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-and-deploy:
+    name: Build e Deploy (${{ needs.resolve-env.outputs.env }})
+    needs: resolve-env
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout do repositorio
+        uses: actions/checkout@v4
+
+      - name: Autenticar no Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: 'access_token'
+          workload_identity_provider: 'projects/${{ env.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'saude-monitor-gitdeploy@${{ env.PROJECT_ID }}.iam.gserviceaccount.com'
+
+      - name: Configurar Docker para o Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      # O driver `docker` padrao nao exporta cache. Sem buildx, o `cache-to: type=gha`
+      # abaixo derruba o build com "Cache export is not supported for the docker driver".
+      - name: Configurar Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build e Push da Imagem Docker
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ needs.resolve-env.outputs.tag }}
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy no Cloud Run (${{ needs.resolve-env.outputs.env }})
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}${{ needs.resolve-env.outputs.service_suffix }}
+          region: ${{ env.REGION }}
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          # Sem env_vars de Mongo de proposito. Em application.properties a linha e
+          # `spring.mongodb.uri=${MONGO_URI:mongodb://...${MONGO_DATABASE:...}...}`:
+          # MONGO_DATABASE e MONGO_AUTH_DB so sao lidos DENTRO do default usado quando
+          # MONGO_URI nao existe. Como o deploy sempre fornece MONGO_URI, defini-los
+          # aqui nao teria efeito nenhum -- e sugeriria um isolamento dev/prod que na
+          # verdade depende so do banco embutido em cada URI.
+          # Nomes conforme existem no Secret Manager do projeto (verificado em
+          # 04/09/2026): MONGO_URI e JWT_SECRET, sem sufixo. O ambiente prod usa
+          # o sufixo _PROD e ainda nao tem secret criado -- o deploy em master vai
+          # falhar de proposito, em vez de subir com credencial de dev.
+          secrets: |
+            MONGO_URI=MONGO_URI${{ needs.resolve-env.outputs.secret_suffix }}:latest
+            JWT_SECRET=JWT_SECRET${{ needs.resolve-env.outputs.secret_suffix }}:latest
+          # O seed de admin fica DESLIGADO ate existirem os secrets ADMIN_EMAIL e
+          # ADMIN_SENHA. application.properties:70-71 cai em `admin@saude.com` /
+          # `admin123` quando eles faltam -- e este servico e publico
+          # (--allow-unauthenticated). Um admin com senha conhecida num endpoint
+          # aberto e pior do que nao ter admin nenhum.
+          env_vars: |
+            APP_SEEDADMIN_ENABLED=false
+          flags: >-
+            --allow-unauthenticated
+            --service-account=saude-monitor-run@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+            --port=8080
+            --memory=1Gi
+            --cpu=1
+            --min-instances=0
+            --max-instances=1
+            --timeout=60s
+          # --max-instances=1 nao e escolha de capacidade, e trava de seguranca:
+          # SeedRunner.java:57 le `hospitalRepository.count()` e so pula o seed se der
+          # diferente de zero. No Render, instancia unica, a corrida era inalcancavel.
+          # No Cloud Run, dois cold starts simultaneos contra a colecao vazia passam
+          # os dois pelo check e importam o DBF/SHP duas vezes. Subir esse limite exige
+          # antes tornar o seed idempotente (lock ou indice unico por codigoCnes).
+
+      - name: Smoke test (aplicacao e banco)
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          echo "Servico publicado em $URL"
+          for tentativa in 1 2 3 4 5 6; do
+            HTTP_CODE=$(curl -sS --max-time 30 -o /tmp/health.json -w '%{http_code}' "$URL/actuator/health" || echo "000")
+            echo "tentativa $tentativa -> HTTP $HTTP_CODE"
+            if [ "$HTTP_CODE" = "200" ]; then
+              cat /tmp/health.json
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "ERRO: /actuator/health nao respondeu 200 em 6 tentativas."
+          [ -s /tmp/health.json ] && cat /tmp/health.json
+          exit 1
+
+      # /actuator/health sozinho nao serve de porteiro: application.properties
+      # desliga o indicador do Mongo (management.health.mongo[db].enabled=false),
+      # entao ele responde 200 com MONGO_URI errada ou inalcancavel. Este passo
+      # bate num endpoint que le a colecao de verdade -- GET /api/v1/hospitais e
+      # permitAll em SecurityConfig.java:60.
+      - name: Smoke test do acesso ao MongoDB
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          URL_HOSPITAIS="$URL/api/v1/hospitais?page=0&size=1"
+          HTTP_CODE=$(curl -sS --max-time 30 -o /tmp/hospitais.json -w '%{http_code}' "$URL_HOSPITAIS" || echo "000")
+          echo "GET /api/v1/hospitais -> HTTP $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ]; then
+            head -c 400 /tmp/hospitais.json
+            exit 0
+          fi
+          echo "ERRO: a aplicacao subiu mas nao consegue ler o MongoDB."
+          [ -s /tmp/hospitais.json ] && head -c 800 /tmp/hospitais.json
+          exit 1

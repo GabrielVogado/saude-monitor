@@ -210,7 +210,13 @@ jobs:
           # Nunca havia aparecido porque o gatilho automatico so roda em `develop` e
           # `master`, que nao tem barra. Nao ha funcao `replace` nas expressoes do
           # Actions; a troca tem de ser feita aqui, no shell.
-          echo "ref_sanitizada=$(printf '%s' "$REF_NAME" | tr '/' '-')" >> "$GITHUB_OUTPUT"
+          #
+          # `-c` (complemento) em vez de trocar so a barra: o upload-artifact tambem
+          # recusa `\ : < > | * ? "` e CR/LF, e as regras de nome de ref do git ainda
+          # permitem `< > | "`. Uma branch `feature/a|b` reproduziria exatamente este
+          # bug -- ~21 min de Gradle para morrer no ultimo passo. Trocar a lista de
+          # proibidos por uma lista de PERMITIDOS fecha a classe inteira de uma vez.
+          echo "ref_sanitizada=$(printf '%s' "$REF_NAME" | tr -c 'A-Za-z0-9._-' '-')" >> "$GITHUB_OUTPUT"
 
       - name: Publicar o APK
         uses: actions/upload-artifact@v4

@@ -97,7 +97,18 @@ jobs:
         include:
           - ambiente: dev
             variavel: BACKEND_HEALTH_URL_DEV
-            padrao: https://saude-monitor.onrender.com/actuator/health
+            # Padrao esvaziado em 05/09/2026, junto com o desligamento do `cron`.
+            # Apontava para `https://saude-monitor.onrender.com/actuator/health` --
+            # que CONTINUA no ar (medido em 05/09/2026: 200 em 3,13 s), e e
+            # justamente esse o problema. Como `BACKEND_HEALTH_URL_DEV` nunca foi
+            # criada, esse padrao ERA o valor efetivo: o unico gatilho que sobrou
+            # (`workflow_dispatch`) acordaria e manteria vivo o servico do Render,
+            # que ninguem consome desde a virada, e reportaria verde -- dando a
+            # impressao de que o backend corrente foi verificado quando nao foi.
+            # Vazio, o passo pula com aviso, que e a verdade: nao ha alvo
+            # configurado. Para religar, criar a variavel apontando para o servico
+            # desejado.
+            padrao: ''
           - ambiente: hom
             variavel: BACKEND_HEALTH_URL_HOM
             padrao: ''

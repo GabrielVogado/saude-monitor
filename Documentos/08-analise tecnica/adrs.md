@@ -1002,9 +1002,10 @@ provisionamento idempotente em `deploy/google/setup-gcp.sh`. O CD do Render viro
 `cd-backend-render.yml` com o gatilho `push` comentado — continua acionável por
 `workflow_dispatch` como rollback enquanto o Cloud Run acumula tempo de uso real.
 
-**Medição de aceitação (04/09/2026), fora da esteira, com `gcloud` autenticado:**
+**Medição de aceitação (04/09/2026), fora da esteira, com `gcloud` autenticado —
+todas com a instância QUENTE**, tomadas logo após o deploy:
 
-| Verificação | Resultado |
+| Verificação | Resultado (instância quente) |
 |:---|:---|
 | Revisão publicada | `saude-monitor-backend-dev-00001-kvf` |
 | `GET /actuator/health` | HTTP 200 em 0,67 s |
@@ -1013,6 +1014,22 @@ provisionamento idempotente em `deploy/google/setup-gcp.sh`. O CD do Render viro
 O segundo teste existe porque o primeiro não basta: `application.properties:18-19`
 desliga o indicador de saúde do Mongo, então `/actuator/health` responde `UP` com
 `MONGO_URI` errada. Só um endpoint que lê a coleção prova o caminho até o banco.
+
+**Medição a frio (05/09/2026) — o número que a tabela acima não podia dar.**
+Registrado no log do próprio Cloud Run, após ociosidade:
+
+```
+03:37:49  503  /actuator/health  14.778080057s
+03:37:49  Starting new instance. Reason: AUTOSCALING
+```
+
+A primeira requisição após a instância ser recolhida devolve **HTTP 503 em ~14,8 s**,
+não uma resposta lenta. Isso importa mais do que a diferença de tempo: para o app,
+`TIMEOUT_PADRAO_MS` (20 s, `frontend/src/config/http.js:25`) **nem chega a ser
+atingido** — a requisição não expira, ela falha. É a mesma forma de erro que o Render
+produzia, 7x mais curta. O boot do Spring é conhecido e cabe no orçamento
+(`Started SaudeMonitorApplication in 8.901 seconds`); o 503 vem de a requisição chegar
+enquanto não há capacidade, com `--max-instances=1` e nenhuma instância viva.
 
 ---
 
@@ -1027,10 +1044,15 @@ desliga o indicador de saúde do Mongo, então `/actuator/health` responde `UP` 
 
 **Negativas e pendências assumidas conscientemente:**
 
-- **Cold start volta.** `--min-instances=0` por decisão do PO em 04/09/2026: começar
-  em zero e **observar a necessidade** de subir para 1. O gatilho de revisão é
-  reclamação de lentidão na primeira abertura do app; `--min-instances=1` é a
-  correção, ao preço de uma instância ociosa cobrada.
+- **Cold start volta — e volta como HTTP 503, não como lentidão.** `--min-instances=0`
+  por decisão do PO em 04/09/2026: começar em zero e **observar a necessidade** de
+  subir para 1. A observação veio no dia seguinte, medida (bloco acima): 503 em
+  ~14,8 s na primeira requisição após ociosidade. O gatilho previsto era "reclamação
+  de lentidão"; o que se mediu é pior que lentidão, porque o app trata como falha de
+  requisição e não como espera. **Enquanto isso não for endereçado, E8-01 não fecha.**
+  As saídas são `--min-instances=1` (instância ociosa cobrada, ~10 s de boot deixam
+  de aparecer para o usuário) ou aceitar um 503 na primeira abertura do dia. É decisão
+  de custo, e continua sendo do PO.
 - **`--max-instances=1` é trava de segurança, não dimensionamento.** `SeedRunner`
   faz *check-then-act* sobre `hospitalRepository.count()`, e o rate limit vive em
   `ConcurrentHashMap` (`RateLimitService`). Dois *cold starts* simultâneos contra a
@@ -1067,7 +1089,7 @@ desliga o indicador de saúde do Mongo, então `/actuator/health` responde `UP` 
 | ADR-008 | Estrutura Feature-First | Média | Alto (incremental) | Alto (longo prazo) |
 | ADR-009 | `HeartbeatService` com `AppState` | Média | Baixo (1–2h) | Médio |
 | ADR-010 | Migração Incremental para TypeScript | Alta | Alto (incremental) | Alto |
-| ADR-011 | Hospedagem do backend no Google Cloud Run | Crítica | **Concluído (04/09/2026)** | Alto |
+| ADR-011 | Hospedagem do backend no Google Cloud Run | Crítica | Concluído em 04/09/2026 | Alto |
 
 > Os ADR-001 a ADR-010 continuam `Proposto`. O **ADR-011 é o único `Aceito`** — e é
 > o único de infraestrutura. Isso reflete a ordem de execução registrada na nota da

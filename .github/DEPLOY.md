@@ -11,17 +11,17 @@ Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gr
 | Componente | Serviço | Custo |
 |-----------|---------|-------|
 | CI (build + testes) | GitHub Actions | Gratuito (2000 min/mês) |
-| Backend (Spring Boot) | Render (free web service) | Gratuito |
+| Backend (Spring Boot) | **Google Cloud Run** (`southamerica-east1`) | Escala a zero — ver ADR-011 |
 | Banco (MongoDB) | MongoDB Atlas (M0) | Gratuito |
 | Frontend (Expo web) | — **sem provedor definido** | — |
 | Imagem Docker | GitHub Container Registry (GHCR) | Gratuito |
 
 ## Ambientes
 
-| Ambiente | Branch/Tag | Backend (Render) | Frontend web | Banco (Atlas) |
+| Ambiente | Branch/Tag | Backend (Cloud Run) | Frontend web | Banco (Atlas) |
 |----------|-----------|------------------|--------------------|---------------|
-| **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | — (sem provedor) | `saude_monitor_dev` |
-| **prod** (produção) | `master` · `release/<tag>` | `saude-monitor-backend-prod` ⚠️ *não criado* | — (sem provedor) | `saude_monitor_prod` ⚠️ *não criado* |
+| **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` — `https://saude-monitor-backend-dev-uly57kmmia-rj.a.run.app` | — (sem provedor) | `saude_monitor_dev` |
+| **prod** (produção) | `master` · `release/<tag>` | `saude-monitor-backend` ⚠️ *não criado* — os secrets `MONGO_URI_PROD`/`JWT_SECRET_PROD` também não existem, e o deploy em `master` falha de propósito | — (sem provedor) | `saude_monitor_prod` ⚠️ *não criado* |
 
 > ⚠️ **Só o ambiente `dev` existe hoje** — é o único Web Service no Render e o único com secrets.
 
@@ -96,12 +96,14 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 
 ## Observações
 
-- O **Render free** "dorme" após ~15 min de inatividade e acorda na primeira requisição (pode demorar ~30s). Ideal para testes.
+- **O backend não está mais no Render** (04/09/2026). O serviço vigente é `saude-monitor-backend-dev` no Cloud Run, `southamerica-east1`. O Render **continua no ar** — medido em 05/09/2026: `https://saude-monitor.onrender.com/actuator/health` respondeu 200 em 3,13 s — mas serve uma imagem congelada: o `cd-backend-render.yml` está pausado e não recebe mais deploy automático. Ele é o caminho de rollback, não o ambiente corrente.
+- O **Render free** "dorme" após ~15 min de inatividade. O **Cloud Run também** recolhe a instância quando ociosa, e a primeira requisição depois disso devolve **HTTP 503 em ~14,8 s** (medido no log do Cloud Run em 05/09/2026), porque `--min-instances=0`. A diferença em relação ao Render é de grau — 14,8 s contra 109 s —, não de natureza: nos dois casos o app vê uma requisição falhada. Ver ADR-011.
 - O **frontend web** é o build do Expo (`react-native-web`). O APK mobile sai do `cd-mobile-apk.yml` (Actions, automático nas branches de integração e produção, ou manual) e também localmente, via `expo run:android --variant release`.
-- Para o frontend web apontar para o backend correto por ambiente, adicione em `frontend/app.json` → `expo.extra`:
+- Para o frontend web apontar para o backend correto por ambiente, ajuste em `frontend/app.json` → `expo.extra`:
   ```json
   "extra": {
-    "apiBaseUrlWeb": "https://saude-monitor-backend-dev.onrender.com"
+    "apiBaseUrlWeb": "https://saude-monitor-backend-dev-uly57kmmia-rj.a.run.app"
   }
   ```
-  (o `api.js` já lê `extra.apiBaseUrlWeb`; o app mobile usa `apiBaseUrlAndroid`/`apiBaseUrlIos`).
+  (hoje `apiBaseUrlWeb` está em `http://localhost:8080`, de propósito: não há hospedagem web configurada.)
+- **`extra` não é o que decide o APK.** `frontend/src/config/api.js` lê `process.env.EXPO_PUBLIC_API_BASE_URL` **primeiro**, e `cd-mobile-apk.yml` sempre a define — o `app.json` só entra quando nenhuma env var existe. Ao trocar o backend, virar os três pontos juntos: `app.json`, `frontend/scripts/build-apk.js` (build local) e o padrão em `cd-mobile-apk.yml`. Alternativa sem código: criar a variável de repositório `EXPO_PUBLIC_API_BASE_URL`, que tem precedência sobre o padrão do workflow.

@@ -94,6 +94,45 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      # Barreira acrescentada em 05/09/2026. Este workflow NAO define
+      # `EXPO_PUBLIC_API_BASE_URL`, entao o bundle cai em `extra.apiBaseUrlAndroid`
+      # do `app.json` -- que desde a virada para o Cloud Run nomeia explicitamente o
+      # servico de DESENVOLVIMENTO (`saude-monitor-backend-dev-...`). Sem esta
+      # verificacao, um `release/1.0.0` produziria um AAB de LOJA falando com o
+      # backend de dev: `--max-instances=1`, seed de admin desligado e a base Atlas
+      # de desenvolvimento.
+      #
+      # Antes da virada o valor era `saude-monitor.onrender.com`, um nome neutro
+      # quanto a ambiente -- o acoplamento existia igual, so era invisivel.
+      #
+      # FALHA em vez de avisar e seguir: um AAB de loja apontando para o ambiente
+      # errado nao da erro nenhum na esteira, so na mao do usuario final. Enquanto
+      # o ambiente de producao nao existir (pendencia P-006), o certo e nao produzir
+      # o artefato.
+      - name: Verificar o destino da API do build de loja
+        env:
+          API_BASE_URL_PROD: ${{ vars.EXPO_PUBLIC_API_BASE_URL_PROD }}
+        run: |
+          if [ -z "${API_BASE_URL_PROD:-}" ]; then
+            echo "ERRO: a variavel de repositorio EXPO_PUBLIC_API_BASE_URL_PROD nao existe."
+            echo ""
+            echo "Sem ela o bundle usa extra.apiBaseUrlAndroid do app.json, que hoje aponta"
+            echo "para o backend de DESENVOLVIMENTO no Cloud Run. Um AAB de loja nao pode"
+            echo "sair apontando para dev."
+            echo ""
+            echo "Defina em Settings > Secrets and variables > Actions > Variables quando o"
+            echo "ambiente de producao existir (P-006)."
+            exit 1
+          fi
+          echo "destino do build de loja: $API_BASE_URL_PROD"
+
+      # NAO adianta exportar EXPO_PUBLIC_API_BASE_URL aqui: `eas build` empacota o
+      # projeto e compila nos servidores da Expo, e variavel de ambiente do runner
+      # do GitHub nao viaja junto. A injecao real tem de sair de `eas.json`
+      # (`build.production.env`) ou das environment variables do proprio EAS.
+      # Por isso o passo acima e um PORTAO, nao uma correcao: ele impede o AAB
+      # errado de nascer, mas quem define o destino continua sendo o `app.json`
+      # ate `eas.json` ganhar o `env` do perfil de producao. Fica junto da P-006.
       - name: Build no EAS (${{ needs.resolve-profile.outputs.profile }})
         run: |
           npx eas-cli build \

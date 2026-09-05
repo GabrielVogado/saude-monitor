@@ -941,6 +941,118 @@ Adotar a **Migração Incremental para TypeScript** com `strict: true`.
 
 ---
 
+## ADR-011: Hospedagem do backend no Google Cloud Run
+
+**Data:** 2026-09-04
+**Status:** Aceito — implementado em 04/09/2026 (PR #79)
+**Área:** Infraestrutura e Deploy do Backend
+
+> Primeiro ADR desta lista que **não** trata do frontend, e o primeiro fora do status
+> `Proposto`. Está aqui, e não num documento próprio, porque `adrs.md` é o único
+> registro de decisão arquitetural do projeto — criar um segundo lugar para o mesmo
+> tipo de conteúdo divide a busca sem ganho.
+
+---
+
+### Contexto e Problema
+
+O backend rodava no Render `plan: free`. A medição de 02/09/2026 (E8-01) registrou
+**109,1 s e HTTP 503 na primeira abertura** e 1–5 s por requisição com o serviço
+quente. A causa é o *spin-down* após ~15 min de ociosidade somado à fração de vCPU
+compartilhada do plano gratuito — não é código da aplicação.
+
+O item E8-01 vinha sendo adiado pelo PO por receio de custo operacional recorrente.
+
+---
+
+### Opções Avaliadas
+
+**Opção 1 — Manter o Render free e mitigar com keep-alive**
+- Descartada por medição, não por preferência: o `keep-alive-backend.yml` executa
+  **~4 vezes por dia em vez das ~96 agendadas** — o agendador do GitHub não honra
+  `cron` de 10 min em repositório gratuito. A mitigação que o E8-01 dava como
+  "resolvida" nunca funcionou.
+
+**Opção 2 — Render pago**
+- Resolve o *spin-down* e introduz custo mensal fixo. Descartada: existe alternativa
+  de custo zero ou quase zero.
+
+**Opção 3 — VM Ampere A1 na Oracle Cloud Always Free (`sa-saopaulo-1`)**
+- Foi a decisão original de 02/09/2026, a ponto de a conta OCI ser criada com região
+  *home* São Paulo — escolha **irreversível** — para casar com o cluster Atlas em
+  `AWS / sa-east-1`. Os artefatos chegaram a ser escritos em `deploy/oracle/`.
+- **Derrubada por indisponibilidade de capacidade**: não há mais cota Always Free de
+  Ampere A1 em `sa-saopaulo-1`. Nenhum ajuste de arquitetura contorna isso; a região
+  não pode ser trocada sem abrir outra conta. `deploy/oracle/` passa a ser material
+  morto.
+
+**Opção 4 — Google Cloud Run, `southamerica-east1`** ← Decisão
+- Escala a zero (sem custo ocioso), região São Paulo, deploy por container — o mesmo
+  `backend/Dockerfile` que o Render já consumia, sem reescrita.
+- Autenticação da esteira por **Workload Identity Federation**, sem chave JSON de
+  service account guardada em secret do GitHub.
+
+---
+
+### Decisão
+
+Backend publicado no Cloud Run, região `southamerica-east1`, serviço
+`saude-monitor-backend-dev`. Esteira em `.github/workflows/cd-backend-google.yml`;
+provisionamento idempotente em `deploy/google/setup-gcp.sh`. O CD do Render virou
+`cd-backend-render.yml` com o gatilho `push` comentado — continua acionável por
+`workflow_dispatch` como rollback enquanto o Cloud Run acumula tempo de uso real.
+
+**Medição de aceitação (04/09/2026), fora da esteira, com `gcloud` autenticado:**
+
+| Verificação | Resultado |
+|:---|:---|
+| Revisão publicada | `saude-monitor-backend-dev-00001-kvf` |
+| `GET /actuator/health` | HTTP 200 em 0,67 s |
+| `GET /api/v1/hospitais?page=0&size=1` | HTTP 200 em 0,52 s, documento real do Atlas |
+
+O segundo teste existe porque o primeiro não basta: `application.properties:18-19`
+desliga o indicador de saúde do Mongo, então `/actuator/health` responde `UP` com
+`MONGO_URI` errada. Só um endpoint que lê a coleção prova o caminho até o banco.
+
+---
+
+### Consequências
+
+**Positivas:**
+- Primeira abertura deixa de custar 109 s. Sem instância ociosa cobrada.
+- Segredos saem de variáveis de ambiente do painel do Render para o Secret Manager,
+  injetados por referência (`MONGO_URI`, `JWT_SECRET`).
+- A esteira não guarda credencial de longa duração: WIF emite token por execução,
+  restrito por `attribute-condition` ao repositório `GabrielVogado/saude-monitor`.
+
+**Negativas e pendências assumidas conscientemente:**
+
+- **Cold start volta.** `--min-instances=0` por decisão do PO em 04/09/2026: começar
+  em zero e **observar a necessidade** de subir para 1. O gatilho de revisão é
+  reclamação de lentidão na primeira abertura do app; `--min-instances=1` é a
+  correção, ao preço de uma instância ociosa cobrada.
+- **`--max-instances=1` é trava de segurança, não dimensionamento.** `SeedRunner`
+  faz *check-then-act* sobre `hospitalRepository.count()`, e o rate limit vive em
+  `ConcurrentHashMap` (`RateLimitService`). Dois *cold starts* simultâneos contra a
+  coleção vazia importariam o DBF/SHP duas vezes. Subir esse limite exige antes
+  tornar o seed idempotente e mover o rate limit para armazenamento compartilhado.
+- **Jobs `@Scheduled` sob risco não medido.** O backend tem 4 jobs de 15 min
+  (`AgregadoHospitalJob`, `FeedbackSemRespostaJob`, `VisitaExpiracaoJob`,
+  `VisitaGpsInterrompidoJob`) e o Cloud Run estrangula CPU entre requisições por
+  padrão. A revisão publicada **não** tem a anotação `run.googleapis.com/cpu-throttling`
+  (verificado: 0 ocorrências), logo o padrão vale. **Não está medido se os jobs
+  disparam ou não** — os quatro não emitem log algum, então isso não é observável
+  hoje. Desligar o throttling resolveria e faria o serviço ser cobrado 24/7 em região
+  Tier 2; a saída barata é migrar os jobs para o Cloud Scheduler.
+- **Seed de admin desligado** (`APP_SEEDADMIN_ENABLED=false`) até existirem os
+  segredos `ADMIN_EMAIL`/`ADMIN_SENHA`: sem eles, `application.properties:70-71`
+  criaria `admin@saude.com`/`admin123` num serviço `--allow-unauthenticated`.
+- **Keep-alive desligado** (04/09/2026). Ele combatia o *spin-down* do Render e
+  apontava para lá; no Cloud Run, manter o serviço acordado por ping é pagar a
+  instância ociosa sem que isso apareça na configuração.
+
+---
+
 ## Resumo de Status
 
 | ADR | Título | Prioridade | Esforço | Impacto |
@@ -955,3 +1067,8 @@ Adotar a **Migração Incremental para TypeScript** com `strict: true`.
 | ADR-008 | Estrutura Feature-First | Média | Alto (incremental) | Alto (longo prazo) |
 | ADR-009 | `HeartbeatService` com `AppState` | Média | Baixo (1–2h) | Médio |
 | ADR-010 | Migração Incremental para TypeScript | Alta | Alto (incremental) | Alto |
+| ADR-011 | Hospedagem do backend no Google Cloud Run | Crítica | **Concluído (04/09/2026)** | Alto |
+
+> Os ADR-001 a ADR-010 continuam `Proposto`. O **ADR-011 é o único `Aceito`** — e é
+> o único de infraestrutura. Isso reflete a ordem de execução registrada na nota da
+> revisão 3.1: o gargalo medido estava no backend, não no frontend.

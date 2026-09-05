@@ -39,20 +39,37 @@
 # desenvolvimento, não arquitetura de produção.
 name: Keep-alive - Backend (Render)
 
+# DESLIGADO em 04/09/2026, por decisão do PO, junto com a virada do backend para
+# o Google Cloud Run. Este workflow existia para combater o *spin-down* de ~15 min
+# do Render `plan: free`; o backend não está mais lá, e o alvo dele continuava
+# sendo `https://saude-monitor.onrender.com` (o padrão embutido na matriz abaixo —
+# a variável `BACKEND_HEALTH_URL_DEV` nunca foi criada, conferido com
+# `gh variable list`, que voltou vazio).
+#
+# Não foi repontado para o Cloud Run porque lá o problema não existe: o serviço
+# escala a zero por projeto, e mantê-lo acordado por ping é justamente o custo que
+# `--min-instances=0` evita. Keep-alive contra cold start de Cloud Run é pagar a
+# instância ociosa pela porta dos fundos, sem a mensuração que `--min-instances=1`
+# deixaria explícita.
+#
+# O `schedule` foi comentado em vez de o arquivo ser apagado: o Render segue como
+# caminho de rollback (`cd-backend-render.yml`, também pausado), e se ele voltar a
+# receber tráfego o keep-alive volta descomentando este bloco. O
+# `workflow_dispatch` fica de pé para ping manual sob demanda.
 on:
-  schedule:
-    # A cada 10 minutos, das 07h às 22h de Brasília (10h–01h UTC).
-    #
-    # Deliberadamente não é 24/7: 24 h/dia consumiriam ~730 h das 750 da cota,
-    # sem folga nenhuma. Esta janela usa ~480 h/mês por ambiente ligado.
-    #
-    # O agendador do GitHub atrasa em horários de pico; o intervalo de 10 min
-    # dá margem antes dos 15 min de ociosidade que disparam a suspensão.
-    #
-    # O `schedule` só dispara a partir da branch padrão do repositório, que
-    # passou a ser `develop` em 03/09/2026 — antes era `master`, e por isso este
-    # workflow nunca havia executado uma única vez (a API devolvia 404).
-    - cron: '*/10 10-23,0-1 * * *'
+  # schedule:
+  #   # A cada 10 minutos, das 07h às 22h de Brasília (10h–01h UTC).
+  #   #
+  #   # Deliberadamente não é 24/7: 24 h/dia consumiriam ~730 h das 750 da cota,
+  #   # sem folga nenhuma. Esta janela usa ~480 h/mês por ambiente ligado.
+  #   #
+  #   # O agendador do GitHub atrasa em horários de pico; o intervalo de 10 min
+  #   # dá margem antes dos 15 min de ociosidade que disparam a suspensão.
+  #   #
+  #   # O `schedule` só dispara a partir da branch padrão do repositório, que
+  #   # passou a ser `develop` em 03/09/2026 — antes era `master`, e por isso este
+  #   # workflow nunca havia executado uma única vez (a API devolvia 404).
+  #   - cron: '*/10 10-23,0-1 * * *'
   workflow_dispatch:
     inputs:
       ambiente:

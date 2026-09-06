@@ -35,14 +35,9 @@ import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.geo.Distance;
-import org.springframework.data.geo.GeoResult;
-import org.springframework.data.geo.Metrics;
-import org.springframework.data.geo.Point;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.geo.GeoJsonPolygon;
 import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.NearQuery;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
@@ -66,6 +61,7 @@ public class HospitalServiceImpl implements HospitalService {
 
     private static final double RAIO_KM_PADRAO = 10.0;
     private static final int CAP_PROXIMOS = 1000;
+    private static final double METROS_POR_KM = 1000.0;
 
     private final HospitalRepository hospitalRepository;
     private final SugestaoHospitalRepository sugestaoHospitalRepository;
@@ -303,7 +299,7 @@ public class HospitalServiceImpl implements HospitalService {
 
     /**
      * Lista hospitais ativos ordenados por distância ao ponto informado, usando
-     * {@code $near} sobre o campo {@code localizacao} (centroide) com índice 2dsphere.
+     * {@code $nearSphere} sobre o campo {@code localizacao} (centroide), com índice 2dsphere.
      */
     private List<HospitalDocument> buscarProximos(double latitude, double longitude, double raioKm,
                                                   TipoEstabelecimento tipo) {
@@ -312,15 +308,20 @@ public class HospitalServiceImpl implements HospitalService {
             filtro.addCriteria(Criteria.where("tipo").is(tipo));
         }
 
-        NearQuery near = NearQuery.near(new Point(longitude, latitude))
-                .maxDistance(new Distance(raioKm, Metrics.KILOMETERS))
-                .query(filtro)
-                .limit(CAP_PROXIMOS);
+        // $nearSphere e nao $geoNear: o estagio $geoNear escolhe sozinho o indice
+        // geoespacial da colecao e `hospitais` tem dois (geofence_2dsphere e
+        // localizacao_2dsphere), o que faz o servidor recusar a consulta com
+        // IndexNotFound "There is more than one 2d index ... unsure which to use".
+        // NearQuery nao expoe a chave `key` para desempatar (ver a API de
+        // NearQuery em spring-data-mongodb 5.0.4), entao o campo vai explicito no
+        // criterio. Com GeoJSON, maxDistance e em METROS. O resultado ja vem
+        // ordenado por distancia crescente, como vinha do $geoNear (BUG-07).
+        filtro.addCriteria(Criteria.where("localizacao")
+                .nearSphere(new GeoJsonPoint(longitude, latitude))
+                .maxDistance(raioKm * METROS_POR_KM));
+        filtro.limit(CAP_PROXIMOS);
 
-        return mongoTemplate.geoNear(near, HospitalDocument.class)
-                .getContent().stream()
-                .map(GeoResult::getContent)
-                .toList();
+        return mongoTemplate.find(filtro, HospitalDocument.class);
     }
 
     /** Busca paginada sem filtro geoespacial, com critérios opcionais de tipo e nome. */

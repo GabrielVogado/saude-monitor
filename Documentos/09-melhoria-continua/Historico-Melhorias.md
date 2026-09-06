@@ -22,6 +22,7 @@
 | **M-002** | 03/09/2026 | [OBS-002](../../skill-observations/OBS-002-ativacao-de-skills-por-dominio.md) → [UPD-002](../../skill-updates/UPD-002-matriz-de-roteamento-de-skills.md) | Matriz de roteamento de skills por área + hook `SessionStart` que a injeta em toda sessão | #63 | ✅ Aplicada |
 | **M-003** | 03/09/2026 | [OBS-003](../../skill-observations/OBS-003-skill-anunciada-nao-e-skill-ativada.md) → [UPD-003](../../skill-updates/UPD-003-portao-verificavel-e-escopo-de-skills.md) | Anunciar ≠ ativar; portão de `code-review` pulado em 3 PRs; `lobehub-react` sai da matriz de `frontend/` | #68 | 🟡 Parcial — item 1 aplicado, 2 e 3 dependem do PO |
 | **M-004** | 04/09/2026 | Observação direta do PO (§ M-004) | Régua de 90% para **todo** o frontend + validação por mutação como parte de escrever teste + piso do `coverageThreshold` sobe a cada onda (70/58/65/70 → 78/66/76/79 → 79/67/77/80 → 90) | (Onda 1) | ✅ Aplicada |
+| **M-005** | 06/09/2026 | BUG-07, relatado pelo PO em uso real | Smoke test de deploy que exercita a rota geoespacial: o portão antigo batia num `find()` sem índice e aprovou um deploy com a F-07 devolvendo HTTP 500 | (este PR) | ✅ Aplicada |
 
 ---
 
@@ -353,6 +354,50 @@ achou de novo:
 **Lição de processo:** data absoluta em teste que atravessa lógica de expiração é a
 mesma família do teste vacuoso — o teste deixa de falar sobre o comportamento e passa a
 falar sobre o relógio. Entra na régua junto com a validação por mutação.
+
+---
+
+## M-005 — Portão que não passa pelo caminho quebrado aprova o deploy quebrado
+
+**Data:** 06/09/2026 · **PR:** (este PR — BUG-07)
+
+### O que aconteceu
+
+O PO selecionou um raio na aba Mapa e recebeu "Erro interno do servidor". O backend
+respondia **HTTP 500** em `GET /api/v1/hospitais?latitude=…&longitude=…&raioKm=5` e
+**HTTP 200** na mesma rota sem coordenada. O deploy que publicou esse estado passou
+verde nos dois smoke tests do CD.
+
+### Diagnóstico
+
+O smoke test de banco existia justamente porque `/actuator/health` não serve de
+porteiro (o indicador do Mongo está desligado no `application.properties`). Mas ele
+batia em `/api/v1/hospitais?page=0&size=1` — um `find()` simples, que **não toca
+índice nenhum**. O defeito estava exatamente no que aquele caminho não exercita: os
+índices declarados nunca eram criados, porque a propriedade estava sob o prefixo
+errado e o Boot ignora chave desconhecida em silêncio.
+
+O padrão é o mesmo do M-003 e do M-004, num terceiro lugar: **um portão que não
+passa pelo caminho que pode quebrar não é portão.** No M-004 era o teste que passava
+com o código de produção quebrado; aqui é o smoke test que passa com o banco sem
+índice.
+
+### O que entrou
+
+- Um passo novo no `cd-backend-google.yml` que chama a listagem **com** latitude,
+  longitude e `raioKm`, e falha o deploy se não vier 200 — com a mensagem apontando
+  para os índices geoespaciais, que é onde a próxima ocorrência vai estar.
+- Doze testes novos (4 de integração com Testcontainers, 8 unitários sobre a
+  consulta), validados por mutação: seis mutações aplicadas, seis mortas.
+- O mesmo exercício de mutação foi repetido sobre as correções anteriores
+  (BUG-01, BUG-02, BUG-04, BUG-05 e BUG-06): as seis mutações do frontend também
+  morrem, então a cobertura de regressão daquelas entregas é real, e não presumida.
+
+### O que isto não cobre
+
+O smoke test roda depois do deploy, contra a revisão nova. Ele impede que um estado
+quebrado seja **declarado bom**; não impede que ele seja publicado. Nenhum ambiente
+intermediário exercita a rota geoespacial antes do Cloud Run.
 
 ---
 

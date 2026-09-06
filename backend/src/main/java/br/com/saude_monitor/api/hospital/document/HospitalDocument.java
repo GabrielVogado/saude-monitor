@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.mongodb.core.geo.GeoJsonPolygon;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.GeoSpatialIndexed;
+import org.springframework.data.mongodb.core.index.GeoSpatialIndexType;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -93,14 +94,14 @@ public class HospitalDocument {
      * Área geográfica (geofence) como polígono GeoJSON, anel fechado em ordem {@code [longitude, latitude]}.
      * Índice 2dsphere para {@code $geoIntersects}.
      */
-    @GeoSpatialIndexed(name = "geofence_2dsphere")
+    @GeoSpatialIndexed(name = "geofence_2dsphere", type = GeoSpatialIndexType.GEO_2DSPHERE)
     private GeoJsonPolygon geofence;
 
     /**
-     * Ponto central (centroide) do geofence, usado na listagem por raio ({@code $near}).
+     * Ponto central (centroide) do geofence, usado na listagem por raio ({@code $nearSphere}).
      * Índice 2dsphere. Mantido explicitamente porque {@code $near} não opera sobre polígonos.
      */
-    @GeoSpatialIndexed(name = "localizacao_2dsphere")
+    @GeoSpatialIndexed(name = "localizacao_2dsphere", type = GeoSpatialIndexType.GEO_2DSPHERE)
     private GeoJsonPoint localizacao;
 
     /** Soft delete — {@code false} remove o estabelecimento da listagem pública imediatamente. */

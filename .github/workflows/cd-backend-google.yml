@@ -171,3 +171,35 @@ jobs:
           echo "ERRO: a aplicacao subiu mas nao consegue ler o MongoDB."
           [ -s /tmp/hospitais.json ] && head -c 800 /tmp/hospitais.json
           exit 1
+
+      # A listagem sem coordenada nao toca indice nenhum: e um find() simples. Foi
+      # por isso que o deploy passou verde com o filtro por raio (F-07) devolvendo
+      # HTTP 500 em todo aparelho -- os indices 2dsphere nunca tinham sido criados
+      # no banco (BUG-07). Este passo exercita o caminho geoespacial, que so
+      # responde 200 se o indice existir e for do tipo certo.
+      - name: Smoke test do filtro por raio (indice 2dsphere)
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          URL_RAIO="$URL/api/v1/hospitais?latitude=-15.924781&longitude=-48.053610&raioKm=25&page=0&size=1"
+          HTTP_CODE=$(curl -sS --max-time 30 -o /tmp/raio.json -w '%{http_code}' "$URL_RAIO" || echo "000")
+          echo "GET /api/v1/hospitais (com raio) -> HTTP $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "ERRO: a listagem por raio falhou. Suspeite dos indices geoespaciais"
+            echo "      (spring.data.mongodb.auto-index-creation e @GeoSpatialIndexed type)."
+            [ -s /tmp/raio.json ] && head -c 800 /tmp/raio.json
+            exit 1
+          fi
+          # 200 nao basta: com `localizacao` nulo em todo documento a rota devolve
+          # `200 []` e a F-07 fica vazia na tela com o deploy verde. O porteiro so
+          # aprova se a consulta geoespacial tiver de fato encontrado alguem.
+          TOTAL=$(jq -r '.totalElements // 0' /tmp/raio.json)
+          echo "totalElements no raio de 25 km = $TOTAL"
+          if [ "$TOTAL" -lt 1 ]; then
+            echo "ERRO: a rota respondeu 200 mas nao encontrou nenhum estabelecimento"
+            echo "      num raio de 25 km de Brasilia-DF, onde a base tem centenas."
+            echo "      Suspeite do campo localizacao nos documentos, nao do indice."
+            head -c 800 /tmp/raio.json
+            exit 1
+          fi
+          head -c 400 /tmp/raio.json

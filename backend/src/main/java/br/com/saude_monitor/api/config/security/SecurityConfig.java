@@ -62,6 +62,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/v1/hospitais/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/hospitais/**").hasRole("ADMIN")
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        // Contrato OpenAPI (E8-09): público, para quem consome a API sem estar autenticado.
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class);

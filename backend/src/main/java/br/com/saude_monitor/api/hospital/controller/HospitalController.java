@@ -18,6 +18,7 @@ import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalDetalheResponse;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalResponse;
 import br.com.saude_monitor.api.hospital.service.HospitalService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -55,6 +56,7 @@ public class HospitalController {
 
     /** 🔓 Lista hospitais ativos, com filtro geoespacial (raio), tipo e busca textual. */
     @GetMapping
+    @SecurityRequirements
     public ResponseEntity<PageResponse<HospitalResumoResponse>> listar(
             @RequestParam(required = false) Double latitude,
             @RequestParam(required = false) Double longitude,
@@ -71,6 +73,7 @@ public class HospitalController {
      * atendimento (E4-05), com filtro opcional por tipo e paginação.
      */
     @GetMapping("/ranking")
+    @SecurityRequirements
     public ResponseEntity<PageResponse<HospitalResumoResponse>> ranking(
             @RequestParam(required = false) OrdemRanking ordem,
             @RequestParam(required = false) TipoEstabelecimento tipo,
@@ -81,12 +84,14 @@ public class HospitalController {
 
     /** 🔓 Detalhe público do hospital. */
     @GetMapping("/{id}")
+    @SecurityRequirements
     public ResponseEntity<HospitalResponse> buscarPorId(@PathVariable String id) {
         return ResponseEntity.ok(hospitalService.buscarPorId(id));
     }
 
     /** 🔓 Retorna apenas o geofence, para renderização no mapa. */
     @GetMapping("/{id}/geofence")
+    @SecurityRequirements
     public ResponseEntity<GeoJsonPolygonDto> buscarGeofence(@PathVariable String id) {
         return ResponseEntity.ok(hospitalService.buscarGeofence(id));
     }
@@ -97,6 +102,7 @@ public class HospitalController {
      * quando ainda não há amostra suficiente (RN-15).
      */
     @GetMapping("/{id}/indicadores")
+    @SecurityRequirements
     public ResponseEntity<IndicadoresDetalheResponse> buscarIndicadores(@PathVariable String id) {
         IndicadoresDetalheResponse detalhe = agregadoService.obterDetalhe(id);
         if (detalhe == null) {
@@ -127,6 +133,7 @@ public class HospitalController {
 
     /** 🔓 Sugestão pública de hospital ainda não cadastrado (E1-05, P2). */
     @PostMapping("/sugestoes")
+    @SecurityRequirements
     public ResponseEntity<SugestaoHospitalResponse> sugerir(@Valid @RequestBody SugestaoHospitalRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(hospitalService.sugerir(request));
     }

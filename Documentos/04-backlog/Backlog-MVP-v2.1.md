@@ -242,7 +242,7 @@ Três decisões do Product Owner reordenam este backlog. Ficam registradas aqui 
 |---|---|---|---|
 | 1 | Código revisado e mergeado na branch principal | ✅ **Atendido** — todo código entra por PR revisado; `develop` = dev, `master` = produção, `release/<tag>` = produção com versão fixada (corrigido na P-004, 03/09/2026 — a branch `main` nunca existiu neste repositório) | — |
 | 2 | Testes unitários dos serviços críticos (visita, agregação, auth) com cobertura ≥ 70% nas regras de negócio | ⚠️ **Não verificável** — existem 118 testes no backend e 166 no frontend, mas **a cobertura nunca foi medida**; não há ferramenta configurada | E8-08 |
-| 3 | Contratos de API documentados (OpenAPI) e testados via testes de integração | 🔴 **Não atendido** — sem OpenAPI e sem testes de integração com contexto Spring completo | E8-09, E8-10 |
+| 3 | Contratos de API documentados (OpenAPI) e testados via testes de integração | 🟡 **Parcial** — testes de integração com contexto Spring completo entregues em 07/09/2026 (E8-10: auth, check-in/check-out, feedback, agregação). OpenAPI é rastreada separadamente pela E8-09, cujo status em `De-Para-Backlog-Features.md` é a fonte de verdade — não repetido aqui para não divergir dele | E8-09 |
 | 4 | Verificação de acessibilidade (WCAG AA) nas telas novas | 🟡 **Parcial** — implementada, nunca auditada | V-07 |
 | 5 | Consentimento LGPD implementado e testado (permissões + exclusão de conta) | ✅ **Atendido** — consentimento no cadastro, revogação auditada (art. 8º §5º), exportação (art. 18) e exclusão com anonimização. **Ressalva:** retenção (art. 16) ainda não implementada | E8-15 (ressalva) |
 | 6 | Teste de campo de geofence realizado em ≥ 3 hospitais reais | ⛔ **Bloqueado** — decisão D-02; depende do Épico 8 | S11 (V-01) |

@@ -60,6 +60,9 @@ dependencies {
 	// Testcontainers MongoDB para testes de contexto (usa Docker, disponível no CI).
 	testImplementation 'org.testcontainers:mongodb:1.20.4'
 	testImplementation 'org.testcontainers:junit-jupiter:1.20.4'
+	// Aguarda o recálculo assíncrono do agregado (E8-10) sem sleep fixo/flaky.
+	// Sem versão: já gerenciada pelo BOM do Spring Boot via spring-boot-starter-test.
+	testImplementation 'org.awaitility:awaitility'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 

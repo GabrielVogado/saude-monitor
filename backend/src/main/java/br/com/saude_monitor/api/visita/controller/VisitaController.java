@@ -13,6 +13,7 @@ import br.com.saude_monitor.api.visita.dto.TipoPermanenciaRequest;
 import br.com.saude_monitor.api.visita.dto.TipoPermanenciaResponse;
 import br.com.saude_monitor.api.visita.dto.VisitaAtivaResponse;
 import br.com.saude_monitor.api.visita.service.VisitaService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -39,6 +40,7 @@ public class VisitaController {
 
     /** 🔓/🔒 Registra entrada (E2-01/E2-06); anônima quando não autenticado e com dispositivoId. */
     @PostMapping("/api/v1/visitas/checkin")
+    @SecurityRequirements
     public ResponseEntity<CheckinResponse> checkin(@Valid @RequestBody CheckinRequest request) {
         String usuarioId = autenticacaoHelper.usuarioIdAtual().orElse(null);
         CheckinResponse resposta = visitaService.checkin(request, usuarioId);
@@ -49,6 +51,7 @@ public class VisitaController {
 
     /** 🔓/🔒 Registra saída (E2-02/E2-05). */
     @PostMapping("/api/v1/visitas/{id}/checkout")
+    @SecurityRequirements
     public ResponseEntity<CheckoutResponse> checkout(@PathVariable String id,
                                                       @Valid @RequestBody CheckoutRequest request) {
         String usuarioId = autenticacaoHelper.usuarioIdAtual().orElse(null);
@@ -57,6 +60,7 @@ public class VisitaController {
 
     /** 🔓/🔒 Sinal de vida da visita ativa (E2-09); posição opcional também renova o sinal de GPS (E2-05). */
     @PostMapping("/api/v1/visitas/{id}/heartbeat")
+    @SecurityRequirements
     public ResponseEntity<HeartbeatResponse> heartbeat(@PathVariable String id,
                                                        @Valid @RequestBody(required = false) HeartbeatRequest request) {
         String usuarioId = autenticacaoHelper.usuarioIdAtual().orElse(null);
@@ -74,6 +78,7 @@ public class VisitaController {
 
     /** 🔓/🔒 Visita ativa do usuário/dispositivo anônimo, para o card/cronômetro (E2-07). */
     @GetMapping("/api/v1/visitas/ativas")
+    @SecurityRequirements
     public ResponseEntity<VisitaAtivaResponse> buscarAtiva(
             @RequestParam(required = false) String dispositivoId) {
         String usuarioId = autenticacaoHelper.usuarioIdAtual().orElse(null);

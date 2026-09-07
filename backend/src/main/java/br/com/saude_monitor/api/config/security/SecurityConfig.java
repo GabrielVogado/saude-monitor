@@ -67,6 +67,8 @@ public class SecurityConfig {
                         // "/actuator" (HAL discovery): sem isso, cai em anyRequest().authenticated()
                         // e qualquer USER autenticado vê o link para os endpoints restritos.
                         .requestMatchers("/actuator", "/actuator/prometheus", "/actuator/metrics/**").hasRole("ADMIN")
+                        // Contrato OpenAPI (E8-09): público, para quem consome a API sem estar autenticado.
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class);

@@ -85,10 +85,10 @@ A v1.0 catalogou 48 itens em 7 categorias e **não tinha nenhum item de desempen
 | `05-features/Relatorio-Aderencia-Codigo-vs-Features.md` | v3.5 · 01/09/2026 | Aderência real código × feature | Atual |
 | `06-sprints/Plano-Sprints-v2.0.md` | v2.0 | Sprints S0..S8 detalhadas, DoD por sprint, riscos | **Termina em S8** — não há planejamento pós-MVP |
 | `De-Para-Backlog-Features.md` | 30/08/2026 | Mapeamento estória × feature × status | **Anterior à S8** — E4-05, E5-05, E6-05, E3-02 e E3-03 constam como parciais/pendentes, mas já foram entregues |
-| `05-features/Pendencias-Epico-01.md` | 20/08/2026 | Débitos do ETL CNES e divergências de contrato | Divergências de contrato **ainda abertas** (verificado no código) |
+| `05-features/Pendencias-Epico-01.md` | 20/08/2026 | Débitos do ETL CNES e divergências de contrato | Divergências de contrato **fechadas em 06/09/2026 (E8-14)** — só os débitos de ETL seguem abertos |
 | `08-analise tecnica/relatorio_auditoria_tecnica.md` | v3.0 · ago/2026 | 11 problemas de arquitetura frontend, estrutura proposta, roadmap de 5 sprints | Sem commit-base; escopo só frontend; 2 erros factuais (§5) |
 | `08-analise tecnica/adrs.md` | v3.0 · 31/08/2026 | ADR-001..ADR-010 em formato MADR | Idem; ADR-001 não cobre download binário |
-| `02-arquitetura-tecnica/Especificacao-API-v2.0.md` | v2.0 | Contrato REST publicado | 2 divergências vivas contra o código |
+| `02-arquitetura-tecnica/Especificacao-API-v2.1.md` | v2.1 (era v2.0) | Contrato REST publicado | **Atualização 06/09/2026:** as 2 divergências (CONT-01/CONT-02) foram fechadas na v2.1 — ver §B.2 |
 | `02-arquitetura-tecnica/Plano-Tecnico-Painel-Administrativo-Web-v1.0.md` | v1.0 | Stack e estrutura do painel admin (F-11) | Não iniciado |
 
 > Este documento **não substitui** os originais. Ele consolida o que está pendente e sinaliza onde os originais precisam ser atualizados (§5).
@@ -162,12 +162,12 @@ Sete categorias. IDs novos, criados aqui para permitir referência estável na p
 
 | ID | Item | Evidência no código | Impacto | Esforço |
 |---|---|---|---|---|
-| CONT-01 | `LoginRequest` usa `password`; a spec v2.0 §3.1 define `senha` | `auth/dto/LoginRequest.java:15` | **Qualquer cliente que siga o contrato publicado quebra.** O painel admin (PROD-01) será o primeiro cliente novo | S (breaking change — exige versionar ou migrar app junto) |
-| CONT-02 | Coleção MongoDB `users`; a spec v2.0 §2.2 define `usuarios` | `user/document/UserDocument.java:24` | Divergência de modelo documentado × real; exige migração de coleção | S–M |
+| CONT-01 | ~~`LoginRequest` usa `password`; a spec v2.0 §3.1 define `senha`~~ **Resolvido 06/09/2026 (E8-14):** decisão do PO foi alinhar a spec ao código (`password`), não o inverso — nenhum cliente real dependia de `senha`, e mudar o código quebraria o app em uso. Ver `Especificacao-API-v2.1.md` | `auth/dto/LoginRequest.java:15` | — | — |
+| CONT-02 | ~~Coleção MongoDB `users`; a spec v2.0 §2.2 define `usuarios`~~ **Resolvido 06/09/2026 (E8-14):** mesma decisão — spec passa a dizer `users` (nome real), evitando migrar uma coleção com contas reais em produção. Ver `Especificacao-API-v2.1.md` | `user/document/UserDocument.java:24` | — | — |
 | CONT-03 | `ImportadorEstabelecimentos` (Java) lê CSV com lat/long e não suporta shapefile — diverge do pipeline Python de fato utilizado | `hospital/migration/` | Dois caminhos de importação divergentes; risco de reimportação inconsistente | M (alinhar ou descontinuar) |
 | CONT-04 | Débitos de ETL: numerais romanos em Title Case, encoding de `Regiões_de_Saúde.csv` | `Pendencias-Epico-01.md §c` | Qualidade de exibição e das camadas de região (insumo de E7-04) | S |
 
-> **CONT-01 e CONT-02 devem ser decididos antes de PROD-01 começar** — congelar o contrato depois de existir um segundo cliente custa o dobro.
+> **CONT-01 e CONT-02 devem ser decididos antes de PROD-01 começar** — congelar o contrato depois de existir um segundo cliente custa o dobro. **Resolvidas em 06/09/2026 (E8-14)**, antes do início do PROD-01/Painel Admin (ainda não iniciado).
 
 ### B.3 — DOD · Definition of Done do MVP não cumprida
 
@@ -288,7 +288,7 @@ Estado verificado item a item contra o código em `develop@f26666e`:
 
 ### 5.3 Divergências código × contrato publicado
 
-`LoginRequest.password` × spec `senha` (CONT-01) e coleção `users` × spec `usuarios` (CONT-02) — ambas **abertas**, apontadas desde 20/08.
+`LoginRequest.password` × spec `senha` (CONT-01) e coleção `users` × spec `usuarios` (CONT-02) — apontadas desde 20/08, **fechadas em 06/09/2026 (E8-14)**: a spec (`Especificacao-API-v2.1.md`) passou a dizer `password`/`users`, alinhada ao código.
 
 ### 5.4 Ressalvas ao roadmap proposto na pasta 08
 

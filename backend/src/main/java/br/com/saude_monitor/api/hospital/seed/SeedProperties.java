@@ -11,8 +11,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * quando a coleção {@code hospitais} está vazia — tornando a inicialização idempotente em
  * qualquer ambiente/máquina.</p>
  *
- * <p>Os raios de geofence por categoria espelham a Especificação (§3.6) e o pipeline
- * ETL de referência (HOSPITAL 200 m · UPA 150 m · UBS 100 m · demais 150 m).</p>
+ * <p>Os raios de geofence por categoria (HOSPITAL 150 m · UBS 75 m · demais 100 m) são a
+ * fonte da verdade do raio em todo o sistema: além de valer para o que este seed cria, o
+ * {@link ReconciliacaoRaioGeofenceRunner} regrava com eles, no startup, os geofences já
+ * gravados no banco. Os valores originais (HOSPITAL 200 · UPA 150 · UBS 100 · demais 150)
+ * vinham do pipeline ETL de referência e cobriam a vizinhança do estabelecimento — ver
+ * BUG-08 e o comentário no {@code application.properties}. A antiga referência à
+ * "Especificação §3.6" era órfã: aquela seção trata do namespace {@code contas}, e nenhum
+ * documento ativo fixa raio de geofence.</p>
  */
 @ConfigurationProperties(prefix = "app.seed")
 public record SeedProperties(

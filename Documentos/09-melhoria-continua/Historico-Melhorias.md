@@ -23,6 +23,7 @@
 | **M-003** | 03/09/2026 | [OBS-003](../../skill-observations/OBS-003-skill-anunciada-nao-e-skill-ativada.md) → [UPD-003](../../skill-updates/UPD-003-portao-verificavel-e-escopo-de-skills.md) | Anunciar ≠ ativar; portão de `code-review` pulado em 3 PRs; `lobehub-react` sai da matriz de `frontend/` | #68 | 🟡 Parcial — item 1 aplicado, 2 e 3 dependem do PO |
 | **M-004** | 04/09/2026 | Observação direta do PO (§ M-004) | Régua de 90% para **todo** o frontend + validação por mutação como parte de escrever teste + piso do `coverageThreshold` sobe a cada onda (70/58/65/70 → 78/66/76/79 → 79/67/77/80 → 90) | (Onda 1) | ✅ Aplicada |
 | **M-005** | 06/09/2026 | BUG-07, relatado pelo PO em uso real | Smoke test de deploy que exercita a rota geoespacial: o portão antigo batia num `find()` sem índice e aprovou um deploy com a F-07 devolvendo HTTP 500 | (este PR) | ✅ Aplicada |
+| **M-006** | 06/09/2026 | BUG-08, relatado pelo PO em uso real | Validação de servidor alimentada por dado do próprio cliente não valida nada + configuração que não migra o dado já gravado não corrige nada | (este PR) | ✅ Aplicada |
 
 ---
 
@@ -398,6 +399,75 @@ com o código de produção quebrado; aqui é o smoke test que passa com o banco
 O smoke test roda depois do deploy, contra a revisão nova. Ele impede que um estado
 quebrado seja **declarado bom**; não impede que ele seja publicado. Nenhum ambiente
 intermediário exercita a rota geoespacial antes do Cloud Run.
+
+---
+
+## M-006 — Validação alimentada pelo cliente, e configuração que não migra o dado
+
+**Data:** 06/09/2026 · **PR:** (este PR — BUG-08)
+
+### O que aconteceu
+
+O PO relatou que uma pessoa a duas ruas do hospital era computada como paciente. O
+backend tinha, desde o Épico 02, uma validação para exatamente isso: o check-in por
+geofence resolve o hospital com `$geoIntersects` sobre a posição do usuário e recusa
+quem está fora de todo polígono.
+
+Ela nunca recusou ninguém. No evento `Enter`, o app enviava como "posição do usuário"
+o **centro da região do geofence** — a coordenada do próprio hospital. O ponto chegava
+sempre dentro do polígono, e a validação aprovava por construção.
+
+### Diagnóstico
+
+Duas lições, e a primeira vale além deste bug:
+
+1. **Uma validação de servidor alimentada por um dado que o cliente derivou de si
+   mesmo não é validação — é carimbo.** O código do servidor estava correto, a
+   consulta estava correta, o índice estava correto (desde o BUG-07), e mesmo assim a
+   regra não existia na prática. Isso não aparece em teste de unidade do servidor, que
+   passa o ponto que quiser; aparece quando se pergunta **de onde vem** o dado que o
+   servidor está conferindo. É a mesma família do M-003 e do M-004 — algo que parecia
+   um portão e não era — num lugar novo: o portão estava certo, a entrada dele é que
+   era fabricada pelo lado que ele deveria fiscalizar.
+
+2. **Configuração que não migra o dado já gravado não corrige nada.** Os raios do
+   geofence vivem em `app.seed.raio-*`, e o `SeedRunner` roda em `skip-if-not-empty`:
+   só semeia banco vazio. Reduzir os números no `application.properties` teria efeito
+   zero sobre os 340 estabelecimentos em produção — a correção existiria no código, o
+   PR passaria verde, e o mapa continuaria desenhando os círculos antigos. Vale para
+   qualquer propriedade que só é lida no momento em que o dado nasce.
+
+### O que entrou
+
+- `ReconciliacaoRaioGeofenceRunner`: regrava no startup os geofences fora do raio da
+  categoria, idempotente, preservando o centro e **preservando polígono desenhado à
+  mão** — a salvaguarda existe porque um geofence editado por um administrador
+  descreve o terreno real e vale mais que o círculo da categoria.
+- O check-in por geofence passa a enviar a posição real do aparelho, e **não envia
+  nada** quando não consegue lê-la. A régua passou a errar para o lado de perder um
+  check-in legítimo em vez de inventar um.
+- Primeira suíte de testes do `GeofencingTaskService`, que não tinha nenhuma apesar de
+  ser quem decide quem vira paciente. Treze mutações no total (7 backend, 6 frontend),
+  treze mortas.
+
+### Endurecimento no code-review (mesmo PR)
+
+O `code-review` achou um furo na salvaguarda que preserva polígono desenhado à mão:
+`ehCirculoRegular` exigia só "vértices equidistantes", então um **círculo liso desenhado
+por ferramenta** (raio uniforme, lados suficientes) também passava e seria regravado com
+o raio da categoria no próximo boot — destruindo o desenho do administrador. O guard
+passou a exigir **exatamente 32 lados**, que é o que os três únicos caminhos que criam
+círculo do produto produzem. Medido no banco real: dos 340 estabelecimentos, **340 têm
+anel de 32 lados** — o guard curado não deixa nenhum de fora. Círculo de 16 lados
+(ferramenta) é preservado; o teste correspondente mata a mutação.
+
+### O que isto não cobre
+
+A régua nova recusa quem está fora do polígono, mas o dado que ela protege continua
+tão bom quanto a coordenada do CNES: as posições vêm com **4 casas decimais** (~11 m)
+e marcam o ponto do cadastro, não o centro do terreno. Nenhum raio conserta um centro
+errado — e não há, hoje, medição de quantos dos 340 estabelecimentos têm o centro fora
+do próprio prédio.
 
 ---
 

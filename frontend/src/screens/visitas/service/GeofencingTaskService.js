@@ -16,13 +16,49 @@ import { centroDoHospital } from "../../../utils/geojson";
  */
 export const GEOFENCING_TASK = "VISITAS_GEOFENCING_TASK";
 
-const RAIO_GEOFENCE_METROS = 120;
+/**
+ * Piso do raio da REGIÃO monitorada pelo SO — não é o raio do geofence (BUG-08).
+ *
+ * A região nativa é apenas o gatilho: ela acorda o processo, e quem decide se houve
+ * visita é o `$geoIntersects` do backend contra o polígono real do hospital, com a
+ * posição de verdade do aparelho (`confirmarEntrada`). Por isso ela pode — e deve —
+ * ser mais generosa que o geofence: o geofencing do Android é notoriamente impreciso
+ * abaixo de ~100 m, e uma região menor que isso simplesmente não dispara de forma
+ * confiável. Uma UBS de 75 m de raio é monitorada numa região de 100 m; quem estiver
+ * entre 75 m e 100 m acorda o app e é recusado pelo servidor, que é o comportamento
+ * desejado — errar para o lado de perguntar, nunca para o lado de registrar visita de
+ * quem está na rua.
+ */
+const PISO_RAIO_DISPARO_METROS = 100;
+
 const RAIO_BUSCA_HOSPITAIS_KM = 5;
 
 // RN-01: só confirma entrada após 2 minutos contínuos dentro do geofence.
 const TOLERANCIA_ENTRADA_MS = 2 * 60 * 1000;
 // RN-03: só confirma saída após 5 minutos contínuos fora do geofence.
 const TOLERANCIA_SAIDA_MS = 5 * 60 * 1000;
+
+/**
+ * Idade máxima de uma leitura de GPS em cache para ainda valer como "onde a pessoa
+ * está". Igual à tolerância de entrada: a leitura foi feita, no pior caso, no momento
+ * em que o SO disparou o Enter, e é isso que o backend precisa validar.
+ */
+const IDADE_MAXIMA_POSICAO_MS = TOLERANCIA_ENTRADA_MS;
+
+/**
+ * Prazo para uma leitura de GPS "ao vivo" responder. `getCurrentPositionAsync` não tem
+ * opção de timeout própria e, em rádio ocupado ou GPS indisponível, a promise pode nunca
+ * resolver nem rejeitar — travando a confirmação de entrada indefinidamente em vez de
+ * cair no fallback de posição em cache.
+ */
+const TIMEOUT_LEITURA_GPS_MS = 10 * 1000;
+
+function comTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_resolve, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
+  ]);
+}
 
 // Os eventos nativos de geofencing (Enter/Exit) disparam uma única vez, sem noção de
 // "contínuo" — as tolerâncias RN-01/RN-03 são aplicadas aqui, em memória, com
@@ -47,14 +83,55 @@ function limparTimer(mapa, hospitalId) {
   }
 }
 
-function paraPosicaoGeoJson(region) {
-  return {
+/**
+ * Posição real do aparelho, para o backend validar a entrada (BUG-08).
+ *
+ * Antes daqui saía o CENTRO da região do geofence (`region.latitude/longitude`), que é
+ * a coordenada do próprio hospital: o ponto chegava ao servidor sempre dentro do
+ * polígono, e o `$geoIntersects` do check-in aprovava por construção. Quem decidia era
+ * só o raio da região nativa — uma pessoa a duas ruas do hospital virava paciente.
+ *
+ * Devolve `null` quando não há leitura utilizável; nesse caso o check-in não é enviado.
+ * Perder uma visita legítima é recuperável (o usuário faz check-in manual no card do
+ * hospital); registrar visita de quem está em casa contamina o tempo de permanência de
+ * forma invisível e irreversível.
+ */
+async function posicaoAtual() {
+  const paraGeoJson = (coords) => ({
     type: "Point",
-    coordinates: [region.longitude, region.latitude],
-  };
+    coordinates: [coords.longitude, coords.latitude],
+  });
+
+  try {
+    const { coords } = await comTimeout(
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+      TIMEOUT_LEITURA_GPS_MS
+    );
+    return paraGeoJson(coords);
+  } catch {
+    // GPS indisponível no momento do disparo (túnel, prédio, chip de rádio ocupado).
+    // A última leitura conhecida serve se for recente o bastante para descrever o agora.
+    try {
+      const ultima = await Location.getLastKnownPositionAsync({
+        maxAge: IDADE_MAXIMA_POSICAO_MS,
+      });
+      return ultima ? paraGeoJson(ultima.coords) : null;
+    } catch {
+      return null;
+    }
+  }
 }
 
-async function confirmarEntrada(hospitalId, posicao) {
+async function confirmarEntrada(hospitalId) {
+  const posicao = await posicaoAtual();
+  if (!posicao) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "GeofencingTaskService: entrada ignorada — sem posição do aparelho para validar o geofence"
+    );
+    return;
+  }
+
   try {
     const resposta = await VisitaService.checkin({
       hospitalId,
@@ -141,7 +218,7 @@ TaskManager.defineTask(GEOFENCING_TASK, ({ data, error }) => {
     if (!timersEntrada.has(hospitalId)) {
       const timer = setTimeout(() => {
         timersEntrada.delete(hospitalId);
-        confirmarEntrada(hospitalId, paraPosicaoGeoJson(region));
+        confirmarEntrada(hospitalId);
       }, TOLERANCIA_ENTRADA_MS);
       timersEntrada.set(hospitalId, timer);
     }
@@ -159,9 +236,23 @@ TaskManager.defineTask(GEOFENCING_TASK, ({ data, error }) => {
 });
 
 /**
- * Monta as regiões circulares (raio ~120m) a partir do centroide do geofence de cada
- * hospital próximo (E2-01/E2-02) e inicia o geofencing nativo. Idempotente: chamadas
- * repetidas reiniciam a lista de regiões monitoradas.
+ * Raio da região nativa de um hospital: o raio real do seu geofence, nunca abaixo do
+ * piso de disparo (BUG-08). Antes era 120 m fixo para todos, o que desprezava o
+ * `raioMetros` que a API devolve por estabelecimento desde E8-03 e monitorava uma UBS
+ * com a mesma folga de um complexo hospitalar.
+ */
+function raioDaRegiao(hospital) {
+  const raio = Number(hospital?.raioMetros);
+  if (!Number.isFinite(raio) || raio <= 0) {
+    return PISO_RAIO_DISPARO_METROS;
+  }
+  return Math.max(raio, PISO_RAIO_DISPARO_METROS);
+}
+
+/**
+ * Monta as regiões circulares a partir do centroide do geofence de cada hospital
+ * próximo (E2-01/E2-02) e inicia o geofencing nativo. Idempotente: chamadas repetidas
+ * reiniciam a lista de regiões monitoradas.
  */
 export async function iniciarGeofencing() {
   const permissaoForeground = await Location.requestForegroundPermissionsAsync();
@@ -176,9 +267,9 @@ export async function iniciarGeofencing() {
     return;
   }
 
-  let posicaoAtual;
+  let posicaoInicial;
   try {
-    posicaoAtual = await Location.getCurrentPositionAsync({});
+    posicaoInicial = await Location.getCurrentPositionAsync({});
   } catch {
     return;
   }
@@ -186,8 +277,8 @@ export async function iniciarGeofencing() {
   let hospitais;
   try {
     hospitais = await HospitalService.listar({
-      latitude: posicaoAtual.coords.latitude,
-      longitude: posicaoAtual.coords.longitude,
+      latitude: posicaoInicial.coords.latitude,
+      longitude: posicaoInicial.coords.longitude,
       raioKm: RAIO_BUSCA_HOSPITAIS_KM,
       size: 50,
     });
@@ -209,7 +300,7 @@ export async function iniciarGeofencing() {
         identifier: hospital.id,
         latitude: centroide.latitude,
         longitude: centroide.longitude,
-        radius: RAIO_GEOFENCE_METROS,
+        radius: raioDaRegiao(hospital),
         notifyOnEnter: true,
         notifyOnExit: true,
       };

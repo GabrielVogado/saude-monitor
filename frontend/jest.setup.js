@@ -73,12 +73,15 @@ jest.mock("expo-location", () => {
   return {
     __esModule: true,
     PermissionStatus,
-    Accuracy: { BestForNavigation: "BestForNavigation", Balanced: "Balanced" },
+    Accuracy: { BestForNavigation: "BestForNavigation", Balanced: "Balanced", High: "High" },
     GeofencingEventType: { Enter: 1, Exit: 2 },
     requestForegroundPermissionsAsync: jest.fn(),
     getForegroundPermissionsAsync: jest.fn(),
     requestBackgroundPermissionsAsync: jest.fn(),
     getCurrentPositionAsync: jest.fn(),
+    // BUG-08: o check-in por geofence passou a mandar a posição real do aparelho, e
+    // cai nesta leitura em cache quando o GPS não responde no momento do disparo.
+    getLastKnownPositionAsync: jest.fn(),
     watchPositionAsync: jest.fn(),
     startGeofencingAsync: jest.fn(),
     stopGeofencingAsync: jest.fn(),

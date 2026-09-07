@@ -24,6 +24,7 @@
 | **M-004** | 04/09/2026 | Observação direta do PO (§ M-004) | Régua de 90% para **todo** o frontend + validação por mutação como parte de escrever teste + piso do `coverageThreshold` sobe a cada onda (70/58/65/70 → 78/66/76/79 → 79/67/77/80 → 90) | (Onda 1) | ✅ Aplicada |
 | **M-005** | 06/09/2026 | BUG-07, relatado pelo PO em uso real | Smoke test de deploy que exercita a rota geoespacial: o portão antigo batia num `find()` sem índice e aprovou um deploy com a F-07 devolvendo HTTP 500 | (este PR) | ✅ Aplicada |
 | **M-006** | 06/09/2026 | BUG-08, relatado pelo PO em uso real | Validação de servidor alimentada por dado do próprio cliente não valida nada + configuração que não migra o dado já gravado não corrige nada | (este PR) | ✅ Aplicada |
+| **M-007** | 06/09/2026 | `code-review` sobre o PR #85 (achados suplementares) | Migração/reconciliador que faz *read-modify-write* do documento inteiro perde edição administrativa concorrente; corrigido para update parcial atômico tocando só os campos da migração | #85 | ✅ Aplicada |
 
 ---
 
@@ -468,6 +469,55 @@ tão bom quanto a coordenada do CNES: as posições vêm com **4 casas decimais*
 e marcam o ponto do cadastro, não o centro do terreno. Nenhum raio conserta um centro
 errado — e não há, hoje, medição de quantos dos 340 estabelecimentos têm o centro fora
 do próprio prédio.
+
+---
+
+## M-007 — Migração que regrava o documento inteiro perde edição concorrente
+
+**Data:** 06/09/2026 · **PR:** #85 (achado suplementar de `code-review`, após o merge do BUG-08)
+
+### O que aconteceu
+
+O `code-review` sobre o diff do BUG-08 encontrou que `ReconciliacaoRaioGeofenceRunner`
+lia o `HospitalDocument` inteiro por página, mudava só `geofence`/`atualizadoEm` em
+memória e regravava o documento inteiro com `saveAll`. Sem campo de controle de
+concorrência, uma edição administrativa (nome, endereço, `ativo` etc., feita por
+`HospitalServiceImpl.atualizar` na janela entre a leitura e a escrita do reconciliador)
+seria silenciosamente sobrescrita pelos valores antigos — um *lost update*. Janela
+pequena, mas real: o reconciliador roda a cada cold start do Cloud Run, que pode
+acontecer a qualquer hora do expediente.
+
+### Por que não virou `@Version`
+
+A correção óbvia — anotar `HospitalDocument` com `@Version` para o Spring Data
+recusar a escrita em caso de conflito — foi descartada: os 340 documentos já
+gravados não têm esse campo, e o Spring Data trata `version == null` como entidade
+**nova**. O próximo `save()` de qualquer um deles (deste reconciliador ou de
+`HospitalServiceImpl`) tentaria **inserir** um `_id` que já existe, quebrando com
+`DuplicateKeyException` em produção — trocaria uma janela de corrida estreita por uma
+falha garantida.
+
+### O que entrou
+
+- `ReconciliacaoRaioGeofenceRunner` passa a gravar via `BulkOperations` com update
+  parcial e atômico por `_id` (`$set` só em `geofence`/`atualizadoEm`), em vez de
+  `saveAll` do documento inteiro. Uma edição concorrente em qualquer outro campo
+  nunca é tocada — o problema deixa de existir por construção, sem migração de schema.
+- `posicaoAtual()` (`GeofencingTaskService.js`) ganhou timeout de 10 s sobre
+  `Location.getCurrentPositionAsync`, que não tem timeout próprio e podia travar a
+  confirmação de entrada indefinidamente em GPS instável — mesma classe de falha que
+  o `E8-04` já havia blindado no HTTP, mas não replicada aqui.
+- Suíte completa revalidada após a mudança: 151 testes de backend e 311 de frontend,
+  0 falhas.
+
+### Lição a repetir
+
+**Um reconciliador/migração que só precisa mudar 1-2 campos não deve ler-modificar-gravar
+o documento inteiro** — isso arrisca sobrescrever qualquer outro campo alterado por um
+caminho concorrente (admin, outro job). Update parcial e atômico pelo identificador é o
+padrão a seguir em futuros runners deste tipo (candidato natural: o próximo
+`Order`-runner de migração/regravação em massa que precisar tocar poucos campos de um
+documento maior).
 
 ---
 

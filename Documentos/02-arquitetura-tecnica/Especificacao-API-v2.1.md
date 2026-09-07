@@ -1,0 +1,562 @@
+# 🔌 Especificação da API REST — saude-monitor v2.1
+
+> **Contratos de integração e modelo de dados MongoDB para o Clinical Sanctuary**
+>
+> | Campo | Valor |
+> |---|---|
+> | **Versão** | 2.1 |
+> | **Status** | Contrato em validação — endpoints já implementados na `develop` (auditoria 30/08/2026); alterações refletidas neste documento e registradas por PR |
+> | **Data** | 07/08/2026 (última atualização: 06/09/2026) |
+> | **Base** | Árvore Tecnológica v2.0 (ADRs) · Documento Negocial v2.0 (RN) · Backlog v2.0 (E1–E6) |
+> | **Padrão** | REST + JSON · OpenAPI 3.1 (geração automática a partir do código proposta na E8-09, PR #88 — não incluída neste PR) |
+
+## 📌 Revisão 06/09/2026 (E8-14 — CONT-01/CONT-02)
+
+**Duas divergências entre este documento e o código, abertas desde 20/08/2026**
+(`Consolidacao-Tecnica-e-Backlog-Pendente-v1.1.md`, CONT-01/CONT-02), foram fechadas
+**alinhando o documento ao código real** — decisão do Product Owner: nenhum cliente
+real hoje depende do nome pt-BR, e mudar o código quebraria o app já em uso
+(login) ou exigiria migrar uma coleção com contas reais em produção.
+
+- **§2.2:** a coleção passa a ser chamada `users` (era `usuarios`) — é o nome real
+  em produção (`UserDocument.java: @Document(collection = "users")`), inclusive já
+  citado corretamente em §3.1 (`DELETE /contas/exclusao`, "remove `users`") antes
+  desta revisão.
+- **§3.1 (`POST /api/v1/auth/login`):** o campo do corpo da requisição passa a ser
+  `password` (era `senha`) — é o nome real em `LoginRequest.java`, já consistente
+  com o `password` usado no `POST /api/v1/auth/registro` (`UserRequest.java`,
+  documentado como herdado do DTO legado em inglês).
+
+A versão anterior (2.0) foi preservada em `_historico/Especificacao-API-v2.0.md`.
+
+---
+
+## 1. Convenções Gerais
+
+- **Base URL:** `https://api.saude-monitor.com.br/api/v1` (produção) · `http://localhost:8080/api/v1` (dev)
+- **Protocolo:** HTTPS obrigatório em produção.
+- **Autenticação:** `Authorization: Bearer <access_token>` (JWT). Endpoints públicos são explicitamente marcados como 🔓.
+- **Formato de data/hora:** ISO 8601 UTC (`2026-08-07T16:00:00Z`).
+- **GeoJSON:** conforme RFC 7946; coordenadas `[longitude, latitude]` (lon/lat, ordem do GeoJSON).
+- **Ids:** strings (MongoDB ObjectId) — `652c9f3e1a2b3c4d5e6f7080`.
+- **Paginação:** `?page=0&size=20` (0-based) → resposta com `page`, `size`, `totalElements`, `totalPages`, `content`.
+- **Idioma das mensagens:** pt-BR.
+- **Versionamento:** prefixo `/api/v1` no path; quebras de contrato exigem v2.
+
+### 1.1 Envelope de resposta padrão
+
+**Sucesso:** o recurso retorna diretamente o JSON do objeto ou paginação.
+
+**Erro (todos os endpoints):**
+```json
+{
+  "timestamp": "2026-08-07T16:00:00Z",
+  "status": 404,
+  "code": "HOSPITAL_NAO_ENCONTRADO",
+  "message": "Hospital não encontrado para o id informado.",
+  "details": [],
+  "traceId": "e3b0c44298fc1c149afbf4c8996fb924"
+}
+```
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `timestamp` | string (ISO) | Momento do erro |
+| `status` | int | HTTP status |
+| `code` | string | Código estável do erro (usar em testes/automação) |
+| `message` | string | Mensagem amigável pt-BR |
+| `details` | array | Detalhes de validação de campo (ex.: `[{campo, mensagem}]`) |
+| `traceId` | string | Correlação para suporte (log) |
+
+### 1.2 Códigos de erro comuns
+
+| Código | HTTP | Uso |
+|---|---|---|
+| `CAMPOS_INVALIDOS` | 400 | Falha de validação de request |
+| `NAO_AUTORIZADO` | 401 | Token ausente/ inválido/ expirado |
+| `ACESSO_NEGADO` | 403 | Sem papel para o recurso |
+| `RECURSO_NAO_ENCONTRADO` | 404 | Id inexistente |
+| `CONFLITO` | 409 | Violação de unicidade/estado (ex.: feedback duplicado) |
+| `LIMITE_EXCEDIDO` | 429 | Rate limit |
+| `ERRO_INTERNO` | 500 | Erro não tratado |
+
+---
+
+## 2. Modelo de Dados MongoDB (coleções)
+
+> Banco: `saude_monitor` · Fonte primária: MongoDB 7 (Percona) · Índices geoespaciais **2dsphere**.
+
+### 2.1 `hospitais`
+
+```json
+{
+  "_id": "652c9f3e1a2b3c4d5e6f7080",
+  "nome": "Hospital Santa Casa",
+  "cnpj": "12.345.678/0001-90",
+  "tipo": "PRIVADO",
+  "endereco": { "logradouro": "Rua X, 100", "cidade": "São Paulo", "uf": "SP", "cep": "01000-000" },
+  "geofence": {
+    "type": "Polygon",
+    "coordinates": [[[-46.633, -23.550], [-46.633, -23.560], [-46.620, -23.560], [-46.620, -23.550], [-46.633, -23.550]]]
+  },
+  "contato": { "telefone": "(11) 3333-0000", "email": "contato@santacasa.com.br" },
+  "ativo": true,
+  "criadoEm": "2026-08-01T10:00:00Z",
+  "atualizadoEm": "2026-08-01T10:00:00Z"
+}
+```
+
+- **Índices:** `{ "geofence": "2dsphere" }` · `{ "nome": 1 }` unique · `{ "cnpj": 1 }` unique · `{ "ativo": 1, "tipo": 1 }`
+- **Regras:** geofence é `Polygon` fechado (primeiro e último vértice iguais); tipo ∈ `PUBLICO|PRIVADO|FILANTROPICO`.
+
+### 2.2 `users`
+
+```json
+{
+  "_id": "652c9f3e1a2b3c4d5e6f7081",
+  "nome": "Marina Souza",
+  "email": "marina@email.com",
+  "senhaHash": "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
+  "telefone": "(11) 99999-0000",
+  "papel": "USER",
+  "consentimentos": {
+    "localizacao": { "aceito": true, "data": "2026-08-01T10:00:00Z", "versaoTermos": "1.0" },
+    "notificacoes": { "aceito": true, "data": "2026-08-01T10:00:00Z" },
+    "termosUso": { "aceito": true, "data": "2026-08-01T10:00:00Z", "versao": "1.0" }
+  },
+  "ativo": true,
+  "criadoEm": "2026-08-01T10:00:00Z",
+  "atualizadoEm": "2026-08-01T10:00:00Z"
+}
+```
+
+- **Índices:** `{ "email": 1 }` unique.
+- **Segurança:** `senhaHash` via BCrypt (F0-01); token JWT armazenado **nunca** no banco (apenas no cliente, SecureStore).
+
+### 2.3 `visitas`
+
+```json
+{
+  "_id": "652c9f3e1a2b3c4d5e6f7082",
+  "usuarioId": "652c9f3e1a2b3c4d5e6f7081",
+  "hospitalId": "652c9f3e1a2b3c4d5e6f7080",
+  "entrada": "2026-08-07T14:03:00Z",
+  "saida": "2026-08-07T16:45:00Z",
+  "duracaoMinutos": 162,
+  "status": "FINALIZADA",
+  "tipoPermanencia": "ATENDIMENTO",
+  "ultimoHeartbeat": "2026-08-07T16:30:00Z",
+  "origem": "GEOFENCE",
+  "pontosAmostrais": [
+    { "posicao": { "type": "Point", "coordinates": [-46.627, -23.555] }, "em": "2026-08-07T14:10:00Z" }
+  ],
+  "notas": "entrada detectada em 3min; saída em 6min",
+  "criadoEm": "2026-08-07T14:03:00Z"
+}
+```
+
+- **Índices:** `{ "hospitalId": 1, "entrada": -1 }` · `{ "usuarioId": 1, "entrada": -1 }` · `{ "status": 1 }` · `{ "ultimoHeartbeat": 1 }`
+- **Status:** `EM_ATENDIMENTO` → `SUSPEITA` → `FINALIZADA` | `EXPIRADA` | `GPS_INTERROMPIDO` | `SEM_FEEDBACK` (derivado)
+- **`tipoPermanencia`:** `ATENDIMENTO` (padrão) | `OBSERVACAO` | `INTERNACAO` — sinalizado pelo usuário após 12h de visita ativa (RN-24).
+- **Regras (RN-01..RN-07, RN-23, RN-24):** entrada após 2min contínuos no geofence; saída após 5min fora; **expiração apenas após 24h sem heartbeat** (não por tempo de permanência — filas de 12h+ no SUS são comuns e a visita deve continuar ativa enquanto houver heartbeat); `origem` ∈ `GEOFENCE|MANUAL`; visitas < 2min não entram no agregado; heartbeat a cada 30min (RN-23).
+
+### 2.4 `feedbacks`
+
+```json
+{
+  "_id": "652c9f3e1a2b3c4d5e6f7083",
+  "visitaId": "652c9f3e1a2b3c4d5e6f7082",
+  "usuarioId": null,
+  "hospitalId": "652c9f3e1a2b3c4d5e6f7080",
+  "foiAtendido": "SIM",
+  "motivoNaoAtendido": null,
+  "teveMedico": "SIM",
+  "fezTriagem": "SIM",
+  "medicacaoReceita": "RECEBI",
+  "nota": 4,
+  "comentario": "Atendimento rápido, equipe atenciosa.",
+  "anonimizado": false,
+  "criadoEm": "2026-08-07T16:55:00Z"
+}
+```
+
+- **Índices:** `{ "visitaId": 1 }` **unique** (RN-12 dedupe) · `{ "hospitalId": 1, "criadoEm": -1 }`
+- **Enums:** `foiAtendido` ∈ `SIM|NAO|DESISTI` · `teveMedico` ∈ `SIM|NAO|NAO_PRECISEI` · `fezTriagem` ∈ `SIM|NAO|NAO_SEI` · `medicacaoReceita` ∈ `RECEBI|NAO_RECEBEU|NAO_PRECISEI` · `nota` 1–5.
+- **Regras:** `usuarioId` pode ser nulo (anônimo); feedbacks nunca expostos publicamente; agregação usa apenas feedbacks com `criadoEm` dentro do período.
+
+### 2.5 `agregados_hospitais` (materializado — leitura pública)
+
+```json
+{
+  "_id": "652c9f3e1a2b3c4d5e6f7084",
+  "hospitalId": "652c9f3e1a2b3c4d5e6f7080",
+  "notaMedia": 4.2,
+  "nAvaliacoes": 12,
+  "tempoMedianoMinutos": 95,
+  "nVisitas": 34,
+  "periodoInicio": "2026-05-10T00:00:00Z",
+  "periodoFim": "2026-08-07T23:59:59Z",
+  "atualizadoEm": "2026-08-07T16:55:05Z"
+}
+```
+
+- **Índices:** `{ "hospitalId": 1 }` unique.
+- **Regras (RN-14..RN-19):** `notaMedia` = média aritmética das notas; `tempoMedianoMinutos` = mediana das durações de visitas FINALIZADA com `tipoPermanencia = ATENDIMENTO` e **≤ 24h** no período (filas de 12h+ do SUS entram na métrica; internação/observação saem — RN-16/RN-17/RN-24); exibir indicadores apenas se `nAvaliacoes >= 5` (o app/API omite quando abaixo); atualização em ≤ 15min via job.
+
+---
+
+## 3. Endpoints
+
+> Legenda: 🔓 público · 🔒 autenticado · 🛡️ admin/gestor
+
+> **Situação de implantação (auditoria `develop` — 30/08/2026):** 🟢 implementado · 🟡 divergente · 🔴 não implementado · Ref = PR que decidiu/materializou.
+
+| Endpoint | Situação | Ref. |
+|---|---|---|
+| `POST /api/v1/auth/registro` | 🟢 (migrado de `/api/user/cadastro`; consentimento LGPD obrigatório) | PR `contas - registro e contas` |
+| `POST /api/v1/auth/login` | 🟢 (rate limit 10/min/IP) | PR #1/#24 |
+| `POST /api/v1/auth/refresh` | 🟢 (rotação) | PR #22 |
+| `POST /api/v1/auth/logout` | 🟢 (blacklist de refresh; idempotente) | PR `feature/logout-server-revogacao-refresh` |
+| `DELETE /api/v1/contas/exclusao` | 🟢 | PR #25 |
+| `GET /api/v1/contas/feedbacks` | 🟢 | PR `contas - registro e contas` |
+| `GET /api/v1/contas/export` | 🟢 (LGPD art. 18 — portabilidade) | PR `contas - registro e contas` |
+| `PUT /api/v1/contas/consentimentos` | 🔴 agendado **Sprint S8 (E5-05)** — revogação de consentimentos via API | — |
+| `GET /api/v1/usuarios/me` | ⛔ **removido do contrato** — perfil servido no payload do login | decisão 31/08/2026 |
+| `GET /api/v1/hospitais` (+ `{id}`, `geofence`) | 🟢 | PR #12/#13 |
+| `POST/PUT/PATCH /api/v1/hospitais...` | 🟢 (ADMIN) | PR #12/#13 |
+| `GET /api/v1/hospitais/ranking` | 🟢 (backend; UI em S8) | PR #27 |
+| `POST /api/v1/hospitais/sugestoes` + moderação | 🟢 | PR #14 |
+| `POST /api/v1/visitas/checkin` · `checkout` · `heartbeat` · PATCH `tipo-permanencia` | 🟢 | PR #17/#18|
+| `GET /api/v1/visitas/ativas` · `GET /api/v1/contas/visitas` | 🟢 | PR #18/#23 |
+| `POST /api/v1/visitas/{id}/expirar` (job) | 🟢 como job interno `@Scheduled` | PR #18 |
+| `POST /api/v1/feedbacks` | 🟢 | PR #22 |
+| `GET /api/v1/visitas/{id}/feedback` · `PUT /api/v1/feedbacks/{id}` | 🟢 | PR #22 |
+| `GET /api/v1/hospitais/{id}/indicadores` | 🟢 | PR #23 |
+
+### 3.1 Auth e Conta
+
+#### `POST /api/v1/auth/registro` 🔓
+Cria conta (opcional no MVP — jornada principal funciona sem login). Substitui o antigo `POST /api/user/cadastro` (legado) e registra o consentimento LGPD no momento do cadastro.
+
+> ✅ **Situação atual (31/08/2026):** implementado. `AuthController#registro` delegou para `UserService.saveUser`, que **rejeita com 400** quando `consentimento.termosUso != true` (decisão de contrato que antes ficava implícita no `UserServiceImpl`). O app mobile usa `UserService.registro` (`frontend/src/screens/user/service/UserService.js`).
+
+**Request:**
+```json
+{
+  "fullName": "Marina Souza",
+  "email": "marina@email.com",
+  "password": "S3nh@Forte!",
+  "phone": "(11) 99999-0000",
+  "consentimento": { "termosUso": true, "versaoTermos": "1.0" }
+}
+```
+> Nota de contrato: os campos `fullName`/`password`/`phone` são herdados do `UserRequest` legado (`/api/user/cadastro`) e mantidos em inglês; o alinhamento completo do payload a camelCase pt-BR (checklist §7) segue como pendência consolidada.
+
+**201 Created**
+```json
+{
+  "success": true,
+  "message": "Conta criada com sucesso.",
+  "id": "652c9f3e1a2b3c4d5e6f7081",
+  "fullName": "Marina Souza",
+  "email": "marina@email.com",
+  "phone": "(11) 99999-0000",
+  "active": true,
+  "createdAt": "2026-08-31T10:00:00Z",
+  "updatedAt": "2026-08-31T10:00:00Z"
+}
+```
+**Validações:** e-mail válido e único (`VALIDACAO` com `errors`); senha ≥ 8 chars com número e letra; `consentimento.termosUso` obrigatório = true (LGPD).
+
+#### `POST /api/v1/auth/login` 🔓
+**Request:**
+```json
+{ "email": "marina@email.com", "password": "S3nh@Forte!" }
+```
+**200 OK**
+```json
+{
+  "accessToken": "eyJhbGciOi...",
+  "refreshToken": "eyJhbGciOi...",
+  "expiraEm": 900,
+  "usuario": { "id": "652c9f3e1a2b3c4d5e6f7081", "nome": "Marina Souza", "email": "marina@email.com", "papel": "USER" }
+}
+```
+**Regras:** `expiraEm` = 900s (15min); rate limit 10 req/min/IP.
+
+#### `POST /api/v1/auth/refresh` 🔓
+**Request:** `{ "refreshToken": "..." }` → **200** `{ "accessToken": "...", "refreshToken": "...", "expiraEm": 900 }`
+Rotação de refresh token (revoga o anterior).
+
+#### `POST /api/v1/auth/logout` 🔒
+**Request:** `{ "refreshToken": "..." }` → **200** `{ "success": true, "message": "Sessão encerrada. Refresh token revogado." }`
+Revoga o refresh token na blacklist (`refresh_tokens_revogados`, TTL até a expiração do token), impedindo novos refreshes. Idempotente: token já expirado/malformado/revogado também responde 200.
+
+> ✅ **Situação atual (30/08/2026):** **implementado** (PR `feature/logout-server-revogacao-refresh`). `POST /api/v1/auth/logout` insere o `jti` do refresh na blacklist; `POST /api/v1/auth/refresh` rejeita tokens revogados (401 `NAO_AUTORIZADO`) e, na rotação, também revoga o refresh anterior. O app chama o endpoint best-effort e sempre limpa os tokens locais (`TokenStorage.limparTokens`).
+
+#### `DELETE /api/v1/contas/exclusao` 🔒
+Exclui conta e dados pessoais (LGPD). **200** com resumo do que foi removido/anonimizado.
+
+> ✅ **Situação atual (30/08/2026):** implementado (PR #25). Substitui o path anterior `DELETE /api/v1/usuarios/me` por clareza semântica. Cascade: remove `users` + `auth_logins` (`AuthRepository.deleteByUser_Id`), anonimiza `visitas`/`feedbacks` (`usuarioId → null`, `anonimizado=true`) e **recalcula os agregados** afetados (job de 15min cobre falhas).
+
+#### `GET /api/v1/usuarios/me` ⛔ (removido do contrato)
+> **Decisão (31/08/2026):** removido da especificação — o perfil é servido no payload do `POST /api/v1/auth/login` e persistido localmente (`TokenStorage`). O namespace `me/` foi substituído por **`/api/v1/contas`** (responsabilidade lógica do titular) — ver §3.6.
+
+#### `PUT /api/v1/contas/consentimentos` 🔒 (agendado — Sprint S8, E5-05)
+> **Situação:** não implementado. Os consentimentos são registrados no cadastro (`/api/v1/auth/registro`); a revogação de localização no app é local/permissão do SO (E5-05). **Agendado para a Sprint S8** sob o path já renomeado para o namespace `contas`. **Request** (desenho): `{ "localizacao": { "aceito": false } }`.
+
+---
+
+### 3.2 Hospitais
+
+#### `GET /api/v1/hospitais` 🔓
+Lista hospitais ativos próximos ou com filtro. Query params: `latitude`, `longitude`, `raioKm` (default 10), `tipo`, `busca`, `page`, `size`.
+**200 OK**
+```json
+{
+  "content": [
+    {
+      "id": "652c9f3e1a2b3c4d5e6f7080",
+      "nome": "Hospital Santa Casa",
+      "tipo": "PRIVADO",
+      "endereco": { "cidade": "São Paulo", "uf": "SP" },
+      "geofence": { "type": "Polygon", "coordinates": [["..."] ] },
+      "indicadores": {
+        "notaMedia": 4.2,
+        "nAvaliacoes": 12,
+        "tempoMedianoMinutos": 95,
+        "atualizadoEm": "2026-08-07T16:55:05Z"
+      }
+    }
+  ],
+  "page": 0, "size": 20, "totalElements": 1, "totalPages": 1
+}
+```
+**Query geo:** usa `$near` com `$maxDistance` sobre `geofence` (centroide) ou `$geoIntersects` — **decisão de implementação**: listar por raio usa o **centroide** do polígono; detectar entrada usa `$geoIntersects` com o ponto do usuário.
+
+#### `GET /api/v1/hospitais/{id}` 🔓
+Detalhe público: campos do hospital + indicadores (omitir `notaMedia`/`tempoMedianoMinutos` se `nAvaliacoes < 5` — retornar `"indicadoresDisponiveis": false`).
+
+#### `GET /api/v1/hospitais/{id}/geofence` 🔓
+Retorna apenas o geofence (para renderização no mapa). **200** `{ "geofence": { ... } }`
+
+#### `POST /api/v1/hospitais` 🛡️
+Cadastro de hospital + geofence (admin). **201** com recurso completo. Valida polígono GeoJSON (fechado, ≥ 3 vértices, sem auto-interseção).
+
+#### `PUT /api/v1/hospitais/{id}` 🛡️
+Atualiza hospital/geofence. **200**.
+
+#### `PATCH /api/v1/hospitais/{id}/status` 🛡️
+Ativa/desativa. **200**.
+
+---
+
+### 3.3 Visitas
+
+> O fluxo de detecção é **iniciado no dispositivo** (geofencing nativo, ADR-002). A API recebe eventos de entrada/saída.
+
+#### `POST /api/v1/visitas/checkin` 🔒
+Registra entrada (automática via geofence ou manual).
+
+**Request:**
+```json
+{
+  "hospitalId": "652c9f3e1a2b3c4d5e6f7080",
+  "origem": "GEOFENCE",
+  "posicao": { "type": "Point", "coordinates": [-46.627, -23.555] },
+  "dispositivoId": "android-uuid-123",
+  "ocorridoEm": "2026-08-07T14:03:00Z"
+}
+```
+**201 Created**
+```json
+{
+  "id": "652c9f3e1a2b3c4d5e6f7082",
+  "hospitalId": "652c9f3e1a2b3c4d5e6f7080",
+  "entrada": "2026-08-07T14:03:00Z",
+  "status": "EM_ATENDIMENTO"
+}
+```
+**Regras:** valida se ponto está dentro do geofence (`$geoIntersects`) quando `origem=GEOFENCE`; se já existe visita `EM_ATENDIMENTO` no mesmo hospital, retorna a existente (idempotente); `dispositivoId` permite visita anônima (sem login).
+
+> **`ocorridoEm` (opcional, OPS-05 — 03/09/2026):** momento real da entrada, enviado quando o check-in foi detectado **sem internet** e ficou na fila offline do aplicativo. Sem ele, o evento reenviado registraria a hora em que a conexão voltou, e o tempo de permanência passaria a medir a rede do aparelho em vez da fila do hospital. O campo é opcional e **não é confiável** (o endpoint é público, OPS-03): o servidor só o aceita no passado recente — dentro da janela de 24h da RN-04, nunca no futuro além de 5 min de tolerância de relógio. Fora disso vale o relógio do servidor.
+
+#### `POST /api/v1/visitas/{id}/checkout` 🔒
+Registra saída. **Request:** `{ "posicao": {...}, "gpsIndisponivel": false, "encerramentoManual": false, "ocorridoEm": "2026-08-07T16:45:00Z" }` → **200**
+```json
+{
+  "id": "652c9f3e1a2b3c4d5e6f7082",
+  "saida": "2026-08-07T16:45:00Z",
+  "duracaoMinutos": 162,
+  "status": "FINALIZADA"
+}
+```
+> **`ocorridoEm` (opcional, OPS-05):** mesmas regras do check-in, com uma restrição a mais — a saída nunca é anterior à entrada. Um relógio atrasado no aparelho produziria duração negativa, que envenenaria a mediana de permanência (RN-15); nesse caso o servidor usa a própria entrada.
+
+#### `POST /api/v1/visitas/{id}/heartbeat` 🔒
+Sinal de vida da visita (RN-23). O app envia a cada **30 minutos** enquanto a visita está ativa (também serve de fallback quando o app está em primeiro plano). Atualiza `ultimoHeartbeat`; se a visita estava `SUSPEITA` (2h sem heartbeat), retorna ao status `EM_ATENDIMENTO`. **200** `{ "status": "EM_ATENDIMENTO", "ultimoHeartbeat": "2026-08-07T16:30:00Z" }`
+
+#### `PATCH /api/v1/visitas/{id}/tipo-permanencia` 🔒
+Sinaliza internação/observação (RN-24) — disponível quando a visita tem ≥ 12h de duração. **Request:** `{ "tipoPermanencia": "INTERNACAO" }` → **200** `{ "tipoPermanencia": "INTERNACAO" }`. A visita continua ativa, mas **sai do cálculo do tempo médio de pronto-atendimento**.
+
+#### `GET /api/v1/visitas/ativas` 🔒
+Retorna visita `EM_ATENDIMENTO` do usuário (para card/cronômetro). **200** `{ "visita": {...} | null }`
+
+#### `GET /api/v1/contas/visitas` 🔒
+Histórico do usuário (paginado). **200** paginação com visita + hospital + status + feedback (se houver).*Antigo `GET /api/v1/usuarios/me/visitas` — renomeado para o namespace `contas`.*
+
+```json
+{
+  "content": [ { "id": "v1", "hospital": {...}, "status": "FINALIZADA", "feedback": null } ],
+  "page": 0, "size": 20, "totalElements": 1, "totalPages": 1
+}
+```
+
+#### `POST /api/v1/visitas/{id}/expirar` 🛡️ (job interno)
+Expira visita **apenas após 24h sem heartbeat** (RN-04) — proteção contra GPS "preso", sem cortar esperas reais de 12h+. Chamado por job agendado (ex.: a cada 15min). Visitas em `SUSPEITA` há 2h são candidatas; sem heartbeat por 24h → `EXPIRADA`.
+
+---
+
+### 3.4 Feedbacks
+
+#### `POST /api/v1/feedbacks` 🔓 (público — permite anônimo)
+Registra feedback pós-saída. **Autenticação opcional** (se logado, vincula `usuarioId`).
+
+**Request:**
+```json
+{
+  "visitaId": "652c9f3e1a2b3c4d5e6f7082",
+  "foiAtendido": "SIM",
+  "motivoNaoAtendido": null,
+  "teveMedico": "SIM",
+  "fezTriagem": "SIM",
+  "medicacaoReceita": "RECEBI",
+  "nota": 4,
+  "comentario": "Atendimento rápido."
+}
+```
+**201 Created** `{ "id": "...", "criadoEm": "...", "recebido": true }`
+**Erros:** `CONFLITO` se `visitaId` já tem feedback (RN-12); `RECURSO_NAO_ENCONTRADO` se visita não existe ou não está FINALIZADA.
+
+#### `GET /api/v1/visitas/{id}/feedback` 🔒
+Retorna feedback da visita (se houver) — usado para edição de comentário (opcional).
+
+#### `PUT /api/v1/feedbacks/{id}` 🔒 (dono)
+Permite editar comentário/nota dentro da janela de 24h (RN-09). **200**.
+
+#### `GET /api/v1/contas/feedbacks` 🔒
+Histórico de feedbacks do usuário (paginado, RN-22 — E5-03). Mesma paginação de `contas/visitas`; cada item traz o feedback e a visita/hospital de referência. **200** `PageResponse`.
+
+---
+
+### 3.6 Conta do titular (namespace `contas`)
+
+> Substitui o namespace `me/` por responsabilidade lógica (decisão 31/08/2026): recursos que dizem respeito ao titular autenticado vivem sob `/api/v1/contas`, não sob um path literal `me`.
+
+#### `GET /api/v1/contas/export` 🔒 (LGPD art. 18)
+Portabilidade: exporta todos os dados pessoais do titular (perfil, visitas, feedbacks e consentimentos) em um único JSON. **200**
+```json
+{
+  "geradoEm": "2026-08-31T00:00:00Z",
+  "usuario": { "id": "u1", "nome": "Marina Souza", "email": "marina@email.com", "telefone": "(11) 99999-0000", "consentimentos": {...} },
+  "visitas": [], "feedbacks": []
+}
+```
+
+#### `DELETE /api/v1/contas/exclusao` 🔒
+Vide §3.1 — exclui conta e anonimiza dados (LGPD art. 18/19), recomputando os agregados afetados.
+
+---
+
+### 3.5 Agregados (leitura pública)
+
+#### `GET /api/v1/hospitais/{id}/indicadores` 🔓
+**200**
+```json
+{
+  "hospitalId": "652c9f3e1a2b3c4d5e6f7080",
+  "indicadoresDisponiveis": true,
+  "notaMedia": 4.2,
+  "nAvaliacoes": 12,
+  "tempoMedianoMinutos": 95,
+  "nVisitas": 34,
+  "periodo": { "inicio": "2026-05-10T00:00:00Z", "fim": "2026-08-07T23:59:59Z" },
+  "atualizadoEm": "2026-08-07T16:55:05Z"
+}
+```
+Se `nAvaliacoes < 5`: `"indicadoresDisponiveis": false` e campos de média `null` (RN-15).
+
+#### `GET /api/v1/hospitais/ranking` 🔓
+Ranking por `ordem=nota|tempo`. Query: `ordem`, `tipo`, `page`, `size`. Ordena pelos campos do agregado.
+
+---
+
+## 4. Fluxo de Detecção (Geofence → API)
+
+```mermaid
+sequenceDiagram
+    participant D as Dispositivo (app)
+    participant OS as SO (geofencing nativo)
+    participant API as Backend API
+    participant DB as MongoDB
+
+    D->>OS: startGeofencingAsync (hospitais ativos)
+    Note over OS: dispositivo dentro do polígono ≥ 2min (RN-01)
+    OS-->>D: evento ENTER (hospitalId)
+    D->>API: POST /visitas/checkin (origem=GEOFENCE, posicao)
+    API->>DB: $geoIntersects valida + cria visita EM_ATENDIMENTO
+    API-->>D: 201 visita
+    Note over D: card "Você está em X" + cronômetro
+    Note over OS: dispositivo fora do polígono ≥ 5min (RN-03)
+    OS-->>D: evento EXIT (hospitalId)
+    D->>API: POST /visitas/{id}/checkout (posicao)
+    API->>DB: atualiza saida + duracaoMinutos (FINALIZADA)
+    API-->>D: 200 visita finalizada
+    Note over D: agenda notificação local de feedback (1–5min, RN-08)
+    D->>API: POST /feedbacks (anônimo ou logado)
+    API->>DB: grava feedback + dispara recálculo agregado
+```
+
+---
+
+## 5. Segurança da API
+
+| Item | Política |
+|---|---|
+| **TLS** | HTTPS obrigatório; HSTS; certificados gerenciados |
+| **JWT** | Access 15min (curto) + Refresh 30d (rotação, SecureStore no app) |
+| **CORS** | Restrito a domínios do app web (dev) |
+| **Rate limit** | Login/refresh 10/min/IP (`AUTH`) · Público 60/min/IP (`PUBLICO`, inclui feedbbacks e agregados) — implementado (PR #24) |
+| **Validação** | Bean Validation em todos os DTOs; mensagens pt-BR |
+| **Logs** | Sem dados pessoais (nunca logar e-mail/senha/posição bruta); `traceId` em todas as respostas |
+| **Papéis** | `USER` (padrão) · `HOSPITAL_ADMIN` (futuro) · `ADMIN` (cadastro de hospitais) |
+
+---
+
+## 6. Contratos de evento (futuro — desenho para Fase 2)
+
+Quando Kafka entrar (ADR-004 revisão), os eventos já serão desenhados:
+
+| Evento | Payload (resumo) | Consumidores futuros |
+|---|---|---|
+| `visita.finalizada` | `{ visitaId, hospitalId, duracaoMinutos, entrada, saida }` | Agregador, Analytics |
+| `feedback.criado` | `{ feedbackId, visitaId, hospitalId, nota, criadoEm }` | Agregador, Notificação |
+| `hospital.atualizado` | `{ hospitalId, versaoGeofence }` | Cache geofence mobile |
+
+No MVP, esses eventos são processados **in-process** (job/`@TransactionalEventListener`) — sem fila externa.
+
+---
+
+## 7. Checklist de congelamento do contrato
+
+- [x] Validar nomes de campos pt-BR vs ingleses (ex.: `duracaoMinutos` vs `durationMinutes`) — **padrão adotado: camelCase pt-BR** no payload JSON, campos de domínio em pt-BR; exceção mantida e agora documentada para `fullName`/`password`/`phone` (DTO legado, §3.1) e para a coleção `users` (E8-14/CONT-01/CONT-02, 06/09/2026).
+- [ ] Confirmar política de `origem=MANUAL` (check-in manual) e seus limites anti-abuso.
+- [ ] Confirmar `dispositivoId` anônimo: formato e duração de retenção (LGPD).
+- [ ] Confirmar política de heartbeat/expiração (RN-04/RN-23): intervalo de 30min, marcação `SUSPEITA` aos 2h, expiração aos 24h sem sinal — validar consumo de bateria e rede em teste de campo.
+- [x] Decisão (PR #22): **nota e demais campos editáveis dentro da janela de 24h** (RN-09); agregado recalcula no `PUT` via evento `FeedbackSalvoEvent`.
+- [ ] Spec OpenAPI 3.1 gerada e servida em `/v3/api-docs` — proposta na E8-09 (PR #88, aberto; `springdoc-openapi` ainda não está em `develop`), direto do código, não deste documento.
+- [ ] Testes de integração por recurso no Sprint 0 (F0-03).
+
+---
+
+*Especificação da API v2.1 — versão anterior (2.0) preservada em `_historico/`.*

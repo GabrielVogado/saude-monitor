@@ -5,6 +5,7 @@ import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
 import br.com.saude_monitor.api.feedback.dto.FeedbackRequest;
 import br.com.saude_monitor.api.feedback.dto.FeedbackResponse;
 import br.com.saude_monitor.api.feedback.service.FeedbackService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -34,6 +35,7 @@ public class FeedbackController {
 
     /** 🔓/🔒 Cria feedback pós-saída; autenticação opcional (anônimo, RN-13). */
     @PostMapping("/api/v1/feedbacks")
+    @SecurityRequirements
     public ResponseEntity<FeedbackResponse> criar(@Valid @RequestBody FeedbackRequest request) {
         String usuarioId = autenticacaoHelper.usuarioIdAtual().orElse(null);
         return ResponseEntity.status(HttpStatus.CREATED).body(feedbackService.criar(request, usuarioId));

@@ -126,7 +126,7 @@ D:\saude-monitor\
 
 ## 4. Consumo da API — reaproveitamento total dos contratos existentes
 
-O painel **não introduz um novo backend**; consome os mesmos endpoints já especificados em `Especificacao-API-v2.0.md`, com o mesmo `Authorization: Bearer <access_token>` e o mesmo papel `ADMIN` já previsto (§5 da Especificação da API).
+O painel **não introduz um novo backend**; consome os mesmos endpoints já especificados em `Especificacao-API-v2.1.md`, com o mesmo `Authorization: Bearer <access_token>` e o mesmo papel `ADMIN` já previsto (§5 da Especificação da API). O login usa o campo `password` (CONT-01 resolvida em 06/09/2026, E8-14) — o painel, como qualquer novo cliente da API, já nasce alinhado ao contrato real.
 
 | Tela / Ação | Endpoint reaproveitado | Observação |
 |---|---|---|

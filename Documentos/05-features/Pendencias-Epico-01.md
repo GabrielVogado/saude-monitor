@@ -87,18 +87,18 @@ possível.
 
 ---
 
-## (d) Divergências de nomenclatura vs spec v2.0 (apontadas pela Renata)
+## (d) Divergências de nomenclatura vs spec v2.0 (apontadas pela Renata) — resolvidas 06/09/2026
 
-Ajustes de contrato pendentes para alinhar o código ao `Especificacao-API-v2.0.md`:
+**Resolvido em 06/09/2026 (E8-14):** decisão do Product Owner foi alinhar a spec ao código,
+não o inverso — nenhum cliente real depende do nome pt-BR hoje, e mudar o código quebraria
+o app em uso (login) ou exigiria migrar uma coleção com contas reais em produção. A
+`Especificacao-API-v2.1.md` já reflete `password`/`users`. Tabela original preservada abaixo
+como registro do que foi encontrado.
 
-| # | Local (código) | Atual | Spec v2.0 | Referência |
+| # | Local (código) | Atual | Spec v2.0 (histórica) | Referência |
 |---|---|---|---|---|
-| 1 | `LoginRequest` — campo de senha | `password` | `senha` | §3.1 `POST /api/v1/auth/login` |
-| 2 | `UserDocument` — coleção MongoDB | `users` | `usuarios` | §2.2 modelo `usuarios` |
-
-**Impacto:** qualquer cliente que siga o contrato publicado (campo `senha`) quebra contra o
-payload atual (`password`). A coleção `users` diverge do contrato `usuarios` — alinhar antes
-do congelamento do contrato (Sprint 0 / F0).
+| 1 | `LoginRequest` — campo de senha | `password` | ~~`senha`~~ (spec corrigida p/ `password`) | §3.1 `POST /api/v1/auth/login` |
+| 2 | `UserDocument` — coleção MongoDB | `users` | ~~`usuarios`~~ (spec corrigida p/ `users`) | §2.2 modelo `usuarios` |
 
 ---
 

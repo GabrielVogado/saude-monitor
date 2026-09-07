@@ -68,7 +68,7 @@ Documentos/
 │
 ├── 02-arquitetura-tecnica/                   ← visão técnica e de engenharia
 │   ├── Arvore-Tecnologica-v2.0.md            ← stack atual vs. proposta, manter/refatorar, ADRs, roadmap
-│   ├── Especificacao-API-v2.0.md             ← contratos REST (OpenAPI), modelo de dados MongoDB, fluxos
+│   ├── Especificacao-API-v2.1.md             ← contratos REST (OpenAPI), modelo de dados MongoDB, fluxos
 │   └── Plano-Tecnico-Painel-Administrativo-Web-v1.0.md  ← stack, estrutura de pastas e consumo de API do painel web (F-11)
 │
 ├── 03-ui-ux/                                 ← padrão de experiência e interface
@@ -120,7 +120,7 @@ Documentos/
 |---|---|---|---|---|
 | 1 | [Documento Negocial](./01-negocio/Documento-Negocial-v2.0.md) | 2.0 | ✅ Ativo | Problema, proposta de valor, público, jornada do usuário, regras de negócio do geofence/feedback, modelo de dados conceitual, KPIs, roadmap e conformidade LGPD. |
 | 2 | [Árvore Tecnológica](./02-arquitetura-tecnica/Arvore-Tecnologica-v2.0.md) | 2.0 | ✅ Ativo | Mapa da stack atual (Spring Boot 4 + MongoDB + Expo 55), decisões manter/refatorar/adicionar, matriz comparativa, ADRs e plano de evolução. |
-| 3 | [Especificação da API](./02-arquitetura-tecnica/Especificacao-API-v2.0.md) | 2.0 | ✅ Ativo | Contratos REST de todos os endpoints (auth, hospitais, visitas, feedbacks, agregados), coleções MongoDB com índices/GeoJSON e fluxo geofence → API. |
+| 3 | [Especificação da API](./02-arquitetura-tecnica/Especificacao-API-v2.1.md) | **2.1** | ✅ Ativo | Contratos REST de todos os endpoints (auth, hospitais, visitas, feedbacks, agregados), coleções MongoDB com índices/GeoJSON e fluxo geofence → API. **v2.1 (06/09/2026):** fecha CONT-01/CONT-02 (E8-14) — documento alinhado ao código (`password`, coleção `users`), não o inverso. |
 | 3b | [Plano Técnico — Painel Administrativo Web](./02-arquitetura-tecnica/Plano-Tecnico-Painel-Administrativo-Web-v1.0.md) | 1.0 | 🟡 Proposta | Stack (React + Vite + Leaflet), estrutura de pastas de `web-admin/` e estratégia de consumo da API existente para o painel administrativo (F-11). |
 | 4 | [Padrão UI/UX](./03-ui-ux/Padrao-UI-UX-v2.0.md) | 2.0 | ✅ Ativo | Princípios de UX, personas, jornada ponta a ponta, arquitetura de informação, design system completo (tokens, componentes), acessibilidade WCAG AA, LGPD por design e protótipos ASCII. |
 | 5 | [Backlog do MVP](./04-backlog/Backlog-MVP-v2.1.md) | **2.1** | ✅ Ativo | Backlog priorizado (Fase 0 + 8 épicos), decisões de priorização (§2.1), **Épico 8 — Estabilização e Desempenho**, sequência real S0–S8 + planejada S9–S12, DoD com situação real e regra de atualização documental. |
@@ -132,7 +132,7 @@ Documentos/
 | 11 | [Consolidação Técnica e Backlog Pendente](./08-analise%20tecnica/Consolidacao-Tecnica-e-Backlog-Pendente-v1.1.md) | **1.1** | ✅ Ativo | Fonte única do que está entregue, do que está pendente (48 itens + PERF) e da **ordem de execução em 6 ondas**, com as decisões do PO registradas literalmente. |
 | 12 | [Relatório de Auditoria Técnica](./08-analise%20tecnica/relatorio_auditoria_tecnica.md) | **3.1** | 🟡 Proposta | 11 problemas de arquitetura do frontend. A v3.1 declara o commit-base e **corrige 3 afirmações** que não se sustentaram na reverificação. |
 | 13 | [ADRs](./08-analise%20tecnica/adrs.md) | **3.1** | 🟡 Proposta | ADR-001..ADR-010 em formato MADR, **todos em status `Proposto`**. Precedência revista: entram depois da Sprint S10. |
-| 14 | [Pendências do Épico 01](./05-features/Pendencias-Epico-01.md) | — | 🟡 Aberto | Débitos do ETL CNES/DATASUS e as 2 divergências de contrato abertas desde 20/08/2026 (tratadas em E8-14). |
+| 14 | [Pendências do Épico 01](./05-features/Pendencias-Epico-01.md) | — | 🟡 Aberto | Débitos do ETL CNES/DATASUS. As 2 divergências de contrato abertas desde 20/08/2026 foram fechadas em 06/09/2026 (E8-14). |
 
 ---
 
@@ -152,8 +152,8 @@ Documentos/
 | Quem é você | Comece por |
 |---|---|
 | **Product Owner / Negócio** | `01-negocio/Documento-Negocial-v2.0.md` → `04-backlog/Backlog-MVP-v2.1.md` → `De-Para-Backlog-Features.md` (status real) |
-| **Arquiteto / Backend** | `02-arquitetura-tecnica/Arvore-Tecnologica-v2.0.md` (decisões, ADRs) → `02-arquitetura-tecnica/Especificacao-API-v2.0.md` (contratos) |
-| **Frontend / Mobile** | `03-ui-ux/Padrao-UI-UX-v2.0.md` → `02-arquitetura-tecnica/Especificacao-API-v2.0.md` (consumo) |
+| **Arquiteto / Backend** | `02-arquitetura-tecnica/Arvore-Tecnologica-v2.0.md` (decisões, ADRs) → `02-arquitetura-tecnica/Especificacao-API-v2.1.md` (contratos) |
+| **Frontend / Mobile** | `03-ui-ux/Padrao-UI-UX-v2.0.md` → `02-arquitetura-tecnica/Especificacao-API-v2.1.md` (consumo) |
 | **Designer** | `03-ui-ux/Padrao-UI-UX-v2.0.md` → `_historico/v1.2-design-clinical-sanctuary/` (base da identidade) |
 | **QA / Testes** | Regras de negócio (Documento Negocial §6) + critérios de aceite (Backlog) + contratos (Especificação da API) |
 | **Scrum Master / Agile Coach** | `06-sprints/Plano-Sprints-v2.1.md` (§22 = próximas sprints) → `04-backlog/Backlog-MVP-v2.1.md` |

@@ -4,7 +4,7 @@
 > **Tipo de entrega:** especificação técnica (SEM codificação)
 > **Destino da codificação:** Bruna (agente de back-end)
 > **Data:** 20/08/2026
-> **Base normativa:** `Modelagem-Migracao-Estabelecimentos-Saude-E1.md` · `Pendencias-Epico-01.md` (item a) · `Especificacao-API-v2.0.md` (§2.1 coleção `hospitais`) · Lei 12.527/2011 (dados abertos)
+> **Base normativa:** `Modelagem-Migracao-Estabelecimentos-Saude-E1.md` · `Pendencias-Epico-01.md` (item a) · `Especificacao-API-v2.1.md` (§2.1 coleção `hospitais`) · Lei 12.527/2011 (dados abertos)
 
 ---
 

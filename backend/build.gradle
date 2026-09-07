@@ -33,6 +33,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	// Contrato OpenAPI gerado a partir dos controllers e servido pela aplicação (E8-09).
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
 	// JSON (ObjectMapper + JavaTimeModule p/ Instant): auto-config Jackson + serialização de respostas
 	implementation 'org.springframework.boot:spring-boot-starter-json'
 	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'

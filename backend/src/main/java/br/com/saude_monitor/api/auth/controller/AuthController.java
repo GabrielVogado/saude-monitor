@@ -7,6 +7,7 @@ import br.com.saude_monitor.api.auth.service.AuthService;
 import br.com.saude_monitor.api.user.dto.UserRequest;
 import br.com.saude_monitor.api.user.dto.UserResponse;
 import br.com.saude_monitor.api.user.service.UserService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -38,12 +39,14 @@ public class AuthController {
 
     /** 🔓 Cria conta opcional (E5-04); exige aceite dos termos LGPD (consentimento.termosUso). */
     @PostMapping("/registro")
+    @SecurityRequirements
     public ResponseEntity<UserResponse> registro(@Valid @RequestBody UserRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.saveUser(request));
     }
 
     /** 🔓 Autentica credenciais e devolve access + refresh tokens. */
     @PostMapping("/login")
+    @SecurityRequirements
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         // Nunca logar a senha — apenas a identidade, para rastreabilidade.
         logger.info("[AuthController] Login recebido para email={}", request.email());
@@ -52,6 +55,7 @@ public class AuthController {
 
     /** 🔓 Renova o access token a partir de um refresh token válido (rotação). */
     @PostMapping("/refresh")
+    @SecurityRequirements
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
         return ResponseEntity.ok(authService.refresh(request));
     }
@@ -61,6 +65,7 @@ public class AuthController {
      * Idempotente: devolve 200 mesmo se o token já estiver expirado/revogado.
      */
     @PostMapping("/logout")
+    @SecurityRequirements
     public ResponseEntity<Map<String, Object>> logout(@Valid @RequestBody RefreshRequest request) {
         return ResponseEntity.ok(authService.logout(request));
     }

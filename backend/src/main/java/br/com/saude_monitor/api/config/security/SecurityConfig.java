@@ -62,6 +62,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/v1/hospitais/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/hospitais/**").hasRole("ADMIN")
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        // Métricas de latência/erro por endpoint (E8-06): detalhe operacional
+                        // interno, não um contrato público — exige papel ADMIN. Inclui o índice
+                        // "/actuator" (HAL discovery): sem isso, cai em anyRequest().authenticated()
+                        // e qualquer USER autenticado vê o link para os endpoints restritos.
+                        .requestMatchers("/actuator", "/actuator/prometheus", "/actuator/metrics/**").hasRole("ADMIN")
                         // Contrato OpenAPI (E8-09): público, para quem consome a API sem estar autenticado.
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated())

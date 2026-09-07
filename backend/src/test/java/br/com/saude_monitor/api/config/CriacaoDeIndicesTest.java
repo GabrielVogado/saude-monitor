@@ -19,6 +19,7 @@ import org.springframework.data.mongodb.core.index.IndexInfo;
 import org.springframework.data.geo.Point;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -52,6 +53,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @Testcontainers
 @SpringBootTest
+@TestPropertySource(properties = "app.geofence.reconciliacao.enabled=false")
 class CriacaoDeIndicesTest {
 
     @Container

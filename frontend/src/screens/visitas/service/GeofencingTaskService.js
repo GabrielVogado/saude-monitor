@@ -33,17 +33,32 @@ const PISO_RAIO_DISPARO_METROS = 100;
 
 const RAIO_BUSCA_HOSPITAIS_KM = 5;
 
+// RN-01: só confirma entrada após 2 minutos contínuos dentro do geofence.
+const TOLERANCIA_ENTRADA_MS = 2 * 60 * 1000;
+// RN-03: só confirma saída após 5 minutos contínuos fora do geofence.
+const TOLERANCIA_SAIDA_MS = 5 * 60 * 1000;
+
 /**
  * Idade máxima de uma leitura de GPS em cache para ainda valer como "onde a pessoa
  * está". Igual à tolerância de entrada: a leitura foi feita, no pior caso, no momento
  * em que o SO disparou o Enter, e é isso que o backend precisa validar.
  */
-const IDADE_MAXIMA_POSICAO_MS = 2 * 60 * 1000;
+const IDADE_MAXIMA_POSICAO_MS = TOLERANCIA_ENTRADA_MS;
 
-// RN-01: só confirma entrada após 2 minutos contínuos dentro do geofence.
-const TOLERANCIA_ENTRADA_MS = 2 * 60 * 1000;
-// RN-03: só confirma saída após 5 minutos contínuos fora do geofence.
-const TOLERANCIA_SAIDA_MS = 5 * 60 * 1000;
+/**
+ * Prazo para uma leitura de GPS "ao vivo" responder. `getCurrentPositionAsync` não tem
+ * opção de timeout própria e, em rádio ocupado ou GPS indisponível, a promise pode nunca
+ * resolver nem rejeitar — travando a confirmação de entrada indefinidamente em vez de
+ * cair no fallback de posição em cache.
+ */
+const TIMEOUT_LEITURA_GPS_MS = 10 * 1000;
+
+function comTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_resolve, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
+  ]);
+}
 
 // Os eventos nativos de geofencing (Enter/Exit) disparam uma única vez, sem noção de
 // "contínuo" — as tolerâncias RN-01/RN-03 são aplicadas aqui, em memória, com
@@ -88,9 +103,10 @@ async function posicaoAtual() {
   });
 
   try {
-    const { coords } = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
-    });
+    const { coords } = await comTimeout(
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+      TIMEOUT_LEITURA_GPS_MS
+    );
     return paraGeoJson(coords);
   } catch {
     // GPS indisponível no momento do disparo (túnel, prédio, chip de rádio ocupado).
@@ -251,9 +267,9 @@ export async function iniciarGeofencing() {
     return;
   }
 
-  let posicaoAtual;
+  let posicaoInicial;
   try {
-    posicaoAtual = await Location.getCurrentPositionAsync({});
+    posicaoInicial = await Location.getCurrentPositionAsync({});
   } catch {
     return;
   }
@@ -261,8 +277,8 @@ export async function iniciarGeofencing() {
   let hospitais;
   try {
     hospitais = await HospitalService.listar({
-      latitude: posicaoAtual.coords.latitude,
-      longitude: posicaoAtual.coords.longitude,
+      latitude: posicaoInicial.coords.latitude,
+      longitude: posicaoInicial.coords.longitude,
       raioKm: RAIO_BUSCA_HOSPITAIS_KM,
       size: 50,
     });

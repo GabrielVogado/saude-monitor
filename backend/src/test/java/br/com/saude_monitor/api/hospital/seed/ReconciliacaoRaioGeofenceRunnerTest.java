@@ -5,21 +5,29 @@ import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.dto.GeoJsonPolygonDto;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import br.com.saude_monitor.api.hospital.service.GeofenceFactory;
+import org.bson.Document;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.core.BulkOperations;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.mongodb.core.geo.GeoJsonPolygon;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
@@ -29,6 +37,11 @@ import static org.mockito.Mockito.doAnswer;
  *
  * <p>Usa o {@link GeofenceFactory} de verdade — a geometria é o que está sob teste;
  * mockar a fábrica testaria apenas o encadeamento de chamadas.</p>
+ *
+ * <p>A reconciliação grava via update parcial e atômico ({@link BulkOperations}), não
+ * via {@code saveAll} do documento inteiro (code-review do PR #85 — evita sobrescrever
+ * uma edição administrativa concorrente); os testes capturam o {@link Query}/{@link Update}
+ * passados ao bulk em vez de inspecionar o {@link HospitalDocument} salvo.</p>
  */
 class ReconciliacaoRaioGeofenceRunnerTest {
 
@@ -37,6 +50,8 @@ class ReconciliacaoRaioGeofenceRunnerTest {
 
     private final HospitalRepository repository = mock(HospitalRepository.class);
     private final GeofenceFactory factory = new GeofenceFactory();
+    private final MongoTemplate mongoTemplate = mock(MongoTemplate.class);
+    private final BulkOperations bulkOps = mock(BulkOperations.class);
 
     /** Raios de destino: HOSPITAL 150 · UPA/POLICLINICA/CAPS/CENTRO/OUTRO 100 · UBS 75. */
     private final SeedProperties properties = new SeedProperties(
@@ -44,7 +59,15 @@ class ReconciliacaoRaioGeofenceRunnerTest {
             150.0, 100.0, 75.0, 100.0, 100.0, 100.0, 100.0);
 
     private final ReconciliacaoRaioGeofenceRunner runner =
-            new ReconciliacaoRaioGeofenceRunner(repository, factory, properties);
+            new ReconciliacaoRaioGeofenceRunner(repository, factory, properties, mongoTemplate);
+
+    {
+        when(mongoTemplate.bulkOps(eq(BulkOperations.BulkMode.UNORDERED), eq(HospitalDocument.class)))
+                .thenReturn(bulkOps);
+    }
+
+    private record Atualizacao(String hospitalId, GeoJsonPolygon geofence, Instant atualizadoEm) {
+    }
 
     private HospitalDocument hospital(CategoriaEstabelecimento categoria, double raioMetros) {
         return HospitalDocument.builder()
@@ -63,31 +86,36 @@ class ReconciliacaoRaioGeofenceRunnerTest {
                 .thenReturn(new PageImpl<>(conteudo, pageable, conteudo.size()));
     }
 
-    @SuppressWarnings("unchecked")
-    private List<HospitalDocument>[] capturarSalvos() {
-        List<HospitalDocument>[] caixa = new List[1];
+    /** Captura as chamadas a {@code bulkOps.updateOne(query, update)} feitas a partir daqui. */
+    private List<Atualizacao> capturarAtualizacoes() {
+        List<Atualizacao> capturadas = new ArrayList<>();
         doAnswer(invocacao -> {
-            caixa[0] = invocacao.getArgument(0);
-            return caixa[0];
-        }).when(repository).saveAll(anyList());
-        return caixa;
+            Query query = invocacao.getArgument(0);
+            Update update = invocacao.getArgument(1);
+            String id = (String) query.getQueryObject().get("id");
+            Document set = (Document) update.getUpdateObject().get("$set");
+            capturadas.add(new Atualizacao(
+                    id,
+                    (GeoJsonPolygon) set.get("geofence"),
+                    (Instant) set.get("atualizadoEm")));
+            return bulkOps;
+        }).when(bulkOps).updateOne(any(Query.class), any(Update.class));
+        return capturadas;
     }
 
     @Test
     void deveEncolherOCirculoAntigoAteORaioDaCategoria() {
         comPagina(List.of(hospital(CategoriaEstabelecimento.UBS, 100.0)));
-        List<HospitalDocument>[] salvos = capturarSalvos();
+        List<Atualizacao> atualizacoes = capturarAtualizacoes();
 
         runner.run(null);
 
-        assertThat(salvos[0]).hasSize(1);
-        HospitalDocument ajustado = salvos[0].getFirst();
-        GeoJsonPoint centro = ajustado.getLocalizacao();
-        assertThat(factory.raioAproximadoMetros(ajustado.getGeofence(), centro)).isEqualTo(75);
-        // O centro não se move: só o raio muda.
-        assertThat(centro.getX()).isEqualTo(LON);
-        assertThat(centro.getY()).isEqualTo(LAT);
-        assertThat(ajustado.getAtualizadoEm()).isNotNull();
+        assertThat(atualizacoes).hasSize(1);
+        Atualizacao ajustada = atualizacoes.getFirst();
+        assertThat(factory.raioAproximadoMetros(ajustada.geofence(), new GeoJsonPoint(LON, LAT)))
+                .isEqualTo(75);
+        assertThat(ajustada.atualizadoEm()).isNotNull();
+        verify(bulkOps).execute();
     }
 
     @Test
@@ -96,13 +124,13 @@ class ReconciliacaoRaioGeofenceRunnerTest {
                 hospital(CategoriaEstabelecimento.HOSPITAL, 200.0),
                 hospital(CategoriaEstabelecimento.UPA, 150.0),
                 hospital(CategoriaEstabelecimento.UBS, 100.0)));
-        List<HospitalDocument>[] salvos = capturarSalvos();
+        List<Atualizacao> atualizacoes = capturarAtualizacoes();
 
         runner.run(null);
 
-        assertThat(salvos[0]).hasSize(3);
-        assertThat(salvos[0])
-                .extracting(h -> factory.raioAproximadoMetros(h.getGeofence(), h.getLocalizacao()))
+        assertThat(atualizacoes).hasSize(3);
+        assertThat(atualizacoes)
+                .extracting(a -> factory.raioAproximadoMetros(a.geofence(), new GeoJsonPoint(LON, LAT)))
                 .containsExactly(150, 100, 75);
     }
 
@@ -114,19 +142,27 @@ class ReconciliacaoRaioGeofenceRunnerTest {
 
         runner.run(null);
 
-        verify(repository, never()).saveAll(anyList());
+        verify(bulkOps, never()).updateOne(any(Query.class), any(Update.class));
+        verify(bulkOps, never()).execute();
     }
 
     @Test
     void deveSerIdempotenteNaSegundaExecucao() {
         HospitalDocument ubs = hospital(CategoriaEstabelecimento.UBS, 100.0);
         comPagina(List.of(ubs));
-        capturarSalvos();
+        List<Atualizacao> primeiraPassada = capturarAtualizacoes();
 
-        runner.run(null); // primeira passada: encolhe de 100 para 75 no próprio documento
-        runner.run(null); // segunda passada: nada a fazer
+        runner.run(null); // primeira passada: encolhe de 100 para 75
 
-        verify(repository).saveAll(anyList()); // exatamente uma gravação nas duas execuções
+        assertThat(primeiraPassada).hasSize(1);
+        // Reflete no documento em memória o que a reconciliação de verdade teria gravado
+        // no MongoDB, para simular o que a segunda leitura encontraria.
+        ubs.setGeofence(primeiraPassada.getFirst().geofence());
+
+        List<Atualizacao> segundaPassada = capturarAtualizacoes();
+        runner.run(null); // segunda passada: já está no raio certo, nada a fazer
+
+        assertThat(segundaPassada).isEmpty();
     }
 
     @Test
@@ -148,7 +184,7 @@ class ReconciliacaoRaioGeofenceRunnerTest {
 
         runner.run(null);
 
-        verify(repository, never()).saveAll(anyList());
+        verify(bulkOps, never()).updateOne(any(Query.class), any(Update.class));
         assertThat(comTerreno.getGeofence()).isSameAs(terreno);
     }
 
@@ -164,7 +200,7 @@ class ReconciliacaoRaioGeofenceRunnerTest {
 
         runner.run(null);
 
-        verify(repository, never()).saveAll(anyList());
+        verify(bulkOps, never()).updateOne(any(Query.class), any(Update.class));
     }
 
     @Test
@@ -176,15 +212,15 @@ class ReconciliacaoRaioGeofenceRunnerTest {
                 new PageImpl<>(List.of(hospital(CategoriaEstabelecimento.UPA, 150.0)),
                         PageRequest.of(1, 1), 2);
         when(repository.findAll(any(Pageable.class))).thenReturn(pagina1, pagina2);
-        List<HospitalDocument>[] salvos = capturarSalvos();
+        List<Atualizacao> atualizacoes = capturarAtualizacoes();
 
         runner.run(null);
 
-        // A segunda página também foi ajustada: a UPA só aparece nela.
-        assertThat(salvos[0]).hasSize(1);
-        assertThat(factory.raioAproximadoMetros(
-                salvos[0].getFirst().getGeofence(), salvos[0].getFirst().getLocalizacao()))
-                .isEqualTo(100);
-        verify(repository, org.mockito.Mockito.times(2)).findAll(any(Pageable.class));
+        // As duas páginas foram percorridas e ajustadas: UBS (100→75) na primeira, UPA (150→100) na segunda.
+        assertThat(atualizacoes).hasSize(2);
+        assertThat(atualizacoes)
+                .extracting(a -> factory.raioAproximadoMetros(a.geofence(), new GeoJsonPoint(LON, LAT)))
+                .containsExactly(75, 100);
+        verify(repository, times(2)).findAll(any(Pageable.class));
     }
 }

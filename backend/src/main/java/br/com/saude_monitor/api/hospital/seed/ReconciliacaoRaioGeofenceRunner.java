@@ -13,13 +13,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.BulkOperations;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.mongodb.core.geo.GeoJsonPolygon;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Regrava, no startup, os geofences cujo raio ficou diferente do raio da categoria
@@ -65,6 +68,7 @@ public class ReconciliacaoRaioGeofenceRunner implements ApplicationRunner {
     private final HospitalRepository hospitalRepository;
     private final GeofenceFactory geofenceFactory;
     private final SeedProperties properties;
+    private final MongoTemplate mongoTemplate;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -78,7 +82,11 @@ public class ReconciliacaoRaioGeofenceRunner implements ApplicationRunner {
 
         do {
             page = hospitalRepository.findAll(pagina);
-            List<HospitalDocument> alterados = new ArrayList<>();
+            // Update parcial e atômico por _id (só `geofence`/`atualizadoEm`), em vez de
+            // regravar o HospitalDocument inteiro: uma edição administrativa concorrente
+            // (outros campos) feita entre este findAll e a escrita não é perdida.
+            BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, HospitalDocument.class);
+            int naPagina = 0;
 
             for (HospitalDocument hospital : page.getContent()) {
                 total++;
@@ -106,15 +114,17 @@ public class ReconciliacaoRaioGeofenceRunner implements ApplicationRunner {
                     continue;
                 }
 
-                hospital.setGeofence(geofenceFactory.criarCirculo(
-                        centro.getY(), centro.getX(), raioAlvo, GeofenceFactory.LADOS_CIRCULO));
-                hospital.setAtualizadoEm(Instant.now());
-                alterados.add(hospital);
+                GeoJsonPolygon novoGeofence = geofenceFactory.criarCirculo(
+                        centro.getY(), centro.getX(), raioAlvo, GeofenceFactory.LADOS_CIRCULO);
+                bulkOps.updateOne(
+                        Query.query(Criteria.where("id").is(hospital.getId())),
+                        Update.update("geofence", novoGeofence).set("atualizadoEm", Instant.now()));
+                naPagina++;
             }
 
-            if (!alterados.isEmpty()) {
-                hospitalRepository.saveAll(alterados);
-                ajustados += alterados.size();
+            if (naPagina > 0) {
+                bulkOps.execute();
+                ajustados += naPagina;
             }
 
             pagina = pagina.next();

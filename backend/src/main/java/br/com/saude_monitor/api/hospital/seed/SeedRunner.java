@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.Charset;
@@ -35,9 +36,18 @@ import java.util.Optional;
  */
 @Slf4j
 @Component
+@Order(SeedRunner.ORDEM)
 @ConditionalOnProperty(prefix = "app.seed", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class SeedRunner implements ApplicationRunner {
+
+    /**
+     * Primeiro entre os runners de dados: semear o banco vazio precede reconciliar o que
+     * já existe ({@link ReconciliacaoRaioGeofenceRunner#ORDEM}). Sem ordem explícita, o
+     * Spring executaria os dois na ordem de descoberta dos beans, e a reconciliação
+     * poderia rodar num banco ainda vazio para depois o seed gravar por cima.
+     */
+    public static final int ORDEM = 10;
 
     private final DbfLeitor dbfLeitor;
     private final ShpPointLeitor shpPointLeitor;

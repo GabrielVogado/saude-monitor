@@ -32,6 +32,9 @@ public class GeofenceFactory {
     private static final double METROS_POR_GRAU_LAT = 111_320.0;
     private static final double EPS = 1e-12;
 
+    /** Dispersão relativa máxima entre os raios dos vértices para o polígono ainda ser "um círculo". */
+    private static final double TOLERANCIA_CIRCULO_REGULAR = 0.02;
+
     /**
      * Converte o DTO em {@link GeoJsonPolygon}, usando o anel externo informado.
      */
@@ -152,5 +155,69 @@ public class GeofenceFactory {
             maior = Math.max(maior, Math.hypot(dLat, dLng));
         }
         return maior < EPS ? null : (int) Math.round(maior);
+    }
+
+    /**
+     * Diz se o polígono é um círculo regular gerado por {@link #criarCirculo} — isto é,
+     * se tem exatamente {@value #LADOS_CIRCULO} lados e todos os seus vértices estão
+     * praticamente à mesma distância do centroide.
+     *
+     * <p>Usado pela reconciliação de raio (BUG-08) como salvaguarda: só um geofence que o
+     * próprio produto gerou pode ser regravado com o raio novo da categoria. Um polígono
+     * desenhado à mão por um administrador — que descreve o terreno real da unidade e vale
+     * mais que qualquer círculo — reprova aqui e é preservado.</p>
+     *
+     * <p>Exigir a contagem exata de lados é o que separa o círculo do produto — sempre
+     * {@value #LADOS_CIRCULO}, nos três únicos caminhos que o criam (seed, importador e a
+     * própria reconciliação) — do círculo de uma ferramenta de desenho, cuja contagem de
+     * lados é escolha da ferramenta e dificilmente coincide com a do produto. Sem esse
+     * critério, um círculo liso de qualquer número de lados desenhado pelo administrador
+     * passaria na salvaguarda e seria regravado com o raio da categoria no próximo boot.
+     * O caso-limite que sobra — administrador redimensionar o próprio círculo do produto,
+     * mantendo 32 lados — é geometricamente indistinguível do círculo intacto e é aceito
+     * como limitação documentada.</p>
+     *
+     * <p>A tolerância de dispersão de {@value #TOLERANCIA_CIRCULO_REGULAR} (2%) absorve a
+     * distorção da aproximação equiretangular, que estica o círculo no eixo leste-oeste
+     * conforme a latitude: no DF (≈ 15,9°S) a diferença entre o maior e o menor raio de um
+     * círculo gerado fica na casa de 0,01%, quatro ordens de grandeza abaixo do limite.</p>
+     *
+     * @return {@code false} para polígono nulo, degenerado, sem exatamente
+     *         {@value #LADOS_CIRCULO} vértices ou com dispersão de raio acima da
+     *         tolerância — nenhum deles é um círculo do produto.
+     */
+    public boolean ehCirculoRegular(GeoJsonPolygon polygon, GeoJsonPoint centroide) {
+        if (polygon == null || centroide == null || polygon.getCoordinates().isEmpty()) {
+            return false;
+        }
+        List<Point> anel = polygon.getCoordinates().getFirst().getCoordinates();
+        if (anel.size() < 2) {
+            return false;
+        }
+        // Despreza o ponto de fechamento repetido.
+        List<Point> vertices = anel.getFirst().equals(anel.getLast())
+                ? anel.subList(0, anel.size() - 1)
+                : anel;
+        if (vertices.size() != LADOS_CIRCULO) {
+            // Só os 32 lados de criarCirculo saíram do produto; qualquer outra contagem
+            // (inclusive um círculo liso desenhado por ferramenta) é de origem externa.
+            return false;
+        }
+
+        double cosLat = Math.cos(Math.toRadians(centroide.getY()));
+        double menor = Double.MAX_VALUE;
+        double maior = 0.0;
+        for (Point v : vertices) {
+            double dLat = (v.getY() - centroide.getY()) * METROS_POR_GRAU_LAT;
+            double dLng = (v.getX() - centroide.getX()) * METROS_POR_GRAU_LAT * cosLat;
+            double raio = Math.hypot(dLat, dLng);
+            menor = Math.min(menor, raio);
+            maior = Math.max(maior, raio);
+        }
+
+        if (maior < EPS) {
+            return false; // todos os vértices sobre o centroide: polígono degenerado
+        }
+        return (maior - menor) / maior <= TOLERANCIA_CIRCULO_REGULAR;
     }
 }

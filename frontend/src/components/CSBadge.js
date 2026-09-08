@@ -29,12 +29,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.s1,
-    height: 32,
+    minHeight: 32,
     paddingHorizontal: spacing.s3,
+    paddingVertical: spacing.s1,
     borderRadius: radii.sm,
     alignSelf: "flex-start",
   },
   label: {
     ...typography.labelMd,
+    flexShrink: 1,
   },
 });

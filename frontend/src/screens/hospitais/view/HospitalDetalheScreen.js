@@ -388,7 +388,7 @@ export default function HospitalDetalheScreen({ navigation, route }) {
             </View>
           ) : (
             <CSBadge
-              label="Ainda sem avaliações suficientes — aparecem após pelo menos 5"
+              label="Ainda sem avaliações suficientes — aparecem após pelo menos 5 avaliações"
               variant="warning"
             />
           )}

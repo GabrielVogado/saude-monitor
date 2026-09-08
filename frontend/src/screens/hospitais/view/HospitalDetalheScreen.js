@@ -235,8 +235,12 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   }
 
   const dadosIndicadores = indicadores || hospital.indicadores;
+  // Mesmo critério do CSHospitalCard (nAvaliacoes >= 5): sem isso o mesmo hospital
+  // mostra "sem avaliações suficientes" na lista mas nota real no detalhe, contrariando
+  // o texto do badge "aparecem após pelo menos 5 avaliações".
   const temIndicadores =
     dadosIndicadores?.indicadoresDisponiveis !== false &&
+    dadosIndicadores?.nAvaliacoes >= 5 &&
     dadosIndicadores?.notaMedia !== null &&
     dadosIndicadores?.notaMedia !== undefined;
 
@@ -407,10 +411,10 @@ export default function HospitalDetalheScreen({ navigation, route }) {
               ) : null}
             </View>
           ) : (
-            <Text style={styles.semIndicadores}>
-              Ainda sem avaliações suficientes — os indicadores aparecem após pelo menos 5
-              avaliações.
-            </Text>
+            <CSBadge
+              label="Ainda sem avaliações suficientes — aparecem após pelo menos 5 avaliações"
+              variant="warning"
+            />
           )}
         </CSCard>
       </ScrollView>
@@ -513,12 +517,17 @@ const styles = StyleSheet.create({
     color: colors.onSurfaceVariant,
   },
   metricRow: {
+    // Regra "no-line" do Padrao-UI-UX-v2.0 (§5.3/5.5): separação de seções nunca por
+    // hairline — sempre espaço ou troca de tom. Era `borderTopWidth: 1`. Achado do
+    // code-review: uma primeira tentativa com fundo de tom trocou `paddingVertical`
+    // por `padding` (todos os lados), desalinhando esta linha dos textos irmãos
+    // (`transparencia`/`atualizado`) na mesma coluna. Aqui a separação vem só do
+    // espaço — o `gap` do container `indicadores` já cumpre a regra sem mexer no
+    // padding horizontal.
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: spacing.s3,
-    borderTopWidth: 1,
-    borderTopColor: colors.surfaceContainer,
   },
   metricLabel: {
     ...typography.bodyMd,
@@ -534,10 +543,6 @@ const styles = StyleSheet.create({
   },
   transparencia: {
     ...typography.bodySm,
-    color: colors.onSurfaceVariant,
-  },
-  semIndicadores: {
-    ...typography.bodyMd,
     color: colors.onSurfaceVariant,
   },
 });

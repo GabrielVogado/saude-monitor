@@ -30,6 +30,7 @@ import {
   formatarPeriodo,
 } from "../../../utils/format";
 import { avisarSemConexao } from "../../../utils/alertas";
+import { ErroDeConexao } from "../../../config/http";
 
 const TIPO_LABEL = {
   PUBLICO: "Público",
@@ -97,6 +98,12 @@ export default function HospitalDetalheScreen({ navigation, route }) {
 
   // Sincroniza o estado da visita manual ao focar a tela (ex.: ao voltar do check-in
   // da lista Hospital → este detalhe). Modo anônimo usa `dispositivoId` (§3.3).
+  //
+  // Achado do code-review: o mesmo bug corrigido em HospitaisScreen existia aqui — um
+  // check-in enfileirado offline (a lista já mostra "Em visita — ver") some deste
+  // card assim que o usuário abre o detalhe, porque o `buscarAtiva()` daqui também
+  // falha (ainda sem internet) e o catch zerava `visitaManual` incondicionalmente.
+  // Sem conectividade não é "sem visita ativa": é "não sabemos" — mantém o que havia.
   const carregarVisitaManual = async () => {
     try {
       const data = await VisitaService.buscarAtiva();
@@ -107,8 +114,10 @@ export default function HospitalDetalheScreen({ navigation, route }) {
       if (visita?.origem === "MANUAL" && visita.hospitalId === id) {
         setAgora(Date.now());
       }
-    } catch {
-      setVisitaManual(null);
+    } catch (e) {
+      if (!(e instanceof ErroDeConexao)) {
+        setVisitaManual(null);
+      }
     }
   };
 

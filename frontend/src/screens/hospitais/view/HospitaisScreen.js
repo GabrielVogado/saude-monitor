@@ -17,6 +17,7 @@ import HospitalService from "../service/HospitalService";
 import VisitaService from "../../visitas/service/VisitaService";
 import { normalizeText } from "../../../utils/normalize";
 import { avisarSemConexao } from "../../../utils/alertas";
+import { ErroDeConexao } from "../../../config/http";
 
 const TIPO_FILTROS = [
   { value: "", label: "Todos" },
@@ -94,11 +95,18 @@ export default function HospitaisScreen({ navigation }) {
   // "não há visita ativa", significa "não sabemos". Zerando aqui, o guard local que o
   // check-in enfileirado arma (abaixo) era apagado no próximo foco da aba enquanto o
   // aparelho ainda estivesse offline, reabrindo a janela para dois check-ins na fila.
-  // Sem dado novo, mantém o que já havia.
+  // Sem dado novo (falha de conectividade), mantém o que já havia. Segundo achado do
+  // code-review: silenciar TODO erro (não só o de conectividade) deixaria um erro real
+  // — sessão expirada, 500 — sem limpar um placeholder otimista obsoleto para sempre;
+  // por isso o `instanceof` restringe a exceção ao que de fato não traz informação.
   const atualizarVisitaAtiva = useCallback(() => {
     VisitaService.buscarAtiva()
       .then((data) => setVisitaAtiva(data?.visita || null))
-      .catch(() => {});
+      .catch((e) => {
+        if (!(e instanceof ErroDeConexao)) {
+          setVisitaAtiva(null);
+        }
+      });
   }, []);
 
   useFocusEffect(

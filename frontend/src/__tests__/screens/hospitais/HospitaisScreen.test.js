@@ -13,6 +13,7 @@ import { Alert } from "react-native";
 import HospitaisScreen from "../../../screens/hospitais/view/HospitaisScreen";
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
 import VisitaService from "../../../screens/visitas/service/VisitaService";
+import { ErroSemInternet } from "../../../config/http";
 
 jest.mock("../../../screens/hospitais/service/HospitalService");
 jest.mock("../../../screens/visitas/service/VisitaService");
@@ -85,6 +86,23 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
 
     expect(await screen.findByLabelText("Hospital A — ver check-in ativo")).toBeTruthy();
     expect(screen.getByLabelText("Fazer check-in em Hospital B")).toBeDisabled();
+  });
+
+  test("um refoco com erro real (não de conectividade) ainda limpa a visita ativa", async () => {
+    // Outra metade do achado do code-review: preservar o estado só faz sentido para
+    // falha de conectividade. Um erro de verdade (sessão expirada, 500) precisa
+    // continuar zerando — senão um placeholder otimista obsoleto travaria o guard
+    // para sempre, impedindo check-in em qualquer hospital.
+    VisitaService.buscarAtiva.mockResolvedValue({
+      visita: { id: "v1", hospitalId: "hA", origem: "MANUAL" },
+    });
+    renderizar();
+    expect(await screen.findByLabelText("Hospital A — ver check-in ativo")).toBeTruthy();
+
+    VisitaService.buscarAtiva.mockRejectedValue(new Error("Sessão expirada. Faça login novamente."));
+    await refocarTela();
+
+    expect(screen.getByLabelText("Fazer check-in em Hospital A")).not.toBeDisabled();
   });
 
   test("tocar em 'ver' no hospital com visita já ativa apenas reabre o detalhe (idempotente)", async () => {
@@ -191,8 +209,10 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
     fireEvent.press(screen.getByLabelText("Fazer check-in em Hospital A"));
     await waitFor(() => expect(Alert.alert).toHaveBeenCalled());
 
-    // Ainda offline: o refetch da visita ativa ao reganhar foco também falha.
-    VisitaService.buscarAtiva.mockRejectedValue(new Error("Sem conexão com a internet."));
+    // Ainda offline: o refetch da visita ativa ao reganhar foco também falha. Precisa
+    // ser a classe real de conectividade (é o que VisitaService de fato lança) — um
+    // Error genérico não deve ser tratado como "sem dado novo", só como falha real.
+    VisitaService.buscarAtiva.mockRejectedValue(new ErroSemInternet("http://exemplo"));
     await refocarTela();
 
     expect(screen.getByLabelText("Fazer check-in em Hospital B")).toBeDisabled();

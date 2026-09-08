@@ -75,4 +75,15 @@ describe("CSHospitalCard", () => {
     fireEvent.press(screen.getByLabelText("Fazer check-in em Hospital de Base"));
     expect(onCheckin).not.toHaveBeenCalled();
   });
+
+  test("com amostra abaixo do mínimo, mostra o badge em vez de inventar uma média", () => {
+    const hospitalSemAmostra = {
+      ...hospital,
+      indicadores: { notaMedia: 4.2, nAvaliacoes: 3, tempoMedianoMinutos: 45 },
+    };
+    render(<CSHospitalCard hospital={hospitalSemAmostra} />);
+
+    expect(screen.getByText("Ainda sem avaliações suficientes")).toBeTruthy();
+    expect(screen.queryByText("3 avaliações")).toBeNull();
+  });
 });

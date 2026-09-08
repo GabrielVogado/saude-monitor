@@ -95,7 +95,7 @@ function CSHospitalCard({
               <Text style={styles.ratingCount}>{indicadores.nAvaliacoes} avaliações</Text>
             </View>
           ) : (
-            <Text style={styles.noRating}>Ainda sem avaliações suficientes</Text>
+            <CSBadge label="Ainda sem avaliações suficientes" variant="warning" />
           )}
           {temIndicadores && indicadores.tempoMedianoMinutos != null ? (
             <Text style={styles.timeMetric}>
@@ -114,6 +114,7 @@ function CSHospitalCard({
           }
           disabled={checkinLoading || checkinDesabilitado}
           onPress={aoTocarCheckin}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={({ pressed }) => [
             styles.checkinButton,
             checkinAtivo && styles.checkinButtonActive,
@@ -196,10 +197,6 @@ const styles = StyleSheet.create({
     color: colors.onSurface,
   },
   ratingCount: {
-    ...typography.bodySm,
-    color: colors.onSurfaceVariant,
-  },
-  noRating: {
     ...typography.bodySm,
     color: colors.onSurfaceVariant,
   },

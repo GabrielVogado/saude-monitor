@@ -129,7 +129,7 @@ export default function HospitaisScreen({ navigation }) {
         } else {
           Alert.alert(
             "Check-in ativo",
-            "Finalize o check-in atual antes de iniciar uma visita em outro hospital."
+            "Você já tem uma visita em andamento em outro hospital. Finalize-a antes de começar outra."
           );
         }
         return;
@@ -162,6 +162,13 @@ export default function HospitaisScreen({ navigation }) {
               { text: "Cancelar", style: "cancel" },
             ]
           );
+          return;
+        }
+        if (e.enfileirado) {
+          // Sem conexão, o check-in foi guardado para sincronizar depois (OPS-05) —
+          // não é uma falha, então o alerta não pode soar como uma. Fica na lista em
+          // vez de navegar para o detalhe, que dependeria da mesma rede indisponível.
+          Alert.alert("Sem conexão", e.message);
           return;
         }
         Alert.alert("Check-in", e.message || "Não foi possível fazer o check-in.");

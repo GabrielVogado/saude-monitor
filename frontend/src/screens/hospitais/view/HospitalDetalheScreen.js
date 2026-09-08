@@ -129,9 +129,11 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   const encerrarVisitaManual = async () => {
     if (!visitaManual) return;
     setEnviandoCheckout(true);
-    try {
-      await VisitaService.checkout(visitaManual.id, { encerramentoManual: true });
-      // Épico 03 — E3-01: agenda o pedido de feedback ~1–5 min após a saída.
+
+    // Épico 03 — E3-01: agenda o pedido de feedback ~1–5 min após a saída. Chamado
+    // tanto no sucesso quanto no checkout enfileirado (abaixo) — nos dois casos a
+    // saída está registrada do ponto de vista do usuário.
+    const encerrarLocalmente = () => {
       agendarFeedback({
         visitaId: visitaManual.id,
         hospitalId: visitaManual.hospitalId,
@@ -139,7 +141,20 @@ export default function HospitalDetalheScreen({ navigation, route }) {
         saidaEm: new Date().toISOString(),
       });
       setVisitaManual(null);
+    };
+
+    try {
+      await VisitaService.checkout(visitaManual.id, { encerramentoManual: true });
+      encerrarLocalmente();
     } catch (e) {
+      if (e.enfileirado) {
+        // Sem conexão, o checkout foi guardado para sincronizar depois (OPS-05).
+        // O cronômetro não pode continuar rodando para uma visita que o usuário
+        // já encerrou — sem isto, ele ficaria contando o tempo indefinidamente.
+        encerrarLocalmente();
+        Alert.alert("Sem conexão", e.message);
+        return;
+      }
       Alert.alert(
         "Check-out",
         e.message || "Não foi possível finalizar o check-out. Tente novamente."

@@ -181,6 +181,37 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     expect(screen.getByText("Check-in manual ativo")).toBeTruthy();
   });
 
+  test("check-out sem internet é enfileirado (OPS-05): encerra localmente em vez de deixar o cronômetro rodando", async () => {
+    // Regressão evitada: sem este tratamento, um checkout enfileirado (sucesso do
+    // ponto de vista do usuário — será sincronizado depois) caía no mesmo catch
+    // genérico de erro e deixava o cronômetro contando indefinidamente para uma
+    // visita que o usuário já encerrou.
+    const AlertModule = require("react-native").Alert;
+    jest.spyOn(AlertModule, "alert").mockImplementation(() => {});
+    VisitaService.buscarAtiva.mockResolvedValue({
+      visita: { id: "v1", origem: "MANUAL", hospitalId: "h1", entrada: new Date().toISOString() },
+    });
+    VisitaService.checkout.mockRejectedValue(
+      Object.assign(new Error("Sem conexão com a internet. O registro foi guardado e será enviado assim que a conexão voltar."), {
+        enfileirado: true,
+      })
+    );
+
+    renderizar();
+    fireEvent.press(await screen.findByText("Não estou aqui"));
+
+    await act(async () => {});
+
+    expect(agendarFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({ visitaId: "v1", hospitalId: "h1", hospitalNome: "Hospital Central" })
+    );
+    expect(screen.queryByText("Check-in manual ativo")).toBeNull();
+    expect(AlertModule.alert).toHaveBeenCalledWith(
+      "Sem conexão",
+      "Sem conexão com a internet. O registro foi guardado e será enviado assim que a conexão voltar."
+    );
+  });
+
   test("indicadores insuficientes mostram a mensagem de transparência (RN-15)", async () => {
     HospitalService.buscarIndicadores.mockResolvedValue({
       hospitalId: "h1",

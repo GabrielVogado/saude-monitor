@@ -130,4 +130,24 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
     });
     expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
   });
+
+  test("check-in sem internet é enfileirado (OPS-05): alerta não soa como falha, e a tela não navega para um detalhe que dependeria da mesma rede indisponível", async () => {
+    VisitaService.checkin.mockRejectedValue(
+      Object.assign(new Error("Sem conexão com a internet. O registro foi guardado e será enviado assim que a conexão voltar."), {
+        enfileirado: true,
+      })
+    );
+
+    renderizar();
+    await screen.findByText("Hospital A");
+    fireEvent.press(screen.getByLabelText("Fazer check-in em Hospital A"));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        "Sem conexão",
+        "Sem conexão com a internet. O registro foi guardado e será enviado assim que a conexão voltar."
+      );
+    });
+    expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
+  });
 });

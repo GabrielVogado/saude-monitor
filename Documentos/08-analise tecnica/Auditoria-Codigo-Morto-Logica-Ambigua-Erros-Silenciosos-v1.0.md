@@ -46,10 +46,10 @@ independentes (um por área), cada um lendo o código-fonte por completo, não a
 
 | # | Prior. | Área | Achado | PR | Status |
 |---|---|---|---|---|---|
-| 1 | P0 | Backend | Cadastro com e-mail duplicado devolve HTTP 201 com `success:false` no corpo | PR-1 | ⬜ Pendente |
-| 2 | P0 | Backend | `catch (RuntimeException)` genérico no logout mascara falha real de revogação como sucesso | PR-1 | ⬜ Pendente |
-| 3 | P0 | Backend | Seed do admin com senha vazia sobe sem erro nem aviso | PR-1 | ⬜ Pendente |
-| 4 | P0 | Backend | Exclusão de conta (LGPD) afirma remover `auth_logins`, coleção nunca escrita (`AuthDocument` morto) | PR-1 | ⬜ Pendente |
+| 1 | P0 | Backend | Cadastro com e-mail duplicado devolve HTTP 201 com `success:false` no corpo | PR-1 | ✅ Corrigido (aguardando PR) |
+| 2 | P0 | Backend | `catch (RuntimeException)` genérico no logout mascara falha real de revogação como sucesso | PR-1 | ✅ Corrigido (aguardando PR) |
+| 3 | P0 | Backend | Seed do admin com senha vazia sobe sem erro nem aviso | PR-1 | ✅ Corrigido (aguardando PR) |
+| 4 | P0 | Backend | Exclusão de conta (LGPD) afirma remover `auth_logins`, coleção nunca escrita (`AuthDocument` morto) | PR-1 | ✅ Corrigido (aguardando PR) |
 | 5 | P1 | Frontend | `pararGeofencing()` nunca chamado no logout/exclusão de conta | PR-3 | ⬜ Pendente |
 | 6 | P1 | Frontend | `feedbackAvaliavel()` (expiração 24h, RN-09) nunca aplicada no cliente | PR-3 | ⬜ Pendente |
 | 7 | P1 | Frontend | "Esqueci minha senha" sem `onPress` | PR-3 | ⬜ Pendente |

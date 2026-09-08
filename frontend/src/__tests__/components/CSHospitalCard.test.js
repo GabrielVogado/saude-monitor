@@ -17,6 +17,7 @@
 import React from "react";
 import { render, fireEvent, screen } from "@testing-library/react-native";
 import CSHospitalCard from "../../components/CSHospitalCard";
+import CSBadge from "../../components/CSBadge";
 
 const hospital = {
   id: "h1",
@@ -76,14 +77,21 @@ describe("CSHospitalCard", () => {
     expect(onCheckin).not.toHaveBeenCalled();
   });
 
-  test("com amostra abaixo do mínimo, mostra o badge em vez de inventar uma média", () => {
+  test("com amostra abaixo do mínimo, mostra o CSBadge de aviso em vez de inventar uma média", () => {
     const hospitalSemAmostra = {
       ...hospital,
       indicadores: { notaMedia: 4.2, nAvaliacoes: 3, tempoMedianoMinutos: 45 },
     };
-    render(<CSHospitalCard hospital={hospitalSemAmostra} />);
+    const { UNSAFE_getAllByType } = render(<CSHospitalCard hospital={hospitalSemAmostra} />);
 
-    expect(screen.getByText("Ainda sem avaliações suficientes")).toBeTruthy();
+    // Verifica o componente, não só o texto: um Text solto (o que existia antes)
+    // faria este teste passar mesmo sem o tratamento visual do CSBadge de aviso.
+    // O card já usa CSBadge para categoria/tipo, então é preciso achar o certo.
+    const badge = UNSAFE_getAllByType(CSBadge).find(
+      (no) => no.props.label === "Ainda sem avaliações suficientes"
+    );
+    expect(badge).toBeTruthy();
+    expect(badge.props.variant).toBe("warning");
     expect(screen.queryByText("3 avaliações")).toBeNull();
   });
 });

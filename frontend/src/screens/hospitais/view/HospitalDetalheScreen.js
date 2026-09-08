@@ -154,10 +154,8 @@ export default function HospitalDetalheScreen({ navigation, route }) {
         // Sem conexão, o checkout foi guardado para sincronizar depois (OPS-05).
         // O cronômetro não pode continuar rodando para uma visita que o usuário
         // já encerrou — sem isto, ele ficaria contando o tempo indefinidamente.
-        // Limitação conhecida (ver `preservarSeSemConexao`, utils/alertas.js): um
-        // refoco entre a conexão voltar e a fila sincronizar este checkout pode
-        // ressuscitar a visita a partir de um `buscarAtiva()` que ainda não reflete
-        // o evento pendente. Decisão aceita em vez de resolvida nesta PR.
+        // Janela residual e decisão de aceitá-la documentadas em
+        // `preservarSeSemConexao` (utils/alertas.js).
         encerrarLocalmente();
         avisarSemConexao(e.message);
         return;

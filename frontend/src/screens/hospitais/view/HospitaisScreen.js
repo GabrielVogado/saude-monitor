@@ -172,18 +172,11 @@ export default function HospitaisScreen({ navigation }) {
           // não é uma falha, então o alerta não pode soar como uma. Fica na lista em
           // vez de navegar para o detalhe, que dependeria da mesma rede indisponível.
           //
-          // Precisa marcar a visita como ativa AQUI, localmente: sem isto, o guard de
-          // "uma visita por vez" (visitaAtivaRef, acima) e o `checkinDesabilitado` dos
-          // outros cards ficam desarmados até a fila sincronizar — um segundo toque em
-          // outro hospital, ainda offline, enfileiraria um segundo check-in, e o
-          // backend, que resolve por "visita ativa do dispositivo", descartaria um dos
-          // dois em silêncio quando a fila enviasse os dois. O `id: null` é substituído
-          // pelo real assim que `atualizarVisitaAtiva` rodar de novo (foco da aba) — e é
-          // exatamente aí que mora a limitação conhecida documentada em
-          // `preservarSeSemConexao` (utils/alertas.js): entre a conexão voltar e a fila
-          // de fato sincronizar este check-in, um refoco pode buscar um estado do
-          // servidor que ainda não reflete o evento pendente. Reduz a janela; não a
-          // fecha por completo — decisão aceita em vez de resolvida nesta PR.
+          // Marca a visita como ativa AQUI, localmente: arma o guard de "uma visita
+          // por vez" (visitaAtivaRef, acima) antes da fila sincronizar. Janela residual
+          // e decisão de aceitá-la documentadas em `preservarSeSemConexao`
+          // (utils/alertas.js) — o `id: null` é substituído pelo real quando
+          // `atualizarVisitaAtiva` rodar de novo (foco da aba).
           setVisitaAtiva({ id: null, hospitalId: hospital.id, origem: "MANUAL" });
           avisarSemConexao(e.message);
           return;

@@ -88,10 +88,17 @@ export default function HospitaisScreen({ navigation }) {
 
   // Reidrata a visita ativa ao focar a aba (e ao voltar do detalhe) para refletir o
   // estado do botão de check-in por hospital (modo anônimo via dispositivoId, §3.3).
+  //
+  // Achado do code-review: o catch zerava `visitaAtiva` em QUALQUER falha, incluindo
+  // "sem internet" — um `buscarAtiva()` que rejeita porque a rede caiu não significa
+  // "não há visita ativa", significa "não sabemos". Zerando aqui, o guard local que o
+  // check-in enfileirado arma (abaixo) era apagado no próximo foco da aba enquanto o
+  // aparelho ainda estivesse offline, reabrindo a janela para dois check-ins na fila.
+  // Sem dado novo, mantém o que já havia.
   const atualizarVisitaAtiva = useCallback(() => {
     VisitaService.buscarAtiva()
       .then((data) => setVisitaAtiva(data?.visita || null))
-      .catch(() => setVisitaAtiva(null));
+      .catch(() => {});
   }, []);
 
   useFocusEffect(

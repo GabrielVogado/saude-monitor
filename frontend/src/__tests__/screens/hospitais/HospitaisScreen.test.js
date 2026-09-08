@@ -17,9 +17,15 @@ import VisitaService from "../../../screens/visitas/service/VisitaService";
 jest.mock("../../../screens/hospitais/service/HospitalService");
 jest.mock("../../../screens/visitas/service/VisitaService");
 
+// Guarda o callback de foco mais recente para o teste poder simular um segundo
+// foco da aba (ex.: voltar de outra tela) sem desmontar o componente — é
+// exatamente essa segunda chamada que expôs a corrida do achado do code-review.
+let callbackDeFoco = null;
+
 jest.mock("@react-navigation/native", () => ({
   useFocusEffect: (callback) => {
     const React = require("react");
+    callbackDeFoco = callback;
     React.useEffect(() => {
       callback();
     }, [callback]);
@@ -33,6 +39,13 @@ const NAVEGACAO = { navigate: jest.fn(), goBack: jest.fn() };
 
 function renderizar() {
   return render(<HospitaisScreen navigation={NAVEGACAO} />);
+}
+
+/** Simula a aba ganhando foco de novo (ex.: voltar de outra tela), sem remontar. */
+async function refocarTela() {
+  await act(async () => {
+    callbackDeFoco();
+  });
 }
 
 describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", () => {
@@ -156,6 +169,32 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
     // offline, enfileiraria um segundo check-in — dois eventos que o backend
     // resolveria por "visita ativa do dispositivo", descartando um deles em silêncio
     // quando a fila enviasse os dois.
+    expect(screen.getByLabelText("Fazer check-in em Hospital B")).toBeDisabled();
+    expect(VisitaService.checkin).toHaveBeenCalledTimes(1);
+  });
+
+  test("o guard do check-in enfileirado sobrevive a um refoco da aba enquanto ainda offline", async () => {
+    // Achado do code-review sobre o teste anterior: o guard local armado pelo
+    // check-in enfileirado era apagado no PRÓXIMO foco da aba (ex.: voltar do
+    // Ranking) se o aparelho ainda estivesse offline — `buscarAtiva()` é uma
+    // requisição viva, não passa pela fila, e falha do mesmo jeito; o `.catch` de
+    // `atualizarVisitaAtiva` zerava `visitaAtiva` em QUALQUER erro, achando que
+    // "falhou" significava "não há visita ativa".
+    VisitaService.checkin.mockRejectedValue(
+      Object.assign(new Error("Sem conexão com a internet. O registro foi guardado e será enviado assim que a conexão voltar."), {
+        enfileirado: true,
+      })
+    );
+
+    renderizar();
+    await screen.findByText("Hospital A");
+    fireEvent.press(screen.getByLabelText("Fazer check-in em Hospital A"));
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalled());
+
+    // Ainda offline: o refetch da visita ativa ao reganhar foco também falha.
+    VisitaService.buscarAtiva.mockRejectedValue(new Error("Sem conexão com a internet."));
+    await refocarTela();
+
     expect(screen.getByLabelText("Fazer check-in em Hospital B")).toBeDisabled();
     expect(VisitaService.checkin).toHaveBeenCalledTimes(1);
   });

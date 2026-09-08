@@ -16,6 +16,7 @@ import { colors, spacing } from "../../../theme/tokens";
 import HospitalService from "../service/HospitalService";
 import VisitaService from "../../visitas/service/VisitaService";
 import { normalizeText } from "../../../utils/normalize";
+import { avisarSemConexao } from "../../../utils/alertas";
 
 const TIPO_FILTROS = [
   { value: "", label: "Todos" },
@@ -168,7 +169,16 @@ export default function HospitaisScreen({ navigation }) {
           // Sem conexão, o check-in foi guardado para sincronizar depois (OPS-05) —
           // não é uma falha, então o alerta não pode soar como uma. Fica na lista em
           // vez de navegar para o detalhe, que dependeria da mesma rede indisponível.
-          Alert.alert("Sem conexão", e.message);
+          //
+          // Precisa marcar a visita como ativa AQUI, localmente: sem isto, o guard de
+          // "uma visita por vez" (visitaAtivaRef, acima) e o `checkinDesabilitado` dos
+          // outros cards ficam desarmados até a fila sincronizar — um segundo toque em
+          // outro hospital, ainda offline, enfileiraria um segundo check-in, e o
+          // backend, que resolve por "visita ativa do dispositivo", descartaria um dos
+          // dois em silêncio quando a fila enviasse os dois. O `id: null` é substituído
+          // pelo real assim que `atualizarVisitaAtiva` rodar de novo (foco da aba).
+          setVisitaAtiva({ id: null, hospitalId: hospital.id, origem: "MANUAL" });
+          avisarSemConexao(e.message);
           return;
         }
         Alert.alert("Check-in", e.message || "Não foi possível fazer o check-in.");

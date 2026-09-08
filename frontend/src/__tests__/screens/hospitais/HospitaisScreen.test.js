@@ -149,5 +149,14 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
       );
     });
     expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
+
+    // O ponto real deste teste: mesmo sem confirmação do servidor, o check-in
+    // enfileirado precisa armar o guard de "uma visita por vez" imediatamente. Sem
+    // isso, o card do Hospital B ficaria destravado e um segundo toque, ainda
+    // offline, enfileiraria um segundo check-in — dois eventos que o backend
+    // resolveria por "visita ativa do dispositivo", descartando um deles em silêncio
+    // quando a fila enviasse os dois.
+    expect(screen.getByLabelText("Fazer check-in em Hospital B")).toBeDisabled();
+    expect(VisitaService.checkin).toHaveBeenCalledTimes(1);
   });
 });

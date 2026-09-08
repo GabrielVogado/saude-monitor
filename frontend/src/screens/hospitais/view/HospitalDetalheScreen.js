@@ -29,6 +29,7 @@ import {
   formatarNota,
   formatarPeriodo,
 } from "../../../utils/format";
+import { avisarSemConexao } from "../../../utils/alertas";
 
 const TIPO_LABEL = {
   PUBLICO: "Público",
@@ -152,7 +153,7 @@ export default function HospitalDetalheScreen({ navigation, route }) {
         // O cronômetro não pode continuar rodando para uma visita que o usuário
         // já encerrou — sem isto, ele ficaria contando o tempo indefinidamente.
         encerrarLocalmente();
-        Alert.alert("Sem conexão", e.message);
+        avisarSemConexao(e.message);
         return;
       }
       Alert.alert(

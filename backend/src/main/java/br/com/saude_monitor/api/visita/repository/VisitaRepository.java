@@ -13,12 +13,6 @@ import java.util.Optional;
 
 public interface VisitaRepository extends MongoRepository<VisitaDocument, String> {
 
-    Optional<VisitaDocument> findFirstByUsuarioIdAndHospitalIdAndStatusInOrderByEntradaDesc(
-            String usuarioId, String hospitalId, List<StatusVisita> status);
-
-    Optional<VisitaDocument> findFirstByDispositivoIdAndHospitalIdAndStatusInOrderByEntradaDesc(
-            String dispositivoId, String hospitalId, List<StatusVisita> status);
-
     Optional<VisitaDocument> findFirstByUsuarioIdAndStatusInOrderByEntradaDesc(
             String usuarioId, List<StatusVisita> status);
 

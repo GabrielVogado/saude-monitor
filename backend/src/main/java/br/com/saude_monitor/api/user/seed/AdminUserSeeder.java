@@ -3,6 +3,7 @@ package br.com.saude_monitor.api.user.seed;
 import br.com.saude_monitor.api.user.document.Papel;
 import br.com.saude_monitor.api.user.document.UserDocument;
 import br.com.saude_monitor.api.user.repository.UserRepository;
+import br.com.saude_monitor.api.user.util.EmailNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -42,11 +43,20 @@ public class AdminUserSeeder implements ApplicationRunner {
             return;
         }
 
-        String senha = properties.senha() == null ? "" : properties.senha();
+        if (properties.senha() == null || properties.senha().isBlank()) {
+            // Não cria admin com senha vazia: o hash de "" nunca autentica (LoginRequest
+            // exige senha não-branco), então o time ficaria sem acesso administrativo sem
+            // nenhum sinal disso no boot — antes este caso seguia em frente e logava
+            // "criado com sucesso" mesmo sem credencial utilizável.
+            log.error("[AdminSeed] app.seed-admin.email configurado mas app.seed-admin.senha "
+                    + "está ausente/vazio. Seed do admin ABORTADO — configure a senha antes do próximo boot.");
+            return;
+        }
+
         UserDocument admin = UserDocument.builder()
                 .fullName(properties.nome())
-                .email(properties.email().trim().toLowerCase())
-                .senhaHash(passwordEncoder.encode(senha))
+                .email(EmailNormalizer.normalizar(properties.email()))
+                .senhaHash(passwordEncoder.encode(properties.senha()))
                 .papel(Papel.ADMIN)
                 .active(true)
                 .createdAt(Instant.now())

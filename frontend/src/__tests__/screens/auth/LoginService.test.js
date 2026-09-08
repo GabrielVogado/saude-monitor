@@ -7,6 +7,11 @@ import * as Network from "expo-network";
 
 import LoginService from "../../../screens/auth/service/LoginService";
 import TokenStorage from "../../../services/TokenStorage";
+import { pararGeofencing } from "../../../screens/visitas/service/GeofencingTaskService";
+
+jest.mock("../../../screens/visitas/service/GeofencingTaskService", () => ({
+  pararGeofencing: jest.fn(),
+}));
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body, text: async () => JSON.stringify(body) };
@@ -74,6 +79,9 @@ describe("LoginService (Fase 0)", () => {
     expect(JSON.parse(config.body).refreshToken).toBe("R");
     expect(await TokenStorage.getAccessToken()).toBeNull();
     expect(await TokenStorage.getRefreshToken()).toBeNull();
+    // achado da auditoria (08/09/2026): o geofencing nativo não era parado no
+    // logout e continuava monitorando regiões após a sessão encerrar
+    expect(pararGeofencing).toHaveBeenCalledTimes(1);
   });
 
   test("logout é best-effort: falha de rede ainda limpa a sessão local", async () => {
@@ -83,6 +91,17 @@ describe("LoginService (Fase 0)", () => {
     await LoginService.logout();
 
     // revogação falhou, mas o logout local não pode ficar bloqueado
+    expect(await TokenStorage.getAccessToken()).toBeNull();
+    expect(await TokenStorage.getRefreshToken()).toBeNull();
+  });
+
+  test("logout é best-effort: falha ao parar o geofencing ainda limpa a sessão local", async () => {
+    await TokenStorage.salvarTokens({ accessToken: "A", refreshToken: "R", usuario: { id: "u1" } });
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ success: true }));
+    pararGeofencing.mockRejectedValueOnce(new Error("TaskManager indisponível"));
+
+    await LoginService.logout();
+
     expect(await TokenStorage.getAccessToken()).toBeNull();
     expect(await TokenStorage.getRefreshToken()).toBeNull();
   });
@@ -124,6 +143,7 @@ describe("LoginService (Fase 0)", () => {
     expect(resp.success).toBe(true);
     // após a exclusão a sessão local é removida (logout)
     expect(await TokenStorage.getAccessToken()).toBeNull();
+    expect(pararGeofencing).toHaveBeenCalledTimes(1);
   });
 
   test("excluirConta sem sessão lança erro", async () => {

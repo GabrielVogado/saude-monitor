@@ -89,7 +89,7 @@ function CSHospitalCard({
               <Text style={styles.ratingCount}>{indicadores.nAvaliacoes} avaliações</Text>
             </View>
           ) : (
-            <CSBadge label="Ainda sem avaliações suficientes" variant="warning" />
+            <Text style={styles.ratingCount}>Ainda sem avaliações suficientes</Text>
           )}
           {temIndicadores && indicadores.tempoMedianoMinutos != null ? (
             <Text style={styles.timeMetric}>

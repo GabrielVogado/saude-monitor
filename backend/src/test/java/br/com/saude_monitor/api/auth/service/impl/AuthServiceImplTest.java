@@ -13,6 +13,7 @@ import br.com.saude_monitor.api.user.document.UserDocument;
 import br.com.saude_monitor.api.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.Map;
@@ -173,5 +174,34 @@ class AuthServiceImplTest {
 
         assertTrue((Boolean) resposta.get("success"));
         verify(revogadoRepository, never()).insert(any(RefreshTokenRevogadoDocument.class));
+    }
+
+    @Test
+    void logoutRepetidoComChaveDuplicadaContinuaRespondendoSucesso() {
+        // Segundo logout com o mesmo refresh token: jti já está na blacklist, o insert
+        // falha por chave duplicada — esperado e inofensivo, resposta continua 200-like.
+        UserDocument user = usuarioAtivo("marina@email.com");
+        String refreshToken = jwtService.generateRefreshToken(user);
+        when(revogadoRepository.insert(any(RefreshTokenRevogadoDocument.class)))
+                .thenThrow(new DuplicateKeyException("E11000 duplicate key"));
+
+        Map<String, Object> resposta = authService.logout(new RefreshRequest(refreshToken));
+
+        assertTrue((Boolean) resposta.get("success"));
+    }
+
+    @Test
+    void logoutNaoMascaraFalhaRealDePersistenciaComoSucesso() {
+        // Achado da auditoria de erros silenciosos (08/09/2026): antes, qualquer
+        // RuntimeException na revogação (não só chave duplicada) era engolida e o logout
+        // sempre respondia "sessão encerrada" — mesmo quando o refresh token continuava
+        // válido por não ter sido revogado de fato (ex.: falha de conexão com o Mongo).
+        UserDocument user = usuarioAtivo("marina@email.com");
+        String refreshToken = jwtService.generateRefreshToken(user);
+        when(revogadoRepository.insert(any(RefreshTokenRevogadoDocument.class)))
+                .thenThrow(new RuntimeException("Mongo indisponível"));
+
+        assertThrows(RuntimeException.class,
+                () -> authService.logout(new RefreshRequest(refreshToken)));
     }
 }

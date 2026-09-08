@@ -15,6 +15,7 @@ import br.com.saude_monitor.api.user.util.EmailNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -104,8 +105,10 @@ public class AuthServiceImpl implements AuthService {
                     .revogadoEm(Instant.now())
                     .expiraEm(jwtService.extractExpiration(token))
                     .build());
-        } catch (RuntimeException ex) {
+        } catch (DuplicateKeyException ex) {
             // Registro duplicado (idêntico ao jti, ex.: logout repetido) é esperado e inofensivo.
+            // Qualquer outra falha (ex.: Mongo indisponível) propaga — logout não pode
+            // devolver "sessão encerrada" quando a revogação não foi persistida de fato.
             logger.debug("Revogação já registrada para o jti: {}", ex.getMessage());
         }
     }

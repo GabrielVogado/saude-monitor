@@ -65,9 +65,6 @@ public class AgregadoServiceImpl implements AgregadoService {
     /** Piso de duração para a métrica de tempo (RN-07): visitas com menos de 2 minutos são ruído e não entram nas estatísticas públicas. */
     static final int DURACAO_MINIMA_MINUTOS = 2;
 
-    /** Percentual mínimo de cobertura de GPS para visitas {@code GPS_INTERROMPIDO} (RN-17). */
-    static final double COBERTURA_GPS_MINIMA = 0.90;
-
     /** Status válidos de visita para o indicador de tempo: FINALIZADA (RN-03) e GPS_INTERROMPIDO (RN-06, com cobertura ≥ 90% — RN-17). */
     private static final List<StatusVisita> STATUS_TEMPO = List.of(
             StatusVisita.FINALIZADA,
@@ -190,7 +187,7 @@ public class AgregadoServiceImpl implements AgregadoService {
             return false;
         }
         double fracao = EstatisticaService.fracaoCoberta(entrada, saida, visita.getUltimaPosicaoEm());
-        return fracao >= COBERTURA_GPS_MINIMA;
+        return fracao >= EstatisticaService.PERCENTUAL_MINIMO_COBERTURA_GPS;
     }
 
     /** Persiste o agregado com upsert idempotente por {@code hospitalId}. */

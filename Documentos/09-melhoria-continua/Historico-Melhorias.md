@@ -25,6 +25,8 @@
 | **M-005** | 06/09/2026 | BUG-07, relatado pelo PO em uso real | Smoke test de deploy que exercita a rota geoespacial: o portão antigo batia num `find()` sem índice e aprovou um deploy com a F-07 devolvendo HTTP 500 | (este PR) | ✅ Aplicada |
 | **M-006** | 06/09/2026 | BUG-08, relatado pelo PO em uso real | Validação de servidor alimentada por dado do próprio cliente não valida nada + configuração que não migra o dado já gravado não corrige nada | (este PR) | ✅ Aplicada |
 | **M-007** | 06/09/2026 | `code-review` sobre o PR #85 (achados suplementares) | Migração/reconciliador que faz *read-modify-write* do documento inteiro perde edição administrativa concorrente; corrigido para update parcial atômico tocando só os campos da migração | #85 | ✅ Aplicada |
+| **M-008** | 08/09/2026 | Auditoria de código morto/lógica ambígua/erros silenciosos (pedido direto do PO) | 4 erros silenciosos críticos de auth/LGPD corrigidos: cadastro duplicado "com sucesso" (201), logout que mascarava falha real de revogação, seed de admin com senha vazia sem aviso, exclusão de conta afirmando remover uma coleção nunca escrita | #98 | ✅ Aplicada |
+| **M-009** | 08/09/2026 | Auditoria de código morto/lógica ambígua/erros silenciosos (pedido direto do PO), mesmo pedido do M-008 | 5 bugs de comportamento do frontend corrigidos: geofencing nativo não parava no logout/exclusão de conta; botão "Sair" do Perfil nunca revogava o refresh token no servidor; notificação de feedback abria o formulário mesmo vencido (RN-09) — e, achado do `code-review` deste mesmo PR, também abria com dados da visita errada quando a pendência já tinha sido substituída; link "Esqueci minha senha" e botão "Voltar" do cadastro sem `onPress`; telas de moderação de sugestões inacessíveis removidas | #100 | ✅ Aplicada |
 
 ---
 
@@ -518,6 +520,117 @@ caminho concorrente (admin, outro job). Update parcial e atômico pelo identific
 padrão a seguir em futuros runners deste tipo (candidato natural: o próximo
 `Order`-runner de migração/regravação em massa que precisar tocar poucos campos de um
 documento maior).
+
+---
+
+## M-008 — Erros silenciosos críticos em auth/LGPD (auditoria de código morto)
+
+**Data:** 08/09/2026 · **PR:** #98
+
+### O que aconteceu
+
+O PO pediu um code review de backend e frontend atrás de "lógicas mortas, ambíguas
+ou que se sobrepõem, código que compromete o comportamento do sistema, códigos e
+lógicas que disparam erros silenciosos". Dois agentes independentes leram o
+código-fonte completo (não o diff) e encontraram 19 achados priorizados P0→P3
+(`Documentos/08-analise tecnica/Auditoria-Codigo-Morto-Logica-Ambigua-Erros-Silenciosos-v1.0.md`).
+Os 4 mais graves (P0) tinham o mesmo padrão: **mascaravam uma falha real como
+sucesso**, ou **afirmavam uma ação de segurança/LGPD que não acontecia de fato**.
+
+### O que entrou
+
+- `UserServiceImpl.saveUser`: e-mail duplicado agora lança `ConflitoException`
+  (409) em vez de devolver `HttpStatus.CREATED` (201) com `success:false` no
+  corpo — um cliente que decide por status HTTP via um cadastro duplicado como
+  sucesso.
+- `AuthServiceImpl.revogar` (logout): `catch (RuntimeException)` genérico
+  restrito a `DuplicateKeyException` — antes, qualquer falha na revogação do
+  refresh token (inclusive Mongo indisponível) era engolida e o logout sempre
+  respondia "sessão encerrada", mesmo com o token continuando válido.
+- `AdminUserSeeder`: aborta o seed com log `ERROR` quando `app.seed-admin.senha`
+  está ausente/vazio, em vez de criar um admin com hash de senha vazia (nunca
+  autentica) e logar "criado com sucesso".
+- `AuthDocument`/`AuthRepository` (coleção `auth_logins`) removidos — nunca
+  eram escritos em lugar nenhum do sistema; a chamada `deleteByUser_Id` na
+  exclusão de conta LGPD era um no-op permanente que, numa auditoria real,
+  responderia errado sobre o que é apagado. Documentação corrigida em 3 lugares
+  (Especificação da API, De-Para, Relatório de Aderência) + `backend/README.md`,
+  que ainda descrevia um contrato de login pré-JWT (achado do `code-review`
+  deste próprio PR).
+
+### Lição a repetir
+
+Os quatro achados compartilham a mesma forma: um `catch`/`if` que devolve
+sucesso ou segue em frente sem propagar a falha real. Vale grep por
+`catch (RuntimeException`/`catch (Exception` genérico e por respostas de
+sucesso condicionais (`return new XResponse(false, ...)` com status HTTP fixo
+no controller) em revisões futuras — é o padrão que gerou os 4 achados P0 aqui.
+
+---
+
+## M-009 — Bugs de comportamento e telas mortas no frontend (auditoria de código morto)
+
+**Data:** 08/09/2026 · **PR:** #100
+
+### O que aconteceu
+
+Mesma auditoria do M-008 (ver aquela seção para o pedido original do PO):
+dois agentes leram o código-fonte completo do backend e do frontend atrás de
+código morto, lógica ambígua e erros silenciosos. Este PR entrega os 5 achados
+P1 do frontend — bugs de comportamento reais, visíveis ao usuário.
+
+### O que entrou
+
+- `LoginService.logout()`/`excluirConta()` passam a chamar `pararGeofencing()`
+  (best-effort) — o monitoramento nativo de geofence continuava rodando depois
+  do logout/exclusão de conta.
+- **Achado extra, descoberto ao corrigir o item acima:** `PerfilService.deslogar()`
+  (botão "Sair" do Perfil) nunca chamava `LoginService.logout()` — o refresh
+  token nunca era revogado no servidor quando o usuário saía manualmente pelo
+  app, apesar de `LoginService` já estar importado no mesmo arquivo para
+  outros usos. Corrigido para delegar.
+- `App.js` passa a checar `feedbackAvaliavel()` (RN-09, janela de 24h) antes
+  de abrir o formulário de feedback a partir de uma notificação — antes abria
+  mesmo vencido, e o usuário só descobria ao tentar enviar (backend 404).
+  **Achado do `code-review` deste mesmo PR:** a primeira versão da correção
+  checava a validade da pendência *atual*, não se ela era da *mesma visita* da
+  notificação tocada — uma notificação de uma visita já substituída por outra
+  mais recente ainda abriria o formulário, com o hospital errado. Corrigido
+  para exigir os dois: `pendencia.visitaId === data.visitaId` **e** dentro da
+  janela de 24h, sobre a mesma pendência.
+- `LoginScreen`: removido o link "Esqueci minha senha" sem `onPress`
+  (**BUG-03** do inventário de bugs, `De-Para-Backlog-Features.md` §E8-05 —
+  decisão anterior do PO em 04/09/2026 tinha sido "registrar e não corrigir";
+  revisitada em 08/09/2026: a feature de recuperação de senha continua fora de
+  escopo, mas o controle morto sai da tela).
+- `UserScreen`: botão "Voltar" do cadastro ganhou `onPress` e o ícone corrigido
+  (estava `ArrowRight`, sentido errado para "voltar").
+- Removidas `SugestoesPendentesScreen`/`RevisarSugestaoScreen` — registradas
+  em `App.js` mas nenhuma navegação do app chegava até elas, e o botão
+  "Aprovar" navegava para uma rota (`HospitalForm`) que nunca existiu no
+  cliente mobile. `De-Para-Backlog-Features.md` (E1-06) e `Features-MVP-v2.1.md`
+  (F-10) atualizados.
+
+### Decisão sobre import circular (achado do `code-review`, não aplicada)
+
+O `code-review` apontou que `LoginService → GeofencingTaskService →
+HospitalService/VisitaService → LoginService` fecha um ciclo de imports.
+Tentativa de quebrá-lo com `import()` dinâmico foi **revertida**: a interop do
+Jest com `jest.mock` sobre import dinâmico exige `__esModule: true` no mock, e
+sem isso o binding chegava `undefined` — os dois testes que exercitam
+`pararGeofencing()` quebraram. Trocar um risco teórico (o ciclo é seguro hoje
+porque nenhum dos quatro módulos lê o binding no topo do arquivo, só dentro de
+corpos de função) por um problema demonstrado não valia a pena. Ciclo mantido,
+documentado em comentário no topo de `LoginService.js`.
+
+### Lição a repetir
+
+O achado extra do `PerfilService.deslogar()` é o mesmo padrão do M-007 e do
+M-008: um módulo já importa a dependência certa para um caso de uso, mas um
+método vizinho no mesmo arquivo reimplementa uma versão mais simples (e
+incompleta) da mesma operação. Vale grep pelo nome do método “irmão” mais
+completo (aqui, `LoginService.logout`) sempre que se mexe numa função de
+limpeza/encerramento de sessão.
 
 ---
 

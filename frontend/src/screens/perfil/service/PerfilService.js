@@ -241,9 +241,17 @@ class PerfilService {
     return request(CONSENTIMENTOS_PATH, { method: "PUT", body: corpo });
   }
 
-  /** Desloga a sessão local (usado ao sair do Perfil). */
+  /**
+   * Desloga a sessão (usado ao sair do Perfil).
+   *
+   * Delega a `LoginService.logout()` — antes limpava só os tokens locais
+   * (`TokenStorage.limparTokens()`), sem passar pela revogação do refresh token
+   * no servidor (blacklist, §3.1) nem pelo encerramento do geofencing nativo:
+   * quem tocasse "Sair" no Perfil tinha o refresh token continuando válido por
+   * até 30 dias, mesmo com a sessão local encerrada.
+   */
   static async deslogar() {
-    await TokenStorage.limparTokens();
+    await LoginService.logout();
   }
 }
 

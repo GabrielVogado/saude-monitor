@@ -30,6 +30,7 @@ import {
   formatarPeriodo,
 } from "../../../utils/format";
 import { avisarSemConexao, preservarSeSemConexao } from "../../../utils/alertas";
+import { avaliacaoSuficiente } from "../../../utils/indicadores";
 
 const TIPO_LABEL = {
   PUBLICO: "Público",
@@ -235,14 +236,10 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   }
 
   const dadosIndicadores = indicadores || hospital.indicadores;
-  // Mesmo critério do CSHospitalCard (nAvaliacoes >= 5): sem isso o mesmo hospital
-  // mostra "sem avaliações suficientes" na lista mas nota real no detalhe, contrariando
-  // o texto do badge "aparecem após pelo menos 5 avaliações".
-  const temIndicadores =
-    dadosIndicadores?.indicadoresDisponiveis !== false &&
-    dadosIndicadores?.nAvaliacoes >= 5 &&
-    dadosIndicadores?.notaMedia !== null &&
-    dadosIndicadores?.notaMedia !== undefined;
+  // Critério compartilhado com CSHospitalCard (utils/indicadores.js): sem isso o
+  // mesmo hospital podia mostrar "sem avaliações suficientes" na lista mas nota real
+  // no detalhe.
+  const temIndicadores = avaliacaoSuficiente(dadosIndicadores);
 
   // Novos campos (opcionais) — tratados com segurança quando ausentes.
   const tipoUnidade =

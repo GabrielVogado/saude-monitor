@@ -11,14 +11,15 @@ import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.security.JwtService;
 import br.com.saude_monitor.api.user.document.UserDocument;
 import br.com.saude_monitor.api.user.repository.UserRepository;
+import br.com.saude_monitor.api.user.util.EmailNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -104,8 +105,10 @@ public class AuthServiceImpl implements AuthService {
                     .revogadoEm(Instant.now())
                     .expiraEm(jwtService.extractExpiration(token))
                     .build());
-        } catch (RuntimeException ex) {
+        } catch (DuplicateKeyException ex) {
             // Registro duplicado (idêntico ao jti, ex.: logout repetido) é esperado e inofensivo.
+            // Qualquer outra falha (ex.: Mongo indisponível) propaga — logout não pode
+            // devolver "sessão encerrada" quando a revogação não foi persistida de fato.
             logger.debug("Revogação já registrada para o jti: {}", ex.getMessage());
         }
     }
@@ -129,6 +132,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private String normalizeEmail(String email) {
-        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+        String normalizado = EmailNormalizer.normalizar(email);
+        return normalizado == null ? "" : normalizado;
     }
 }

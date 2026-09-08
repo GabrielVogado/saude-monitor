@@ -169,9 +169,12 @@ const styles = StyleSheet.create({
     },
     securityBadges: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         justifyContent: 'center',
-        gap: spacing.s5,
+        rowGap: spacing.s2,
+        columnGap: spacing.s5,
         marginTop: spacing.s8,
+        paddingHorizontal: spacing.s4,
     },
     badgeItem: {
         flexDirection: 'row',
@@ -179,38 +182,9 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     badgeText: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '600',
-        color: colors.outline,
-    },
-    socialIcons: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        gap: spacing.s8,
-        marginTop: spacing.s10,
-    },
-    iconWrapper: {
-        alignItems: 'center',
-        gap: spacing.s2,
-    },
-    socialBtn: {
-        width: 48,
-        height: 48,
-        borderRadius: radii.xl,
-        backgroundColor: colors.surfaceContainerLowest,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: colors.onSurface,
-        shadowOffset: {width: 0, height: 2},
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    iconLabel: {
-        fontSize: 10,
-        fontWeight: '700',
         color: colors.onSurfaceVariant,
-        letterSpacing: 0.5,
     },
     simpleFooter: {
         flexDirection: 'row',

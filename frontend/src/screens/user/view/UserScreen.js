@@ -13,15 +13,13 @@ import {
     ArrowRight,
     Eye,
     EyeOff,
-    Globe,
-    HelpCircle,
     Lock,
     Mail,
     Phone,
-    Share2,
     ShieldCheck,
     User,
-    UserPlus
+    UserPlus,
+    Users
 } from 'lucide-react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import UserService from '../service/UserService';
@@ -96,9 +94,10 @@ const HospitalRegisterScreen = ({navigation}) => {
                             </View>
                         </View>
 
-                        <Text style={styles.title}>Crie seu cadastro</Text>
+                        <Text style={styles.title}>Crie sua conta</Text>
                         <Text style={styles.subtitle}>
-                            Preencha seus dados para solicitar acesso ao painel.
+                            Guarde seu histórico de visitas e suas avaliações. O cadastro é
+                            opcional — você já pode usar o app sem ele.
                         </Text>
 
                         {/* Form */}
@@ -110,21 +109,21 @@ const HospitalRegisterScreen = ({navigation}) => {
                                 <User size={20} color={colors.outline} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Ex: Dr. Alberto Ferreira"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholder="Seu nome completo"
+                                    placeholderTextColor={colors.outline}
                                     value={fullName}
                                     onChangeText={setFullName}
                                 />
                             </View>
 
                             {/* Email */}
-                            <Text style={styles.label}>E-MAIL INSTITUCIONAL</Text>
+                            <Text style={styles.label}>E-MAIL</Text>
                             <View style={styles.inputContainer}>
                                 <Mail size={20} color={colors.outline} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="nome@hospital.com.br"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholder="seu@email.com"
+                                    placeholderTextColor={colors.outline}
                                     value={email}
                                     onChangeText={setEmail}
                                     keyboardType="email-address"
@@ -133,13 +132,13 @@ const HospitalRegisterScreen = ({navigation}) => {
                             </View>
 
                             {/* Phone */}
-                            <Text style={styles.label}>TELEFONE</Text>
+                            <Text style={styles.label}>TELEFONE (OPCIONAL)</Text>
                             <View style={styles.inputContainer}>
                                 <Phone size={20} color={colors.outline} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="(11) 99999-9999"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholderTextColor={colors.outline}
                                     value={phone}
                                     onChangeText={setPhone}
                                     keyboardType="phone-pad"
@@ -196,7 +195,7 @@ const HospitalRegisterScreen = ({navigation}) => {
                                     >
                                         Política de Privacidade
                                     </Text>{" "}
-                                    da plataforma Hospital Monitor.
+                                    do Clinical Sanctuary.
                                 </Text>
                             </View>
 
@@ -206,11 +205,11 @@ const HospitalRegisterScreen = ({navigation}) => {
                                 onPress={handleCadastro}
                                 disabled={isSubmitting}
                                 accessibilityRole="button"
-                                accessibilityLabel={isSubmitting ? "Enviando cadastro" : "Cadastrar no sistema"}
+                                accessibilityLabel={isSubmitting ? "Enviando cadastro" : "Criar conta"}
                                 accessibilityState={{disabled: isSubmitting, busy: isSubmitting}}
                             >
                                 <Text style={styles.registerButtonText}>
-                                    {isSubmitting ? 'Enviando...' : 'Cadastrar no sistema'}
+                                    {isSubmitting ? 'Enviando...' : 'Criar conta'}
                                 </Text>
                                 <ArrowRight size={20} color={colors.onPrimary} style={styles.registerButtonIcon} />
                             </TouchableOpacity>
@@ -222,7 +221,8 @@ const HospitalRegisterScreen = ({navigation}) => {
                                 <ShieldCheck size={18} color={colors.primary} />
                             </View>
                             <Text style={styles.complianceText}>
-                                Em conformidade com a <Text style={styles.complianceHighlight}>LGPD (Lei Geral de Proteção de Dados)</Text>. Suas informações são tratadas com sigilo absoluto e utilizadas exclusivamente para autenticação institucional.
+                                Suas avaliações são anônimas e agregadas por hospital, seguindo a{" "}
+                                <Text style={styles.complianceHighlight}>LGPD</Text>.
                             </Text>
                         </View>
                     </View>
@@ -230,38 +230,26 @@ const HospitalRegisterScreen = ({navigation}) => {
                     {/* Security Badges */}
                     <View style={styles.securityBadges}>
                         <View style={styles.badgeItem}>
-                            <Lock size={14} color={colors.onSurfaceVariant} />
-                            <Text style={styles.badgeText}>END-TO-END ENCRYPTED</Text>
+                            <ShieldCheck size={14} color={colors.onSurfaceVariant} />
+                            <Text style={styles.badgeText}>LGPD</Text>
                         </View>
                         <View style={styles.badgeItem}>
-                            <ShieldCheck size={14} color={colors.onSurfaceVariant} />
-                            <Text style={styles.badgeText}>LGPD COMPLIANT</Text>
+                            <Lock size={14} color={colors.onSurfaceVariant} />
+                            <Text style={styles.badgeText}>Criptografia ponta a ponta</Text>
+                        </View>
+                        <View style={styles.badgeItem}>
+                            <Users size={14} color={colors.onSurfaceVariant} />
+                            <Text style={styles.badgeText}>Dados anônimos e agregados</Text>
                         </View>
                     </View>
 
-                    {/* Social / Support Icons */}
-                    <View style={styles.socialIcons}>
-                        <View style={styles.iconWrapper}>
-                            <TouchableOpacity style={styles.socialBtn} accessibilityRole="button" accessibilityLabel="Site global"><Globe size={24} color={colors.onSurface} /></TouchableOpacity>
-                            <Text style={styles.iconLabel}>GLOBAL</Text>
-                        </View>
-                        <View style={styles.iconWrapper}>
-                            <TouchableOpacity style={styles.socialBtn} accessibilityRole="button" accessibilityLabel="Partilhar"><Share2 size={24} color={colors.onSurface} /></TouchableOpacity>
-                            <Text style={styles.iconLabel}>PARTILHAR</Text>
-                        </View>
-                        <View style={styles.iconWrapper}>
-                            <TouchableOpacity style={styles.socialBtn} accessibilityRole="button" accessibilityLabel="Suporte"><HelpCircle size={24} color={colors.onSurface} /></TouchableOpacity>
-                            <Text style={styles.iconLabel}>SUPORTE</Text>
-                        </View>
-                    </View>
-
-                    {/* Simple Footer Links */}
+                    {/* Footer */}
                     <View style={styles.simpleFooter}>
                         <Text style={styles.simpleFooterLink}>Termos</Text>
                         <View style={styles.dot} />
-                        <Text style={styles.simpleFooterLink}>Cookies</Text>
-                        <View style={styles.dot} />
-                        <Text style={styles.simpleFooterLink}>Privacidade</Text>
+                        <TouchableOpacity onPress={() => navigation?.navigate?.("Privacidade")} accessibilityRole="link" accessibilityLabel="Política de Privacidade">
+                            <Text style={styles.linkText}>Privacidade</Text>
+                        </TouchableOpacity>
                     </View>
 
                 </ScrollView>

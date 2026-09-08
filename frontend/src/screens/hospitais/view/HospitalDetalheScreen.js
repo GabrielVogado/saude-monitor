@@ -29,6 +29,7 @@ import {
   formatarNota,
   formatarPeriodo,
 } from "../../../utils/format";
+import { avisarSemConexao, preservarSeSemConexao } from "../../../utils/alertas";
 
 const TIPO_LABEL = {
   PUBLICO: "Público",
@@ -95,7 +96,9 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   }, [id]);
 
   // Sincroniza o estado da visita manual ao focar a tela (ex.: ao voltar do check-in
-  // da lista Hospital → este detalhe). Modo anônimo usa `dispositivoId` (§3.3).
+  // da lista Hospital → este detalhe). Modo anônimo usa `dispositivoId` (§3.3). Sem
+  // conexão não é "sem visita ativa" — ver `preservarSeSemConexao`, incluindo a
+  // limitação conhecida sobre a janela entre reconectar e a fila sincronizar.
   const carregarVisitaManual = async () => {
     try {
       const data = await VisitaService.buscarAtiva();
@@ -106,8 +109,8 @@ export default function HospitalDetalheScreen({ navigation, route }) {
       if (visita?.origem === "MANUAL" && visita.hospitalId === id) {
         setAgora(Date.now());
       }
-    } catch {
-      setVisitaManual(null);
+    } catch (e) {
+      preservarSeSemConexao(e, setVisitaManual);
     }
   };
 
@@ -129,9 +132,11 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   const encerrarVisitaManual = async () => {
     if (!visitaManual) return;
     setEnviandoCheckout(true);
-    try {
-      await VisitaService.checkout(visitaManual.id, { encerramentoManual: true });
-      // Épico 03 — E3-01: agenda o pedido de feedback ~1–5 min após a saída.
+
+    // Épico 03 — E3-01: agenda o pedido de feedback ~1–5 min após a saída. Chamado
+    // tanto no sucesso quanto no checkout enfileirado (abaixo) — nos dois casos a
+    // saída está registrada do ponto de vista do usuário.
+    const encerrarLocalmente = () => {
       agendarFeedback({
         visitaId: visitaManual.id,
         hospitalId: visitaManual.hospitalId,
@@ -139,7 +144,22 @@ export default function HospitalDetalheScreen({ navigation, route }) {
         saidaEm: new Date().toISOString(),
       });
       setVisitaManual(null);
+    };
+
+    try {
+      await VisitaService.checkout(visitaManual.id, { encerramentoManual: true });
+      encerrarLocalmente();
     } catch (e) {
+      if (e.enfileirado) {
+        // Sem conexão, o checkout foi guardado para sincronizar depois (OPS-05).
+        // O cronômetro não pode continuar rodando para uma visita que o usuário
+        // já encerrou — sem isto, ele ficaria contando o tempo indefinidamente.
+        // Janela residual e decisão de aceitá-la documentadas em
+        // `preservarSeSemConexao` (utils/alertas.js).
+        encerrarLocalmente();
+        avisarSemConexao(e.message);
+        return;
+      }
       Alert.alert(
         "Check-out",
         e.message || "Não foi possível finalizar o check-out. Tente novamente."

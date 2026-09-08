@@ -1,7 +1,7 @@
 package br.com.saude_monitor.api.user.service.impl;
 
 import br.com.saude_monitor.api.agregado.service.AgregadoService;
-import br.com.saude_monitor.api.auth.repository.AuthRepository;
+import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
 import br.com.saude_monitor.api.config.exception.ValidacaoNegocioException;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
@@ -41,8 +41,9 @@ import java.util.Set;
  * nunca em texto puro. O papel padrão é {@code USER} e os consentimentos LGPD são
  * registrados com aceite dos termos de uso (obrigatório).</p>
  *
- * <p>Na exclusão de conta (F0-05), os dados pessoais identificáveis são removidos
- * (documento de usuário + registros de autenticação) e os dados usados nas estatísticas
+ * <p>Na exclusão de conta (F0-05), o dado pessoal identificável é removido
+ * (documento de usuário — a senha vive apenas como hash nesse mesmo documento, não há
+ * coleção de autenticação separada) e os dados usados nas estatísticas
  * (visitas e feedbacks) são anonimizados — {@code usuarioId} zerado — preservando os
  * agregados públicos (nota/tempo), que nunca referenciam identidade.</p>
  */
@@ -55,7 +56,6 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final AuthRepository authRepository;
     private final MongoTemplate mongoTemplate;
     private final AgregadoService agregadoService;
 
@@ -65,17 +65,7 @@ public class UserServiceImpl implements UserService {
         var normalizedEmail = normalizeEmail(request.email());
 
         if (userRepository.findByEmail(normalizedEmail).isPresent()) {
-            return new UserResponse(
-                    false,
-                    "Email já cadastrado",
-                    null,
-                    request.fullName(),
-                    normalizedEmail,
-                    request.phone(),
-                    false,
-                    null,
-                    null
-            );
+            throw new ConflitoException("Email já cadastrado.");
         }
 
         ConsentimentoRequest consent = request.consentimento();
@@ -196,10 +186,8 @@ public class UserServiceImpl implements UserService {
         anonimizarVisitas(usuarioId);
         anonimizarFeedbacks(usuarioId);
 
-        // Remove registros de autenticação (email + vínculo com o usuário).
-        authRepository.deleteByUser_Id(usuarioId);
-
-        // Remove o documento de usuário (dado pessoal identificável).
+        // Remove o documento de usuário (dado pessoal identificável). A senha vive apenas
+        // como hash neste mesmo documento — não há coleção de autenticação separada.
         userRepository.delete(user);
 
         log.info("Conta do usuário {} excluída (LGPD). Dados pessoais removidos; visitas/feedbacks anonimizados.",

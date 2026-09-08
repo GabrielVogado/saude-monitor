@@ -89,47 +89,38 @@ Get-Content .env | ForEach-Object {
 
 ### POST `/api/v1/auth/login`
 
-Recebe o payload de login, valida os campos e persiste na colecao `auth_logins`.
+Autentica e-mail/senha (hash BCrypt contra `senhaHash` em `users`) e emite um par de
+tokens JWT. Contrato completo em `Documentos/02-arquitetura-tecnica/Especificacao-API-v2.1.md` §3.1.
 
 **Payload:**
 ```json
 {
   "email": "usuario@teste.com",
-  "password": "senha123",
-  "rememberDevice": true
+  "password": "senha123"
 }
 ```
 
-**Resposta 200 OK (se o usuário estiver cadastrado na base):**
+**Resposta 200 OK:**
 ```json
 {
-  "success": true,
-  "message": "Login salvo com sucesso",
-  "email": "usuario@teste.com",
-  "rememberDevice": true
+  "accessToken": "eyJhbGciOi...",
+  "refreshToken": "eyJhbGciOi...",
+  "expiraEm": 900,
+  "usuario": { "id": "...", "nome": "Marina Souza", "email": "usuario@teste.com", "papel": "USER" }
 }
 ```
 
-**Resposta 400 Bad Request** (campos invalidos):
-```json
-{
-  "success": false,
-  "message": "validation failed",
-  "errors": {
-    "email": "email is required",
-    "password": "password is required"
-  }
-}
-```
+**Resposta 401** (`NAO_AUTORIZADO`): e-mail ou senha inválidos.
 
 **Teste rapido:**
 ```powershell
 $headers = @{"Content-Type"="application/json"}
-$body    = '{"email":"usuario@teste.com","password":"senha123","rememberDevice":true}'
+$body    = '{"email":"usuario@teste.com","password":"senha123"}'
 Invoke-WebRequest -Uri "http://localhost:8080/api/v1/auth/login" `
   -Method POST -Headers $headers -Body $body -UseBasicParsing |
   Select-Object -ExpandProperty Content
-# Obs: Espera-se um erro 401 caso esse usuário não tenha sido previamente adicionado no banco
+# Obs: Espera-se um erro 401 caso esse usuário não tenha sido previamente cadastrado
+# (POST /api/v1/auth/registro) no banco
 ```
 
 ---

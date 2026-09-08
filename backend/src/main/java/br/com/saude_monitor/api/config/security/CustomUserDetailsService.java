@@ -25,7 +25,14 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        UserDocument user = userRepository.findByEmail(EmailNormalizer.normalizar(email))
+        String normalizado = EmailNormalizer.normalizar(email);
+        if (normalizado == null) {
+            // Contrato do UserDetailsService: username ausente é "não encontrado", não
+            // uma exceção de acesso a dados — evita repassar null a uma query derivada
+            // do Spring Data (comportamento não garantido pelo driver do Mongo).
+            throw new UsernameNotFoundException("Usuário não encontrado: " + email);
+        }
+        UserDocument user = userRepository.findByEmail(normalizado)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado: " + email));
 
         String papel = user.getPapel() == null ? "USER" : user.getPapel().name();

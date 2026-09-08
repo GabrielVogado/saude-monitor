@@ -29,8 +29,7 @@ import {
   formatarNota,
   formatarPeriodo,
 } from "../../../utils/format";
-import { avisarSemConexao } from "../../../utils/alertas";
-import { ErroDeConexao } from "../../../config/http";
+import { avisarSemConexao, preservarSeSemConexao } from "../../../utils/alertas";
 
 const TIPO_LABEL = {
   PUBLICO: "Público",
@@ -97,13 +96,9 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   }, [id]);
 
   // Sincroniza o estado da visita manual ao focar a tela (ex.: ao voltar do check-in
-  // da lista Hospital → este detalhe). Modo anônimo usa `dispositivoId` (§3.3).
-  //
-  // Achado do code-review: o mesmo bug corrigido em HospitaisScreen existia aqui — um
-  // check-in enfileirado offline (a lista já mostra "Em visita — ver") some deste
-  // card assim que o usuário abre o detalhe, porque o `buscarAtiva()` daqui também
-  // falha (ainda sem internet) e o catch zerava `visitaManual` incondicionalmente.
-  // Sem conectividade não é "sem visita ativa": é "não sabemos" — mantém o que havia.
+  // da lista Hospital → este detalhe). Modo anônimo usa `dispositivoId` (§3.3). Sem
+  // conexão não é "sem visita ativa" — ver `preservarSeSemConexao`, incluindo a
+  // limitação conhecida sobre a janela entre reconectar e a fila sincronizar.
   const carregarVisitaManual = async () => {
     try {
       const data = await VisitaService.buscarAtiva();
@@ -115,9 +110,7 @@ export default function HospitalDetalheScreen({ navigation, route }) {
         setAgora(Date.now());
       }
     } catch (e) {
-      if (!(e instanceof ErroDeConexao)) {
-        setVisitaManual(null);
-      }
+      preservarSeSemConexao(e, setVisitaManual);
     }
   };
 
@@ -161,6 +154,10 @@ export default function HospitalDetalheScreen({ navigation, route }) {
         // Sem conexão, o checkout foi guardado para sincronizar depois (OPS-05).
         // O cronômetro não pode continuar rodando para uma visita que o usuário
         // já encerrou — sem isto, ele ficaria contando o tempo indefinidamente.
+        // Limitação conhecida (ver `preservarSeSemConexao`, utils/alertas.js): um
+        // refoco entre a conexão voltar e a fila sincronizar este checkout pode
+        // ressuscitar a visita a partir de um `buscarAtiva()` que ainda não reflete
+        // o evento pendente. Decisão aceita em vez de resolvida nesta PR.
         encerrarLocalmente();
         avisarSemConexao(e.message);
         return;

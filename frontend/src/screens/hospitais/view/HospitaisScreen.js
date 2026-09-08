@@ -16,8 +16,7 @@ import { colors, spacing } from "../../../theme/tokens";
 import HospitalService from "../service/HospitalService";
 import VisitaService from "../../visitas/service/VisitaService";
 import { normalizeText } from "../../../utils/normalize";
-import { avisarSemConexao } from "../../../utils/alertas";
-import { ErroDeConexao } from "../../../config/http";
+import { avisarSemConexao, preservarSeSemConexao } from "../../../utils/alertas";
 
 const TIPO_FILTROS = [
   { value: "", label: "Todos" },
@@ -89,24 +88,12 @@ export default function HospitaisScreen({ navigation }) {
 
   // Reidrata a visita ativa ao focar a aba (e ao voltar do detalhe) para refletir o
   // estado do botão de check-in por hospital (modo anônimo via dispositivoId, §3.3).
-  //
-  // Achado do code-review: o catch zerava `visitaAtiva` em QUALQUER falha, incluindo
-  // "sem internet" — um `buscarAtiva()` que rejeita porque a rede caiu não significa
-  // "não há visita ativa", significa "não sabemos". Zerando aqui, o guard local que o
-  // check-in enfileirado arma (abaixo) era apagado no próximo foco da aba enquanto o
-  // aparelho ainda estivesse offline, reabrindo a janela para dois check-ins na fila.
-  // Sem dado novo (falha de conectividade), mantém o que já havia. Segundo achado do
-  // code-review: silenciar TODO erro (não só o de conectividade) deixaria um erro real
-  // — sessão expirada, 500 — sem limpar um placeholder otimista obsoleto para sempre;
-  // por isso o `instanceof` restringe a exceção ao que de fato não traz informação.
+  // Sem conexão não é "sem visita ativa" — ver `preservarSeSemConexao`, incluindo a
+  // limitação conhecida sobre a janela entre reconectar e a fila sincronizar.
   const atualizarVisitaAtiva = useCallback(() => {
     VisitaService.buscarAtiva()
       .then((data) => setVisitaAtiva(data?.visita || null))
-      .catch((e) => {
-        if (!(e instanceof ErroDeConexao)) {
-          setVisitaAtiva(null);
-        }
-      });
+      .catch((e) => preservarSeSemConexao(e, setVisitaAtiva));
   }, []);
 
   useFocusEffect(
@@ -191,7 +178,12 @@ export default function HospitaisScreen({ navigation }) {
           // outro hospital, ainda offline, enfileiraria um segundo check-in, e o
           // backend, que resolve por "visita ativa do dispositivo", descartaria um dos
           // dois em silêncio quando a fila enviasse os dois. O `id: null` é substituído
-          // pelo real assim que `atualizarVisitaAtiva` rodar de novo (foco da aba).
+          // pelo real assim que `atualizarVisitaAtiva` rodar de novo (foco da aba) — e é
+          // exatamente aí que mora a limitação conhecida documentada em
+          // `preservarSeSemConexao` (utils/alertas.js): entre a conexão voltar e a fila
+          // de fato sincronizar este check-in, um refoco pode buscar um estado do
+          // servidor que ainda não reflete o evento pendente. Reduz a janela; não a
+          // fecha por completo — decisão aceita em vez de resolvida nesta PR.
           setVisitaAtiva({ id: null, hospitalId: hospital.id, origem: "MANUAL" });
           avisarSemConexao(e.message);
           return;

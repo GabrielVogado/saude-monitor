@@ -494,13 +494,16 @@ const styles = StyleSheet.create({
   },
   metricRow: {
     // Regra "no-line" do Padrao-UI-UX-v2.0 (§5.3/5.5): separação de seções nunca por
-    // hairline — sempre espaço ou troca de tom. Era `borderTopWidth: 1`.
+    // hairline — sempre espaço ou troca de tom. Era `borderTopWidth: 1`. Achado do
+    // code-review: uma primeira tentativa com fundo de tom trocou `paddingVertical`
+    // por `padding` (todos os lados), desalinhando esta linha dos textos irmãos
+    // (`transparencia`/`atualizado`) na mesma coluna. Aqui a separação vem só do
+    // espaço — o `gap` do container `indicadores` já cumpre a regra sem mexer no
+    // padding horizontal.
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: spacing.s3,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfaceContainerLow,
+    paddingVertical: spacing.s3,
   },
   metricLabel: {
     ...typography.bodyMd,

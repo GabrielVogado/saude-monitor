@@ -1,13 +1,13 @@
 package br.com.saude_monitor.api.config.security;
 
 import br.com.saude_monitor.api.user.repository.UserRepository;
+import br.com.saude_monitor.api.user.util.EmailNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
-import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -21,7 +21,7 @@ public class AutenticacaoHelper {
 
     public Optional<String> usuarioIdAtual() {
         return usuarioEmailAtual()
-                .flatMap(email -> userRepository.findByEmail(email.toLowerCase(Locale.ROOT)))
+                .flatMap(email -> userRepository.findByEmail(EmailNormalizer.normalizar(email)))
                 .map(u -> u.getId());
     }
 

@@ -17,6 +17,13 @@ import java.util.List;
  */
 public final class EstatisticaService {
 
+    /**
+     * Percentual mínimo de cobertura de GPS para a RN-17 — única fonte do limiar; usado
+     * tanto pelo cálculo de cobertura abaixo quanto por quem decide se uma visita
+     * {@code GPS_INTERROMPIDO} entra no indicador de tempo ({@code AgregadoServiceImpl}).
+     */
+    public static final double PERCENTUAL_MINIMO_COBERTURA_GPS = 0.90;
+
     private EstatisticaService() {
     }
 
@@ -86,7 +93,7 @@ public final class EstatisticaService {
      * {@code 0.9 - 0.000001} é rejeitado; {@code 0.9} em diante é aceito.
      */
     public static boolean coberturaGpsConfiável(Duration periodoTotal, Duration periodoCoberto) {
-        return coberturaGpsConfiável(periodoTotal, periodoCoberto, 0.9);
+        return coberturaGpsConfiável(periodoTotal, periodoCoberto, PERCENTUAL_MINIMO_COBERTURA_GPS);
     }
 
     /** Fração coberta (0..1) entre dois instantes, usada para diagnóstico. */

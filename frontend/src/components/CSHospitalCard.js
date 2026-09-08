@@ -89,7 +89,7 @@ function CSHospitalCard({
               <Text style={styles.ratingCount}>{indicadores.nAvaliacoes} avaliações</Text>
             </View>
           ) : (
-            <Text style={styles.noRating}>Ainda sem avaliações suficientes</Text>
+            <Text style={styles.ratingCount}>Ainda sem avaliações suficientes</Text>
           )}
           {temIndicadores && indicadores.tempoMedianoMinutos != null ? (
             <Text style={styles.timeMetric}>
@@ -187,10 +187,6 @@ const styles = StyleSheet.create({
     color: colors.onSurface,
   },
   ratingCount: {
-    ...typography.bodySm,
-    color: colors.onSurfaceVariant,
-  },
-  noRating: {
     ...typography.bodySm,
     color: colors.onSurfaceVariant,
   },

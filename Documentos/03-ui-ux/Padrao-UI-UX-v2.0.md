@@ -12,6 +12,13 @@
 
 > **Como ler este documento:** ele é autocontido. Toda decisão de design está expressa em tokens, números e nomes de componentes. Se um valor não está aqui, ele não existe no padrão — crie a partir das escalas definidas nas seções 5.2 a 5.5.
 
+> ⚠️ **Correção (08/09/2026):** as três menções a `CSBadgeWarning`/badge para "Ainda
+> sem avaliações suficientes" (§3, §8.3, §9) foram trocadas por "texto simples" —
+> decisão direta do PO (com evidência de tela): o fundo colorido do badge de aviso
+> volta a ser texto sem fundo, tanto na listagem quanto no detalhe do hospital.
+> `CSBadgeWarning` continua válido para os demais usos da §5.8.5 (ex.: GPS sem
+> sinal). Ver `Documentos/08-analise tecnica/Auditoria-Codigo-Morto-Logica-Ambigua-Erros-Silenciosos-v1.0.md`.
+
 ---
 
 ## 1. Visão Geral e Princípios de UX
@@ -165,7 +172,7 @@ flowchart TD
 | Hospital não mapeado | Convida a "Sugerir hospital" (envia geolocalização + nome) | Link no empty state do mapa |
 | Bateria baixa | Reduz frequência de amostragem de GPS | Sem UI; degrade transparente |
 | Notificação não aberta em 2h | 1 lembrete; expira em 24h | Notificação local + card na home |
-| Sem amostra suficiente no hospital | Não exibe média inventada | Badge "Ainda sem avaliações suficientes" |
+| Sem amostra suficiente no hospital | Não exibe média inventada | Texto simples "Ainda sem avaliações suficientes" |
 
 ---
 
@@ -736,7 +743,7 @@ Gate de aceite — nenhuma tela entra em desenvolvimento sem passar por esta se�
 ### 8.3 Anonimização e agregação (dados públicos)
 
 - **Publicação somente agregada por hospital:** média de nota e tempo médio de permanência.
-- **N mínimo:** nota e tempo só são exibidos com **≥ 10 avaliações nos últimos 90 dias**; abaixo disso, badge "Ainda sem avaliações suficientes".
+- **N mínimo:** nota e tempo só são exibidos com **≥ 10 avaliações nos últimos 90 dias**; abaixo disso, texto simples "Ainda sem avaliações suficientes".
 - Sem identificadores na agregação: nome, e-mail e dispositivo nunca entram no agregado público.
 - Período e método visíveis na tela pública ("Baseado em 132 avaliações nos últimos 90 dias").
 
@@ -948,7 +955,7 @@ flowchart LR
 ```
 
 **Regras de comportamento:**
-- Nota e tempo só aparecem com N ≥ 10 (90 dias) — caso contrário `CSBadgeWarning` "Ainda sem avaliações suficientes" e barras ocultas.
+- Nota e tempo só aparecem com N ≥ 10 (90 dias) — caso contrário texto simples "Ainda sem avaliações suficientes" e barras ocultas.
 - Barras por categoria: somente se cada categoria tiver N ≥ 10.
 - "Avaliar agora" abre o `CSFeedbackForm` (passos 2–4) se o usuário esteve no hospital; senão mostra `CSToast` "Para avaliar, passe pelo hospital e o app detecta sozinho".
 - Metodologia sempre visível: quem lê entende de onde vêm os números (P4, P9).

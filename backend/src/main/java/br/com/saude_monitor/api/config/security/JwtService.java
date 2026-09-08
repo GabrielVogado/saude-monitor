@@ -30,8 +30,6 @@ import java.util.UUID;
 public class JwtService {
 
     private static final String CLAIM_TYPE = "type";
-    private static final String CLAIM_USER_ID = "userId";
-    private static final String CLAIM_PAPEL = "papel";
     private static final String TYPE_ACCESS = "access";
     private static final String TYPE_REFRESH = "refresh";
 
@@ -106,8 +104,6 @@ public class JwtService {
         return Jwts.builder()
                 .id(UUID.randomUUID().toString())
                 .subject(user.getEmail())
-                .claim(CLAIM_USER_ID, user.getId())
-                .claim(CLAIM_PAPEL, user.getPapel() == null ? "USER" : user.getPapel().name())
                 .claim(CLAIM_TYPE, type)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(expirationMs)))

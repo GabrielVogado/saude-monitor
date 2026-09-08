@@ -16,6 +16,7 @@ import br.com.saude_monitor.api.user.dto.UserRequest;
 import br.com.saude_monitor.api.user.dto.UserResponse;
 import br.com.saude_monitor.api.user.repository.UserRepository;
 import br.com.saude_monitor.api.user.service.UserService;
+import br.com.saude_monitor.api.user.util.EmailNormalizer;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +31,6 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -62,7 +62,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserResponse saveUser(UserRequest request) {
         var now = Instant.now();
-        var normalizedEmail = normalizeEmail(request.email());
+        var normalizedEmail = EmailNormalizer.normalizar(request.email());
 
         if (userRepository.findByEmail(normalizedEmail).isPresent()) {
             throw new ConflitoException("Email já cadastrado.");
@@ -244,9 +244,5 @@ public class UserServiceImpl implements UserService {
                 .localizacao(ConsentimentoItem.builder().aceito(false).data(null).versao(null).build())
                 .notificacoes(ConsentimentoItem.builder().aceito(false).data(null).versao(null).build())
                 .build();
-    }
-
-    private String normalizeEmail(String email) {
-        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 }

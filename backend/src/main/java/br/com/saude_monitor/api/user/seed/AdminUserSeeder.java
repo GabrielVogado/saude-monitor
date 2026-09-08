@@ -3,6 +3,7 @@ package br.com.saude_monitor.api.user.seed;
 import br.com.saude_monitor.api.user.document.Papel;
 import br.com.saude_monitor.api.user.document.UserDocument;
 import br.com.saude_monitor.api.user.repository.UserRepository;
+import br.com.saude_monitor.api.user.util.EmailNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -54,7 +55,7 @@ public class AdminUserSeeder implements ApplicationRunner {
 
         UserDocument admin = UserDocument.builder()
                 .fullName(properties.nome())
-                .email(properties.email().trim().toLowerCase())
+                .email(EmailNormalizer.normalizar(properties.email()))
                 .senhaHash(passwordEncoder.encode(properties.senha()))
                 .papel(Papel.ADMIN)
                 .active(true)

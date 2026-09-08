@@ -6,8 +6,10 @@
  * conforme já feitos em `jest.setup.js`, e valida a árvore de acessibilidade da tab bar.
  */
 import React from "react";
-import { render, screen } from "@testing-library/react-native";
+import { render, screen, act } from "@testing-library/react-native";
+import * as Notifications from "expo-notifications";
 import App from "../../../App";
+import * as FeedbackNotificationService from "../../screens/feedback/service/FeedbackNotificationService";
 
 // @maplibre/maplibre-react-native: expõe componentes nativos (MapLibre) não
 // suportados pelo Jest; substituímos por Views textuais para o smoke test.
@@ -125,5 +127,56 @@ describe("App — Bottom Tabs (E6-01)", () => {
     expect(abaPerfil).toBeOnTheScreen();
     expect(abaInicio).toBeOnTheScreen();
     expect(abaMapa).toBeOnTheScreen();
+  });
+});
+
+describe("App — abrir formulário a partir da notificação de feedback (RN-09)", () => {
+  /** Captura o callback registrado em Notifications.addNotificationResponseReceivedListener. */
+  function callbackDeResposta() {
+    const chamada = Notifications.addNotificationResponseReceivedListener.mock.calls.at(-1);
+    return chamada[0];
+  }
+
+  function respostaDeNotificacao(data) {
+    return { notification: { request: { content: { data } } } };
+  }
+
+  test("pendência dentro da janela de 24h abre o formulário de feedback", async () => {
+    jest.spyOn(FeedbackNotificationService, "feedbackAvaliavel").mockResolvedValue(true);
+    jest.spyOn(FeedbackNotificationService, "pendenciaAtual").mockResolvedValue({
+      visitaId: "v1",
+      hospitalNome: "Hospital Central",
+    });
+    jest.spyOn(FeedbackNotificationService, "agendarLembrete").mockResolvedValue(undefined);
+
+    render(<App />);
+    const tratarResposta = callbackDeResposta();
+
+    await act(async () => {
+      await tratarResposta(respostaDeNotificacao({ abrirFeedback: true, visitaId: "v1" }));
+    });
+
+    expect(await screen.findByText("Você passou pela triagem?")).toBeOnTheScreen();
+  });
+
+  test("pendência vencida (>24h) não abre o formulário — RN-09", async () => {
+    // Achado da auditoria de código morto (08/09/2026): a notificação pode ficar
+    // parada na bandeja além da janela de 24h; antes desta correção, tocá-la ainda
+    // abria o formulário, que só falhava ao enviar (backend responde 404).
+    jest.spyOn(FeedbackNotificationService, "feedbackAvaliavel").mockResolvedValue(false);
+    const pendenciaAtualSpy = jest.spyOn(FeedbackNotificationService, "pendenciaAtual");
+    const agendarLembreteSpy = jest.spyOn(FeedbackNotificationService, "agendarLembrete");
+
+    render(<App />);
+    const tratarResposta = callbackDeResposta();
+
+    await act(async () => {
+      await tratarResposta(respostaDeNotificacao({ abrirFeedback: true, visitaId: "v1" }));
+    });
+
+    expect(screen.queryByText("Você passou pela triagem?")).toBeNull();
+    expect(screen.getByText("Início")).toBeOnTheScreen();
+    expect(pendenciaAtualSpy).not.toHaveBeenCalled();
+    expect(agendarLembreteSpy).not.toHaveBeenCalled();
   });
 });

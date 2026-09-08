@@ -1,6 +1,7 @@
 import { buildApiUrl } from "../../../config/api";
 import { classificarErroDeRede, fetchComRetry, fetchComTimeout } from "../../../config/http";
 import TokenStorage from "../../../services/TokenStorage";
+import { pararGeofencing } from "../../visitas/service/GeofencingTaskService";
 
 const BASE_PATH = "/api/v1/auth";
 
@@ -122,6 +123,13 @@ class LoginService {
       }
     }
 
+    try {
+      await pararGeofencing();
+    } catch {
+      // best-effort, mesmo padrão da revogação acima: o logout local não pode
+      // ficar bloqueado por uma falha ao parar o monitoramento nativo.
+    }
+
     await TokenStorage.limparTokens();
   }
 
@@ -165,6 +173,13 @@ class LoginService {
         data?.message ||
         `Falha ao excluir a conta (HTTP ${response.status}).`;
       throw new Error(message);
+    }
+
+    try {
+      await pararGeofencing();
+    } catch {
+      // best-effort: a conta já foi excluída no servidor: não bloquear a
+      // limpeza local por falha ao parar o monitoramento nativo.
     }
 
     await TokenStorage.limparTokens();

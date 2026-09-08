@@ -15,15 +15,13 @@ import HospitaisScreen from "./src/screens/hospitais/view/HospitaisScreen.js";
 import HospitalDetalheScreen from "./src/screens/hospitais/view/HospitalDetalheScreen.js";
 import RankingScreen from "./src/screens/hospitais/view/RankingScreen.js";
 import SugerirHospitalScreen from "./src/screens/hospitais/view/SugerirHospitalScreen.js";
-import SugestoesPendentesScreen from "./src/screens/hospitais/view/SugestoesPendentesScreen.js";
-import RevisarSugestaoScreen from "./src/screens/hospitais/view/RevisarSugestaoScreen.js";
 import FeedbackFormScreen from "./src/screens/feedback/view/FeedbackFormScreen.js";
 import PerfilScreen from "./src/screens/perfil/view/PerfilScreen.js";
 import HistoricoScreen from "./src/screens/perfil/view/HistoricoScreen.js";
 import PrivacidadeScreen from "./src/screens/perfil/view/PrivacidadeScreen.js";
 import NotificacoesScreen from "./src/screens/perfil/view/NotificacoesScreen.js";
 import {colors} from "./src/theme";
-import { agendarLembrete, pendenciaAtual } from "./src/screens/feedback/service/FeedbackNotificationService";
+import { agendarLembrete, feedbackAvaliavel, pendenciaAtual } from "./src/screens/feedback/service/FeedbackNotificationService";
 import { sincronizar } from "./src/services/SincronizacaoOffline";
 
 const Stack = createNativeStackNavigator();
@@ -48,8 +46,6 @@ function HospitaisStack() {
             <Stack.Screen name="HospitalDetalhe" component={HospitalDetalheScreen} />
             <Stack.Screen name="Ranking" component={RankingScreen} />
             <Stack.Screen name="SugerirHospital" component={SugerirHospitalScreen} />
-            <Stack.Screen name="SugestoesPendentes" component={SugestoesPendentesScreen} />
-            <Stack.Screen name="RevisarSugestao" component={RevisarSugestaoScreen} />
         </Stack.Navigator>
     );
 }
@@ -160,6 +156,13 @@ export default function App() {
         const tratarResposta = async (resposta) => {
             const data = resposta?.notification?.request?.content?.data;
             if (!data?.abrirFeedback || !data?.visitaId) {
+                return;
+            }
+            // RN-09: a notificação pode ficar parada na bandeja além das 24h da
+            // janela de resposta (ex.: aparelho desligado). Sem este check, o app
+            // abria o formulário mesmo vencido e o usuário só descobria ao tentar
+            // enviar (o backend responde 404 — achado da auditoria de 08/09/2026).
+            if (!(await feedbackAvaliavel())) {
                 return;
             }
             const pendencia = await pendenciaAtual();

@@ -150,7 +150,7 @@ formulário inteiro e só descobrir que expirou ao tentar enviar (o backend resp
 salva, evitando abrir um formulário que vai falhar de antemão.
 
 ### P1.3 — "Esqueci minha senha" sem `onPress`
-**Arquivo:** `frontend/src/screens/login/view/LoginScreen.js:121-126`
+**Arquivo:** `frontend/src/screens/auth/view/LoginScreen.js:121-126`
 **Decisão do PO:** remover o link agora; recuperação de senha vira item de backlog futuro.
 
 ### P1.4 — Botão "Voltar" do cadastro sem `onPress` e com ícone trocado
@@ -201,7 +201,8 @@ Remoção direta, sem mudança de comportamento:
 - `CSHospitalCard.distanciaKm` — nenhum dos dois chamadores (`HospitaisScreen`, `RankingScreen`) passa
   essa prop.
 - `CSRatingStars.showLabel`/`labelMap` — nenhum dos dois usos do componente ativa esse rótulo.
-- `CSHeader.subtitle` — nenhum dos 9 usos do componente passa essa prop.
+- `CSHeader.subtitle` — nenhum dos 12 usos do componente (`grep -rc "<CSHeader" frontend/src`,
+  fora de `__tests__`, commit-base `27ee9e6`) passa essa prop.
 
 ---
 

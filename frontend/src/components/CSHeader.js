@@ -7,7 +7,7 @@ import { colors, spacing, touchTarget, typography } from "../theme/tokens";
  * Header padrão (sem borda inferior — regra "no-line").
  * Back opcional (CSIconButton 48), título centralizado e ação direita opcional.
  */
-export default function CSHeader({ title, onBack, rightAction, subtitle }) {
+export default function CSHeader({ title, onBack, rightAction }) {
   return (
     <View style={styles.container}>
       <View style={styles.side}>
@@ -27,11 +27,6 @@ export default function CSHeader({ title, onBack, rightAction, subtitle }) {
         <Text style={styles.title} numberOfLines={1}>
           {title}
         </Text>
-        {subtitle ? (
-          <Text style={styles.subtitle} numberOfLines={1}>
-            {subtitle}
-          </Text>
-        ) : null}
       </View>
 
       <View style={styles.side}>
@@ -72,11 +67,6 @@ const styles = StyleSheet.create({
   title: {
     ...typography.titleLg,
     color: colors.onSurface,
-    textAlign: "center",
-  },
-  subtitle: {
-    ...typography.bodySm,
-    color: colors.onSurfaceVariant,
     textAlign: "center",
   },
 });

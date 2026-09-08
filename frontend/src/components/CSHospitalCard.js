@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Building2 } from "lucide-react-native";
 import { colors, radii, shadows, spacing, typography } from "../theme/tokens";
 import { formatarDuracao, formatarNota } from "../utils/format";
+import { avaliacaoSuficiente } from "../utils/indicadores";
 import CSRatingStars from "./CSRatingStars";
 import CSBadge from "./CSBadge";
 
@@ -29,7 +30,6 @@ const CATEGORIA_LABEL = {
 function CSHospitalCard({
   hospital,
   onPress,
-  distanciaKm,
   onCheckin,
   checkinLoading,
   checkinAtivo,
@@ -43,10 +43,7 @@ function CSHospitalCard({
   const aoTocarCheckin = useCallback(() => onCheckin?.(hospital), [onCheckin, hospital]);
 
   const indicadores = hospital?.indicadores;
-  const temIndicadores =
-    indicadores?.notaMedia !== null &&
-    indicadores?.notaMedia !== undefined &&
-    indicadores?.nAvaliacoes >= 5;
+  const temIndicadores = avaliacaoSuficiente(indicadores);
   const tipoLabel = TIPO_LABEL[hospital?.tipo] || hospital?.tipo || "Hospital";
   const categoriaLabel = CATEGORIA_LABEL[hospital?.categoria] || hospital?.categoria;
   const tipoUnidade =
@@ -78,9 +75,6 @@ function CSHospitalCard({
             )}
             {tipoLabel && categoriaLabel ? (
               <CSBadge label={tipoLabel} variant="neutral" />
-            ) : null}
-            {distanciaKm !== null && distanciaKm !== undefined ? (
-              <Text style={styles.distance}>{distanciaKm.toFixed(1)} km</Text>
             ) : null}
           </View>
           {tipoUnidade ? (
@@ -177,10 +171,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     alignItems: "center",
     gap: spacing.s2,
-  },
-  distance: {
-    ...typography.bodySm,
-    color: colors.onSurfaceVariant,
   },
   unitType: {
     ...typography.bodySm,

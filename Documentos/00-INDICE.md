@@ -133,6 +133,7 @@ Documentos/
 | 12 | [Relatório de Auditoria Técnica](./08-analise%20tecnica/relatorio_auditoria_tecnica.md) | **3.1** | 🟡 Proposta | 11 problemas de arquitetura do frontend. A v3.1 declara o commit-base e **corrige 3 afirmações** que não se sustentaram na reverificação. |
 | 13 | [ADRs](./08-analise%20tecnica/adrs.md) | **3.1** | 🟡 Proposta | ADR-001..ADR-010 em formato MADR, **todos em status `Proposto`**. Precedência revista: entram depois da Sprint S10. |
 | 14 | [Pendências do Épico 01](./05-features/Pendencias-Epico-01.md) | — | 🟡 Aberto | Débitos do ETL CNES/DATASUS. As 2 divergências de contrato abertas desde 20/08/2026 foram fechadas em 06/09/2026 (E8-14). |
+| 15 | [Auditoria — Código Morto, Lógica Ambígua e Erros Silenciosos](./08-analise%20tecnica/Auditoria-Codigo-Morto-Logica-Ambigua-Erros-Silenciosos-v1.0.md) | 1.0 | 🟡 Em correção | 19 achados (backend + frontend) com plano de correção priorizado P0–P3 e status por item. Commit-base `27ee9e6`. |
 
 ---
 

@@ -19,6 +19,7 @@ import HospitalDetalheScreen from "../../../screens/hospitais/view/HospitalDetal
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
 import VisitaService from "../../../screens/visitas/service/VisitaService";
 import { agendarFeedback } from "../../../screens/feedback/service/FeedbackNotificationService";
+import CSBadge from "../../../components/CSBadge";
 
 jest.mock("../../../screens/hospitais/service/HospitalService");
 jest.mock("../../../screens/visitas/service/VisitaService");
@@ -189,11 +190,16 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
       nAvaliacoes: 2,
     });
 
-    renderizar();
+    const { UNSAFE_getAllByType } = renderizar();
     await screen.findByText("Hospital Central");
-    expect(
-      screen.getByText(/Ainda sem avaliações suficientes/)
-    ).toBeTruthy();
+
+    // Verifica o componente, não só o texto: um Text solto (o que existia antes)
+    // faria este teste passar mesmo sem o tratamento visual do CSBadge de aviso.
+    const badge = UNSAFE_getAllByType(CSBadge).find((no) =>
+      no.props.label.startsWith("Ainda sem avaliações suficientes")
+    );
+    expect(badge).toBeTruthy();
+    expect(badge.props.variant).toBe("warning");
   });
 
   test("falha ao buscar indicadores dedicados usa o fallback embutido no hospital", async () => {

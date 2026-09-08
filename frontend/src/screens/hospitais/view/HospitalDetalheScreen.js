@@ -387,10 +387,10 @@ export default function HospitalDetalheScreen({ navigation, route }) {
               ) : null}
             </View>
           ) : (
-            <Text style={styles.semIndicadores}>
-              Ainda sem avaliações suficientes — os indicadores aparecem após pelo menos 5
-              avaliações.
-            </Text>
+            <CSBadge
+              label="Ainda sem avaliações suficientes — aparecem após pelo menos 5"
+              variant="warning"
+            />
           )}
         </CSCard>
       </ScrollView>
@@ -493,12 +493,14 @@ const styles = StyleSheet.create({
     color: colors.onSurfaceVariant,
   },
   metricRow: {
+    // Regra "no-line" do Padrao-UI-UX-v2.0 (§5.3/5.5): separação de seções nunca por
+    // hairline — sempre espaço ou troca de tom. Era `borderTopWidth: 1`.
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: spacing.s3,
-    borderTopWidth: 1,
-    borderTopColor: colors.surfaceContainer,
+    padding: spacing.s3,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceContainerLow,
   },
   metricLabel: {
     ...typography.bodyMd,
@@ -514,10 +516,6 @@ const styles = StyleSheet.create({
   },
   transparencia: {
     ...typography.bodySm,
-    color: colors.onSurfaceVariant,
-  },
-  semIndicadores: {
-    ...typography.bodyMd,
     color: colors.onSurfaceVariant,
   },
 });

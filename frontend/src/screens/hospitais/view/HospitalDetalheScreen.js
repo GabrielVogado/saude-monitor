@@ -411,10 +411,9 @@ export default function HospitalDetalheScreen({ navigation, route }) {
               ) : null}
             </View>
           ) : (
-            <CSBadge
-              label="Ainda sem avaliações suficientes — aparecem após pelo menos 5 avaliações"
-              variant="warning"
-            />
+            <Text style={styles.semIndicadores}>
+              Ainda sem avaliações suficientes — aparecem após pelo menos 5 avaliações
+            </Text>
           )}
         </CSCard>
       </ScrollView>
@@ -543,6 +542,10 @@ const styles = StyleSheet.create({
   },
   transparencia: {
     ...typography.bodySm,
+    color: colors.onSurfaceVariant,
+  },
+  semIndicadores: {
+    ...typography.bodyMd,
     color: colors.onSurfaceVariant,
   },
 });

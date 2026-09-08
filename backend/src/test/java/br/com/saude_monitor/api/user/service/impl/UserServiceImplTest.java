@@ -1,7 +1,7 @@
 package br.com.saude_monitor.api.user.service.impl;
 
 import br.com.saude_monitor.api.agregado.service.AgregadoService;
-import br.com.saude_monitor.api.auth.repository.AuthRepository;
+import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
 import br.com.saude_monitor.api.config.exception.ValidacaoNegocioException;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
@@ -49,21 +49,18 @@ class UserServiceImplTest {
 
     private UserServiceImpl userService;
     private UserRepository userRepository;
-    private AuthRepository authRepository;
     private MongoTemplate mongoTemplate;
     private AgregadoService agregadoService;
 
     @BeforeEach
     void setup() {
         userRepository = mock(UserRepository.class);
-        authRepository = mock(AuthRepository.class);
         mongoTemplate = mock(MongoTemplate.class);
         agregadoService = mock(AgregadoService.class);
 
         userService = new UserServiceImpl(
                 userRepository,
                 new BCryptPasswordEncoder(),
-                authRepository,
                 mongoTemplate,
                 agregadoService);
     }
@@ -92,7 +89,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    void deveExcluirUsuarioEAuthEAnonimizarVisitasEFeedbacks() {
+    void deveExcluirUsuarioEAnonimizarVisitasEFeedbacks() {
         UserDocument user = usuario("u1");
         when(userRepository.findById("u1")).thenReturn(Optional.of(user));
         when(mongoTemplate.find(any(Query.class), eq(VisitaDocument.class)))
@@ -107,7 +104,6 @@ class UserServiceImplTest {
                 eq(VisitaDocument.class));
         verify(mongoTemplate).updateMulti(any(Query.class), any(),
                 eq(FeedbackDocument.class));
-        verify(authRepository).deleteByUser_Id("u1");
         verify(userRepository).delete(user);
     }
 
@@ -127,6 +123,21 @@ class UserServiceImplTest {
         ConsentimentoItem termos = captor.getValue().getConsentimentos().getTermosUso();
         assertTrue(termos.isAceito());
         assertEquals("1.0", termos.getVersao());
+    }
+
+    @Test
+    void deveRejeitarCadastroComEmailJaCadastradoComoConflito() {
+        // Antes retornava UserResponse(success=false) com 201 Created no controller —
+        // um cliente que decide por status HTTP via um cadastro duplicado como sucesso.
+        // Alinhado ao resto do domínio (hospital/CNPJ/feedback duplicado): 409 CONFLITO.
+        when(userRepository.findByEmail("marina@email.com"))
+                .thenReturn(Optional.of(usuario("u1")));
+
+        UserRequest request = new UserRequest("Marina Souza", "marina@email.com", "S3nh@Forte!",
+                "(11) 99999-0000", new ConsentimentoRequest(true, "1.0"));
+
+        assertThrows(ConflitoException.class, () -> userService.saveUser(request));
+        verify(userRepository, never()).save(any(UserDocument.class));
     }
 
     @Test

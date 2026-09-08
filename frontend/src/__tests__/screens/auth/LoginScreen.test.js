@@ -29,7 +29,7 @@ function preencherCredenciais(email = "ana@exemplo.com", senha = "segredo123") {
 }
 
 function tocarEntrar() {
-  fireEvent.press(screen.getByLabelText("Entrar no sistema"));
+  fireEvent.press(screen.getByLabelText("Entrar"));
 }
 
 describe("LoginScreen", () => {
@@ -152,7 +152,7 @@ describe("LoginScreen", () => {
     // Com a requisição em voo o botão precisa travar: sem isso, um toque duplo em
     // conexão lenta dispara dois POST /auth/login e cunha dois pares de tokens. A
     // suíte anterior só olhava o estado DEPOIS da falha.
-    const emVoo = await screen.findByLabelText("Entrando no sistema");
+    const emVoo = await screen.findByLabelText("Entrando");
     expect(emVoo.props.accessibilityState).toEqual({ disabled: true, busy: true });
 
     fireEvent.press(emVoo);
@@ -167,15 +167,15 @@ describe("LoginScreen", () => {
     // prop: é o único ponto onde o defeito é observável.
     const botao = screen
       .UNSAFE_getAllByType(TouchableOpacity)
-      .find((no) => no.props.accessibilityLabel === "Entrando no sistema");
+      .find((no) => no.props.accessibilityLabel === "Entrando");
     expect(botao.props.disabled).toBe(true);
 
     liberar();
     await waitFor(() => expect(Alert.alert).toHaveBeenCalled());
 
-    // Se o `finally` não rodasse, o rótulo continuaria "Entrando no sistema" e o
+    // Se o `finally` não rodasse, o rótulo continuaria "Entrando" e o
     // usuário ficaria preso numa tela travada após um erro de rede.
-    expect(screen.getByLabelText("Entrar no sistema")).toBeTruthy();
+    expect(screen.getByLabelText("Entrar")).toBeTruthy();
 
     LoginService.login.mockResolvedValueOnce({ accessToken: "t" });
     tocarEntrar();
@@ -217,5 +217,17 @@ describe("LoginScreen", () => {
     fireEvent.press(screen.getByLabelText("Política de Privacidade"));
 
     expect(NAVEGACAO.navigate).toHaveBeenCalledWith("Privacidade");
+  });
+
+  test("'Continuar sem conta' volta sem exigir login — a jornada principal é anônima", () => {
+    // Padrao-UI-UX v2.0 §4.4: a conta é opcional. Sem este botão, a tela de Login
+    // se comporta como um gate obrigatório e não como um passo dispensável.
+    const navegacaoComVolta = { ...NAVEGACAO, goBack: jest.fn() };
+    render(<LoginScreen navigation={navegacaoComVolta} />);
+
+    fireEvent.press(screen.getByLabelText("Continuar sem conta"));
+
+    expect(navegacaoComVolta.goBack).toHaveBeenCalledTimes(1);
+    expect(navegacaoComVolta.navigate).not.toHaveBeenCalled();
   });
 });

@@ -132,7 +132,7 @@ export default function LoginScreen({navigation}) {
                                 onPress={handleLogin}
                                 disabled={loading}
                                 accessibilityRole="button"
-                                accessibilityLabel={loading ? "Entrando no sistema" : "Entrar no sistema"}
+                                accessibilityLabel={loading ? "Entrando" : "Entrar"}
                                 accessibilityState={{disabled: loading, busy: loading}}
                             >
                                 <Text style={styles.loginButtonText}>

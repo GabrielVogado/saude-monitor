@@ -215,8 +215,12 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   }
 
   const dadosIndicadores = indicadores || hospital.indicadores;
+  // Mesmo critério do CSHospitalCard (nAvaliacoes >= 5): sem isso o mesmo hospital
+  // mostra "sem avaliações suficientes" na lista mas nota real no detalhe, contrariando
+  // o texto do badge "aparecem após pelo menos 5 avaliações".
   const temIndicadores =
     dadosIndicadores?.indicadoresDisponiveis !== false &&
+    dadosIndicadores?.nAvaliacoes >= 5 &&
     dadosIndicadores?.notaMedia !== null &&
     dadosIndicadores?.notaMedia !== undefined;
 

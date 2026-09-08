@@ -202,6 +202,29 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     expect(badge.props.variant).toBe("warning");
   });
 
+  test("nota com menos de 5 avaliações também é insuficiente (mesmo critério do card)", async () => {
+    // Caso limítrofe apontado no code-review: nota real mas nAvaliacoes < 5. Antes, o
+    // detalhe mostrava a nota enquanto o card da lista mostrava o badge de aviso — o
+    // mesmo hospital em dois estados contraditórios. Alinhado ao critério nAvaliacoes >= 5.
+    HospitalService.buscarIndicadores.mockResolvedValue({
+      hospitalId: "h1",
+      indicadoresDisponiveis: true,
+      notaMedia: 4.2,
+      nAvaliacoes: 3,
+    });
+
+    const { UNSAFE_getAllByType } = renderizar();
+    await screen.findByText("Hospital Central");
+
+    const badge = UNSAFE_getAllByType(CSBadge).find((no) =>
+      no.props.label.startsWith("Ainda sem avaliações suficientes")
+    );
+    expect(badge).toBeTruthy();
+    expect(badge.props.variant).toBe("warning");
+    expect(screen.queryByText("4,2")).toBeNull();
+    expect(screen.queryByText("3 avaliações")).toBeNull();
+  });
+
   test("falha ao buscar indicadores dedicados usa o fallback embutido no hospital", async () => {
     HospitalService.buscarIndicadores.mockRejectedValue(new Error("indisponível"));
     HospitalService.buscarPorId.mockResolvedValue({ ...HOSPITAL, indicadores: INDICADORES });

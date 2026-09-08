@@ -66,10 +66,7 @@ const styles = StyleSheet.create({
         marginBottom: spacing.s1 + 1,
     },
     topicIcon: {
-        width: 20,
-        height: 20,
         marginRight: spacing.s2,
-        resizeMode: "contain",
     },
     topicTitle: {
         ...typography.titleMd,

@@ -1,7 +1,6 @@
 import React, {useState} from "react";
 import {
     Alert,
-    Image,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -11,7 +10,7 @@ import {
     View,
 } from "react-native";
 import {SafeAreaView} from "react-native-safe-area-context";
-import {Globe, HelpCircle, Lock, Share2, ShieldCheck} from "lucide-react-native";
+import {HeartHandshake, Lock, Mail, ShieldCheck, Users} from "lucide-react-native";
 import LoginService from "../service/LoginService";
 import {colors} from "../../../theme";
 import styles from "./css/LoginStyle";
@@ -59,23 +58,19 @@ export default function LoginScreen({navigation}) {
 
                     {/* Header */}
                     <View style={styles.header}>
-                        <Text style={styles.headerTitle}>Hospital Monitor</Text>
+                        <Text style={styles.headerTitle}>Clinical Sanctuary</Text>
                     </View>
 
                     {/* Main Card */}
                     <View style={styles.card}>
 
-                        {/* Doctor GIF */}
                         <View style={styles.imageContainer}>
-                            <Image
-                                source={require("../../../../assets/img/doutor.gif")}
-                                style={styles.doctorImage}
-                            />
+                            <HeartHandshake size={44} color={colors.primary} />
                         </View>
 
-                        <Text style={styles.title}>Acessar painel hospitalar</Text>
+                        <Text style={styles.title}>Sua conta</Text>
                         <Text style={styles.subtitle}>
-                            Entre com suas credenciais institucionais para acessar o painel.
+                            Entre para acompanhar seu histórico de visitas e suas avaliações.
                         </Text>
 
                         {/* Form */}
@@ -84,14 +79,11 @@ export default function LoginScreen({navigation}) {
                             {/* Email */}
                             <Text style={styles.label}>E-MAIL OU USUÁRIO</Text>
                             <View style={styles.inputContainer}>
-                                <Image
-                                    source={require("../../../../assets/img/pessoa.png")}
-                                    style={styles.inputIcon}
-                                />
+                                <Mail size={20} color={colors.outline} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="E-mail ou Nome de Usuario"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholderTextColor={colors.outline}
                                     value={email}
                                     onChangeText={setEmail}
                                     keyboardType="email-address"
@@ -102,14 +94,11 @@ export default function LoginScreen({navigation}) {
                             {/* Senha */}
                             <Text style={styles.label}>SENHA</Text>
                             <View style={styles.inputContainer}>
-                                <Image
-                                    source={require("../../../../assets/img/cadeado.png")}
-                                    style={styles.inputIcon}
-                                />
+                                <Lock size={20} color={colors.outline} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="••••••••"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholderTextColor={colors.outline}
                                     value={password}
                                     onChangeText={setPassword}
                                     secureTextEntry
@@ -147,9 +136,22 @@ export default function LoginScreen({navigation}) {
                                 accessibilityState={{disabled: loading, busy: loading}}
                             >
                                 <Text style={styles.loginButtonText}>
-                                    {loading ? "Entrando..." : "Entrar no sistema ➜"}
+                                    {loading ? "Entrando…" : "Entrar"}
                                 </Text>
                             </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.semContaButton}
+                                onPress={() => navigation.goBack?.()}
+                                accessibilityRole="button"
+                                accessibilityLabel="Continuar sem conta"
+                            >
+                                <Text style={styles.semContaText}>Continuar sem conta</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.semContaHelper}>
+                                Você pode usar o app sem se cadastrar. A conta serve só para guardar
+                                seu histórico e suas avaliações.
+                            </Text>
                         </View>
 
                         {/* Compliance Info */}
@@ -158,9 +160,8 @@ export default function LoginScreen({navigation}) {
                                 <ShieldCheck size={18} color={colors.primary} />
                             </View>
                             <Text style={styles.complianceText}>
-                                Este sistema utiliza geolocalização seguindo as diretrizes da{" "}
-                                <Text style={styles.complianceHighlight}>LGPD</Text>
-                                . Ao continuar, você concorda com o uso de seus dados para monitoramento da experiência hospitalar.
+                                Suas avaliações são anônimas e agregadas por hospital, seguindo a{" "}
+                                <Text style={styles.complianceHighlight}>LGPD</Text>.
                             </Text>
                         </View>
                     </View>
@@ -168,42 +169,22 @@ export default function LoginScreen({navigation}) {
                     {/* Security Badges */}
                     <View style={styles.securityBadges}>
                         <View style={styles.badgeItem}>
-                            <Lock size={14} color={colors.onSurfaceVariant} />
-                            <Text style={styles.badgeText}>END-TO-END ENCRYPTED</Text>
+                            <ShieldCheck size={14} color={colors.onSurfaceVariant} />
+                            <Text style={styles.badgeText}>LGPD</Text>
                         </View>
                         <View style={styles.badgeItem}>
-                            <ShieldCheck size={14} color={colors.onSurfaceVariant} />
-                            <Text style={styles.badgeText}>LGPD COMPLIANT</Text>
+                            <Lock size={14} color={colors.onSurfaceVariant} />
+                            <Text style={styles.badgeText}>Criptografia ponta a ponta</Text>
+                        </View>
+                        <View style={styles.badgeItem}>
+                            <Users size={14} color={colors.onSurfaceVariant} />
+                            <Text style={styles.badgeText}>Dados anônimos e agregados</Text>
                         </View>
                     </View>
 
-                    {/* Social / Support Icons */}
-                    <View style={styles.socialIcons}>
-                        <View style={styles.iconWrapper}>
-                            <TouchableOpacity style={styles.socialBtn} accessibilityRole="button" accessibilityLabel="Site global">
-                                <Globe size={24} color={colors.onSurface} />
-                            </TouchableOpacity>
-                            <Text style={styles.iconLabel}>GLOBAL</Text>
-                        </View>
-                        <View style={styles.iconWrapper}>
-                            <TouchableOpacity style={styles.socialBtn} accessibilityRole="button" accessibilityLabel="Partilhar">
-                                <Share2 size={24} color={colors.onSurface} />
-                            </TouchableOpacity>
-                            <Text style={styles.iconLabel}>PARTILHAR</Text>
-                        </View>
-                        <View style={styles.iconWrapper}>
-                            <TouchableOpacity style={styles.socialBtn} accessibilityRole="button" accessibilityLabel="Suporte">
-                                <HelpCircle size={24} color={colors.onSurface} />
-                            </TouchableOpacity>
-                            <Text style={styles.iconLabel}>SUPORTE</Text>
-                        </View>
-                    </View>
-
-                    {/* Simple Footer Links */}
+                    {/* Footer */}
                     <View style={styles.simpleFooter}>
                         <Text style={styles.simpleFooterLink}>Termos</Text>
-                        <View style={styles.dot} />
-                        <Text style={styles.simpleFooterLink}>Cookies</Text>
                         <View style={styles.dot} />
                         <TouchableOpacity onPress={() => navigation.navigate?.("Privacidade")} accessibilityRole="link" accessibilityLabel="Política de Privacidade">
                             <Text style={styles.link}>Privacidade</Text>

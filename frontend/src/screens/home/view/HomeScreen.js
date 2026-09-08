@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Image, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
+import { MapPin, MessageCircle, ShieldCheck } from "lucide-react-native";
 import styles from "./css/HomeStyle";
+import { colors } from "../../../theme";
 import VisitaService from "../../visitas/service/VisitaService";
 import { iniciarGeofencing, sincronizarVisitaAtiva } from "../../visitas/service/GeofencingTaskService";
 import { iniciarHeartbeat, pararHeartbeat } from "../../visitas/service/HeartbeatService";
@@ -64,63 +66,68 @@ export default function HomeScreen() {
             >
                 {/* Headline destacada */}
                 <Text style={styles.headline}>
-                    MONITORE A EXPERIÊNCIA{" "}
-                    <Text style={styles.highlight}>HOSPITALAR</Text>{" "}
-                    EM TEMPO REAL
+                    CUIDAMOS DE VOCÊ{" "}
+                    <Text style={styles.highlight}>ANTES, DURANTE E DEPOIS</Text>{" "}
+                    DA VISITA
                 </Text>
 
                 {/* Texto explicativo */}
                 <Text style={styles.description}>
-                    Nosso sistema oferece visibilidade total sobre a jornada do paciente.
-                    Visualize lotação, tempos de espera e realize check-in/check-out
-                    automáticos através de geolocalização precisa (GPS, BLE, beacons),
-                    integrando dashboards em tempo real para uma gestão hospitalar eficiente.
+                    Quando você chega a um hospital, a gente percebe sozinho — sem precisar
+                    abrir o app. Na saída, pedimos sua opinião em menos de um minuto. Assim,
+                    todo mundo pode ver quais hospitais atendem melhor.
                 </Text>
 
                 {/* Tópicos com ícones e descrição (E6-03: imagens decorativas ocultas do leitor) */}
                 <View style={styles.topicsContainer}>
                     <View style={styles.topicBlock}>
                         <View style={styles.topicHeader}>
-                            <Image
-                                source={require("../../../../assets/img/grafico-de-pizza.png")}
+                            <MapPin
+                                size={20}
+                                color={colors.primary}
                                 style={styles.topicIcon}
                                 importantForAccessibility="no"
                                 accessibilityElementsHidden
                             />
-                            <Text style={styles.topicTitle}>Analytics de Lotação</Text>
+                            <Text style={styles.topicTitle}>Detecção automática</Text>
                         </View>
                         <Text style={styles.topicDescription}>
-                            Veja lotação e tempo de espera por setor do hospital em dashboards dinâmicos.
+                            Assim que você entra num hospital, o app percebe sozinho e começa a
+                            contar o tempo — você não precisa apertar nada.
                         </Text>
                     </View>
 
                     <View style={styles.topicBlock}>
                         <View style={styles.topicHeader}>
-                            <Image
-                                source={require("../../../../assets/img/localizacao.png")}
+                            <MessageCircle
+                                size={20}
+                                color={colors.primary}
                                 style={styles.topicIcon}
                                 importantForAccessibility="no"
                                 accessibilityElementsHidden
                             />
-                            <Text style={styles.topicTitle}>Geolocalização Automática</Text>
+                            <Text style={styles.topicTitle}>Feedback rápido e opcional</Text>
                         </View>
                         <Text style={styles.topicDescription}>
-                            Acompanhe check-in e check-out automaticamente via sensores de presença e GPS.
+                            Depois da sua visita, perguntamos rapidinho como foi. Leva menos de
+                            um minuto e você pode pular quando quiser.
                         </Text>
                     </View>
 
                     <View style={styles.topicBlock}>
                         <View style={styles.topicHeader}>
-                            <Image
-                                source={require("../../../../assets/img/bubble-chat.png")}
+                            <ShieldCheck
+                                size={20}
+                                color={colors.primary}
                                 style={styles.topicIcon}
                                 importantForAccessibility="no"
                                 accessibilityElementsHidden
                             />
-                            <Text style={styles.topicTitle}>Feedback do Paciente</Text>
+                            <Text style={styles.topicTitle}>Avaliação pública e transparente</Text>
                         </View>
                         <Text style={styles.topicDescription}>
-                            Colete e analise feedbacks estruturados dos pacientes logo após o atendimento.
+                            Veja a nota e o tempo médio de espera de cada hospital, calculados a
+                            partir de avaliações reais de outras pessoas.
                         </Text>
                     </View>
                 </View>

@@ -411,9 +411,7 @@ export default function HospitalDetalheScreen({ navigation, route }) {
               ) : null}
             </View>
           ) : (
-            <Text style={styles.semIndicadores}>
-              Ainda sem avaliações suficientes — aparecem após pelo menos 5 avaliações
-            </Text>
+            <Text style={styles.semIndicadores}>Ainda sem avaliações suficientes</Text>
           )}
         </CSCard>
       </ScrollView>

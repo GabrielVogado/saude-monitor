@@ -23,8 +23,6 @@ public interface HospitalRepository extends MongoRepository<HospitalDocument, St
     /** Hospitais ativos — usado no recálculo em lote dos agregados (Épico 04). */
     List<HospitalDocument> findAllByAtivoTrue();
 
-    boolean existsByCnpj(String cnpj);
-
     Optional<HospitalDocument> findByCnpj(String cnpj);
 
     Optional<HospitalDocument> findByCodigoCnes(String codigoCnes);

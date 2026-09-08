@@ -24,7 +24,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **F0-02** | Autenticação via JWT | **F-02** | ✅ Existente (login/refresh/logout; refresh rotaciona e **logout revoga o refresh na blacklist** — PR `feature/logout-server-revogacao-refresh`) |
 | **F0-03** | Padronizar envelope de erro | **F-09** | ✅ Existente |
 | **F0-04** | Rate limiting | **F-09** | ✅ Existente (PR #24 — login/refresh > 10/min/IP e públicos > 60/min/IP retornam 429 no envelope padrão) |
-| **F0-05** | Exclusão de conta (LGPD) | **F-02**, **F-09** | ✅ Existente (PR #25 — `DELETE /api/v1/contas/exclusao` com cascade: remove user + `auth_logins`, anonimiza visitas/feedbacks e recalcula agregados) |
+| **F0-05** | Exclusão de conta (LGPD) | **F-02**, **F-09** | ✅ Existente (PR #25 — `DELETE /api/v1/contas/exclusao` com cascade: remove user, anonimiza visitas/feedbacks e recalcula agregados; a menção a `auth_logins` era código morto nunca escrito, removido em 08/09/2026 — auditoria de código morto) |
 
 ## Épico 1 — Cadastro de Hospitais e Geofences
 | ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |

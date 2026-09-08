@@ -68,9 +68,7 @@
 | Arquivo existente | Status | Comentário |
 |---|---|---|
 | `AuthController.java` | ✅ Existe | Login/refresh + `POST /api/v1/auth/logout` (revoga refresh na blacklist, F0-02) |
-| `AuthDocument.java` | ✅ Existe | Mongo document OK |
 | `AuthServiceImpl.java` | ✅ **Seguro** | Compara senha via `passwordEncoder.matches`; refresh rotaciona e revoga o anterior; logout idempotente |
-| `AuthRepository.java` | ✅ Existe | `findByEmail` |
 | `UserController.java` | ❌ Removido (v3.4) | Legado `POST /api/user/cadastro` migrado para `POST /api/v1/auth/registro` (`AuthController` §3.1) |
 | `UserDocument.java` | ✅ Existe | Mongo document OK |
 | `UserServiceImpl.java` | ✅ **Seguro** | Salva o usuário codificando a senha via `passwordEncoder.encode()` |
@@ -164,7 +162,7 @@
 | Vulnerabilidade | Localização / Resposta |
 |---|---|
 | **Senha em texto puro** | ❌ (Corrigido/Inexistente - App utiliza BCrypt e JWT) |
-| **Exclusão de Conta / LGPD** | ✅ `DELETE /api/v1/contas/exclusao` (autenticada) — cascade remove user + `auth_logins`, anonimiza visitas/feedbacks e recalcula agregados (F0-05, PR #25) |
+| **Exclusão de Conta / LGPD** | ✅ `DELETE /api/v1/contas/exclusao` (autenticada) — cascade remove user, anonimiza visitas/feedbacks e recalcula agregados (F0-05, PR #25); `AuthDocument`/`auth_logins` eram código morto nunca escrito, removidos em 08/09/2026 |
 | **Erros da API (Envelope)** | ✅ Padronizado (Retorna timestamp, traceId, message) |
 
 ---

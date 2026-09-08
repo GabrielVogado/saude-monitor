@@ -297,7 +297,15 @@ Revoga o refresh token na blacklist (`refresh_tokens_revogados`, TTL até a expi
 #### `DELETE /api/v1/contas/exclusao` 🔒
 Exclui conta e dados pessoais (LGPD). **200** com resumo do que foi removido/anonimizado.
 
-> ✅ **Situação atual (30/08/2026):** implementado (PR #25). Substitui o path anterior `DELETE /api/v1/usuarios/me` por clareza semântica. Cascade: remove `users` + `auth_logins` (`AuthRepository.deleteByUser_Id`), anonimiza `visitas`/`feedbacks` (`usuarioId → null`, `anonimizado=true`) e **recalcula os agregados** afetados (job de 15min cobre falhas).
+> ✅ **Situação atual (30/08/2026):** implementado (PR #25). Substitui o path anterior `DELETE /api/v1/usuarios/me` por clareza semântica. Cascade: remove `users`, anonimiza `visitas`/`feedbacks` (`usuarioId → null`, `anonimizado=true`) e **recalcula os agregados** afetados (job de 15min cobre falhas).
+>
+> ⚠️ **Correção (08/09/2026, auditoria de código morto):** a menção anterior a uma
+> coleção `auth_logins`/`AuthRepository.deleteByUser_Id` no cascade estava errada —
+> essa coleção nunca chegou a ser escrita em nenhum ponto do sistema (login não
+> grava trilha de auditoria própria); a chamada morta e as classes `AuthDocument`/
+> `AuthRepository` foram removidas do código nesta mesma correção. A senha vive
+> apenas como hash no próprio documento `users`, então removê-lo já é suficiente
+> para o dado de autenticação. Ver `Auditoria-Codigo-Morto-Logica-Ambigua-Erros-Silenciosos-v1.0.md`.
 
 #### `GET /api/v1/usuarios/me` ⛔ (removido do contrato)
 > **Decisão (31/08/2026):** removido da especificação — o perfil é servido no payload do `POST /api/v1/auth/login` e persistido localmente (`TokenStorage`). O namespace `me/` foi substituído por **`/api/v1/contas`** (responsabilidade lógica do titular) — ver §3.6.

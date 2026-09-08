@@ -16,6 +16,7 @@ import { colors, spacing } from "../../../theme/tokens";
 import HospitalService from "../service/HospitalService";
 import VisitaService from "../../visitas/service/VisitaService";
 import { normalizeText } from "../../../utils/normalize";
+import { avisarSemConexao, preservarSeSemConexao } from "../../../utils/alertas";
 
 const TIPO_FILTROS = [
   { value: "", label: "Todos" },
@@ -87,10 +88,12 @@ export default function HospitaisScreen({ navigation }) {
 
   // Reidrata a visita ativa ao focar a aba (e ao voltar do detalhe) para refletir o
   // estado do botão de check-in por hospital (modo anônimo via dispositivoId, §3.3).
+  // Sem conexão não é "sem visita ativa" — ver `preservarSeSemConexao`, incluindo a
+  // limitação conhecida sobre a janela entre reconectar e a fila sincronizar.
   const atualizarVisitaAtiva = useCallback(() => {
     VisitaService.buscarAtiva()
       .then((data) => setVisitaAtiva(data?.visita || null))
-      .catch(() => setVisitaAtiva(null));
+      .catch((e) => preservarSeSemConexao(e, setVisitaAtiva));
   }, []);
 
   useFocusEffect(
@@ -129,7 +132,7 @@ export default function HospitaisScreen({ navigation }) {
         } else {
           Alert.alert(
             "Check-in ativo",
-            "Finalize o check-in atual antes de iniciar uma visita em outro hospital."
+            "Você já tem uma visita em andamento em outro hospital. Finalize-a antes de começar outra."
           );
         }
         return;
@@ -162,6 +165,20 @@ export default function HospitaisScreen({ navigation }) {
               { text: "Cancelar", style: "cancel" },
             ]
           );
+          return;
+        }
+        if (e.enfileirado) {
+          // Sem conexão, o check-in foi guardado para sincronizar depois (OPS-05) —
+          // não é uma falha, então o alerta não pode soar como uma. Fica na lista em
+          // vez de navegar para o detalhe, que dependeria da mesma rede indisponível.
+          //
+          // Marca a visita como ativa AQUI, localmente: arma o guard de "uma visita
+          // por vez" (visitaAtivaRef, acima) antes da fila sincronizar. Janela residual
+          // e decisão de aceitá-la documentadas em `preservarSeSemConexao`
+          // (utils/alertas.js) — o `id: null` é substituído pelo real quando
+          // `atualizarVisitaAtiva` rodar de novo (foco da aba).
+          setVisitaAtiva({ id: null, hospitalId: hospital.id, origem: "MANUAL" });
+          avisarSemConexao(e.message);
           return;
         }
         Alert.alert("Check-in", e.message || "Não foi possível fazer o check-in.");

@@ -8,6 +8,7 @@ import { colors } from "../../../theme";
 import VisitaService from "../../visitas/service/VisitaService";
 import { iniciarGeofencing, sincronizarVisitaAtiva } from "../../visitas/service/GeofencingTaskService";
 import { iniciarHeartbeat, pararHeartbeat } from "../../visitas/service/HeartbeatService";
+import { preservarSeSemConexao } from "../../../utils/alertas";
 
 /**
  * Tela inicial (E6-01): apresentação do app.
@@ -34,10 +35,15 @@ export default function HomeScreen() {
         });
     }, []);
 
+    // Achado de code-review (08/09/2026): o mesmo padrão corrigido em
+    // HospitaisScreen/HospitalDetalheScreen existia aqui. Uma oscilação de conexão
+    // durante um foco da Home não pode zerar `visitaAtivaId` — isso alimenta
+    // `sincronizarVisitaAtiva`/heartbeat abaixo, e zerar por engano pararia
+    // silenciosamente o heartbeat (E2-09) de uma visita geofence real e ativa.
     const carregarVisitaAtiva = useCallback(() => {
         VisitaService.buscarAtiva()
             .then((data) => setVisitaAtivaId(data?.visita?.id || null))
-            .catch(() => setVisitaAtivaId(null));
+            .catch((e) => preservarSeSemConexao(e, setVisitaAtivaId));
     }, []);
 
     // Reidrata a visita ativa sempre que a Home ganha foco (anônimo via dispositivoId

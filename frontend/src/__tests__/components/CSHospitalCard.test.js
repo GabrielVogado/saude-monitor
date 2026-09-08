@@ -86,6 +86,7 @@ describe("CSHospitalCard", () => {
 
     // Verifica o componente, não só o texto: um Text solto (o que existia antes)
     // faria este teste passar mesmo sem o tratamento visual do CSBadge de aviso.
+    // O card já usa CSBadge para categoria/tipo, então é preciso achar o certo.
     const badge = UNSAFE_getAllByType(CSBadge).find(
       (no) => no.props.label === "Ainda sem avaliações suficientes"
     );

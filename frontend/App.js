@@ -15,15 +15,13 @@ import HospitaisScreen from "./src/screens/hospitais/view/HospitaisScreen.js";
 import HospitalDetalheScreen from "./src/screens/hospitais/view/HospitalDetalheScreen.js";
 import RankingScreen from "./src/screens/hospitais/view/RankingScreen.js";
 import SugerirHospitalScreen from "./src/screens/hospitais/view/SugerirHospitalScreen.js";
-import SugestoesPendentesScreen from "./src/screens/hospitais/view/SugestoesPendentesScreen.js";
-import RevisarSugestaoScreen from "./src/screens/hospitais/view/RevisarSugestaoScreen.js";
 import FeedbackFormScreen from "./src/screens/feedback/view/FeedbackFormScreen.js";
 import PerfilScreen from "./src/screens/perfil/view/PerfilScreen.js";
 import HistoricoScreen from "./src/screens/perfil/view/HistoricoScreen.js";
 import PrivacidadeScreen from "./src/screens/perfil/view/PrivacidadeScreen.js";
 import NotificacoesScreen from "./src/screens/perfil/view/NotificacoesScreen.js";
 import {colors} from "./src/theme";
-import { agendarLembrete, pendenciaAtual } from "./src/screens/feedback/service/FeedbackNotificationService";
+import { agendarLembrete, feedbackAvaliavel, pendenciaAtual } from "./src/screens/feedback/service/FeedbackNotificationService";
 import { sincronizar } from "./src/services/SincronizacaoOffline";
 
 const Stack = createNativeStackNavigator();
@@ -48,8 +46,6 @@ function HospitaisStack() {
             <Stack.Screen name="HospitalDetalhe" component={HospitalDetalheScreen} />
             <Stack.Screen name="Ranking" component={RankingScreen} />
             <Stack.Screen name="SugerirHospital" component={SugerirHospitalScreen} />
-            <Stack.Screen name="SugestoesPendentes" component={SugestoesPendentesScreen} />
-            <Stack.Screen name="RevisarSugestao" component={RevisarSugestaoScreen} />
         </Stack.Navigator>
     );
 }
@@ -162,17 +158,27 @@ export default function App() {
             if (!data?.abrirFeedback || !data?.visitaId) {
                 return;
             }
+            // RN-09: a pendência guardada é sempre a mais recente (uma só por vez —
+            // ver o comentário de concluirFeedback em FeedbackNotificationService.js).
+            // Uma notificação antiga, de uma visita já substituída por outra mais
+            // recente, pode continuar parada na bandeja: feedbackAvaliavel() sozinho
+            // checaria a validade da pendência ATUAL, não da visita tocada, e abriria
+            // o formulário com dados de outra visita/hospital (achado do code-review
+            // no PR desta correção — 08/09/2026). Por isso o match de visitaId e a
+            // checagem de janela de 24h têm que valer para a MESMA pendência.
             const pendencia = await pendenciaAtual();
-            if (pendencia?.visitaId === data.visitaId) {
-                // Pedido de feedback visualizado: agenda o lembrete único
-                // (RN-09/E3-03) caso ele não responda de imediato.
-                await agendarLembrete({ visitaId: data.visitaId, hospitalNome: pendencia.hospitalNome });
+            const disponivel = pendencia?.visitaId === data.visitaId && (await feedbackAvaliavel());
+            if (!disponivel) {
+                return;
             }
+            // Pedido de feedback visualizado: agenda o lembrete único (RN-09/E3-03)
+            // caso ele não responda de imediato.
+            await agendarLembrete({ visitaId: data.visitaId, hospitalNome: pendencia.hospitalNome });
             navigationRef.current?.navigate("Feedback", {
                 screen: "FeedbackForm",
                 params: {
                     visitaId: data.visitaId,
-                    hospitalNome: pendencia?.hospitalNome || data.hospitalNome,
+                    hospitalNome: pendencia.hospitalNome,
                 },
             });
         };

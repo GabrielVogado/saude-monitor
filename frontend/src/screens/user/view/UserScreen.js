@@ -10,6 +10,7 @@ import {
     View,
 } from 'react-native';
 import {
+    ArrowLeft,
     ArrowRight,
     Eye,
     EyeOff,
@@ -80,8 +81,13 @@ const HospitalRegisterScreen = ({navigation}) => {
 
                     {/* Header with Back Button Placeholder */}
                     <View style={styles.header}>
-                        <TouchableOpacity style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Voltar">
-                            <ArrowRight size={24} color={colors.primary} style={styles.headerBackIcon} />
+                        <TouchableOpacity
+                            style={styles.backBtn}
+                            onPress={() => navigation?.goBack?.()}
+                            accessibilityRole="button"
+                            accessibilityLabel="Voltar"
+                        >
+                            <ArrowLeft size={24} color={colors.primary} style={styles.headerBackIcon} />
                         </TouchableOpacity>
                         <View style={styles.headerSpacer} />
                     </View>

@@ -36,7 +36,7 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 | **F-07** | Mapa e busca de hospitais | Épico 1 + Épico 6 | P0 | ✅ Funcional | E1-03, E1-05, E6-01 | — | S (8) |
 | **F-08** | Polimento e acessibilidade | Épico 6 | P1 | 🟡 Funcional, não auditado | E6-02, E6-03, E6-04, E6-05 | — | M (20) |
 | **F-09** | Segurança e privacidade | Fase 0 + Épico 5 | P0 | ✅ Conforme | F0-03, F0-04, E5-01, E5-02, E5-05 | RN-21, RNF-05, RNF-06 | M (18) |
-| **F-10** | Moderação de sugestões de hospitais | Épico 1 | P1 | ✅ Backend funcional | E1-06 | — | S (5) |
+| **F-10** | Moderação de sugestões de hospitais | Épico 1 | P1 | ✅ Backend funcional · telas mobile removidas (08/09/2026) | E1-06 | — | S (5) |
 | **F-11** | Painel Administrativo Web (hospitais + georreferenciamento) | Épico 7 | **P2 — adiada** | 🔴 Inexistente | E7-01..E7-09 | — | L (25) |
 
 > **Legenda de status:** ✅ Funcional (implementado e coberto por teste automatizado) · 🟡 Funcional com ressalva (implementado, mas sem a auditoria/validação exigida pelo DoD) · 🔴 Inexistente (construir do zero). Verificação arquivo a arquivo: `Relatorio-Aderencia-Codigo-vs-Features.md` (v3.5).
@@ -481,6 +481,17 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
   O fluxo de aprovação reutiliza o formulário de hospital existente (F-01), pré-preenchendo nome e endereço a partir da sugestão. O admin completa ou corrige os dados (CNPJ, tipo, contato, geofence) e, ao salvar, o sistema cria o hospital e marca a sugestão como `APROVADA` com o `hospitalId` vinculado. A rejeição é uma ação mais simples, feita via modal com campo de motivo.
 
 - **User Stories vinculadas:** E1-06
+
+> ⚠️ **Correção (08/09/2026, auditoria de código morto):** os critérios 7 e 8
+> abaixo (telas mobile de fila/revisão) e o item de DoD correspondente
+> descrevem UI que foi **removida** — `SugestoesPendentesScreen`/
+> `RevisarSugestaoScreen` estavam registradas em `App.js` mas nenhuma
+> navegação do app chegava até elas, e o botão "Aprovar" pré-preenchia um
+> `HospitalFormScreen` que nunca existiu no cliente mobile (o CRUD de
+> hospital sempre foi exclusivo do futuro Painel Web, F-11). Os critérios
+> 1-6 e 9-10 (endpoints admin) permanecem válidos e implementados. Ver
+> `Auditoria-Codigo-Morto-Logica-Ambigua-Erros-Silenciosos-v1.0.md`.
+
 - **Critérios de aceite:**
   1. Endpoint admin `GET /api/v1/hospitais/sugestoes` retorna sugestões filtráveis por `status` (`PENDENTE`, `APROVADA`, `RECUSADA`), ordenadas por `criadoEm` decrescente, paginadas; resposta `< 300 ms` (p95)
   2. Endpoint admin `GET /api/v1/hospitais/sugestoes/{id}` retorna detalhe completo da sugestão, incluindo audit quando `APROVADA`/`RECUSADA`
@@ -1021,8 +1032,8 @@ sequenceDiagram
 - [x] Lista de hospitais com busca por nome
 - [x] 10 hospitais seedados para desenvolvimento
 - [x] Endpoints admin de moderação de sugestões (`GET /hospitais/sugestoes`, `POST /hospitais/sugestoes/{id}/aprovar`, `POST /hospitais/sugestoes/{id}/rejeitar`)
-- [ ] Tela de fila de moderação de sugestões no app (apenas admin)
-- [ ] Fluxo de aprovação pré-preenche formulário de hospital e vincula sugestão a hospital criado
+- [ ] ~~Tela de fila de moderação de sugestões no app (apenas admin)~~ — removida em 08/09/2026 (código morto/inacessível); migra para o Painel Web (F-11)
+- [ ] ~~Fluxo de aprovação pré-preenche formulário de hospital e vincula sugestão a hospital criado~~ — idem; navegava para uma rota inexistente
 
 ### Sprint 2 — Geofence Core (Features: F-03 início)
 

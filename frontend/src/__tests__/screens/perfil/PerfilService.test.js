@@ -215,15 +215,16 @@ describe("PerfilService (Épico 05)", () => {
     });
   });
 
-  test("deslogar limpa tokens e usuário persistidos", async () => {
-    await AsyncStorage.multiSet([
-      [ACCESS_TOKEN_KEY, "abc"],
-      [REFRESH_TOKEN_KEY, "def"],
-      [USUARIO_KEY, JSON.stringify({ nome: "Ana" })],
-    ]);
+  test("deslogar delega a LoginService.logout (revoga o refresh no servidor)", async () => {
+    // Achado da auditoria de código morto (08/09/2026): deslogar() limpava só os
+    // tokens locais (TokenStorage.limparTokens direto), sem passar pela revogação
+    // server-side do refresh token — quem tocasse "Sair" no Perfil tinha o refresh
+    // token continuando válido por até 30 dias. LoginService.logout() já cobre a
+    // limpeza local (testado em LoginService.test.js); aqui só a delegação importa.
+    LoginService.logout.mockResolvedValueOnce(undefined);
+
     await PerfilService.deslogar();
-    expect(await AsyncStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
-    expect(await AsyncStorage.getItem(REFRESH_TOKEN_KEY)).toBeNull();
-    expect(await AsyncStorage.getItem(USUARIO_KEY)).toBeNull();
+
+    expect(LoginService.logout).toHaveBeenCalledTimes(1);
   });
 });

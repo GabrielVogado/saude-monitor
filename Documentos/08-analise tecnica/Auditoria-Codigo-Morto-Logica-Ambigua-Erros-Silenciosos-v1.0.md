@@ -13,6 +13,21 @@ independentes (um por área), cada um lendo o código-fonte por completo, não a
 > status abaixo é atualizado no mesmo PR que entrega a correção (mesma regra do `De-Para-Backlog-Features.md`
 > §8: PR que entrega atualiza o status, no mesmo PR).
 
+## Status geral (08/09/2026)
+
+Os 19 achados estão corrigidos nos 4 PRs abaixo, todos abertos contra `develop`, aguardando merge:
+
+| PR | Tema | Itens |
+|---|---|---|
+| [#98](https://github.com/GabrielVogado/saude-monitor/pull/98) | Backend — erros silenciosos críticos (P0) | 1-4 |
+| [#99](https://github.com/GabrielVogado/saude-monitor/pull/99) | Backend — lógica duplicada e código morto (P2/P3) | 10-11, 14-16 |
+| [#100](https://github.com/GabrielVogado/saude-monitor/pull/100) | Frontend — bugs de comportamento e telas mortas (P1) | 5-9 |
+| [#101](https://github.com/GabrielVogado/saude-monitor/pull/101) | Frontend — lógica ambígua e código morto (P2/P3) | 12, 17-19 |
+
+**Ordem de merge:** #98 antes de #99 — os dois tocam `UserServiceImpl.java`/`AuthServiceImpl.java`;
+mergear fora de ordem gera conflito (documentado na descrição do #99). #100 e #101 são independentes
+dos PRs de backend e entre si.
+
 ---
 
 ## Decisões do PO (08/09/2026)
@@ -50,21 +65,21 @@ independentes (um por área), cada um lendo o código-fonte por completo, não a
 | 2 | P0 | Backend | `catch (RuntimeException)` genérico no logout mascara falha real de revogação como sucesso | PR-1 | ✅ Corrigido (aguardando PR) |
 | 3 | P0 | Backend | Seed do admin com senha vazia sobe sem erro nem aviso | PR-1 | ✅ Corrigido (aguardando PR) |
 | 4 | P0 | Backend | Exclusão de conta (LGPD) afirma remover `auth_logins`, coleção nunca escrita (`AuthDocument` morto) | PR-1 | ✅ Corrigido (aguardando PR) |
-| 5 | P1 | Frontend | `pararGeofencing()` nunca chamado no logout/exclusão de conta | PR-3 | ⬜ Pendente |
-| 6 | P1 | Frontend | `feedbackAvaliavel()` (expiração 24h, RN-09) nunca aplicada no cliente | PR-3 | ⬜ Pendente |
-| 7 | P1 | Frontend | "Esqueci minha senha" sem `onPress` | PR-3 | ⬜ Pendente |
-| 8 | P1 | Frontend | Botão "Voltar" do cadastro sem `onPress` e com ícone trocado | PR-3 | ⬜ Pendente |
-| 9 | P1 | Frontend | Moderação de sugestões navega para rota inexistente e já é inacessível | PR-3 | ⬜ Pendente |
-| 10 | P2 | Backend | Regra RN-17 (cobertura GPS ≥ 90%) implementada duas vezes de forma independente | PR-2 | ⬜ Pendente |
-| 11 | P2 | Backend | Normalização de e-mail reimplementada em 4 lugares (uma delas sem `trim()`) | PR-2 | ⬜ Pendente |
-| 12 | P2 | Frontend | Critério "avaliação suficiente" com acoplamento implícito entre card e detalhe | PR-4 | ⬜ Pendente |
+| 5 | P1 | Frontend | `pararGeofencing()` nunca chamado no logout/exclusão de conta | PR-3 | ✅ Corrigido (aguardando merge) |
+| 6 | P1 | Frontend | `feedbackAvaliavel()` (expiração 24h, RN-09) nunca aplicada no cliente | PR-3 | ✅ Corrigido (aguardando merge) |
+| 7 | P1 | Frontend | "Esqueci minha senha" sem `onPress` | PR-3 | ✅ Corrigido — link removido (aguardando merge) |
+| 8 | P1 | Frontend | Botão "Voltar" do cadastro sem `onPress` e com ícone trocado | PR-3 | ✅ Corrigido (aguardando merge) |
+| 9 | P1 | Frontend | Moderação de sugestões navega para rota inexistente e já é inacessível | PR-3 | ✅ Corrigido — telas removidas (aguardando merge) |
+| 10 | P2 | Backend | Regra RN-17 (cobertura GPS ≥ 90%) implementada duas vezes de forma independente | PR-2 | ✅ Corrigido (aguardando merge) |
+| 11 | P2 | Backend | Normalização de e-mail reimplementada em 4 lugares (uma delas sem `trim()`) | PR-2 | ✅ Corrigido — 5 pontos (achado extra: `AdminUserSeeder`) (aguardando merge) |
+| 12 | P2 | Frontend | Critério "avaliação suficiente" com acoplamento implícito entre card e detalhe | PR-4 | ✅ Corrigido (aguardando merge) |
 | 13 | P2 | Frontend | Formatação de data divergente em `SugestoesPendentesScreen` | — | ✅ Resolvido pela remoção do item 9 |
-| 14 | P3 | Backend | `VisitaRepository` — 2 métodos de busca nunca chamados | PR-2 | ⬜ Pendente |
-| 15 | P3 | Backend | `HospitalRepository.existsByCnpj` nunca chamado | PR-2 | ⬜ Pendente |
-| 16 | P3 | Backend | Claim `papel` gravado no JWT mas nunca lido de volta | PR-2 | ⬜ Pendente |
-| 17 | P3 | Frontend | `CSHospitalCard.distanciaKm` — prop existe, nunca é alimentada | PR-4 | ⬜ Pendente |
-| 18 | P3 | Frontend | `CSRatingStars.showLabel` — nunca ativado por nenhum chamador | PR-4 | ⬜ Pendente |
-| 19 | P3 | Frontend | `CSHeader.subtitle` — prop nunca usada | PR-4 | ⬜ Pendente |
+| 14 | P3 | Backend | `VisitaRepository` — 2 métodos de busca nunca chamados | PR-2 | ✅ Corrigido (aguardando merge) |
+| 15 | P3 | Backend | `HospitalRepository.existsByCnpj` nunca chamado | PR-2 | ✅ Corrigido (aguardando merge) |
+| 16 | P3 | Backend | Claim `papel` gravado no JWT mas nunca lido de volta | PR-2 | ✅ Corrigido — achado extra: claim `userId` também removido (aguardando merge) |
+| 17 | P3 | Frontend | `CSHospitalCard.distanciaKm` — prop existe, nunca é alimentada | PR-4 | ✅ Corrigido (aguardando merge) |
+| 18 | P3 | Frontend | `CSRatingStars.showLabel` — nunca ativado por nenhum chamador | PR-4 | ✅ Corrigido (aguardando merge) |
+| 19 | P3 | Frontend | `CSHeader.subtitle` — prop nunca usada | PR-4 | ✅ Corrigido (aguardando merge) |
 
 ---
 

@@ -1,6 +1,14 @@
 import { buildApiUrl } from "../../../config/api";
 import { classificarErroDeRede, fetchComRetry, fetchComTimeout } from "../../../config/http";
 import TokenStorage from "../../../services/TokenStorage";
+// Import circular consciente: GeofencingTaskService importa HospitalService e
+// VisitaService, que por sua vez importam este módulo (LoginService) para o
+// interceptor 401. Seguro porque nenhum dos quatro módulos lê o binding importado
+// no topo do arquivo — só dentro de corpos de função, chamados depois que o grafo
+// inteiro já carregou. Tentativa de quebrar o ciclo com `import()` dinâmico foi
+// descartada: introduzia uma dependência real e frágil da interop do Jest com
+// `jest.mock` em import dinâmico (sem `__esModule: true` no mock, o binding vinha
+// undefined) — trocava um risco teórico por um problema demonstrado.
 import { pararGeofencing } from "../../visitas/service/GeofencingTaskService";
 
 const BASE_PATH = "/api/v1/auth";
@@ -45,6 +53,16 @@ async function post(path, body, { idempotente = false } = {}) {
   }
 
   return data;
+}
+
+/** Encerra o geofencing nativo sem nunca bloquear logout/exclusão por falha aqui. */
+async function pararGeofencingBestEffort() {
+  try {
+    await pararGeofencing();
+  } catch {
+    // best-effort: falha ao parar o monitoramento nativo não pode impedir a
+    // limpeza local da sessão (nem, na exclusão, a conta já excluída no servidor).
+  }
 }
 
 class LoginService {
@@ -123,13 +141,7 @@ class LoginService {
       }
     }
 
-    try {
-      await pararGeofencing();
-    } catch {
-      // best-effort, mesmo padrão da revogação acima: o logout local não pode
-      // ficar bloqueado por uma falha ao parar o monitoramento nativo.
-    }
-
+    await pararGeofencingBestEffort();
     await TokenStorage.limparTokens();
   }
 
@@ -175,13 +187,7 @@ class LoginService {
       throw new Error(message);
     }
 
-    try {
-      await pararGeofencing();
-    } catch {
-      // best-effort: a conta já foi excluída no servidor: não bloquear a
-      // limpeza local por falha ao parar o monitoramento nativo.
-    }
-
+    await pararGeofencingBestEffort();
     await TokenStorage.limparTokens();
     return data;
   }

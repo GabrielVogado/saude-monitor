@@ -163,8 +163,11 @@ describe("App — abrir formulário a partir da notificação de feedback (RN-09
     // Achado da auditoria de código morto (08/09/2026): a notificação pode ficar
     // parada na bandeja além da janela de 24h; antes desta correção, tocá-la ainda
     // abria o formulário, que só falhava ao enviar (backend responde 404).
+    jest.spyOn(FeedbackNotificationService, "pendenciaAtual").mockResolvedValue({
+      visitaId: "v1",
+      hospitalNome: "Hospital Central",
+    });
     jest.spyOn(FeedbackNotificationService, "feedbackAvaliavel").mockResolvedValue(false);
-    const pendenciaAtualSpy = jest.spyOn(FeedbackNotificationService, "pendenciaAtual");
     const agendarLembreteSpy = jest.spyOn(FeedbackNotificationService, "agendarLembrete");
 
     render(<App />);
@@ -176,7 +179,37 @@ describe("App — abrir formulário a partir da notificação de feedback (RN-09
 
     expect(screen.queryByText("Você passou pela triagem?")).toBeNull();
     expect(screen.getByText("Início")).toBeOnTheScreen();
-    expect(pendenciaAtualSpy).not.toHaveBeenCalled();
     expect(agendarLembreteSpy).not.toHaveBeenCalled();
+  });
+
+  test("notificação de uma visita já substituída por outra não abre o formulário", async () => {
+    // Achado do code-review (08/09/2026): só existe uma pendência guardada por vez
+    // (concluirFeedback). Se o usuário visitar outro hospital antes de responder,
+    // a notificação antiga (visitaId diferente) ainda pode estar na bandeja.
+    // feedbackAvaliavel() sozinho checaria a validade da pendência ATUAL (da visita
+    // nova, ainda dentro da janela) e abriria o formulário com o hospital errado.
+    jest.spyOn(FeedbackNotificationService, "pendenciaAtual").mockResolvedValue({
+      visitaId: "v2-mais-recente",
+      hospitalNome: "Hospital Novo",
+    });
+    const feedbackAvaliavelSpy = jest
+      .spyOn(FeedbackNotificationService, "feedbackAvaliavel")
+      .mockResolvedValue(true);
+    const agendarLembreteSpy = jest.spyOn(FeedbackNotificationService, "agendarLembrete");
+
+    render(<App />);
+    const tratarResposta = callbackDeResposta();
+
+    await act(async () => {
+      await tratarResposta(
+        respostaDeNotificacao({ abrirFeedback: true, visitaId: "v1-antiga" })
+      );
+    });
+
+    expect(screen.queryByText("Você passou pela triagem?")).toBeNull();
+    expect(screen.getByText("Início")).toBeOnTheScreen();
+    expect(agendarLembreteSpy).not.toHaveBeenCalled();
+    // curto-circuito: nem chega a checar a janela de 24h da pendência errada
+    expect(feedbackAvaliavelSpy).not.toHaveBeenCalled();
   });
 });

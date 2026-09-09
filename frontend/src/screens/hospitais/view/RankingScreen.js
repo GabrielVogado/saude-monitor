@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Trophy } from "lucide-react-native";
@@ -45,8 +45,19 @@ export default function RankingScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [erro, setErro] = useState(null);
 
+  // Guard contra corrida entre `carregar` (troca de ordem/tipo, ou refresh) e uma
+  // `carregarMais` já em voo — achado do code-review de 09/09/2026, mesma correção
+  // aplicada em HospitaisScreen.js. `geracaoRef` descarta a resposta de uma página
+  // pedida sob um critério que já não é o vigente; `buscandoMaisRef` bloqueia
+  // reentrância imediatamente (um fling rápido dispara `onEndReached` de novo antes
+  // do `carregandoMais` do estado sequer commitar no próximo render).
+  const geracaoRef = useRef(0);
+  const buscandoMaisRef = useRef(false);
+
   const carregar = useCallback(
     async (modo = "inicial") => {
+      const minhaGeracao = ++geracaoRef.current;
+
       if (modo === "refresh") setRefreshing(true);
       else setCarregando(true);
       setErro(null);
@@ -58,15 +69,22 @@ export default function RankingScreen({ navigation }) {
           page: 0,
           size: TAMANHO_PAGINA,
         });
+        if (geracaoRef.current !== minhaGeracao) {
+          return;
+        }
         setDados(resposta?.content || []);
         setPagina(resposta?.page ?? 0);
         setTotalPaginas(resposta?.totalPages ?? 0);
       } catch (e) {
-        setErro(e.message || "Não foi possível carregar o ranking.");
-        setDados([]);
+        if (geracaoRef.current === minhaGeracao) {
+          setErro(e.message || "Não foi possível carregar o ranking.");
+          setDados([]);
+        }
       } finally {
-        setCarregando(false);
-        setRefreshing(false);
+        if (geracaoRef.current === minhaGeracao) {
+          setCarregando(false);
+          setRefreshing(false);
+        }
       }
     },
     [ordem, tipo]
@@ -79,10 +97,12 @@ export default function RankingScreen({ navigation }) {
   }, [carregar]);
 
   const carregarMais = async () => {
-    if (carregando || carregandoMais || pagina + 1 >= totalPaginas) {
+    if (carregando || pagina + 1 >= totalPaginas || buscandoMaisRef.current) {
       return;
     }
 
+    buscandoMaisRef.current = true;
+    const minhaGeracao = geracaoRef.current;
     setCarregandoMais(true);
     try {
       const proxima = pagina + 1;
@@ -92,13 +112,24 @@ export default function RankingScreen({ navigation }) {
         page: proxima,
         size: TAMANHO_PAGINA,
       });
+      if (geracaoRef.current !== minhaGeracao) {
+        // O critério mudou (ou um refresh rodou) enquanto esta página estava em
+        // voo — aplicar agora concatenaria a página errada sobre um ranking que já
+        // foi resetado para outro critério.
+        return;
+      }
       setDados((atual) => [...atual, ...(resposta?.content || [])]);
       setPagina(resposta?.page ?? proxima);
       setTotalPaginas(resposta?.totalPages ?? totalPaginas);
     } catch (e) {
-      setErro(e.message || "Não foi possível carregar mais hospitais.");
+      if (geracaoRef.current === minhaGeracao) {
+        setErro(e.message || "Não foi possível carregar mais hospitais.");
+      }
     } finally {
-      setCarregandoMais(false);
+      buscandoMaisRef.current = false;
+      if (geracaoRef.current === minhaGeracao) {
+        setCarregandoMais(false);
+      }
     }
   };
 

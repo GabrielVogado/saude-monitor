@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { MapPinOff, Search, Trophy } from "lucide-react-native";
@@ -25,6 +25,11 @@ const TIPO_FILTROS = [
   { value: "FILANTROPICO", label: "Filantrópico" },
 ];
 
+// O backend limita `size` a 100 por chamada (HospitalController) e a base tem ~340
+// hospitais ativos — uma única página nunca traz o catálogo inteiro. 50 é o meio-termo
+// entre poucas chamadas e uma resposta que ainda cabe confortavelmente numa página.
+const TAMANHO_PAGINA = 50;
+
 /**
  * Listagem pública de hospitais ativos (E1-03).
  *
@@ -42,13 +47,41 @@ export default function HospitaisScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [erro, setErro] = useState(null);
 
+  // Paginação incremental (E1-03 / bug relatado em 09/09/2026): sem isso, a lista
+  // pública mostrava só os primeiros 20 hospitais (o `size` padrão do serviço) e o
+  // usuário nunca via os ~320 restantes a menos que buscasse pelo nome exato.
+  const [pagina, setPagina] = useState(0);
+  const [temMais, setTemMais] = useState(false);
+  const [carregandoMais, setCarregandoMais] = useState(false);
+
   const [visitaAtiva, setVisitaAtiva] = useState(null);
   const [checkinEnviandoId, setCheckinEnviandoId] = useState(null);
 
   const debounceRef = useRef(null);
   const carregamentoInicialFeitoRef = useRef(false);
 
+  // Geração da carga atual: `carregar()` incrementa a cada chamada (busca/tipo
+  // mudou, ou refresh). Uma `carregarMais()` cuja resposta chega depois de uma
+  // geração mais nova descarta o resultado em vez de concatenar a página de um
+  // critério de busca que já não é o vigente (code-review de 09/09/2026).
+  const geracaoRef = useRef(0);
+  // Guard de reentrância síncrono: `carregandoMais` (estado) só reflete no próximo
+  // render, então dois disparos de `onEndReached` antes desse commit passariam os
+  // dois pelo guard baseado em estado e pediriam a mesma página duas vezes. O ref
+  // bloqueia imediatamente, sem esperar o React re-renderizar.
+  const buscandoMaisRef = useRef(false);
+
+  /** Filtro defensivo no cliente: garante consistência acento/caixa mesmo que o
+   * backend devolva itens fora do critério (ex.: dados legados sem normalização). */
+  const filtrarLocalmente = useCallback((lista, termo) => {
+    return termo
+      ? lista.filter((hospital) => normalizeText(hospital?.nome).includes(termo))
+      : lista;
+  }, []);
+
   const carregar = useCallback(async (modo = "inicial") => {
+    const minhaGeracao = ++geracaoRef.current;
+
     if (modo === "refresh") setRefreshing(true);
     else setCarregando(true);
     setErro(null);
@@ -56,23 +89,74 @@ export default function HospitaisScreen({ navigation }) {
     try {
       // Normaliza a busca (acento/caixa) antes de enviar ao backend e de filtrar localmente.
       const termo = normalizeText(busca);
-      const resposta = await HospitalService.listar({ busca: termo, tipo });
-      const lista = resposta?.content || resposta || [];
+      const resposta = await HospitalService.listar({ busca: termo, tipo, page: 0, size: TAMANHO_PAGINA });
+      if (geracaoRef.current !== minhaGeracao) {
+        return;
+      }
 
-      // Filtro defensivo no cliente: garante consistência acento/caixa mesmo que o
-      // backend devolva itens fora do critério (ex.: dados legados sem normalização).
-      const filtrados = termo
-        ? lista.filter((hospital) => normalizeText(hospital?.nome).includes(termo))
-        : lista;
+      const lista = resposta?.content || resposta || [];
+      const filtrados = filtrarLocalmente(lista, termo);
 
       setDados(filtrados);
+      setPagina(0);
+      const total = resposta?.totalElements ?? lista.length;
+      setTemMais(lista.length > 0 && lista.length < total);
     } catch (e) {
-      setErro(e.message || "Não foi possível carregar os hospitais.");
+      if (geracaoRef.current === minhaGeracao) {
+        setErro(e.message || "Não foi possível carregar os hospitais.");
+      }
     } finally {
-      setCarregando(false);
-      setRefreshing(false);
+      if (geracaoRef.current === minhaGeracao) {
+        setCarregando(false);
+        setRefreshing(false);
+      }
     }
-  }, [busca, tipo]);
+  }, [busca, tipo, filtrarLocalmente]);
+
+  // Chamado pela FlatList ao chegar perto do fim (`onEndReached`) — busca a próxima
+  // página e concatena, sem recarregar nem perder a posição do scroll.
+  const carregarMais = useCallback(async () => {
+    if (!temMais || carregando || buscandoMaisRef.current) {
+      return;
+    }
+
+    buscandoMaisRef.current = true;
+    const minhaGeracao = geracaoRef.current;
+    setCarregandoMais(true);
+    try {
+      const termo = normalizeText(busca);
+      const proximaPagina = pagina + 1;
+      const resposta = await HospitalService.listar({
+        busca: termo,
+        tipo,
+        page: proximaPagina,
+        size: TAMANHO_PAGINA,
+      });
+      if (geracaoRef.current !== minhaGeracao) {
+        // A busca/tipo mudou (ou um refresh rodou) enquanto esta página estava em
+        // voo — aplicar agora concatenaria a página errada numa lista que já foi
+        // resetada para outro critério.
+        return;
+      }
+
+      const lista = resposta?.content || resposta || [];
+      const filtrados = filtrarLocalmente(lista, termo);
+
+      setDados((atual) => atual.concat(filtrados));
+      setPagina(proximaPagina);
+      const jaCarregado = (proximaPagina + 1) * TAMANHO_PAGINA;
+      const total = resposta?.totalElements ?? jaCarregado;
+      setTemMais(lista.length > 0 && jaCarregado < total);
+    } catch {
+      // Mantém a lista já visível; o usuário pode rolar até o fim de novo para
+      // tentar a próxima página outra vez, sem perder o que já carregou.
+    } finally {
+      buscandoMaisRef.current = false;
+      if (geracaoRef.current === minhaGeracao) {
+        setCarregandoMais(false);
+      }
+    }
+  }, [temMais, carregando, busca, tipo, pagina, filtrarLocalmente]);
 
   useEffect(() => {
     if (!carregamentoInicialFeitoRef.current) {
@@ -288,11 +372,24 @@ export default function HospitaisScreen({ navigation }) {
         <CSLoadingList count={3} />
       ) : (
         <FlatList
+          testID="lista-hospitais"
           data={dados}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           ListEmptyComponent={renderVazio}
           contentContainerStyle={styles.listContent}
+          onEndReached={carregarMais}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            carregandoMais ? (
+              <ActivityIndicator
+                style={styles.rodapeCarregando}
+                size="small"
+                color={colors.primary}
+                accessibilityLabel="Carregando mais hospitais"
+              />
+            ) : null
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -322,5 +419,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.s6,
     gap: spacing.s4,
     flexGrow: 1,
+  },
+  rodapeCarregando: {
+    paddingVertical: spacing.s4,
   },
 });

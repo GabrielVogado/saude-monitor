@@ -63,6 +63,110 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
     expect(screen.getByText("Hospital B")).toBeTruthy();
   });
 
+  test("BUG-09: rolar até o fim carrega a próxima página em vez de parar nos primeiros 20", async () => {
+    // Regressão relatada em 09/09/2026: com ~340 hospitais ativos e o serviço usando o
+    // `size` padrão (20) sem paginação incremental, a lista pública nunca mostrava o
+    // que vinha depois do vigésimo hospital (por ordem "natural" do Mongo) — a menos
+    // que o usuário buscasse pelo nome exato do hospital que faltava.
+    const HOSPITAL_C = { id: "hC", nome: "Hospital C", tipo: "PUBLICO", categoria: "HOSPITAL" };
+    HospitalService.listar.mockImplementation(({ page }) => {
+      if (page === 0) {
+        return Promise.resolve({ content: [HOSPITAL_A, HOSPITAL_B], totalElements: 3 });
+      }
+      return Promise.resolve({ content: [HOSPITAL_C], totalElements: 3 });
+    });
+
+    renderizar();
+    await screen.findByText("Hospital A");
+    expect(screen.queryByText("Hospital C")).toBeNull();
+
+    await act(async () => {
+      fireEvent(screen.getByTestId("lista-hospitais"), "endReached");
+    });
+
+    expect(await screen.findByText("Hospital C")).toBeTruthy();
+    expect(screen.getByText("Hospital A")).toBeTruthy();
+    expect(HospitalService.listar).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1 })
+    );
+  });
+
+  test("code-review 09/09/2026: um refresh enquanto a próxima página está em voo não mistura as duas respostas", async () => {
+    // Achado do code-review: `carregarMais` (page 1 da busca vigente) não tinha guard
+    // contra uma `carregar()` concorrente. Se o pull-to-refresh resolvesse ANTES da
+    // página em voo, a resposta antiga (de um critério que já não é o exibido)
+    // chegava depois e era concatenada por cima da lista já resetada pelo refresh.
+    const HOSPITAL_C = { id: "hC", nome: "Hospital C", tipo: "PUBLICO", categoria: "HOSPITAL" };
+    const HOSPITAL_REFRESCADO = { id: "hR", nome: "Hospital Refrescado", tipo: "PUBLICO", categoria: "HOSPITAL" };
+
+    let resolverPaginaAntiga;
+    let chamadas = 0;
+    HospitalService.listar.mockImplementation(() => {
+      chamadas += 1;
+      if (chamadas === 1) {
+        return Promise.resolve({ content: [HOSPITAL_A, HOSPITAL_B], totalElements: 3 });
+      }
+      if (chamadas === 2) {
+        return new Promise((resolve) => {
+          resolverPaginaAntiga = resolve;
+        });
+      }
+      return Promise.resolve({ content: [HOSPITAL_REFRESCADO], totalElements: 1 });
+    });
+
+    renderizar();
+    await screen.findByText("Hospital A");
+
+    const lista = screen.getByTestId("lista-hospitais");
+    await act(async () => {
+      lista.props.onEndReached();
+    });
+
+    await act(async () => {
+      lista.props.refreshControl.props.onRefresh();
+    });
+
+    expect(await screen.findByText("Hospital Refrescado")).toBeTruthy();
+    expect(screen.queryByText("Hospital A")).toBeNull();
+
+    // A página antiga (da busca já substituída pelo refresh) resolve por último —
+    // precisa ser descartada, não concatenada sobre a lista já atualizada.
+    await act(async () => {
+      resolverPaginaAntiga({ content: [HOSPITAL_C], totalElements: 3 });
+    });
+
+    expect(screen.queryByText("Hospital C")).toBeNull();
+    expect(screen.getByText("Hospital Refrescado")).toBeTruthy();
+  });
+
+  test("code-review 09/09/2026: dois onEndReached em sequência rápida não duplicam a mesma página", async () => {
+    // Achado do code-review: o guard de reentrância lia `carregandoMais` (estado), que
+    // só reflete no próximo render. Um fling rápido dispara `onEndReached` de novo
+    // antes desse commit, e as duas chamadas passavam pelo guard e pediam a mesma
+    // página duas vezes — duplicando cards na lista.
+    const HOSPITAL_C = { id: "hC", nome: "Hospital C", tipo: "PUBLICO", categoria: "HOSPITAL" };
+    let chamadasDePaginaSeguinte = 0;
+    HospitalService.listar.mockImplementation(({ page }) => {
+      if (page === 0) {
+        return Promise.resolve({ content: [HOSPITAL_A, HOSPITAL_B], totalElements: 3 });
+      }
+      chamadasDePaginaSeguinte += 1;
+      return Promise.resolve({ content: [HOSPITAL_C], totalElements: 3 });
+    });
+
+    renderizar();
+    await screen.findByText("Hospital A");
+
+    const lista = screen.getByTestId("lista-hospitais");
+    await act(async () => {
+      lista.props.onEndReached();
+      lista.props.onEndReached();
+    });
+
+    await screen.findByText("Hospital C");
+    expect(chamadasDePaginaSeguinte).toBe(1);
+  });
+
   test("check-in bem-sucedido navega para o detalhe do hospital selecionado", async () => {
     VisitaService.checkin.mockResolvedValue({ id: "v1", hospitalId: "hA", status: "EM_ATENDIMENTO" });
 

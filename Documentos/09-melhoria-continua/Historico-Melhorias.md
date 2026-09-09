@@ -27,6 +27,7 @@
 | **M-007** | 06/09/2026 | `code-review` sobre o PR #85 (achados suplementares) | Migração/reconciliador que faz *read-modify-write* do documento inteiro perde edição administrativa concorrente; corrigido para update parcial atômico tocando só os campos da migração | #85 | ✅ Aplicada |
 | **M-008** | 08/09/2026 | Auditoria de código morto/lógica ambígua/erros silenciosos (pedido direto do PO) | 4 erros silenciosos críticos de auth/LGPD corrigidos: cadastro duplicado "com sucesso" (201), logout que mascarava falha real de revogação, seed de admin com senha vazia sem aviso, exclusão de conta afirmando remover uma coleção nunca escrita | #98 | ✅ Aplicada |
 | **M-009** | 08/09/2026 | Auditoria de código morto/lógica ambígua/erros silenciosos (pedido direto do PO), mesmo pedido do M-008 | 5 bugs de comportamento do frontend corrigidos: geofencing nativo não parava no logout/exclusão de conta; botão "Sair" do Perfil nunca revogava o refresh token no servidor; notificação de feedback abria o formulário mesmo vencido (RN-09) — e, achado do `code-review` deste mesmo PR, também abria com dados da visita errada quando a pendência já tinha sido substituída; link "Esqueci minha senha" e botão "Voltar" do cadastro sem `onPress`; telas de moderação de sugestões inacessíveis removidas | #100 | ✅ Aplicada |
+| **M-011** | 09/09/2026 | Bug relatado pelo PO em uso real (UBS 05 do Recanto das Emas ausente no mapa com "Todos") | Listagem sem filtro geoespacial (mapa "Todos" e aba Hospitais) truncava em 100/20 hospitais por chamada, sem `Sort` estável — de 340 hospitais ativos, até 240 nunca apareciam no mapa e 320 nunca na lista sem busca por nome. Corrigido: `Sort` estável (nome + id) no backend, paginação completa no mapa e scroll infinito com guard de geração/reentrância na aba Hospitais **e** no Ranking (mesma falha pré-existente, achado do `code-review` deste PR) | #105 | ✅ Aplicada |
 
 ---
 
@@ -692,6 +693,87 @@ Duas, uma de cada PR desta mesma história:
    confiança sigla ambíguas (HRL = "Hospital da Região Leste"; HMAB =
    "Hospital Militar de Área de Brasília") que não teriam batido por nenhum
    critério de string matching.
+
+---
+
+## M-011 — Paginação truncada escondia até 240 hospitais no mapa e 320 na lista
+
+**Data:** 09/09/2026 · **PR:** #105
+
+### O que aconteceu
+
+O PO relatou: com o filtro "1 km" selecionado no mapa, a UBS 05 do Recanto das
+Emas aparece; com "Todos" selecionado, ela desaparece — o esperado é o
+inverso, já que "Todos" deveria ser um superconjunto. Pediu para verificar se
+o mesmo problema afeta outras unidades e a listagem da aba Hospitais.
+
+### Diagnóstico
+
+Medido diretamente contra o backend em produção: **340 hospitais ativos**.
+Duas causas, uma no backend e uma em cada tela:
+
+- `HospitalServiceImpl#listar` só usa a busca geoespacial (`$nearSphere`)
+  quando `latitude`/`longitude` chegam. Sem elas ("Todos"), cai em
+  `buscarPaginado`, que faz `mongoTemplate.find` **sem `Sort`** e pagina o
+  resultado em memória — a ordem "natural" do MongoDB não é um contrato.
+- `HospitalController` limita `size` a 100 por chamada (`@Max(100)`). O mapa
+  pedia `size=100/page=0` para "Todos": só os 100 primeiros (por essa ordem
+  instável) chegavam ao cliente — 240 hospitais nunca eram desenhados.
+- A aba Hospitais (`HospitaisScreen`) nem informava `page`/`size`: caía no
+  default do serviço (`size=20`), sem paginação incremental na `FlatList` —
+  320 hospitais nunca apareciam sem busca pelo nome exato.
+- Com um raio selecionado, a busca geoespacial reduz o total a poucos
+  hospitais, que cabem numa única página — por isso a UBS só aparecia com
+  "1 km".
+
+Confirmado por medição: baixando as 4 páginas de 100 contra produção, a UBS
+05 do Recanto está no índice 261 de 340 — muito além da janela de 100 que o
+mapa pedia. Outras 7 UBS do Recanto (01, 02, 03, 04, 08, 10, 11) estão nos
+índices 296–327, mesmo problema.
+
+O PO escolheu, entre três opções apresentadas (paginação incremental, subir o
+cap e carregar tudo de uma vez, ou só corrigir a ordenação sem mostrar o
+catálogo completo), a **paginação incremental completa**: nenhuma tela deve
+voltar a montar centenas de marcadores/cards numa única leva — o risco de ANR
+do mapa (`Plano-Sprints-v2.1.md` §21.6, mesma família do BUG-04 já corrigido
+nesta tela) continua valendo.
+
+### O que entrou
+
+- `HospitalServiceImpl#buscarPaginado`: `Sort.by("nome").and(Sort.by("id"))`.
+  Só por nome não bastava — achado do `code-review` deste PR: o
+  `ImportadorEstabelecimentos` (migração CNES) grava direto via
+  `hospitalRepository.save`, sem passar por `validarUnicidade`, então dois
+  hospitais importados podem legitimamente compartilhar o nome; o `id` entra
+  como critério de desempate para garantir ordem total.
+- `GeoLocalizacaoScreen` (mapa): com "Todos", percorre todas as páginas em
+  sequência até completar o total, atualizando o mapa lote a lote em vez de
+  esperar tudo para montar de uma vez.
+- `HospitaisScreen`: scroll infinito real (`onEndReached`) com guard de
+  geração (`geracaoRef`) contra uma busca/filtro nova enquanto uma página
+  seguinte está em voo, e guard de reentrância por `ref` (não por estado) para
+  não duplicar requisições num fling rápido — os dois, achados do
+  `code-review` deste PR depois da primeira versão da correção.
+- `RankingScreen`: a mesma dupla de guards, **fora do escopo original do
+  bug relatado** — o `code-review` encontrou a mesma falta de proteção contra
+  corrida já existente ali antes deste PR (não era uma regressão desta
+  entrega). O PO decidiu corrigir no mesmo PR em vez de abrir dívida técnica
+  separada.
+- Testes de regressão nos três pontos (backend + 3 telas), cada um validado
+  por mutação (falha de fato quando a correção é revertida).
+
+### Lição a repetir
+
+1. **Medir contra produção antes de propor a correção.** A causa só ficou
+   inequívoca depois de baixar as 4 páginas reais e localizar o índice exato
+   da UBS relatada (261 de 340) — sem isso, a hipótese seria só plausível, não
+   verificada (`Verificar antes de afirmar`).
+2. **Uma correção que introduz paginação incremental pede o mesmo escrutínio
+   que qualquer estado assíncrono concorrente** — o `code-review` achou dois
+   bugs de corrida (busca vs. "carregar mais"; reentrância por fling) na
+   primeira versão da correção, e um terceiro pré-existente no `RankingScreen`
+   só porque ele usa o mesmo padrão. Perguntar ao PO antes de expandir o diff
+   para um arquivo fora do bug original, em vez de decidir sozinho.
 
 ---
 

@@ -119,8 +119,32 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     renderizar();
 
     await waitFor(() => {
-      expect(HospitalService.listar).toHaveBeenCalledWith({ size: 100 });
+      expect(HospitalService.listar).toHaveBeenCalledWith({ page: 0, size: 100 });
     });
+  });
+
+  test("BUG-09: 'Todos' percorre todas as páginas até completar o catálogo, não só a primeira", async () => {
+    // Regressão relatada em 09/09/2026: com 340 hospitais ativos e o backend limitando
+    // `size` a 100, uma única chamada com "Todos" selecionado só trazia os 100 primeiros
+    // (por ordem "natural" do Mongo) — as UBS do Recanto das Emas, entre outras, ficavam
+    // de fora do mapa mesmo estando ativas, e só apareciam com um raio selecionado
+    // porque o recorte geográfico reduzia o total a poucos itens.
+    const p0 = Array.from({ length: 100 }, (_, i) => ({ id: `a${i}`, nome: `Hospital ${i}` }));
+    const p1 = Array.from({ length: 100 }, (_, i) => ({ id: `b${i}`, nome: `Hospital ${100 + i}` }));
+    const p2 = [{ id: "ubs-05", nome: "Ubs 05 Recanto das Emas" }];
+
+    HospitalService.listar.mockImplementation(({ page }) => {
+      const paginas = [p0, p1, p2];
+      return Promise.resolve({ content: paginas[page], totalElements: 201 });
+    });
+
+    renderizar();
+
+    await waitFor(() => {
+      expect(HospitalService.listar).toHaveBeenLastCalledWith({ page: 2, size: 100 });
+    });
+    expect(HospitalService.listar).toHaveBeenNthCalledWith(1, { page: 0, size: 100 });
+    expect(HospitalService.listar).toHaveBeenNthCalledWith(2, { page: 1, size: 100 });
   });
 
   test("selecionar um raio envia latitude, longitude e raioKm ao backend", async () => {
@@ -149,7 +173,7 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     expect(
       await screen.findByText("Aguardando o GPS para filtrar hospitais num raio de 10 km.")
     ).toBeTruthy();
-    expect(HospitalService.listar).toHaveBeenLastCalledWith({ size: 100 });
+    expect(HospitalService.listar).toHaveBeenLastCalledWith({ page: 0, size: 100 });
   });
 
   test("tocar num polígono abre o detalhe do hospital correspondente", async () => {

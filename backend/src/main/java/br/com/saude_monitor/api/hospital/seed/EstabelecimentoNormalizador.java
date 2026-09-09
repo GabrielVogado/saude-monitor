@@ -14,6 +14,13 @@ import java.util.Set;
  * segunda fonte (JSON) exigiria reimplementar Title Case/CNES/CEP pela segunda vez,
  * exatamente o padrão de duplicação que a auditoria de código morto/lógica ambígua
  * já tinha encontrado em outros pontos do backend (RN-17, normalização de e-mail).</p>
+ *
+ * <p>A segunda fonte é {@link SeedMapper#montarPublicoComplementar} — hospitais
+ * PÚBLICOS do CNES ausentes da fonte InfoSaúde/GDF (ver
+ * {@code Documentos/07-dados/relatorio-importacao-CNES_PUBLICOS_COMPLEMENTARES_20260909.md}).
+ * Um pipeline anterior desta mesma extração classificava também hospitais privados/
+ * filantrópicos ({@code montarPrivado}) — revertido por decisão do PO (a base é
+ * público-only por enquanto); o código atual não tem esse caminho.</p>
  */
 final class EstabelecimentoNormalizador {
 

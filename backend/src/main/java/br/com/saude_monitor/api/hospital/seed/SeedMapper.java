@@ -168,7 +168,7 @@ public class SeedMapper {
 
         EnderecoDocument endereco = EnderecoDocument.builder()
                 .logradouro(EstabelecimentoNormalizador.normalizarTexto(registro.logradouro()))
-                .numero(registro.numero())
+                .numero(registro.numero() == null ? null : EstabelecimentoNormalizador.colapsar(registro.numero()))
                 .complemento(null)
                 .bairro(EstabelecimentoNormalizador.normalizarTexto(registro.bairro()))
                 .cidade("Brasília")

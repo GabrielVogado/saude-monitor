@@ -1,6 +1,7 @@
 package br.com.saude_monitor.api.hospital.seed;
 
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
+import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import br.com.saude_monitor.api.hospital.service.GeofenceFactory;
 import org.junit.jupiter.api.Test;
@@ -67,6 +68,7 @@ class SeedRunnerPublicoComplementarTest {
         HospitalDocument jaImportado = HospitalDocument.builder()
                 .id("h-existente")
                 .nome("Instituto de Cardiologia e Transplantes do Distrito Federal")
+                .tipo(TipoEstabelecimento.PUBLICO)
                 .codigoCnes("3276678")
                 .ativo(true)
                 .build();
@@ -77,6 +79,29 @@ class SeedRunnerPublicoComplementarTest {
         runner(dataDir, "upsert").run(null);
 
         verify(hospitalRepository).save(any(HospitalDocument.class));
+    }
+
+    @Test
+    void recusaUpsertQuandoRegistroExistenteTemTipoDivergente(@TempDir Path dataDir) throws Exception {
+        // Cenário hipotético (nenhum pipeline atual produz PRIVADO), mas é exatamente o
+        // que a proteção generalizada em salvarUpsert existe para prevenir: uma colisão
+        // de CNES entre fontes diferentes não pode reclassificar o hospital em silêncio.
+        Files.writeString(dataDir.resolve(SeedRunner.ARQUIVO_PUBLICOS_COMPLEMENTARES), JSON_VALIDO);
+
+        HospitalDocument existentePrivado = HospitalDocument.builder()
+                .id("h-existente")
+                .nome("Instituto de Cardiologia e Transplantes do Distrito Federal")
+                .tipo(TipoEstabelecimento.PRIVADO)
+                .codigoCnes("3276678")
+                .ativo(true)
+                .build();
+
+        when(hospitalRepository.count()).thenReturn(341L);
+        when(hospitalRepository.findByCodigoCnes(eq("3276678"))).thenReturn(Optional.of(existentePrivado));
+
+        runner(dataDir, "upsert").run(null);
+
+        verify(hospitalRepository, org.mockito.Mockito.never()).save(any(HospitalDocument.class));
     }
 
     @Test

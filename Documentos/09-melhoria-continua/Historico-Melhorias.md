@@ -632,6 +632,52 @@ incompleta) da mesma operação. Vale grep pelo nome do método “irmão” mai
 completo (aqui, `LoginService.logout`) sempre que se mexe numa função de
 limpeza/encerramento de sessão.
 
+## M-010 — Base de hospitais sem rede privada/filantrópica (lacuna de dados)
+
+**Data:** 08/09/2026 · **PR:** #103
+
+### O que aconteceu
+
+Ao verificar se a base de 340 hospitais cobria "todos os hospitais existentes"
+(pedido do PO), a rede pública SES-DF conferiu 100% contra a lista oficial da
+Secretaria de Saúde — mas a base **não tinha nenhum hospital privado ou
+filantrópico**, apesar de a Especificação da API citar "públicos e privados"
+como escopo do produto. Avaliada e **rejeitada** a alternativa de refatorar o
+seed para puxar fontes públicas ao vivo no boot (risco de cold start em
+Render/Cloud Run, já documentado em incidentes anteriores).
+
+### O que entrou
+
+- Extrato do CNES/DATASUS (UF=DF, tipo hospitalar) classificado em
+  PRIVADO/FILANTROPICO, deduplicado por nome contra a base existente:
+  **58 hospitais novos** (340 → 398). Proveniência completa em
+  `Documentos/07-dados/relatorio-importacao-CNES_PRIVADOS_20260908.md`,
+  incluindo 2 classificações de confiança baixa sinalizadas para revisão
+  manual e um hospital público (Instituto de Cardiologia e Transplantes do
+  DF) encontrado fora da base atual mas **não** importado — fora de escopo
+  desta tarefa, registrado à parte.
+- `EstabelecimentoNormalizador`: normalização compartilhada entre o
+  pipeline DBF/SHP existente e o novo pipeline JSON, extraída de
+  `SeedMapper` para não duplicar Title Case/CNES/CEP pela segunda vez.
+- Achado do próprio `code-review` (auditoria pesada, antes do PR): o upsert
+  por `codigoCnes` não checava o `tipo` do documento existente — uma
+  colisão de CNES entre o novo registro privado e um hospital público já
+  existente reclassificaria o público em silêncio. Corrigido antes da
+  primeira revisão humana.
+
+### Lição a repetir
+
+A primeira tentativa de classificar público vs. privado pelo dígito inicial
+de `CO_NATUREZA_JUR` classificou errado hospitais públicos genuínos (Hospital
+de Base, HRSM) — fundações públicas de direito privado usam o mesmo código
+que entidades privadas sem fins lucrativos. Sem uma tabela oficial confiável
+de códigos à mão, a classificação final combinou dedup objetivo por nome +
+exceções pequenas e verificadas manualmente + confiança explicitamente
+rebaixada para o código residual `3999`, em vez de assumir a leitura mais
+simples do campo. Vale o mesmo cuidado em qualquer classificação futura que
+dependa de um campo de nomenclatura oficial sem dicionário de dados completo
+à disposição.
+
 ---
 
 ## Anexo A — Matriz de roteamento de skills (transcrição)

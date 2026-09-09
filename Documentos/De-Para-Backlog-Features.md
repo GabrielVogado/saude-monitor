@@ -31,7 +31,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 |---|---|---|---|
 | **E1-01** | Cadastrar hospital (Admin) | **F-01** | ✅ Existente (Protegido Admin) |
 | **E1-02** | Definir geofence (Admin) | **F-01** | ✅ Existente (Via endpoints Admin) |
-| **E1-03** | Listar hospitais (Público) | **F-01**, **F-07** | ✅ Existente (340 importados) |
+| **E1-03** | Listar hospitais (Público) | **F-01**, **F-07** | ✅ Existente (398 importados — 340 da rede pública SES-DF via InfoSaúde/GDF + 58 privados/filantrópicos via CNES/DATASUS, adicionados em 08/09/2026; ver `Documentos/07-dados/relatorio-importacao-CNES_PRIVADOS_20260908.md`) |
 | **E1-04** | Editar/Desativar hospital | **F-01** | ✅ Existente |
 | **E1-05** | Sugerir hospital | **F-07** | ✅ Existente (tela pública + endpoint público) |
 | **E1-06** | Revisar/aprovar/rejeitar sugestão | **F-10** | ✅ Backend no escopo (endpoints aprovar/rejeitar, PR #14). **Telas mobile removidas em 08/09/2026** (auditoria de código morto) — estavam registradas em `App.js` mas inacessíveis (nenhuma navegação do app chegava até elas) e o botão "Aprovar" navegava para uma rota inexistente. O fluxo de aprovação migra integralmente ao **Painel Web (F-11)**, ainda não construído |

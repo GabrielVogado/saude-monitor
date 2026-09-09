@@ -632,6 +632,67 @@ incompleta) da mesma operação. Vale grep pelo nome do método “irmão” mai
 completo (aqui, `LoginService.logout`) sempre que se mexe numa função de
 limpeza/encerramento de sessão.
 
+## M-010 — Um hospital público ausente, achado ao investigar uma lacuna que não era essa
+
+**Data:** 08–09/09/2026 · **PR:** #103 (fechado, não mergeado) → PR seguinte na mesma branch
+
+### O que aconteceu
+
+Ao verificar se a base de 340 hospitais cobria "todos os hospitais existentes"
+(pedido do PO), a rede pública SES-DF conferiu 100% contra a lista oficial da
+Secretaria de Saúde. Interpretando o pedido de forma ampla, um primeiro PR
+(#103, 08/09) classificou um extrato do CNES/DATASUS em PRIVADO/FILANTROPICO
+e propôs importar 58 hospitais — mas **isso nunca tinha sido pedido**: o PO
+esclareceu depois que hospitais privados ficam para uma versão futura, hoje a
+base é só rede pública. PR fechado sem merge, nada foi para produção.
+
+Reaproveitando a mesma extração/normalização/dedup (o PO pediu explicitamente
+para não descartar esse trabalho), o mesmo cruzamento CNES foi refeito com o
+objetivo certo: quantos hospitais **públicos** da rede SES-DF o CNES lista que
+a nossa base não tem. Resposta, depois de verificar manualmente os 21
+candidatos que não batiam por nome (a primeira passada não tinha feito essa
+verificação individual, por não ser o objetivo daquela importação): **1**
+— o Instituto de Cardiologia e Transplantes do Distrito Federal. Os outros 20
+já existiam sob sigla diferente (10: HRAN, HRG, HRL etc.) ou são
+federais/militares/temporários fora da rede SES-DF (10: Hospital Universitário
+de Brasília, hospitais das três Forças Armadas, 5 hospitais de campanha
+COVID-19).
+
+### O que entrou
+
+- `hospitais_publicos_complementares.json`: **1 hospital novo** (340 → 341).
+  Proveniência completa, incluindo a tabela dos 21 candidatos verificados um a
+  um, em `Documentos/07-dados/relatorio-importacao-CNES_PUBLICOS_COMPLEMENTARES_20260909.md`.
+- `EstabelecimentoNormalizador`: normalização compartilhada entre o pipeline
+  DBF/SHP existente e o novo pipeline JSON, extraída de `SeedMapper` para não
+  duplicar Title Case/CNES/CEP pela segunda vez — parte reaproveitada do PR
+  fechado, sem alteração.
+- `SeedMapper#montarPublicoComplementar`: versão simplificada do que era
+  `montarPrivado` no PR #103 — sem campo `tipo` no registro de entrada (é
+  sempre PUBLICO, fixo no código), sem a lógica de rejeitar/aceitar por
+  classificação. A proteção contra colisão de CNES reclassificar um hospital
+  público em silêncio (achado do `code-review` no PR #103) deixou de ser
+  necessária: com uma fonte exclusivamente pública, não há mais o risco que
+  ela existia para prevenir.
+
+### Lição a repetir
+
+Duas, uma de cada PR desta mesma história:
+
+1. **Verificar o escopo antes de expandir a interpretação de um pedido.** "Tenho
+   certeza que pegamos todos os hospitais existentes" foi lido como "inclua
+   privados", uma inferência razoável mas que nunca tinha sido confirmada —
+   e só foi corrigida depois de o código já estar pronto e o PR aberto. Vale
+   perguntar antes de expandir escopo com base em documentação (a
+   Especificação da API menciona "públicos e privados" como contexto de
+   mercado, não como status de implementação — outra leitura apressada).
+2. **Verificação individual dos 21 candidatos** (sigla vs. nome completo)
+   exigiu abrir a razão social e o endereço de cada um no CNES — não deu para
+   confiar apenas no nome normalizado. A mesma tabela permitiu resolver com
+   confiança sigla ambíguas (HRL = "Hospital da Região Leste"; HMAB =
+   "Hospital Militar de Área de Brasília") que não teriam batido por nenhum
+   critério de string matching.
+
 ---
 
 ## Anexo A — Matriz de roteamento de skills (transcrição)

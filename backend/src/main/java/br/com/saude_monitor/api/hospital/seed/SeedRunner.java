@@ -54,6 +54,14 @@ public class SeedRunner implements ApplicationRunner {
     private final SeedMapper seedMapper;
     private final HospitalRepository hospitalRepository;
     private final SeedProperties properties;
+    private final HospitalPublicoComplementarLeitor hospitalPublicoComplementarLeitor;
+
+    /**
+     * Nome do arquivo JSON com hospitais PÚBLICOS do CNES ausentes da fonte InfoSaúde/GDF
+     * (ver {@code backend/data/README.md}). Fonte exclusiva de hospitais públicos — ver
+     * {@link SeedMapper#montarPublicoComplementar}.
+     */
+    static final String ARQUIVO_PUBLICOS_COMPLEMENTARES = "hospitais_publicos_complementares.json";
 
     @Override
     public void run(ApplicationArguments args) {
@@ -118,11 +126,10 @@ public class SeedRunner implements ApplicationRunner {
                         continue;
                     }
                     lidos++;
-                    boolean existia = salvarUpsert(doc);
-                    if (existia) {
-                        atualizados++;
-                    } else {
-                        novos++;
+                    switch (salvarUpsert(doc)) {
+                        case NOVO -> novos++;
+                        case ATUALIZADO -> atualizados++;
+                        case IGNORADO_TIPO_DIVERGENTE -> descartados++;
                     }
                 }
                 camadasProcessadas++;
@@ -132,26 +139,73 @@ public class SeedRunner implements ApplicationRunner {
             log.error("[Seed] Falha ao processar o diretório de dados.", e);
         }
 
+        Path jsonPublicosComplementares = diretorio.resolve(ARQUIVO_PUBLICOS_COMPLEMENTARES);
+        if (Files.isRegularFile(jsonPublicosComplementares)) {
+            try {
+                List<HospitalPublicoComplementarRecord> registros =
+                        hospitalPublicoComplementarLeitor.ler(jsonPublicosComplementares);
+                int lidos = 0;
+                for (HospitalPublicoComplementarRecord registro : registros) {
+                    HospitalDocument doc = seedMapper.montarPublicoComplementar(registro);
+                    if (doc == null) {
+                        descartados++;
+                        continue;
+                    }
+                    lidos++;
+                    switch (salvarUpsert(doc)) {
+                        case NOVO -> novos++;
+                        case ATUALIZADO -> atualizados++;
+                        case IGNORADO_TIPO_DIVERGENTE -> descartados++;
+                    }
+                }
+                log.info("[Seed] Arquivo '{}': {} registro(s) lidos/gravados.",
+                        jsonPublicosComplementares.getFileName(), lidos);
+            } catch (Exception e) {
+                log.error("[Seed] Falha ao processar {}.", jsonPublicosComplementares.getFileName(), e);
+            }
+        }
+
         log.info("[Seed] Concluído — camadas: {}, novos: {}, atualizados: {}, descartados: {}.",
                 camadasProcessadas, novos, atualizados, descartados);
     }
 
-    /** Upsert idempotente por {@code codigoCnes} (primário) ou {@code importKey} (fallback). */
-    private boolean salvarUpsert(HospitalDocument doc) {
+    /** Resultado de {@link #salvarUpsert}, distinto de um simples booleano para poder
+     * contabilizar separadamente o caso em que o upsert foi recusado. */
+    private enum ResultadoUpsert { NOVO, ATUALIZADO, IGNORADO_TIPO_DIVERGENTE }
+
+    /**
+     * Upsert idempotente por {@code codigoCnes} (primário) ou {@code importKey} (fallback).
+     *
+     * <p>Recusa o upsert quando o documento existente tem um {@code tipo} diferente do
+     * documento novo — uma colisão de chave entre fontes/pipelines diferentes com tipo
+     * divergente nunca é esperada (hoje os dois pipelines só produzem PUBLICO), e
+     * sobrescrever reclassificaria o hospital em silêncio. Generalização de uma proteção
+     * que existia só no ponto de entrada de uma fonte específica (código-review do PR
+     * #103) — vale para qualquer pipeline futuro que reutilize este método, não só para
+     * o que a motivou originalmente.</p>
+     */
+    private ResultadoUpsert salvarUpsert(HospitalDocument doc) {
         Optional<HospitalDocument> existente = buscarExistente(doc);
         if (existente.isPresent()) {
+            HospitalDocument atual = existente.get();
+            if (atual.getTipo() != doc.getTipo()) {
+                log.warn("[Seed] '{}' já existe como {}, mas o registro novo é {} — upsert "
+                                + "recusado para não reclassificar em silêncio.",
+                        atual.getNome(), atual.getTipo(), doc.getTipo());
+                return ResultadoUpsert.IGNORADO_TIPO_DIVERGENTE;
+            }
             // Preserva o identificador e a data de criação originais.
-            doc.setId(existente.get().getId());
-            doc.setCriadoEm(existente.get().getCriadoEm());
+            doc.setId(atual.getId());
+            doc.setCriadoEm(atual.getCriadoEm());
         }
         try {
             hospitalRepository.save(doc);
         } catch (org.springframework.dao.DuplicateKeyException e) {
             // Corrida de concorrência: chave única já existente — ignora sem interromper.
             log.warn("[Seed] Registro ignorado por chave duplicada: {}", doc.getNome());
-            return existente.isPresent();
+            return existente.isPresent() ? ResultadoUpsert.ATUALIZADO : ResultadoUpsert.NOVO;
         }
-        return existente.isPresent();
+        return existente.isPresent() ? ResultadoUpsert.ATUALIZADO : ResultadoUpsert.NOVO;
     }
 
     private Optional<HospitalDocument> buscarExistente(HospitalDocument doc) {

@@ -41,6 +41,44 @@ Camadas de estabelecimento processadas (stem do arquivo → categoria):
 O pareamento entre o `.dbf` e o `.shp` é feito **por ordem de registro** (1 DBF ⇄ 1 ponto SHP),
 o mesmo contrato do pipeline ETL de referência.
 
+## Hospitais privados/filantrópicos — `estabelecimentos_privados.json`
+
+Fonte **separada** da rede pública acima: um extrato do **CNES/DATASUS** (competência
+09/2026, filtro `CO_UF=53` e `TP_UNIDADE` hospitalar) com os hospitais privados e
+filantrópicos do Distrito Federal que não fazem parte da rede SES-DF. Diferente do
+DBF/SHP, é **um único arquivo JSON** — o CNES já publica `NU_LATITUDE`/`NU_LONGITUDE`,
+então não há geometria separada nem pareamento por ordem de registro.
+
+Formato (lido por `EstabelecimentoPrivadoLeitor` → `SeedMapper#montarPrivado`):
+
+```json
+[
+  {
+    "nome": "HOSPITAL AGUAS CLARAS",
+    "tipo": "PRIVADO",
+    "codigoCnes": "49867",
+    "logradouro": "R ARARIBA LOTE 03 E",
+    "numero": "05",
+    "bairro": "AGUAS CLARAS",
+    "cep": "71927360",
+    "latitude": -15.845841,
+    "longitude": -48.031202
+  }
+]
+```
+
+- `tipo`: `"PRIVADO"` ou `"FILANTROPICO"` (nunca `"PUBLICO"` — registros públicos
+  encontrados no CNES que não estejam na rede SES-DF são um achado à parte, não entram
+  neste arquivo; ver o relatório de importação).
+- `codigoCnes` é **obrigatório** — sem ele o registro é descartado (é a única chave de
+  dedup disponível para esta fonte, não há coordenada de referência do DBF/SHP para gerar
+  um `importKey`).
+- Os demais campos chegam **brutos** (maiúsculas, sem formatação) — a mesma normalização
+  de Title Case/CEP aplicada ao pipeline DBF/SHP (`EstabelecimentoNormalizador`) é
+  aplicada aqui, então não há necessidade de pré-formatar o arquivo.
+- Proveniência completa, critérios de classificação público/privado/filantrópico, exclusões
+  por duplicata e achados fora de escopo: ver o relatório em `Documentos/07-dados/`.
+
 ## Como o seed é controlado
 
 Configuração em `application.properties` (prefixo `app.seed`):

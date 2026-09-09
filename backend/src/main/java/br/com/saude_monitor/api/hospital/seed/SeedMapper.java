@@ -13,11 +13,9 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.text.Normalizer;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Converte um registro do seed (linha DBF + ponto SHP) em {@link HospitalDocument},
@@ -36,19 +34,16 @@ import java.util.Set;
  *
  * <p>Retorna {@code null} para registros com coordenada inválida (fora do bbox do DF com
  * tolerância) ou sem nome — o runner descarta e contabiliza.</p>
+ *
+ * <p>A normalização (Title Case, CNES, CEP, validação de coordenada) vive em
+ * {@link EstabelecimentoNormalizador}, compartilhada com {@link #montarPrivado}
+ * (fonte JSON do CNES/DATASUS para hospitais privados/filantrópicos).</p>
  */
 @Component
 public class SeedMapper {
 
-    /** Partículas que permanecem minúsculas no Title Case (especificação do ETL). */
-    private static final Set<String> PARTICULAS_MINUSCULAS = Set.of(
-            "de", "da", "do", "das", "dos", "e", "a", "o", "em", "na", "no");
-
-    /** Bounding box do Distrito Federal (lat/lon em graus). */
-    private static final double LAT_MIN = -16.20;
-    private static final double LAT_MAX = -15.40;
-    private static final double LON_MIN = -48.30;
-    private static final double LON_MAX = -47.30;
+    /** Fonte declarada no campo {@code fonte} dos registros vindos do JSON de privados. */
+    static final String FONTE_PRIVADOS_CNES = "CNES_ESTABELECIMENTOS_PRIVADOS";
 
     private final SeedProperties properties;
     private final GeofenceFactory geofenceFactory;
@@ -65,25 +60,25 @@ public class SeedMapper {
      */
     public HospitalDocument montar(CamadaEstabelecimento camada, Map<String, String> linha,
                                    double lon, double lat) {
-        if (!coordenadaValida(lon, lat)) {
+        if (!EstabelecimentoNormalizador.coordenadaValida(lon, lat, properties.toleranciaBbox())) {
             return null;
         }
 
         // Nome — deriva da Região Administrativa quando a camada não tem coluna de nome.
         String nome = valor(linha, camada.getNome());
         if (nome == null) {
-            String ra = normalizarNome(valor(linha, camada.getBairro()));
+            String ra = EstabelecimentoNormalizador.normalizarNome(valor(linha, camada.getBairro()));
             if (ra != null) {
-                nome = normalizarNome("UBS " + ra);
+                nome = EstabelecimentoNormalizador.normalizarNome("UBS " + ra);
             }
         }
-        nome = normalizarNome(nome);
+        nome = EstabelecimentoNormalizador.normalizarNome(nome);
         if (nome == null) {
             return null; // sem nome e sem RA: registro irrecuperável
         }
 
-        String cnes = normalizarCnes(valor(linha, camada.getCnes()));
-        String nomeCanonico = canonicalizar(nome);
+        String cnes = EstabelecimentoNormalizador.normalizarCnes(valor(linha, camada.getCnes()));
+        String nomeCanonico = EstabelecimentoNormalizador.canonicalizar(nome);
 
         Instant agora = Instant.now();
         double raio = properties.raio(camada.getCategoria());
@@ -92,13 +87,13 @@ public class SeedMapper {
                 lat, lon, raio, GeofenceFactory.LADOS_CIRCULO);
 
         EnderecoDocument endereco = EnderecoDocument.builder()
-                .logradouro(normalizarTexto(valor(linha, camada.getEndereco())))
+                .logradouro(EstabelecimentoNormalizador.normalizarTexto(valor(linha, camada.getEndereco())))
                 .numero(valor(linha, camada.getNumero()))
                 .complemento(null)
-                .bairro(normalizarTexto(valor(linha, camada.getBairro())))
+                .bairro(EstabelecimentoNormalizador.normalizarTexto(valor(linha, camada.getBairro())))
                 .cidade("Brasília")
                 .uf("DF")
-                .cep(normalizarCep(valor(linha, camada.getCep())))
+                .cep(EstabelecimentoNormalizador.normalizarCep(valor(linha, camada.getCep())))
                 .build();
 
         HospitalDocument.HospitalDocumentBuilder builder = HospitalDocument.builder()
@@ -106,9 +101,9 @@ public class SeedMapper {
                 .tipo(TipoEstabelecimento.PUBLICO)
                 .categoria(camada.getCategoria())
                 .horarioFuncionamento(valor(linha, camada.getHorario()))
-                .salaVacina(simNaoParaBool(valor(linha, camada.getSalaVacina())))
-                .farmacia(simNaoParaBool(valor(linha, camada.getFarmacia())))
-                .coletaMaterial(simNaoParaBool(valor(linha, camada.getColetaMaterial())))
+                .salaVacina(EstabelecimentoNormalizador.simNaoParaBool(valor(linha, camada.getSalaVacina())))
+                .farmacia(EstabelecimentoNormalizador.simNaoParaBool(valor(linha, camada.getFarmacia())))
+                .coletaMaterial(EstabelecimentoNormalizador.simNaoParaBool(valor(linha, camada.getColetaMaterial())))
                 .tipoUnidade(valor(linha, camada.getTipoUnidade()))
                 .endereco(endereco)
                 .contato(ContatoDocument.builder().telefone(null).email(null).build())
@@ -128,8 +123,85 @@ public class SeedMapper {
         return builder.build();
     }
 
+    /**
+     * Monta o documento a partir de um registro do CNES/DATASUS (hospitais privados/
+     * filantrópicos do DF, fonte JSON — ver {@code EstabelecimentoPrivadoLeitor}).
+     *
+     * <p>Diferente de {@link #montar}, esta fonte já traz coordenadas próprias (CNES
+     * publica {@code NU_LATITUDE}/{@code NU_LONGITUDE}) e exige CNES para dedup estável
+     * — sem CNES, o registro é descartado (não há geometria de referência como no
+     * pipeline DBF/SHP para gerar um {@code importKey} confiável).</p>
+     */
+    public HospitalDocument montarPrivado(EstabelecimentoPrivadoRecord registro) {
+        if (registro.latitude() == null || registro.longitude() == null) {
+            return null;
+        }
+        double lon = registro.longitude();
+        double lat = registro.latitude();
+        if (!EstabelecimentoNormalizador.coordenadaValida(lon, lat, properties.toleranciaBbox())) {
+            return null;
+        }
+
+        String nome = EstabelecimentoNormalizador.normalizarNome(registro.nome());
+        if (nome == null) {
+            return null;
+        }
+
+        TipoEstabelecimento tipo = parseTipo(registro.tipo());
+        if (tipo == null || tipo == TipoEstabelecimento.PUBLICO) {
+            return null; // fonte exclusiva de privados/filantrópicos
+        }
+
+        String cnes = EstabelecimentoNormalizador.normalizarCnes(registro.codigoCnes());
+        if (cnes == null) {
+            return null; // fonte exige CNES para dedup estável
+        }
+
+        Instant agora = Instant.now();
+        double raio = properties.raio(CategoriaEstabelecimento.HOSPITAL);
+        GeoJsonPoint localizacao = new GeoJsonPoint(lon, lat);
+        GeoJsonPolygon geofence = geofenceFactory.criarCirculo(
+                lat, lon, raio, GeofenceFactory.LADOS_CIRCULO);
+
+        EnderecoDocument endereco = EnderecoDocument.builder()
+                .logradouro(EstabelecimentoNormalizador.normalizarTexto(registro.logradouro()))
+                .numero(registro.numero())
+                .complemento(null)
+                .bairro(EstabelecimentoNormalizador.normalizarTexto(registro.bairro()))
+                .cidade("Brasília")
+                .uf("DF")
+                .cep(EstabelecimentoNormalizador.normalizarCep(registro.cep()))
+                .build();
+
+        return HospitalDocument.builder()
+                .nome(nome)
+                .tipo(tipo)
+                .categoria(CategoriaEstabelecimento.HOSPITAL)
+                .endereco(endereco)
+                .contato(ContatoDocument.builder().telefone(null).email(null).build())
+                .geofence(geofence)
+                .localizacao(localizacao)
+                .ativo(true)
+                .fonte(FONTE_PRIVADOS_CNES)
+                .codigoCnes(cnes)
+                .criadoEm(agora)
+                .atualizadoEm(agora)
+                .build();
+    }
+
+    private static TipoEstabelecimento parseTipo(String s) {
+        if (s == null) {
+            return null;
+        }
+        try {
+            return TipoEstabelecimento.valueOf(s.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     // ------------------------------------------------------------------
-    // Extração / sanitização
+    // Extração / sanitização (pipeline DBF)
     // ------------------------------------------------------------------
 
     /** Extrai o valor do campo (chave canonicalizada), sanitiza e converte vazio em null. */
@@ -141,132 +213,13 @@ public class SeedMapper {
         if (v == null) {
             return null;
         }
-        String limpo = limparCaracteresInvalidos(v);
+        String limpo = EstabelecimentoNormalizador.limparCaracteresInvalidos(v);
         return limpo.isEmpty() ? null : limpo;
     }
 
-    /** Corrige U+FFFD (ex.: "N�" → "Nº") e colapsa espaços. */
-    private static String limparCaracteresInvalidos(String s) {
-        s = s.replace("N\uFFFD", "Nº").replace("n\uFFFD", "nº");
-        s = s.replace("\uFFFD", " ");
-        return colapsar(s);
-    }
-
-    private boolean coordenadaValida(double lon, double lat) {
-        if (lon == 0.0 && lat == 0.0) {
-            return false;
-        }
-        if (!(-180.0 <= lon && lon <= 180.0 && -90.0 <= lat && lat <= 90.0)) {
-            return false;
-        }
-        double tol = properties.toleranciaBbox();
-        return (LAT_MIN - tol <= lat && lat <= LAT_MAX + tol
-                && LON_MIN - tol <= lon && lon <= LON_MAX + tol);
-    }
-
     // ------------------------------------------------------------------
-    // Normalização (espelha o ETL de referência)
+    // Dedup (registros sem CNES)
     // ------------------------------------------------------------------
-
-    /** Title Case com partículas minúsculas. */
-    private static String normalizarNome(String s) {
-        if (s == null) {
-            return null;
-        }
-        String colapsado = colapsar(s);
-        if (colapsado.isEmpty()) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder();
-        for (String p : colapsado.split(" ")) {
-            if (p.isEmpty()) {
-                continue;
-            }
-            String low = p.toLowerCase(Locale.ROOT);
-            sb.append(PARTICULAS_MINUSCULAS.contains(low) ? low : capitalizePalavra(low))
-                    .append(' ');
-        }
-        String resultado = sb.toString().trim();
-        return resultado.isEmpty() ? null : resultado;
-    }
-
-    /** Title Case em TODAS as palavras (logradouro/bairro/cidade). */
-    private static String normalizarTexto(String s) {
-        if (s == null) {
-            return null;
-        }
-        String colapsado = colapsar(s);
-        if (colapsado.isEmpty()) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder();
-        for (String p : colapsado.split(" ")) {
-            if (p.isEmpty()) {
-                continue;
-            }
-            sb.append(capitalizePalavra(p)).append(' ');
-        }
-        String resultado = sb.toString().trim();
-        return resultado.isEmpty() ? null : resultado;
-    }
-
-    /** Forma canônica para dedup: minúsculas, sem acento, espaços colapsados (mantém pontuação). */
-    private static String canonicalizar(String s) {
-        return colapsar(semAcento(s).toLowerCase(Locale.ROOT));
-    }
-
-    /** Remove dígitos não-numéricos e completa à esquerda até 7 posições. */
-    private static String normalizarCnes(String s) {
-        if (s == null) {
-            return null;
-        }
-        StringBuilder digitos = new StringBuilder();
-        for (char c : s.toCharArray()) {
-            if (Character.isDigit(c)) {
-                digitos.append(c);
-            }
-        }
-        if (digitos.length() == 0) {
-            return null;
-        }
-        String d = digitos.toString();
-        while (d.length() < 7) {
-            d = "0" + d;
-        }
-        return d;
-    }
-
-    /** Formata CEP como {@code #####-###}; null se não houver exatamente 8 dígitos. */
-    private static String normalizarCep(String s) {
-        if (s == null) {
-            return null;
-        }
-        StringBuilder digitos = new StringBuilder();
-        for (char c : s.toCharArray()) {
-            if (Character.isDigit(c)) {
-                digitos.append(c);
-            }
-        }
-        if (digitos.length() != 8) {
-            return null;
-        }
-        return digitos.substring(0, 5) + "-" + digitos.substring(5);
-    }
-
-    /** Converte "SIM"/"NÃO" (tolerante) em booleano; null se ausente/ambíguo. */
-    private static Boolean simNaoParaBool(String s) {
-        if (s == null) {
-            return null;
-        }
-        String v = semAcento(s.trim()).toUpperCase(Locale.ROOT);
-        if ("SIM".equals(v) || "S".equals(v)) {
-            return true;
-        }
-        if ("NAO".equals(v) || "N".equals(v) || "NO".equals(v)) {
-            return false;
-        }
-        return null;
-    }
 
     /** sha256({@code categoria|nomeCanonico|lon|lat}) — chave de dedup sem CNES. */
     private static String gerarImportKey(CategoriaEstabelecimento categoria, String nomeCanonico,
@@ -289,25 +242,5 @@ public class SeedMapper {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 indisponível na JVM", e);
         }
-    }
-
-    // ------------------------------------------------------------------
-    // Utilidades
-    // ------------------------------------------------------------------
-
-    private static String semAcento(String s) {
-        return Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
-    }
-
-    private static String colapsar(String s) {
-        return s.trim().replaceAll("\\s+", " ");
-    }
-
-    /** Equivalente a {@code str.capitalize()} do Python: 1ª letra maiúscula, resto minúsculo. */
-    private static String capitalizePalavra(String s) {
-        if (s.isEmpty()) {
-            return s;
-        }
-        return s.substring(0, 1).toUpperCase(Locale.ROOT) + s.substring(1).toLowerCase(Locale.ROOT);
     }
 }

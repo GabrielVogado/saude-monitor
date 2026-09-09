@@ -54,6 +54,10 @@ public class SeedRunner implements ApplicationRunner {
     private final SeedMapper seedMapper;
     private final HospitalRepository hospitalRepository;
     private final SeedProperties properties;
+    private final EstabelecimentoPrivadoLeitor estabelecimentoPrivadoLeitor;
+
+    /** Nome do arquivo JSON com os hospitais privados/filantrópicos do CNES (ver {@code backend/data/README.md}). */
+    static final String ARQUIVO_PRIVADOS = "estabelecimentos_privados.json";
 
     @Override
     public void run(ApplicationArguments args) {
@@ -130,6 +134,31 @@ public class SeedRunner implements ApplicationRunner {
             }
         } catch (Exception e) {
             log.error("[Seed] Falha ao processar o diretório de dados.", e);
+        }
+
+        Path jsonPrivados = diretorio.resolve(ARQUIVO_PRIVADOS);
+        if (Files.isRegularFile(jsonPrivados)) {
+            try {
+                List<EstabelecimentoPrivadoRecord> registros = estabelecimentoPrivadoLeitor.ler(jsonPrivados);
+                int lidos = 0;
+                for (EstabelecimentoPrivadoRecord registro : registros) {
+                    HospitalDocument doc = seedMapper.montarPrivado(registro);
+                    if (doc == null) {
+                        descartados++;
+                        continue;
+                    }
+                    lidos++;
+                    boolean existia = salvarUpsert(doc);
+                    if (existia) {
+                        atualizados++;
+                    } else {
+                        novos++;
+                    }
+                }
+                log.info("[Seed] Arquivo '{}': {} registro(s) lidos/gravados.", jsonPrivados.getFileName(), lidos);
+            } catch (Exception e) {
+                log.error("[Seed] Falha ao processar {}.", jsonPrivados.getFileName(), e);
+            }
         }
 
         log.info("[Seed] Concluído — camadas: {}, novos: {}, atualizados: {}, descartados: {}.",

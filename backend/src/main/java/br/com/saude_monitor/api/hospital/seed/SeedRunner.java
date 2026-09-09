@@ -1,6 +1,7 @@
 package br.com.saude_monitor.api.hospital.seed;
 
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
+import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -144,6 +145,19 @@ public class SeedRunner implements ApplicationRunner {
                 for (EstabelecimentoPrivadoRecord registro : registros) {
                     HospitalDocument doc = seedMapper.montarPrivado(registro);
                     if (doc == null) {
+                        descartados++;
+                        continue;
+                    }
+                    // CNES é a única chave de dedup desta fonte (ver montarPrivado). Se já
+                    // pertencer a um hospital PUBLICO existente (colisão de código — possível
+                    // em dados CNES, ver o relatório de importação), não sobrescreve: um
+                    // upsert normal trocaria o tipo do hospital público em silêncio.
+                    Optional<HospitalDocument> existentePublico = hospitalRepository.findByCodigoCnes(doc.getCodigoCnes())
+                            .filter(h -> h.getTipo() == TipoEstabelecimento.PUBLICO);
+                    if (existentePublico.isPresent()) {
+                        log.warn("[Seed] CNES {} já pertence ao hospital público '{}' — registro "
+                                        + "privado/filantrópico ignorado (não reclassifica um hospital público existente).",
+                                doc.getCodigoCnes(), existentePublico.get().getNome());
                         descartados++;
                         continue;
                     }

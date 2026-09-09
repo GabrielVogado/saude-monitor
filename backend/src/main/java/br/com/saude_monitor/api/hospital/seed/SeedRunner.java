@@ -1,7 +1,6 @@
 package br.com.saude_monitor.api.hospital.seed;
 
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
-import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,10 +54,14 @@ public class SeedRunner implements ApplicationRunner {
     private final SeedMapper seedMapper;
     private final HospitalRepository hospitalRepository;
     private final SeedProperties properties;
-    private final EstabelecimentoPrivadoLeitor estabelecimentoPrivadoLeitor;
+    private final HospitalPublicoComplementarLeitor hospitalPublicoComplementarLeitor;
 
-    /** Nome do arquivo JSON com os hospitais privados/filantrópicos do CNES (ver {@code backend/data/README.md}). */
-    static final String ARQUIVO_PRIVADOS = "estabelecimentos_privados.json";
+    /**
+     * Nome do arquivo JSON com hospitais PÚBLICOS do CNES ausentes da fonte InfoSaúde/GDF
+     * (ver {@code backend/data/README.md}). Fonte exclusiva de hospitais públicos — ver
+     * {@link SeedMapper#montarPublicoComplementar}.
+     */
+    static final String ARQUIVO_PUBLICOS_COMPLEMENTARES = "hospitais_publicos_complementares.json";
 
     @Override
     public void run(ApplicationArguments args) {
@@ -137,27 +140,15 @@ public class SeedRunner implements ApplicationRunner {
             log.error("[Seed] Falha ao processar o diretório de dados.", e);
         }
 
-        Path jsonPrivados = diretorio.resolve(ARQUIVO_PRIVADOS);
-        if (Files.isRegularFile(jsonPrivados)) {
+        Path jsonPublicosComplementares = diretorio.resolve(ARQUIVO_PUBLICOS_COMPLEMENTARES);
+        if (Files.isRegularFile(jsonPublicosComplementares)) {
             try {
-                List<EstabelecimentoPrivadoRecord> registros = estabelecimentoPrivadoLeitor.ler(jsonPrivados);
+                List<HospitalPublicoComplementarRecord> registros =
+                        hospitalPublicoComplementarLeitor.ler(jsonPublicosComplementares);
                 int lidos = 0;
-                for (EstabelecimentoPrivadoRecord registro : registros) {
-                    HospitalDocument doc = seedMapper.montarPrivado(registro);
+                for (HospitalPublicoComplementarRecord registro : registros) {
+                    HospitalDocument doc = seedMapper.montarPublicoComplementar(registro);
                     if (doc == null) {
-                        descartados++;
-                        continue;
-                    }
-                    // CNES é a única chave de dedup desta fonte (ver montarPrivado). Se já
-                    // pertencer a um hospital PUBLICO existente (colisão de código — possível
-                    // em dados CNES, ver o relatório de importação), não sobrescreve: um
-                    // upsert normal trocaria o tipo do hospital público em silêncio.
-                    Optional<HospitalDocument> existentePublico = hospitalRepository.findByCodigoCnes(doc.getCodigoCnes())
-                            .filter(h -> h.getTipo() == TipoEstabelecimento.PUBLICO);
-                    if (existentePublico.isPresent()) {
-                        log.warn("[Seed] CNES {} já pertence ao hospital público '{}' — registro "
-                                        + "privado/filantrópico ignorado (não reclassifica um hospital público existente).",
-                                doc.getCodigoCnes(), existentePublico.get().getNome());
                         descartados++;
                         continue;
                     }
@@ -169,9 +160,10 @@ public class SeedRunner implements ApplicationRunner {
                         novos++;
                     }
                 }
-                log.info("[Seed] Arquivo '{}': {} registro(s) lidos/gravados.", jsonPrivados.getFileName(), lidos);
+                log.info("[Seed] Arquivo '{}': {} registro(s) lidos/gravados.",
+                        jsonPublicosComplementares.getFileName(), lidos);
             } catch (Exception e) {
-                log.error("[Seed] Falha ao processar {}.", jsonPrivados.getFileName(), e);
+                log.error("[Seed] Falha ao processar {}.", jsonPublicosComplementares.getFileName(), e);
             }
         }
 

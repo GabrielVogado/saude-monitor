@@ -36,14 +36,14 @@ import java.util.Map;
  * tolerância) ou sem nome — o runner descarta e contabiliza.</p>
  *
  * <p>A normalização (Title Case, CNES, CEP, validação de coordenada) vive em
- * {@link EstabelecimentoNormalizador}, compartilhada com {@link #montarPrivado}
- * (fonte JSON do CNES/DATASUS para hospitais privados/filantrópicos).</p>
+ * {@link EstabelecimentoNormalizador}, compartilhada com {@link #montarPublicoComplementar}
+ * (fonte JSON do CNES/DATASUS para hospitais públicos ausentes da fonte InfoSaúde/GDF).</p>
  */
 @Component
 public class SeedMapper {
 
-    /** Fonte declarada no campo {@code fonte} dos registros vindos do JSON de privados. */
-    static final String FONTE_PRIVADOS_CNES = "CNES_ESTABELECIMENTOS_PRIVADOS";
+    /** Fonte declarada no campo {@code fonte} dos registros vindos do JSON complementar. */
+    static final String FONTE_PUBLICOS_COMPLEMENTARES_CNES = "CNES_HOSPITAIS_PUBLICOS_COMPLEMENTARES";
 
     private final SeedProperties properties;
     private final GeofenceFactory geofenceFactory;
@@ -124,15 +124,23 @@ public class SeedMapper {
     }
 
     /**
-     * Monta o documento a partir de um registro do CNES/DATASUS (hospitais privados/
-     * filantrópicos do DF, fonte JSON — ver {@code EstabelecimentoPrivadoLeitor}).
+     * Monta o documento a partir de um registro do CNES/DATASUS — hospitais PÚBLICOS que
+     * o CNES lista no DF mas que não aparecem na fonte InfoSaúde/GDF (fonte JSON, ver
+     * {@link HospitalPublicoComplementarLeitor}).
+     *
+     * <p>Fonte exclusiva de hospitais PÚBLICOS — hospitais privados/filantrópicos ficam
+     * fora de escopo por decisão do PO (08/09/2026, ver
+     * {@code Documentos/07-dados/relatorio-importacao-CNES_PUBLICOS_COMPLEMENTARES_20260909.md}).
+     * Por isso {@code tipo} é sempre {@link TipoEstabelecimento#PUBLICO}, fixo — não há
+     * campo de classificação a ler do registro nem risco de importar algo fora do
+     * escopo atual por engano.</p>
      *
      * <p>Diferente de {@link #montar}, esta fonte já traz coordenadas próprias (CNES
      * publica {@code NU_LATITUDE}/{@code NU_LONGITUDE}) e exige CNES para dedup estável
      * — sem CNES, o registro é descartado (não há geometria de referência como no
      * pipeline DBF/SHP para gerar um {@code importKey} confiável).</p>
      */
-    public HospitalDocument montarPrivado(EstabelecimentoPrivadoRecord registro) {
+    public HospitalDocument montarPublicoComplementar(HospitalPublicoComplementarRecord registro) {
         if (registro.latitude() == null || registro.longitude() == null) {
             return null;
         }
@@ -145,11 +153,6 @@ public class SeedMapper {
         String nome = EstabelecimentoNormalizador.normalizarNome(registro.nome());
         if (nome == null) {
             return null;
-        }
-
-        TipoEstabelecimento tipo = parseTipo(registro.tipo());
-        if (tipo == null || tipo == TipoEstabelecimento.PUBLICO) {
-            return null; // fonte exclusiva de privados/filantrópicos
         }
 
         String cnes = EstabelecimentoNormalizador.normalizarCnes(registro.codigoCnes());
@@ -175,29 +178,18 @@ public class SeedMapper {
 
         return HospitalDocument.builder()
                 .nome(nome)
-                .tipo(tipo)
+                .tipo(TipoEstabelecimento.PUBLICO)
                 .categoria(CategoriaEstabelecimento.HOSPITAL)
                 .endereco(endereco)
                 .contato(ContatoDocument.builder().telefone(null).email(null).build())
                 .geofence(geofence)
                 .localizacao(localizacao)
                 .ativo(true)
-                .fonte(FONTE_PRIVADOS_CNES)
+                .fonte(FONTE_PUBLICOS_COMPLEMENTARES_CNES)
                 .codigoCnes(cnes)
                 .criadoEm(agora)
                 .atualizadoEm(agora)
                 .build();
-    }
-
-    private static TipoEstabelecimento parseTipo(String s) {
-        if (s == null) {
-            return null;
-        }
-        try {
-            return TipoEstabelecimento.valueOf(s.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
     }
 
     // ------------------------------------------------------------------

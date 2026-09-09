@@ -41,43 +41,52 @@ Camadas de estabelecimento processadas (stem do arquivo → categoria):
 O pareamento entre o `.dbf` e o `.shp` é feito **por ordem de registro** (1 DBF ⇄ 1 ponto SHP),
 o mesmo contrato do pipeline ETL de referência.
 
-## Hospitais privados/filantrópicos — `estabelecimentos_privados.json`
+## Hospitais públicos complementares — `hospitais_publicos_complementares.json`
 
 Fonte **separada** da rede pública acima: um extrato do **CNES/DATASUS** (competência
-09/2026, filtro `CO_UF=53` e `TP_UNIDADE` hospitalar) com os hospitais privados e
-filantrópicos do Distrito Federal que não fazem parte da rede SES-DF. Diferente do
-DBF/SHP, é **um único arquivo JSON** — o CNES já publica `NU_LATITUDE`/`NU_LONGITUDE`,
-então não há geometria separada nem pareamento por ordem de registro.
+09/2026, filtro `CO_UF=53` e `TP_UNIDADE` hospitalar) com hospitais **PÚBLICOS** que o
+CNES lista no DF mas que a fonte InfoSaúde/GDF (DBF/SHP) não traz — descoberto ao
+verificar a cobertura da base contra a lista oficial de hospitais.
 
-Formato (lido por `EstabelecimentoPrivadoLeitor` → `SeedMapper#montarPrivado`):
+> ⚠️ **Escopo (decisão do PO, 08/09/2026): só hospitais públicos.** O mesmo
+> levantamento CNES também classificou hospitais privados/filantrópicos do DF — essa
+> parte **não é importada** (fica para uma versão futura). Este arquivo traz somente o
+> subconjunto público; não existe campo `tipo` porque todo registro aqui é PÚBLICO por
+> construção (ver `SeedMapper#montarPublicoComplementar`). O histórico completo da
+> classificação privada/filantrópica (58 registros, já revertida) fica preservado no PR
+> #103 (fechado, não mergeado) para quando a feature entrar em escopo.
+
+Diferente do DBF/SHP, é **um único arquivo JSON** — o CNES já publica
+`NU_LATITUDE`/`NU_LONGITUDE`, então não há geometria separada nem pareamento por ordem
+de registro.
+
+Formato (lido por `HospitalPublicoComplementarLeitor` → `SeedMapper#montarPublicoComplementar`):
 
 ```json
 [
   {
-    "nome": "HOSPITAL AGUAS CLARAS",
-    "tipo": "PRIVADO",
-    "codigoCnes": "49867",
-    "logradouro": "R ARARIBA LOTE 03 E",
-    "numero": "05",
-    "bairro": "AGUAS CLARAS",
-    "cep": "71927360",
-    "latitude": -15.845841,
-    "longitude": -48.031202
+    "nome": "INSTITUTO DE CARDIOLOGIA E TRANSPLANTES DO DISTRITO FEDERAL",
+    "codigoCnes": "3276678",
+    "logradouro": "ST SUDOESTE CRUZEIRO SUDOESTE OCTOGONAL",
+    "numero": "S/N",
+    "bairro": "CRUZEIRO NOVO",
+    "cep": "70675731",
+    "latitude": -15.801428,
+    "longitude": -47.935961
   }
 ]
 ```
 
-- `tipo`: `"PRIVADO"` ou `"FILANTROPICO"` (nunca `"PUBLICO"` — registros públicos
-  encontrados no CNES que não estejam na rede SES-DF são um achado à parte, não entram
-  neste arquivo; ver o relatório de importação).
 - `codigoCnes` é **obrigatório** — sem ele o registro é descartado (é a única chave de
   dedup disponível para esta fonte, não há coordenada de referência do DBF/SHP para gerar
   um `importKey`).
 - Os demais campos chegam **brutos** (maiúsculas, sem formatação) — a mesma normalização
   de Title Case/CEP aplicada ao pipeline DBF/SHP (`EstabelecimentoNormalizador`) é
   aplicada aqui, então não há necessidade de pré-formatar o arquivo.
-- Proveniência completa, critérios de classificação público/privado/filantrópico, exclusões
-  por duplicata e achados fora de escopo: ver o relatório em `Documentos/07-dados/`.
+- Proveniência completa — os 21 candidatos públicos encontrados no CNES, quais já
+  existiam na base sob sigla diferente (10), quais são federais/militares/temporários
+  fora do escopo da rede SES-DF (10), e o único genuinamente ausente (1): ver o relatório
+  em `Documentos/07-dados/`.
 
 ## Como o seed é controlado
 

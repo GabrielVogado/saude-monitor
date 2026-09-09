@@ -35,6 +35,7 @@ import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.geo.GeoJsonPolygon;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -330,6 +331,20 @@ public class HospitalServiceImpl implements HospitalService {
         if (tipo != null) {
             query.addCriteria(Criteria.where("tipo").is(tipo));
         }
+        // Ordenação estável obrigatória: a paginação abaixo é feita em memória (subList),
+        // e sem um `Sort` explícito a ordem "natural" do MongoDB não é garantida entre
+        // chamadas. Isso quebrava a listagem sem filtro geoespacial (mapa "Todos" e a aba
+        // Hospitais): com `size` limitado a 100 pelo controller e ~340 hospitais ativos,
+        // um cliente que percorre página a página até completar o total (única forma de
+        // ver o catálogo inteiro sem cap único) dependia dessa ordem para não pular nem
+        // repetir hospitais entre uma chamada e a próxima.
+        //
+        // `nome` sozinho não é ordem total: o `ImportadorEstabelecimentos` (migração CNES)
+        // grava direto via `hospitalRepository.save`, sem passar por `validarUnicidade`, e
+        // dois estabelecimentos importados podem legitimamente compartilhar o mesmo nome.
+        // Para esse par, o Mongo não garante ordem relativa consistente entre chamadas — daí
+        // o `id` como critério de desempate.
+        query.with(Sort.by(Sort.Direction.ASC, "nome").and(Sort.by(Sort.Direction.ASC, "id")));
         // A filtragem por nome é feita em memória (e não via regex no MongoDB) para
         // suportar busca insensível a acentos/caixa de forma consistente nas duas rotas
         // de listagem. O volume de registros (~340) torna essa abordagem segura.

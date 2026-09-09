@@ -60,26 +60,68 @@ function GeolocalizacaoContent({ navigation }) {
   posicaoRef.current = coordenadas;
   const temGps = coordenadas !== null;
 
+  // Identifica a carga em andamento: ao trocar o raio (ou o GPS aparecer/desaparecer)
+  // no meio da paginação incremental abaixo, a chamada antiga precisa parar de
+  // escrever no estado em vez de sobrescrever a lista da carga nova.
+  const cargaEmAndamentoRef = useRef(0);
+
   const carregarHospitais = useCallback(async () => {
     const posicao = posicaoRef.current;
-
-    // Filtro por raio exige posição: sem GPS, mantém o catálogo completo.
-    const filtros =
-      raioKm !== null && posicao
-        ? {
-            latitude: posicao.latitude,
-            longitude: posicao.longitude,
-            raioKm,
-            size: 100,
-          }
-        : { size: 100 };
+    const idCarga = ++cargaEmAndamentoRef.current;
 
     setErroHospitais(null);
+
+    // Filtro por raio exige posição: sem GPS, mantém o catálogo completo (bloco abaixo).
+    if (raioKm !== null && posicao) {
+      // O recorte geográfico já restringe o resultado a poucos hospitais — cabe
+      // numa única página.
+      try {
+        const data = await HospitalService.listar({
+          latitude: posicao.latitude,
+          longitude: posicao.longitude,
+          raioKm,
+          size: 100,
+        });
+        if (cargaEmAndamentoRef.current === idCarga) {
+          setHospitais(data?.content || data || []);
+        }
+      } catch (e) {
+        if (cargaEmAndamentoRef.current === idCarga) {
+          setErroHospitais(e.message || "Não foi possível carregar os hospitais.");
+        }
+      }
+      return;
+    }
+
+    // "Todos": o catálogo (~340 hospitais) excede o `size` máximo aceito pelo
+    // backend (100, ver HospitalController). Busca todas as páginas em sequência
+    // e vai atualizando o mapa lote a lote — mostrar todas as unidades (item 05)
+    // sem voltar a montar centenas de marcadores numa única leva, que era o risco
+    // de ANR já mitigado (Plano-Sprints-v2.1 §21.6 / BUG-04 no topo deste arquivo).
+    let pagina = 0;
+    let acumulado = [];
     try {
-      const data = await HospitalService.listar(filtros);
-      setHospitais(data?.content || data || []);
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const data = await HospitalService.listar({ page: pagina, size: 100 });
+        if (cargaEmAndamentoRef.current !== idCarga) {
+          return;
+        }
+
+        const lote = data?.content || [];
+        acumulado = pagina === 0 ? lote : acumulado.concat(lote);
+        setHospitais(acumulado);
+
+        const total = data?.totalElements ?? acumulado.length;
+        if (lote.length === 0 || acumulado.length >= total) {
+          break;
+        }
+        pagina += 1;
+      }
     } catch (e) {
-      setErroHospitais(e.message || "Não foi possível carregar os hospitais.");
+      if (cargaEmAndamentoRef.current === idCarga) {
+        setErroHospitais(e.message || "Não foi possível carregar os hospitais.");
+      }
     }
   }, [raioKm]);
 

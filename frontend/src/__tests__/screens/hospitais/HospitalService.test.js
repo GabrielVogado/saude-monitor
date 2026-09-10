@@ -6,6 +6,7 @@ import HospitalService from "../../../screens/hospitais/service/HospitalService"
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../../screens/auth/service/LoginService";
 import { reiniciarControleDeRenovacao } from "../../../config/sessao";
+import { ErroServidorIndisponivel } from "../../../config/http";
 
 process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
 
@@ -111,6 +112,21 @@ describe("HospitalService (Épico 01)", () => {
     expect(LoginService.refresh).toHaveBeenCalledTimes(1);
     expect(LoginService.logout).not.toHaveBeenCalled();
     expect(global.fetch).toHaveBeenCalledTimes(4);
+  });
+
+  test("refresh falha por servidor indisponível (cold start) — não desloga, preserva a sessão", async () => {
+    // Achado de 10/09/2026: antes, QUALQUER falha do refresh (inclusive esta, sem
+    // relação com o refresh token válido por 30 dias) disparava logout permanente.
+    await TokenStorage.salvarTokens({ accessToken: "OLD", refreshToken: "R" });
+    LoginService.refresh.mockRejectedValue(
+      new ErroServidorIndisponivel("https://api.test/api/v1/auth/refresh")
+    );
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "expirado" }, 401));
+
+    await expect(HospitalService.listar({ size: 10 })).rejects.toThrow(/indisponível/i);
+
+    expect(LoginService.logout).not.toHaveBeenCalled();
+    expect(await TokenStorage.getRefreshToken()).toBe("R");
   });
 
   test("401 sem refresh token NÃO tenta renovar e lança o envelope de erro", async () => {

@@ -1,6 +1,6 @@
 import { buildApiUrl } from "../../../config/api";
 import { classificarErroDeRede, fetchComRetry } from "../../../config/http";
-import { geracaoDaSessao, renovarSessao } from "../../../config/sessao";
+import { deveEncerrarSessao, geracaoDaSessao, renovarSessao } from "../../../config/sessao";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../auth/service/LoginService";
 
@@ -60,9 +60,15 @@ async function request(path, { method = "GET", body, headers = {} } = {}) {
       try {
         await renovarSessao(() => LoginService.refresh(), geracao);
         response = await doFetch();
-      } catch {
-        await LoginService.logout();
-        throw new Error("Sessão expirada. Faça login novamente.");
+      } catch (erroRenovacao) {
+        // Só desloga quando o servidor rejeitou o token (401/403) — falha de rede ou
+        // servidor indisponível (ex.: cold start) preserva a sessão local, o refresh
+        // token (30 dias) segue bom para a próxima tentativa (achado de 10/09/2026).
+        if (deveEncerrarSessao(erroRenovacao)) {
+          await LoginService.logout();
+          throw new Error("Sessão expirada. Faça login novamente.");
+        }
+        throw erroRenovacao;
       }
     }
   }

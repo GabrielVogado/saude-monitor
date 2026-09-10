@@ -1,3 +1,5 @@
+import { ErroDeConexao } from "./http";
+
 /**
  * Coordenação da renovação do access token entre requisições concorrentes.
  *
@@ -77,4 +79,33 @@ export async function renovarSessao(executarRenovacao, geracaoObservada) {
 export function reiniciarControleDeRenovacao() {
   renovacaoEmCurso = null;
   geracao = 0;
+}
+
+/**
+ * Decide se uma falha ao renovar a sessão deve encerrá-la (logout) ou não.
+ *
+ * Achado de 10/09/2026: os 5 pontos que chamam `renovarSessao` tratavam QUALQUER
+ * falha do refresh como "sessão morta" — inclusive um 503 do backend em cold start
+ * (medido ~14s nesta sessão) ou uma falha de rede passageira, que nada têm a ver com
+ * o refresh token (válido por 30 dias) estar realmente inválido. O access token dura
+ * só 15 minutos, então esse cenário é comum: o app fica ocioso, o backend "esfria"
+ * junto, e a primeira tentativa de renovar ao reabrir o app cai exatamente nessa
+ * janela — deslogando o usuário sem necessidade.
+ *
+ * Só desloga quando o SERVIDOR respondeu explicitamente que o token não vale mais
+ * (401/403 do próprio endpoint `/auth/refresh`), ou quando não havia refresh token
+ * armazenado para começar (erro local, síncrono, lançado por `LoginService.refresh`
+ * antes de qualquer chamada de rede — cai no fallback abaixo, sem `.status` e sem
+ * ser `ErroDeConexao`). Qualquer falha de transporte (sem internet, timeout,
+ * servidor indisponível) ou outro status HTTP que não seja uma rejeição explícita do
+ * token preserva a sessão local — a próxima tentativa usa o mesmo refresh token.
+ */
+export function deveEncerrarSessao(erro) {
+  if (erro instanceof ErroDeConexao) {
+    return false;
+  }
+  if (typeof erro?.status === "number") {
+    return erro.status === 401 || erro.status === 403;
+  }
+  return true;
 }

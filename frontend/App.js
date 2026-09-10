@@ -51,6 +51,22 @@ function HospitaisStack() {
     );
 }
 
+// Stack da aba Mapa (F-07): pilha própria, no mesmo padrão da aba Hospitais.
+// Sem isso, abrir o detalhe do hospital a partir de um pino do mapa navegava para
+// dentro da pilha da aba Hospitais (`navigation.navigate("Hospitais", { screen:
+// "HospitalDetalhe" })`) — voltar pousava na lista de Hospitais, não no mapa de
+// onde o usuário veio. Relatado pelo PO em uso real (10/09/2026): "não consigo
+// retornar para a aba de mapas", enquanto o mesmo fluxo pela lista já funcionava
+// (HospitalDetalhe já vivia dentro da própria pilha da aba Hospitais).
+function MapaStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="MapaTela" component={GeoLocalizacaoScreen} />
+            <Stack.Screen name="HospitalDetalhe" component={HospitalDetalheScreen} />
+        </Stack.Navigator>
+    );
+}
+
 // Stack da aba Perfil (Épico 05 — conta, consentimento, privacidade; F0-05).
 function PerfilStack() {
     return (
@@ -129,7 +145,7 @@ function Tabs() {
             />
             <Tab.Screen
                 name="Mapa"
-                component={GeoLocalizacaoScreen}
+                component={MapaStack}
                 options={{
                     tabBarLabel: "Mapa",
                     tabBarAccessibilityLabel: "Mapa — hospitais e geolocalização",

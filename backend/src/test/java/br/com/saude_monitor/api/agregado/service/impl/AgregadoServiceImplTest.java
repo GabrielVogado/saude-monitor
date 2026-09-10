@@ -21,8 +21,12 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -246,5 +250,96 @@ class AgregadoServiceImplTest {
         assertThat(detalhe.nVisitas()).isEqualTo(34);
         assertThat(detalhe.periodo().inicio()).isEqualTo(Instant.parse("2026-05-10T00:00:00Z"));
         assertThat(detalhe.periodo().fim()).isEqualTo(Instant.parse("2026-08-07T23:59:59Z"));
+    }
+
+    // ------------------------------------------------ recalcularPendentes (09/09/2026) -----------------------------
+
+    private VisitaDocument visitaFinalizadaDe(String hospitalId) {
+        return VisitaDocument.builder()
+                .hospitalId(hospitalId)
+                .status(StatusVisita.FINALIZADA)
+                .tipoPermanencia(TipoPermanencia.ATENDIMENTO)
+                .build();
+    }
+
+    /**
+     * Antes recalculava os ~340 hospitais ativos a cada execução, mesmo sem nenhuma
+     * mudança. Agora só recalcula quem teve feedback ou visita finalizada recente —
+     * este teste falha se o full scan voltar (h3, sem atividade, seria recalculado).
+     */
+    @Test
+    void recalcularPendentesRecalculaSoQuemTeveAtividadeRecente() {
+        AgregadoServiceImpl spyService = spy((AgregadoServiceImpl) service);
+        doReturn(null).when(spyService).recalcular(anyString());
+
+        when(feedbackRepository.findByCriadoEmAfter(any()))
+                .thenReturn(List.of(feedback("h1", 4)));
+        when(visitaRepository.findByStatusInAndProcessadoEmAfter(any(), any()))
+                .thenReturn(List.of(visitaFinalizadaDe("h2")));
+
+        spyService.recalcularPendentes();
+
+        verify(spyService).recalcular("h1");
+        verify(spyService).recalcular("h2");
+        verify(spyService, never()).recalcular("h3");
+        verify(hospitalRepository, never()).findAllByAtivoTrue();
+    }
+
+    /**
+     * Achado do code-review de 09/09/2026: `saida` pode ser retroativa (GPS
+     * interrompido grava o último sinal real, não o momento do job; checkout offline
+     * sincronizado carrega `ocorridoEm` de um evento antigo) — usá-la como critério de
+     * "atividade recente" faria o hospital poder nunca mais ser recalculado. Este teste
+     * simula exatamente esse caso: uma visita com `saida` de dias atrás (fora de
+     * qualquer janela razoável), mas que a consulta encontrou porque o *pré-filtro real*
+     * é por `processadoEm`, não por `saida` — `AgregadoServiceImpl` não deve refiltrar
+     * por `saida` em memória.
+     */
+    @Test
+    void recalcularPendentesRecalculaVisitaComSaidaAntigaSeProcessadoEmForRecente() {
+        AgregadoServiceImpl spyService = spy((AgregadoServiceImpl) service);
+        doReturn(null).when(spyService).recalcular(anyString());
+
+        VisitaDocument gpsInterrompidaHaDias = VisitaDocument.builder()
+                .hospitalId("h4")
+                .status(StatusVisita.GPS_INTERROMPIDO)
+                .saida(Instant.now().minus(java.time.Duration.ofDays(3)))
+                .processadoEm(Instant.now())
+                .build();
+        when(feedbackRepository.findByCriadoEmAfter(any())).thenReturn(List.of());
+        when(visitaRepository.findByStatusInAndProcessadoEmAfter(any(), any()))
+                .thenReturn(List.of(gpsInterrompidaHaDias));
+
+        spyService.recalcularPendentes();
+
+        verify(spyService).recalcular("h4");
+    }
+
+    @Test
+    void recalcularPendentesNaoDuplicaQuandoMesmoHospitalTemFeedbackEVisita() {
+        AgregadoServiceImpl spyService = spy((AgregadoServiceImpl) service);
+        doReturn(null).when(spyService).recalcular(anyString());
+
+        when(feedbackRepository.findByCriadoEmAfter(any()))
+                .thenReturn(List.of(feedback("h1", 4)));
+        when(visitaRepository.findByStatusInAndProcessadoEmAfter(any(), any()))
+                .thenReturn(List.of(visitaFinalizadaDe("h1")));
+
+        spyService.recalcularPendentes();
+
+        verify(spyService, org.mockito.Mockito.times(1)).recalcular("h1");
+    }
+
+    @Test
+    void recalcularPendentesSemAtividadeNaoRecalculaNinguem() {
+        AgregadoServiceImpl spyService = spy((AgregadoServiceImpl) service);
+        doReturn(null).when(spyService).recalcular(anyString());
+
+        when(feedbackRepository.findByCriadoEmAfter(any())).thenReturn(List.of());
+        when(visitaRepository.findByStatusInAndProcessadoEmAfter(any(), any())).thenReturn(List.of());
+
+        spyService.recalcularPendentes();
+
+        verify(spyService, never()).recalcular(anyString());
     }
 }

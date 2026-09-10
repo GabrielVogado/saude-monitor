@@ -74,5 +74,13 @@ public class FeedbackDocument {
     @Builder.Default
     private boolean anonimizado = false;
 
+    /**
+     * Sem índice próprio até 09/09/2026: só participava do composto
+     * {@code idx_hospital_criado} ({@code hospitalId}+{@code criadoEm}), que não serve
+     * para filtrar por {@code criadoEm} sem igualdade em {@code hospitalId} — necessário
+     * para {@code AgregadoServiceImpl.recalcularPendentes} descobrir hospitais com
+     * feedback recente sem recalcular todos os ativos a cada execução (RN-18).
+     */
+    @Indexed
     private Instant criadoEm;
 }

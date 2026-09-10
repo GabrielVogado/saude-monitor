@@ -26,6 +26,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Implementação do serviço de feedback pós-saída (Épico 03 / F-05).
@@ -77,7 +79,19 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .criadoEm(agora)
                 .build();
 
-        FeedbackDocument salvo = feedbackRepository.save(feedback);
+        FeedbackDocument salvo;
+        try {
+            salvo = feedbackRepository.save(feedback);
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            // Corrida entre a checagem acima (linha 58) e este save: um retry do cliente
+            // em 502/503/504 (frontend marca `enviar`/`atualizar` como idempotente) pode
+            // chegar ao servidor enquanto a tentativa original ainda está processando —
+            // ambas passam por `existsByVisitaId` antes de qualquer uma salvar. O índice
+            // único em `visitaId` pega o que a checagem em memória não pegou; sem este
+            // catch, a exceção vazava como 500 genérico em vez do 409 que o frontend já
+            // trata como sucesso silencioso (achado do code-review de 09/09/2026).
+            throw new ConflitoException("Você já avaliou esta visita.");
+        }
 
         // Dispara o recálculo assíncrono do agregado do hospital (Épico 04, RN-18).
         // AFTER_COMMIT no listener garante que só recalcula depois do commit desta transação.
@@ -141,13 +155,19 @@ public class FeedbackServiceImpl implements FeedbackService {
         List<VisitaDocument> encerradas = visitaRepository
                 .findByStatusAndSaidaBefore(StatusVisita.FINALIZADA, limite);
 
-        for (VisitaDocument visita : encerradas) {
-            if (feedbackRepository.existsByVisitaId(visita.getId())) {
-                continue;
-            }
-            visita.setStatus(StatusVisita.SEM_FEEDBACK);
-        }
-        visitaRepository.saveAll(encerradas);
+        // Antes chamava existsByVisitaId dentro do loop (N+1) e salvava a lista inteira,
+        // inclusive as visitas que já tinham feedback e não foram alteradas. Agora busca
+        // o feedback de todas de uma vez e só salva quem de fato mudou de status.
+        List<String> visitaIds = encerradas.stream().map(VisitaDocument::getId).toList();
+        Set<String> comFeedback = feedbackRepository.findByVisitaIdIn(visitaIds).stream()
+                .map(FeedbackDocument::getVisitaId)
+                .collect(Collectors.toSet());
+
+        List<VisitaDocument> semFeedback = encerradas.stream()
+                .filter(v -> !comFeedback.contains(v.getId()))
+                .toList();
+        semFeedback.forEach(v -> v.setStatus(StatusVisita.SEM_FEEDBACK));
+        visitaRepository.saveAll(semFeedback);
     }
 
     /** Busca a visita e garante que está {@code FINALIZADA} (não é possível avaliar visita em andamento/expirada). */

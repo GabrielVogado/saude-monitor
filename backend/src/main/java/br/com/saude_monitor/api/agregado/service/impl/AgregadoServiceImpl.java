@@ -7,7 +7,6 @@ import br.com.saude_monitor.api.agregado.service.AgregadoService;
 import br.com.saude_monitor.api.agregado.service.EstatisticaService;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.feedback.repository.FeedbackRepository;
-import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.dto.IndicadoresResponse;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import br.com.saude_monitor.api.visita.document.StatusVisita;
@@ -27,8 +26,10 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -151,17 +152,32 @@ public class AgregadoServiceImpl implements AgregadoService {
                 .orElseGet(() -> IndicadoresDetalheResponse.indisponivel(hospitalId));
     }
 
+    /** Margem sobre o ciclo de 15min do job (atraso/jitter de agendamento). */
+    static final Duration JANELA_RECALCULO = Duration.ofMinutes(20);
+
     @Override
     public void recalcularPendentes() {
-        // MVP: recalcula todos os hospitais ativos. O volume é pequeno (~340) e as leituras
-        // são indexadas; garante a atualização ≤ 15min (RN-18) mesmo quando um evento de
-        // feedback falha/atrasa. O evento AFTER_COMMIT já cobre o caminho de baixa latência.
-        List<HospitalDocument> ativos = hospitalRepository.findAllByAtivoTrue();
-        for (HospitalDocument hospital : ativos) {
+        // Recalcula só os hospitais com atividade recente (feedback novo ou visita
+        // finalizada), não os ~340 hospitais ativos — full scan a cada 15min mesmo sem
+        // nenhuma mudança. O evento AFTER_COMMIT (pós-feedback) já cobre o caminho de
+        // baixa latência; este job é a rede de segurança para o que ele perder (RN-18).
+        // Recalcular um hospital que o evento já recalculou é desperdício pequeno, não um
+        // bug — não vale a complexidade extra de tentar excluí-lo daqui.
+        Instant desde = Instant.now().minus(JANELA_RECALCULO);
+
+        Set<String> candidatos = new HashSet<>();
+        feedbackRepository.findByCriadoEmAfter(desde)
+                .forEach(f -> candidatos.add(f.getHospitalId()));
+        // `processadoEm` (write time), não `saida` (business time, pode ser retroativo —
+        // ver VisitaDocument.getProcessadoEm()). Achado do code-review de 09/09/2026.
+        visitaRepository.findByStatusInAndProcessadoEmAfter(STATUS_TEMPO, desde)
+                .forEach(v -> candidatos.add(v.getHospitalId()));
+
+        for (String hospitalId : candidatos) {
             try {
-                recalcular(hospital.getId());
+                recalcular(hospitalId);
             } catch (Exception ex) {
-                log.warn("Falha ao recalcular agregado do hospital {}: {}", hospital.getId(), ex.getMessage());
+                log.warn("Falha ao recalcular agregado do hospital {}: {}", hospitalId, ex.getMessage());
             }
         }
     }

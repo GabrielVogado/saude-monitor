@@ -271,4 +271,58 @@ class VisitaServiceImplTest {
         assertEquals("h1", item.hospitalId());
         assertEquals("Hospital Central", item.hospitalNome());
     }
+
+    // ------------------------------------------------ processarGpsInterrompido (09/09/2026) --------------------
+
+    private VisitaDocument visitaComSinal(Instant ultimoHeartbeat, Instant ultimaPosicaoEm) {
+        return VisitaDocument.builder()
+                .id("v1")
+                .hospitalId("h1")
+                .entrada(Instant.now().minus(java.time.Duration.ofHours(1)))
+                .status(StatusVisita.EM_ATENDIMENTO)
+                .ultimoHeartbeat(ultimoHeartbeat)
+                .ultimaPosicaoEm(ultimaPosicaoEm)
+                .build();
+    }
+
+    /**
+     * Antes trazia TODA visita EM_ATENDIMENTO (`findByStatus`) e filtrava em Java.
+     * Agora pré-filtra no Mongo por `ultimoHeartbeat`, mas a decisão final continua em
+     * `ultimoSinalDe` (o mais recente entre heartbeat e posição) — este teste prova que
+     * uma posição recente ainda protege a visita mesmo com heartbeat antigo.
+     */
+    @Test
+    void processarGpsInterrompidoNaoMarcaQuandoPosicaoRecenteMesmoComHeartbeatAntigo() {
+        Instant agora = Instant.now();
+        VisitaDocument comPosicaoRecente = visitaComSinal(agora.minus(Duration.ofMinutes(15)), agora.minus(Duration.ofMinutes(1)));
+        when(visitaRepository.findByStatusAndUltimoHeartbeatBefore(any(), any()))
+                .thenReturn(List.of(comPosicaoRecente));
+
+        visitaService.processarGpsInterrompido();
+
+        verify(visitaRepository).saveAll(List.of());
+        assertEquals(StatusVisita.EM_ATENDIMENTO, comPosicaoRecente.getStatus());
+    }
+
+    @Test
+    void processarGpsInterrompidoMarcaQuandoHeartbeatAntigoSemPosicao() {
+        Instant agora = Instant.now();
+        VisitaDocument semPosicao = visitaComSinal(agora.minus(Duration.ofMinutes(15)), null);
+        when(visitaRepository.findByStatusAndUltimoHeartbeatBefore(any(), any()))
+                .thenReturn(List.of(semPosicao));
+
+        visitaService.processarGpsInterrompido();
+
+        assertEquals(StatusVisita.GPS_INTERROMPIDO, semPosicao.getStatus());
+        verify(visitaRepository).saveAll(List.of(semPosicao));
+    }
+
+    @Test
+    void processarGpsInterrompidoConsultaPorHeartbeatNoMongoNaoTrazTudo() {
+        when(visitaRepository.findByStatusAndUltimoHeartbeatBefore(any(), any())).thenReturn(List.of());
+
+        visitaService.processarGpsInterrompido();
+
+        verify(visitaRepository).findByStatusAndUltimoHeartbeatBefore(org.mockito.ArgumentMatchers.eq(StatusVisita.EM_ATENDIMENTO), any());
+    }
 }

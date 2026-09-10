@@ -25,10 +25,19 @@ public interface VisitaRepository extends MongoRepository<VisitaDocument, String
 
     List<VisitaDocument> findByStatusInAndUltimoHeartbeatBefore(List<StatusVisita> status, Instant limite);
 
-    List<VisitaDocument> findByStatus(StatusVisita status);
-
     /** Visitas finalizadas cuja saída ocorreu antes de {@code limite} — usada pelo job de feedback sem resposta (RN-09). */
     List<VisitaDocument> findByStatusAndSaidaBefore(StatusVisita status, Instant limite);
+
+    /**
+     * Visitas de um conjunto de status processadas (write time — ver
+     * {@link VisitaDocument#getProcessadoEm()}) após {@code limite}, de qualquer
+     * hospital — usado por {@code recalcularPendentes} para descobrir quais hospitais
+     * tiveram visita finalizada/GPS-interrompida recentemente sem recalcular os ~340
+     * hospitais ativos a cada execução. Deliberadamente NÃO usa {@code saida} (business
+     * time, pode ser retroativo via GPS interrompido ou fila offline — faria o hospital
+     * poder nunca mais ser pego por esta consulta).
+     */
+    List<VisitaDocument> findByStatusInAndProcessadoEmAfter(List<StatusVisita> status, Instant limite);
 
     /**
      * Visitas de um hospital, de um conjunto de status, com saída no intervalo

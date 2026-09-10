@@ -32,7 +32,13 @@ import java.util.List;
 @Builder
 @CompoundIndexes({
         @CompoundIndex(name = "idx_hospital_entrada", def = "{ 'hospitalId': 1, 'entrada': -1 }"),
-        @CompoundIndex(name = "idx_usuario_entrada", def = "{ 'usuarioId': 1, 'entrada': -1 }")
+        @CompoundIndex(name = "idx_usuario_entrada", def = "{ 'usuarioId': 1, 'entrada': -1 }"),
+        // Servem às consultas por status+tempo dos jobs de agregação/expiração/GPS
+        // interrompido/feedback sem resposta — hoje resolvidas por índices simples
+        // separados (interseção de índices, menos eficiente que um composto dedicado).
+        @CompoundIndex(name = "idx_status_saida", def = "{ 'status': 1, 'saida': -1 }"),
+        @CompoundIndex(name = "idx_status_heartbeat", def = "{ 'status': 1, 'ultimoHeartbeat': -1 }"),
+        @CompoundIndex(name = "idx_status_processado", def = "{ 'status': 1, 'processadoEm': -1 }")
 })
 public class VisitaDocument {
 
@@ -81,4 +87,18 @@ public class VisitaDocument {
     private String notas;
 
     private Instant criadoEm;
+
+    /**
+     * Momento em que o servidor gravou {@code status = FINALIZADA} ou
+     * {@code GPS_INTERROMPIDO} (write time) — deliberadamente diferente de
+     * {@link #saida} (business time), que pode ser retroativo: o job de GPS
+     * interrompido grava o último sinal real (até ~15min no passado, o ciclo do
+     * próprio job), e um checkout sincronizado da fila offline (OPS-05) carrega
+     * {@code ocorridoEm} de um evento que pode ter horas ou dias de atraso.
+     * {@code AgregadoServiceImpl.recalcularPendentes} depende deste campo para saber
+     * "isso mudou desde a última varredura" — usar {@link #saida} ali fazia o hospital
+     * poder nunca mais ser recalculado (achado do code-review de 09/09/2026).
+     */
+    @Indexed
+    private Instant processadoEm;
 }

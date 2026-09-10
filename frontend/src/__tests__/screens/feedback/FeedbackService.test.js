@@ -5,6 +5,7 @@
  */
 import FeedbackService from "../../../screens/feedback/service/FeedbackService";
 import TokenStorage from "../../../services/TokenStorage";
+import * as httpModule from "../../../config/http";
 
 process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
 
@@ -63,6 +64,38 @@ describe("FeedbackService (Épico 03)", () => {
     expect(c.url).toContain("/api/v1/contas/feedbacks");
     expect(c.url).toContain("page=1");
     expect(c.url).toContain("size=10");
+  });
+
+  test("enviar marca a chamada como idempotente (retry seguro em 502/503/504)", async () => {
+    // 09/09/2026: sem isso, `fetchComRetry` nunca repete um POST (restantes=1 por
+    // padrão para métodos não-idempotentes) — se o cold start do backend coincidir
+    // com o envio, o usuário via um erro na hora em vez do retry automático. Seguro
+    // porque o backend deduplica por `visitaId` (índice único + `existsByVisitaId`)
+    // e o 409 resultante já é tratado pela tela como "Você já avaliou esta visita",
+    // não como erro.
+    const spy = jest
+      .spyOn(httpModule, "fetchComRetry")
+      .mockResolvedValue(jsonResponse({ id: "fb1", recebido: true }, 201));
+
+    await FeedbackService.enviar({ visitaId: "v1", nota: 4 });
+
+    expect(spy).toHaveBeenCalledWith(expect.any(String), expect.any(Object), {
+      idempotente: true,
+    });
+    spy.mockRestore();
+  });
+
+  test("atualizar também marca a chamada como idempotente", async () => {
+    const spy = jest
+      .spyOn(httpModule, "fetchComRetry")
+      .mockResolvedValue(jsonResponse({ id: "fb1", recebido: true }, 200));
+
+    await FeedbackService.atualizar("fb1", { visitaId: "v1", nota: 3 });
+
+    expect(spy).toHaveBeenCalledWith(expect.any(String), expect.any(Object), {
+      idempotente: true,
+    });
+    spy.mockRestore();
   });
 
   test("duplicidade (dedupe RN-12) — 409 propagado com status", async () => {

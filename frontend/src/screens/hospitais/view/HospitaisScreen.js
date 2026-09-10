@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
@@ -56,6 +56,12 @@ export default function HospitaisScreen({ navigation }) {
 
   const [visitaAtiva, setVisitaAtiva] = useState(null);
   const [checkinEnviandoId, setCheckinEnviandoId] = useState(null);
+
+  // Pedido do PO (10/09/2026): o hospital do check-in ativo deve aparecer no topo,
+  // sem precisar procurá-lo na lista paginada (~340 hospitais, 50 por página, ordem
+  // alfabética — o hospital ativo pode estar em qualquer página, inclusive uma ainda
+  // não carregada pelo scroll infinito). Buscado à parte, não depende de `dados`.
+  const [hospitalCheckinAtivo, setHospitalCheckinAtivo] = useState(null);
 
   const debounceRef = useRef(null);
   const carregamentoInicialFeitoRef = useRef(false);
@@ -185,6 +191,40 @@ export default function HospitaisScreen({ navigation }) {
       atualizarVisitaAtiva();
     }, [atualizarVisitaAtiva])
   );
+
+  // Busca o hospital do check-in ativo independente da paginação de `dados` — ele
+  // pode estar em qualquer página, carregada ou não. Falha silenciosa de propósito
+  // (ex.: sem conexão): a lista continua funcionando normalmente, só sem o destaque.
+  useEffect(() => {
+    const hospitalId = visitaAtiva?.hospitalId;
+    if (!hospitalId) {
+      setHospitalCheckinAtivo(null);
+      return undefined;
+    }
+
+    let cancelado = false;
+    HospitalService.buscarPorId(hospitalId)
+      .then((hospital) => {
+        if (!cancelado) setHospitalCheckinAtivo(hospital);
+      })
+      .catch(() => {
+        if (!cancelado) setHospitalCheckinAtivo(null);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [visitaAtiva?.hospitalId]);
+
+  // Hospital do check-in ativo primeiro, sem duplicá-lo caso já esteja em `dados`
+  // (página carregada por acaso contém o mesmo hospital, ordem alfabética).
+  const dadosComDestaque = useMemo(() => {
+    if (!hospitalCheckinAtivo) {
+      return dados;
+    }
+    const semODuplicado = dados.filter((h) => h.id !== hospitalCheckinAtivo.id);
+    return [hospitalCheckinAtivo, ...semODuplicado];
+  }, [dados, hospitalCheckinAtivo]);
 
   // ARQ-05 / code-review de 03/09/2026: a expressão de função nomeada `checkin` abaixo
   // congela o closure. Se a visita ativa chegar (buscarAtiva resolvendo) DEPOIS que o
@@ -373,7 +413,7 @@ export default function HospitaisScreen({ navigation }) {
       ) : (
         <FlatList
           testID="lista-hospitais"
-          data={dados}
+          data={dadosComDestaque}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           ListEmptyComponent={renderVazio}

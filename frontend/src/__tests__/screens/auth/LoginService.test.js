@@ -8,6 +8,7 @@ import * as Network from "expo-network";
 import LoginService from "../../../screens/auth/service/LoginService";
 import TokenStorage from "../../../services/TokenStorage";
 import { pararGeofencing } from "../../../screens/visitas/service/GeofencingTaskService";
+import * as httpModule from "../../../config/http";
 
 jest.mock("../../../screens/visitas/service/GeofencingTaskService", () => ({
   pararGeofencing: jest.fn(),
@@ -154,5 +155,75 @@ describe("LoginService (Fase 0)", () => {
     await TokenStorage.salvarTokens({ accessToken: "TOK" });
     global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "Falha ao excluir a conta: erro interno" }, 500));
     await expect(LoginService.excluirConta()).rejects.toThrow("Falha ao excluir a conta");
+  });
+
+  // ------------------------------------------------ Esqueci minha senha (E8-05/BUG-03) ---
+
+  test("esqueciSenha envia o e-mail (sem espaços) para /auth/esqueci-senha", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      jsonResponse({ success: true, message: "Se o e-mail existir, você receberá um código de redefinição." })
+    );
+
+    const resp = await LoginService.esqueciSenha("  marina@email.com  ");
+
+    const [url, config] = global.fetch.mock.calls[0];
+    expect(url).toContain("/api/v1/auth/esqueci-senha");
+    expect(config.method).toBe("POST");
+    expect(JSON.parse(config.body).email).toBe("marina@email.com");
+    expect(resp.success).toBe(true);
+  });
+
+  test("esqueciSenha marca a chamada como idempotente (retry seguro em 502/503/504)", async () => {
+    // O backend faz upsert por e-mail: reenviar só troca o código, nunca deixa dois
+    // códigos ativos — seguro repetir em cold start (achado de 10/09/2026).
+    const spy = jest
+      .spyOn(httpModule, "fetchComRetry")
+      .mockResolvedValue(jsonResponse({ success: true }));
+
+    await LoginService.esqueciSenha("marina@email.com");
+
+    expect(spy).toHaveBeenCalledWith(expect.any(String), expect.any(Object), { idempotente: true });
+    spy.mockRestore();
+  });
+
+  test("redefinirSenha envia email/codigo/novaSenha para /auth/redefinir-senha", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      jsonResponse({ success: true, message: "Senha redefinida com sucesso." })
+    );
+
+    const resp = await LoginService.redefinirSenha({
+      email: " marina@email.com ",
+      codigo: " 123456 ",
+      novaSenha: "N0vaSenha!",
+    });
+
+    const [url, config] = global.fetch.mock.calls[0];
+    expect(url).toContain("/api/v1/auth/redefinir-senha");
+    const body = JSON.parse(config.body);
+    expect(body.email).toBe("marina@email.com");
+    expect(body.codigo).toBe("123456");
+    expect(body.novaSenha).toBe("N0vaSenha!");
+    expect(resp.success).toBe(true);
+  });
+
+  test("redefinirSenha NÃO marca a chamada como idempotente", async () => {
+    // Diferente de esqueciSenha: repetir depois que o código já foi consumido
+    // devolveria um erro confuso — o usuário decide se tenta de novo.
+    const spy = jest
+      .spyOn(httpModule, "fetchComRetry")
+      .mockResolvedValue(jsonResponse({ success: true }));
+
+    await LoginService.redefinirSenha({ email: "marina@email.com", codigo: "123456", novaSenha: "x" });
+
+    expect(spy).toHaveBeenCalledWith(expect.any(String), expect.any(Object), { idempotente: false });
+    spy.mockRestore();
+  });
+
+  test("redefinirSenha propaga o erro genérico de código inválido/expirado", async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "Código inválido ou expirado." }, 401));
+
+    await expect(
+      LoginService.redefinirSenha({ email: "marina@email.com", codigo: "000000", novaSenha: "x" })
+    ).rejects.toThrow("Código inválido ou expirado.");
   });
 });

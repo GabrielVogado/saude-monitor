@@ -76,6 +76,11 @@ public class JwtService {
         return extractAllClaims(token).getExpiration().toInstant();
     }
 
+    /** Extrai o momento de emissão (para comparar com {@code UserDocument.senhaAlteradaEm}). */
+    public Instant extractIssuedAt(String token) {
+        return extractAllClaims(token).getIssuedAt().toInstant();
+    }
+
     /** True se o token é um access token válido (assinatura, tipo e expiração) para o e-mail. */
     public boolean isAccessTokenValid(String token, String email) {
         try {

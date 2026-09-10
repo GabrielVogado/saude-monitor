@@ -117,6 +117,14 @@ export default function LoginScreen({navigation}) {
                                     <View style={[styles.checkbox, rememberDevice && styles.checkboxActive]} />
                                     <Text style={styles.optionText}>Lembrar este dispositivo</Text>
                                 </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={() => navigation?.navigate?.("EsqueciSenha")}
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Esqueci minha senha"
+                                >
+                                    <Text style={styles.link}>Esqueci minha senha</Text>
+                                </TouchableOpacity>
                             </View>
 
                             {/* Login Button */}

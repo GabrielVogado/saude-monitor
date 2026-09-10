@@ -152,6 +152,33 @@ class LoginService {
   }
 
   /**
+   * Solicita o código de redefinição de senha ("esqueci minha senha", E8-05/BUG-03).
+   *
+   * O backend sempre devolve a mesma resposta genérica, exista ou não o e-mail — esta
+   * tela nunca deve tentar diferenciar os dois casos a partir do retorno.
+   *
+   * `idempotente: true`: reenviar é seguro — o backend faz upsert por e-mail, então
+   * repetir só troca o código, nunca deixa dois códigos ativos.
+   */
+  static async esqueciSenha(email) {
+    return post(`${BASE_PATH}/esqueci-senha`, { email: email?.trim() || "" }, { idempotente: true });
+  }
+
+  /**
+   * Confirma o código enviado por e-mail e define a nova senha.
+   *
+   * Sem `idempotente`: uma repetição depois que o código já foi consumido devolveria um
+   * erro confuso ("código inválido"); melhor deixar o usuário tentar de novo manualmente.
+   */
+  static async redefinirSenha({ email, codigo, novaSenha }) {
+    return post(`${BASE_PATH}/redefinir-senha`, {
+      email: email?.trim() || "",
+      codigo: codigo?.trim() || "",
+      novaSenha: novaSenha || "",
+    });
+  }
+
+  /**
    * Exclui a conta do usuário autenticado (F0-05/LGPD).
    *
    * Envia `DELETE /api/v1/contas/exclusao` com o access token e, em caso de

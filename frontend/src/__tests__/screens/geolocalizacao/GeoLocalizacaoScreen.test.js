@@ -176,7 +176,10 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     expect(HospitalService.listar).toHaveBeenLastCalledWith({ page: 0, size: 100 });
   });
 
-  test("tocar num polígono abre o detalhe do hospital correspondente", async () => {
+  test("tocar num polígono abre o detalhe do hospital correspondente na própria pilha do Mapa", async () => {
+    // Achado de 10/09/2026: navegar para a pilha da aba Hospitais em vez da
+    // própria pilha da aba Mapa ("MapaStack" em App.js) trocava de aba por baixo
+    // dos panos — voltar do detalhe pousava na lista de Hospitais, não no mapa.
     renderizar();
 
     const fonte = await screen.findByTestId("geofences-hospitais");
@@ -185,10 +188,7 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     });
 
     await waitFor(() =>
-      expect(NAVEGACAO.navigate).toHaveBeenCalledWith("Hospitais", {
-        screen: "HospitalDetalhe",
-        params: { id: "h1" },
-      })
+      expect(NAVEGACAO.navigate).toHaveBeenCalledWith("HospitalDetalhe", { id: "h1" })
     );
   });
 

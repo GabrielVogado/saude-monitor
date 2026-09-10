@@ -210,10 +210,10 @@ function GeolocalizacaoContent({ navigation }) {
 
     const id = hospitalPendente.current;
     hospitalPendente.current = null;
-    navigation?.navigate?.("Hospitais", {
-      screen: "HospitalDetalhe",
-      params: { id },
-    });
+    // Achado de 10/09/2026: navegar para a pilha da aba Hospitais (em vez da
+    // própria pilha da aba Mapa, "MapaStack" em App.js) trocava de aba por baixo
+    // dos panos — voltar do detalhe pousava na lista de Hospitais, não no mapa.
+    navigation?.navigate?.("HospitalDetalhe", { id });
   }, [mapaMontado, navigation]);
 
   // Remonta o mapa ao voltar para a aba. Usa o listener do `navigation` em vez de

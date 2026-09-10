@@ -148,6 +148,10 @@ public class VisitaServiceImpl implements VisitaService {
         visita.setSaida(saida);
         visita.setDuracaoMinutos((int) Duration.between(visita.getEntrada(), saida).toMinutes());
         visita.setStatus(gpsIndisponivel ? StatusVisita.GPS_INTERROMPIDO : StatusVisita.FINALIZADA);
+        // `agora` (write time), não `saida` (business time — pode ser retroativo via
+        // `ocorridoEm` da fila offline, OPS-05): é o que `recalcularPendentes` usa para
+        // saber "isso mudou desde a última varredura", achado do code-review de 09/09/2026.
+        visita.setProcessadoEm(agora);
         if (Boolean.TRUE.equals(request.encerramentoManual())) {
             visita.setEncerramentoManual(true);
         }
@@ -252,7 +256,16 @@ public class VisitaServiceImpl implements VisitaService {
     public void processarGpsInterrompido() {
         Instant agora = Instant.now();
 
-        List<VisitaDocument> semSinal = visitaRepository.findByStatus(StatusVisita.EM_ATENDIMENTO).stream()
+        // Pré-filtro seguro no Mongo, em vez de trazer TODA visita EM_ATENDIMENTO para a
+        // JVM: `ultimoHeartbeat` é setado incondicionalmente no checkin/heartbeat (nunca
+        // nulo para uma visita ativa) e nunca é anterior a `ultimaPosicaoEm` quando ambos
+        // existem — confirmado lendo os dois pontos de escrita, não assumido — então
+        // "ultimoHeartbeat < corte" é condição NECESSÁRIA (não suficiente) para
+        // "ultimoSinalDe(v) < corte". O filtro fino abaixo continua idêntico ao anterior:
+        // a decisão de negócio não muda, só o volume trazido do banco.
+        Instant corte = agora.minus(LIMITE_GPS_INTERROMPIDO);
+        List<VisitaDocument> semSinal = visitaRepository
+                .findByStatusAndUltimoHeartbeatBefore(StatusVisita.EM_ATENDIMENTO, corte).stream()
                 .filter(v -> Duration.between(ultimoSinalDe(v), agora).compareTo(LIMITE_GPS_INTERROMPIDO) > 0)
                 .toList();
 
@@ -263,6 +276,9 @@ public class VisitaServiceImpl implements VisitaService {
             v.setStatus(StatusVisita.GPS_INTERROMPIDO);
             v.setSaida(ultimoSinal);
             v.setDuracaoMinutos((int) Duration.between(v.getEntrada(), ultimoSinal).toMinutes());
+            // `agora` (write time), não `ultimoSinal` (pode ser de até ~15min atrás, o
+            // ciclo deste job) — mesmo motivo do checkout, achado do code-review.
+            v.setProcessadoEm(agora);
         });
         visitaRepository.saveAll(semSinal);
     }

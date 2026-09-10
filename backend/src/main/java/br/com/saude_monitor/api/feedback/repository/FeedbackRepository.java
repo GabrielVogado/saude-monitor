@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,4 +24,17 @@ public interface FeedbackRepository extends MongoRepository<FeedbackDocument, St
      * usada na agregação de indicadores (Épico 04, RN-14).
      */
     List<FeedbackDocument> findByHospitalIdAndCriadoEmAfterAndNotaNotNull(String hospitalId, Instant criadoEm);
+
+    /**
+     * Feedbacks criados após {@code criadoEm}, de qualquer hospital — usado por
+     * {@code recalcularPendentes} para descobrir quais hospitais tiveram atividade
+     * recente sem precisar recalcular os ~340 hospitais ativos a cada execução.
+     */
+    List<FeedbackDocument> findByCriadoEmAfter(Instant criadoEm);
+
+    /**
+     * Feedbacks das visitas informadas, em lote — evita N+1 de
+     * {@code existsByVisitaId} chamado dentro de um loop.
+     */
+    List<FeedbackDocument> findByVisitaIdIn(Collection<String> visitaIds);
 }

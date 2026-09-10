@@ -14,6 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import TokenStorage from "../../../services/TokenStorage";
 import PerfilService from "../../../screens/perfil/service/PerfilService";
 import LoginService from "../../../screens/auth/service/LoginService";
+import { ErroServidorIndisponivel } from "../../../config/http";
 
 jest.mock("../../../screens/auth/service/LoginService");
 
@@ -130,6 +131,21 @@ describe("PerfilService (Épico 05)", () => {
       expect(LoginService.logout).toHaveBeenCalledTimes(1);
     });
 
+    test("refresh falha por servidor indisponível (cold start) — não desloga, preserva a sessão", async () => {
+      // Achado de 10/09/2026: antes, QUALQUER falha do refresh (inclusive esta, sem
+      // relação com o refresh token válido por 30 dias) disparava logout permanente.
+      await darSessao("token-velho", "refresh-1");
+      File.downloadFileAsync.mockRejectedValueOnce(new Error("response has status: 401"));
+      LoginService.refresh.mockRejectedValue(
+        new ErroServidorIndisponivel("https://api.test/api/v1/auth/refresh")
+      );
+
+      await expect(PerfilService.exportarDadosPdf()).rejects.toThrow(/indisponível/i);
+
+      expect(LoginService.logout).not.toHaveBeenCalled();
+      expect(await TokenStorage.getRefreshToken()).toBe("refresh-1");
+    });
+
     test("propaga falhas de geração do relatório", async () => {
       await darSessao("token-123", "refresh-1");
       File.downloadFileAsync.mockRejectedValueOnce(new Error("response has status: 500"));
@@ -201,6 +217,21 @@ describe("PerfilService (Épico 05)", () => {
 
       expect(global.fetch).toHaveBeenCalledTimes(2);
       expect(global.fetch.mock.calls[1][1].headers.Authorization).toBe("Bearer token-novo");
+    });
+
+    test("refresh falha por servidor indisponível (cold start) — não desloga, preserva a sessão", async () => {
+      await darSessao("token-velho", "refresh-1");
+      global.fetch = jest.fn().mockResolvedValue(respostaJson(401, { message: "expirado" }));
+      LoginService.refresh.mockRejectedValue(
+        new ErroServidorIndisponivel("https://api.test/api/v1/auth/refresh")
+      );
+
+      await expect(
+        PerfilService.atualizarConsentimento({ localizacao: true })
+      ).rejects.toThrow(/indisponível/i);
+
+      expect(LoginService.logout).not.toHaveBeenCalled();
+      expect(await TokenStorage.getRefreshToken()).toBe("refresh-1");
     });
 
     test("propaga a mensagem de erro do backend", async () => {

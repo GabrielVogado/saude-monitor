@@ -5,9 +5,13 @@
  */
 import FeedbackService from "../../../screens/feedback/service/FeedbackService";
 import TokenStorage from "../../../services/TokenStorage";
+import LoginService from "../../../screens/auth/service/LoginService";
 import * as httpModule from "../../../config/http";
+import { ErroServidorIndisponivel } from "../../../config/http";
 
 process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
+
+jest.mock("../../../screens/auth/service/LoginService");
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, text: async () => JSON.stringify(body), json: async () => body };
@@ -96,6 +100,21 @@ describe("FeedbackService (Épico 03)", () => {
       idempotente: true,
     });
     spy.mockRestore();
+  });
+
+  test("refresh falha por servidor indisponível (cold start) — não desloga, preserva a sessão", async () => {
+    // Achado de 10/09/2026: antes, QUALQUER falha do refresh (inclusive esta, sem
+    // relação com o refresh token válido por 30 dias) disparava logout permanente.
+    await TokenStorage.salvarTokens({ accessToken: "OLD", refreshToken: "R" });
+    LoginService.refresh.mockRejectedValue(
+      new ErroServidorIndisponivel("https://api.test/api/v1/auth/refresh")
+    );
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "expirado" }, 401));
+
+    await expect(FeedbackService.buscarPorVisita("v1")).rejects.toThrow(/indisponível/i);
+
+    expect(LoginService.logout).not.toHaveBeenCalled();
+    expect(await TokenStorage.getRefreshToken()).toBe("R");
   });
 
   test("duplicidade (dedupe RN-12) — 409 propagado com status", async () => {

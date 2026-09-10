@@ -49,7 +49,13 @@ async function post(path, body, { idempotente = false } = {}) {
       data?.message ||
       data?.error ||
       `Falha na autenticação (HTTP ${response.status}).`;
-    throw new Error(message);
+    const erro = new Error(message);
+    // Sem isto, nada consegue diferenciar "o servidor rejeitou o token" (401/403) de
+    // "o servidor está indisponível agora" (503 de cold start) — as duas viravam o
+    // mesmo Error genérico e derrubavam a sessão por igual (achado de 10/09/2026).
+    erro.status = response.status;
+    erro.data = data;
+    throw erro;
   }
 
   return data;

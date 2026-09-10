@@ -1,8 +1,14 @@
 import {
+  deveEncerrarSessao,
   geracaoDaSessao,
   reiniciarControleDeRenovacao,
   renovarSessao,
 } from "../../config/sessao";
+import {
+  ErroDeTimeout,
+  ErroSemInternet,
+  ErroServidorIndisponivel,
+} from "../../config/http";
 
 /** Promessa controlada, para segurar a renovação enquanto outra chamada chega. */
 const promessaSuspensa = () => {
@@ -125,5 +131,45 @@ describe("ARQ-01 — renovação de sessão concorrente", () => {
     await renovarSessao(renovacao);
 
     expect(renovacao).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("deveEncerrarSessao — achado de 10/09/2026", () => {
+  // Antes desta correção, os 5 pontos que chamam renovarSessao/LoginService.refresh
+  // tratavam QUALQUER falha (erro de rede, timeout, 503 de cold start) como sessão
+  // morta e deslogavam o usuário — mesmo com o refresh token (30 dias) ainda válido.
+
+  it("falha de conexão (sem internet) não encerra a sessão", () => {
+    expect(deveEncerrarSessao(new ErroSemInternet("http://x"))).toBe(false);
+  });
+
+  it("timeout não encerra a sessão", () => {
+    expect(deveEncerrarSessao(new ErroDeTimeout("http://x", 20000))).toBe(false);
+  });
+
+  it("servidor indisponível (cold start) não encerra a sessão", () => {
+    expect(deveEncerrarSessao(new ErroServidorIndisponivel("http://x"))).toBe(false);
+  });
+
+  it("401 do endpoint de refresh — o servidor rejeitou o token — encerra a sessão", () => {
+    const erro = new Error("token inválido");
+    erro.status = 401;
+    expect(deveEncerrarSessao(erro)).toBe(true);
+  });
+
+  it("403 do endpoint de refresh encerra a sessão", () => {
+    const erro = new Error("proibido");
+    erro.status = 403;
+    expect(deveEncerrarSessao(erro)).toBe(true);
+  });
+
+  it("outro status HTTP (ex.: 500) não é uma rejeição explícita do token — não encerra a sessão", () => {
+    const erro = new Error("erro interno");
+    erro.status = 500;
+    expect(deveEncerrarSessao(erro)).toBe(false);
+  });
+
+  it("erro sem status e sem ser de conexão (ex.: sem refresh token local) encerra a sessão por segurança", () => {
+    expect(deveEncerrarSessao(new Error("Sessão expirada. Faça login novamente."))).toBe(true);
   });
 });

@@ -95,7 +95,9 @@ Documentos/
 │   └── adrs.md                               ← ADR-001..010, todos em status Proposto (v3.1)
 │
 ├── 09-melhoria-continua/                     ← melhorias de processo e de comportamento do agente
-│   └── Historico-Melhorias.md                ← o que entrou, quando, por qual PR e com que efeito
+│   ├── Historico-Melhorias.md                ← o que entrou, quando, por qual PR e com que efeito
+│   ├── Arquitetura de Resiliência, Segurança e Evolução Contínua.md ← SDD: rate limit, migrations, testes de carga, feature flags, JWT/JWKS
+│   └── Plano-Implantacao-Cache-Fila-Resiliencia-v1.0.md ← plano de implantação (7 fases) para cache/fila/resiliência — proposta, ainda não implementado
 │
 ├── De-Para-Backlog-Features.md               ← status estória × feature (fonte de verdade de status)
 │
@@ -134,6 +136,8 @@ Documentos/
 | 13 | [ADRs](./08-analise%20tecnica/adrs.md) | **3.1** | 🟡 Proposta | ADR-001..ADR-010 em formato MADR, **todos em status `Proposto`**. Precedência revista: entram depois da Sprint S10. |
 | 14 | [Pendências do Épico 01](./05-features/Pendencias-Epico-01.md) | — | 🟡 Aberto | Débitos do ETL CNES/DATASUS. As 2 divergências de contrato abertas desde 20/08/2026 foram fechadas em 06/09/2026 (E8-14). |
 | 15 | [Auditoria — Código Morto, Lógica Ambígua e Erros Silenciosos](./08-analise%20tecnica/Auditoria-Codigo-Morto-Logica-Ambigua-Erros-Silenciosos-v1.0.md) | 1.0 | 🟡 Em correção | 19 achados (backend + frontend) com plano de correção priorizado P0–P3 e status por item. Commit-base `27ee9e6`. |
+| 16 | [Arquitetura de Resiliência, Segurança e Evolução Contínua](<./09-melhoria-continua/Arquitetura de Resiliência, Segurança e Evolução Contínua.md>) | — | 🟡 Proposta | SDD: rate limit (Token/Leaky Bucket + Redis), migrations versionadas, testes de carga (k6), testes A/B (feature flags) e JWT com expiração curta + refresh + JWKS/rotação de chaves. Não estava indexado aqui até 09/09/2026, apesar de já existir no repositório. |
+| 17 | [Plano de Implantação — Cache, Fila e Resiliência](./09-melhoria-continua/Plano-Implantacao-Cache-Fila-Resiliencia-v1.0.md) | 1.0 | 🟡 Proposta | Diagnóstico técnico (arquivo:linha) das leituras/escritas pesadas e dos 4 jobs `@Scheduled` possivelmente não confiáveis no Cloud Run atual; plano em 7 fases (otimizações → Mongock → feature flags → cache Upstash/rate limit → fila Cloud Tasks/Scheduler → JWT RS256/JWKS → k6), aplicando o item 16. Nenhuma fase implementada ainda. |
 
 ---
 

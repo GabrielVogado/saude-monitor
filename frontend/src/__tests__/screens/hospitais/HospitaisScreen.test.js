@@ -53,6 +53,7 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
   beforeEach(() => {
     jest.clearAllMocks();
     HospitalService.listar.mockResolvedValue({ content: [HOSPITAL_A, HOSPITAL_B] });
+    HospitalService.buscarPorId.mockResolvedValue(null);
     VisitaService.buscarAtiva.mockResolvedValue({ visita: null });
     jest.spyOn(Alert, "alert").mockImplementation(() => {});
   });
@@ -321,5 +322,57 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
 
     expect(screen.getByLabelText("Fazer check-in em Hospital B")).toBeDisabled();
     expect(VisitaService.checkin).toHaveBeenCalledTimes(1);
+  });
+
+  describe("hospital do check-in ativo no topo da lista (pedido do PO, 10/09/2026)", () => {
+    test("hospital ativo já presente na página carregada aparece primeiro, sem duplicar", async () => {
+      VisitaService.buscarAtiva.mockResolvedValue({ visita: { hospitalId: "hB" } });
+      HospitalService.buscarPorId.mockResolvedValue(HOSPITAL_B);
+
+      renderizar();
+      await screen.findByText("Hospital A");
+
+      // `buscarPorId` resolve assincronamente, depois da lista já ter carregado —
+      // esperar só "Hospital A" existir não garante que o destaque já aplicou
+      // (achado sob carga: passava isolado, falhava junto com a suíte completa).
+      await waitFor(() => {
+        const nomes = screen.getAllByText(/^Hospital [AB]$/).map((el) => el.props.children);
+        expect(nomes).toEqual(["Hospital B", "Hospital A"]);
+      });
+    });
+
+    test("hospital ativo fora da página carregada é buscado à parte e aparece no topo", async () => {
+      const HOSPITAL_FORA_DA_PAGINA = { id: "hZ", nome: "Hospital Z", tipo: "PUBLICO", categoria: "HOSPITAL" };
+      VisitaService.buscarAtiva.mockResolvedValue({ visita: { hospitalId: "hZ" } });
+      HospitalService.buscarPorId.mockResolvedValue(HOSPITAL_FORA_DA_PAGINA);
+
+      renderizar();
+      await screen.findByText("Hospital A");
+
+      await waitFor(() => expect(HospitalService.buscarPorId).toHaveBeenCalledWith("hZ"));
+      await waitFor(() => {
+        const nomes = screen.getAllByText(/^Hospital [ABZ]$/).map((el) => el.props.children);
+        expect(nomes).toEqual(["Hospital Z", "Hospital A", "Hospital B"]);
+      });
+    });
+
+    test("sem check-in ativo, a ordem da lista não muda", async () => {
+      renderizar();
+      await screen.findByText("Hospital A");
+
+      expect(HospitalService.buscarPorId).not.toHaveBeenCalled();
+      const nomes = screen.getAllByText(/^Hospital [AB]$/).map((el) => el.props.children);
+      expect(nomes).toEqual(["Hospital A", "Hospital B"]);
+    });
+
+    test("falha ao buscar o hospital ativo não quebra a lista (fallback silencioso)", async () => {
+      VisitaService.buscarAtiva.mockResolvedValue({ visita: { hospitalId: "hB" } });
+      HospitalService.buscarPorId.mockRejectedValue(new Error("sem conexão"));
+
+      renderizar();
+
+      expect(await screen.findByText("Hospital A")).toBeTruthy();
+      expect(screen.getByText("Hospital B")).toBeTruthy();
+    });
   });
 });

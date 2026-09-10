@@ -120,8 +120,12 @@ jobs:
           # `admin123` quando eles faltam -- e este servico e publico
           # (--allow-unauthenticated). Um admin com senha conhecida num endpoint
           # aberto e pior do que nao ter admin nenhum.
+          # RESEND_FROM_EMAIL sem nome de exibicao (sem espacos/`<>`) de proposito:
+          # o formato de env_vars desta action e sensivel a virgula/espaco/caracteres
+          # especiais no valor -- um endereco puro elimina qualquer ambiguidade de parse.
           env_vars: |
             APP_SEEDADMIN_ENABLED=false
+            RESEND_FROM_EMAIL=senha@saudemonitor.dev
           flags: >-
             --allow-unauthenticated
             --service-account=saude-monitor-run@${{ env.PROJECT_ID }}.iam.gserviceaccount.com

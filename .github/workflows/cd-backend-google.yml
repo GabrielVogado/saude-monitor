@@ -108,9 +108,13 @@ jobs:
           # 04/09/2026): MONGO_URI e JWT_SECRET, sem sufixo. O ambiente prod usa
           # o sufixo _PROD e ainda nao tem secret criado -- o deploy em master vai
           # falhar de proposito, em vez de subir com credencial de dev.
+          # RESEND_API_KEY (10/09/2026, feature "esqueci minha senha") segue o
+          # mesmo padrao -- so existe a versao sem sufixo por enquanto, mesma
+          # decisao: deploy em master falha ate existir RESEND_API_KEY_PROD.
           secrets: |
             MONGO_URI=MONGO_URI${{ needs.resolve-env.outputs.secret_suffix }}:latest
             JWT_SECRET=JWT_SECRET${{ needs.resolve-env.outputs.secret_suffix }}:latest
+            RESEND_API_KEY=RESEND_API_KEY${{ needs.resolve-env.outputs.secret_suffix }}:latest
           # O seed de admin fica DESLIGADO ate existirem os secrets ADMIN_EMAIL e
           # ADMIN_SENHA. application.properties:70-71 cai em `admin@saude.com` /
           # `admin123` quando eles faltam -- e este servico e publico

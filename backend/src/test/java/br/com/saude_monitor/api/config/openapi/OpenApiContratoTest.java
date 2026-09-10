@@ -25,10 +25,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Contrato OpenAPI publicado e servido pela aplicação (E8-09).
  *
- * <p>O CA pede que a especificação "cubra os 31 endpoints REST atuais". Confirmado nesta
- * entrega, contando as chaves HTTP por caminho (não o número de caminhos — vários
- * caminhos têm mais de um verbo): são de fato **31**. Este teste mede o total de
- * operações que o springdoc realmente gera, não presume que bateu.</p>
+ * <p>O CA pede que a especificação "cubra os endpoints REST atuais". Eram 31 endpoints na
+ * entrega original (E8-09); a feature de recuperação de senha ("esqueci minha senha",
+ * 10/09/2026) acrescentou 2 (`/auth/esqueci-senha`, `/auth/redefinir-senha`), somando
+ * **33**. Este teste mede o total de operações que o springdoc realmente gera, não
+ * presume que bateu.</p>
  */
 @Testcontainers
 @SpringBootTest
@@ -75,7 +76,7 @@ class OpenApiContratoTest {
             }
         }
 
-        assertThat(operacoes).isEqualTo(31);
+        assertThat(operacoes).isEqualTo(33);
     }
 
     /**
@@ -85,7 +86,8 @@ class OpenApiContratoTest {
      * {@code SecurityConfig} real (achado do code-review deste PR). Os 15 endpoints
      * `permitAll` recebem {@code @SecurityRequirements} vazio para sobrepor o global;
      * este teste mede que a sobreposição chegou ao contrato publicado — e que nenhum
-     * dos demais 16 ganhou a mesma isenção por engano.
+     * dos demais ganhou a mesma isenção por engano. Lista ampliada em 10/09/2026 com os
+     * 2 endpoints de "esqueci minha senha" (17 públicos ao todo).
      */
     @Test
     void devePublicarSegurancaCoerenteComOSecurityConfig() throws Exception {
@@ -94,6 +96,8 @@ class OpenApiContratoTest {
                 "POST /api/v1/auth/login",
                 "POST /api/v1/auth/refresh",
                 "POST /api/v1/auth/logout",
+                "POST /api/v1/auth/esqueci-senha",
+                "POST /api/v1/auth/redefinir-senha",
                 "POST /api/v1/visitas/checkin",
                 "POST /api/v1/visitas/{id}/checkout",
                 "POST /api/v1/visitas/{id}/heartbeat",

@@ -777,6 +777,100 @@ nesta tela) continua valendo.
 
 ---
 
+## M-012 — Recuperação de senha: feature nova, 4 achados reais no code-review
+
+**Data:** 10/09/2026 · **PR:** #110
+
+### O que aconteceu
+
+O PO pediu diretamente: "Esqueci minha senha. O usuário deve poder resetar
+sua senha caso ele esqueça sua senha". O link já existia no `LoginScreen`
+(sem `onPress`), mas foi **removido** em 08/09/2026 (BUG-03) por não ter
+endpoint, tela nem envio de e-mail por trás — o PO havia decidido, nas duas
+vezes em que o assunto surgiu (04/09 e 08/09), que implementar seria feature
+nova e ficaria para uma estória própria. Esta é essa estória.
+
+### Diagnóstico
+
+Não existia nenhuma infraestrutura de e-mail no backend (nenhuma dependência
+de mail/SMTP, nenhum secret configurado no CI) — teve que ser criada do zero.
+Provedor (Resend) escolhido pelo usuário entre quatro opções apresentadas.
+Mecanismo (código de 6 dígitos digitado no app, não link por e-mail) decidido
+a partir de uma medição do próprio projeto: `app.json` não declara `scheme`,
+então um link exigiria configurar Universal Links (iOS) e App Links (Android)
+— infraestrutura à parte, arriscada de acertar sem hardware para validar.
+
+### O que entrou
+
+- `POST /api/v1/auth/esqueci-senha` e `/redefinir-senha` — públicos, já sob o
+  rate limit de 10 req/min/IP que `/api/v1/auth/**` já tinha (nenhum código
+  novo de rate limit).
+- `PasswordResetTokenDocument` (TTL de 15 min, mesmo padrão de
+  `RefreshTokenRevogadoDocument`), código hasheado com o `PasswordEncoder`
+  (BCrypt) já existente, limite de 5 tentativas.
+- `EmailService`/`ResendEmailService` — `RestClient` (sem dependência nova),
+  envio assíncrono (achado do code-review, ver abaixo), nunca propaga falha.
+- Reset invalida refresh tokens emitidos antes dele: `UserDocument` ganha
+  `senhaAlteradaEm`; `AuthServiceImpl.refresh()` — que **já** carrega o
+  `UserDocument` a cada renovação — compara o `iat` do token contra esse
+  campo, sem nenhuma leitura extra de banco.
+- Frontend: `EsqueciSenhaScreen` (duas etapas: e-mail → código+nova senha),
+  link restaurado no `LoginScreen`.
+
+### Os 4 achados do `code-review` (aplicados os quatro, nenhum descartado)
+
+1. **Corrida no upsert do código.** `esqueciSenha` do frontend é
+   `idempotente: true` (retry em 502/503/504) — duas requisições quase
+   simultâneas para o mesmo e-mail liam "nenhum token" e as duas tentavam
+   inserir; a segunda estourava `DuplicateKeyException` **sem captura**
+   (diferente do `revogar()`, que já trata esse mesmo padrão de corrida há
+   mais tempo), virando 500 em vez da resposta genérica sempre-200. Corrigido
+   com upsert atômico via `MongoTemplate` — a corrida passa a ser resolvida
+   pelo próprio Mongo, não há mais dois inserts concorrentes para capturar.
+2. **Canal lateral de tempo.** O ramo "e-mail existe" fazia BCrypt + upsert +
+   uma chamada HTTP síncrona ao Resend antes de responder; o ramo "não
+   existe" só a consulta — mesmo com o corpo da resposta idêntico, a
+   diferença de latência era medível e derrotava a proteção contra
+   enumeração de e-mail. Corrigido em duas frentes: um `encode` BCrypt
+   descartável no ramo inexistente (normaliza o custo de CPU) e o envio do
+   e-mail virou `@Async` (`@EnableAsync` já ativo no projeto, mesmo padrão do
+   `FeedbackSalvoEventListener`), tirando a chamada de rede externa do
+   caminho de resposta.
+3. **Corrida no contador de tentativas.** Um read-modify-write comum
+   (ler `tentativas`, somar 1, salvar) perdia incrementos sob tentativas
+   paralelas — o mesmo padrão de corrida do achado 1, num campo diferente.
+   Corrigido com `$inc` atômico via `findAndModify`.
+4. **Precisão do `iat`.** O claim `iat` do JWT só tem precisão de segundo
+   (RFC 7519 NumericDate); comparar direto contra `senhaAlteradaEm` (com
+   milissegundos) rejeitava, por engano, um refresh token emitido no MESMO
+   segundo do reset mas de fato depois dele — um usuário que resetasse a
+   senha e fizesse login de novo no mesmo segundo via a própria sessão nova
+   ser recusada. Corrigido truncando `senhaAlteradaEm` ao segundo antes da
+   comparação, o mesmo nível de precisão que o `iat` já tem.
+
+Um quinto ponto (access tokens já emitidos continuam válidos até expirarem,
+até 15 min, porque só o refresh é checado) **não é um achado novo** — já
+estava registrado como trade-off explícito no plano antes da implementação,
+por não valer a pena acrescentar uma leitura de banco a cada requisição
+autenticada só para fechar uma janela de 15 minutos.
+
+### Lição a repetir
+
+1. **O mesmo padrão de corrida apareceu duas vezes na mesma entrega** (achados
+   1 e 3) porque os dois vieram de um reflexo comum — "ler, decidir, salvar"
+   — em vez de perguntar primeiro se o Mongo já resolve a operação de forma
+   atômica. Antes de escrever um find-then-save/read-modify-write num campo
+   que pode receber escrita concorrente, checar se `$inc`/upsert do
+   `MongoTemplate` já cobre o caso — evita reintroduzir a mesma classe de bug.
+2. **Um teste que passa "olhando de fora" pode não testar o mecanismo real.**
+   `spy()` sobre `BCryptPasswordEncoder` para verificar o encode descartável
+   quebrou a suíte inteira (métodos efetivamente finais no Spring Security,
+   que o mock-maker padrão do Mockito não intercepta) — a correção não foi
+   contornar com `verify` mais frouxo, foi isolar a verificação num
+   `PasswordEncoder` mockado por interface, só naquele teste.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

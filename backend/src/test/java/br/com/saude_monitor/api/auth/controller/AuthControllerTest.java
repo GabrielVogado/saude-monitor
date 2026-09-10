@@ -1,7 +1,9 @@
 package br.com.saude_monitor.api.auth.controller;
 
 import br.com.saude_monitor.api.auth.dto.AuthResponse;
+import br.com.saude_monitor.api.auth.dto.EsqueciSenhaRequest;
 import br.com.saude_monitor.api.auth.dto.LoginRequest;
+import br.com.saude_monitor.api.auth.dto.RedefinirSenhaRequest;
 import br.com.saude_monitor.api.auth.dto.RefreshRequest;
 import br.com.saude_monitor.api.auth.dto.UsuarioDto;
 import br.com.saude_monitor.api.auth.service.AuthService;
@@ -44,6 +46,16 @@ class AuthControllerTest {
         @Override
         public Map<String, Object> logout(RefreshRequest request) {
             return Map.of("success", true, "message", "Sessão encerrada. Refresh token revogado.");
+        }
+
+        @Override
+        public Map<String, Object> esqueciSenha(EsqueciSenhaRequest request) {
+            return Map.of("success", true, "message", "Se o e-mail existir, você receberá um código de redefinição.");
+        }
+
+        @Override
+        public Map<String, Object> redefinirSenha(RedefinirSenhaRequest request) {
+            return Map.of("success", true, "message", "Senha redefinida com sucesso.");
         }
     };
 
@@ -179,5 +191,56 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Sessão encerrada. Refresh token revogado."));
+    }
+
+    @Test
+    void deveSolicitarCodigoDeRedefinicaoDeSenha() throws Exception {
+        String payload = "{\"email\":\"marina@email.com\"}";
+
+        mockMvc.perform(post("/api/v1/auth/esqueci-senha")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void deveRetornar400QuandoEmailInvalidoEmEsqueciSenha() throws Exception {
+        String payload = "{\"email\":\"nao-e-email\"}";
+
+        mockMvc.perform(post("/api/v1/auth/esqueci-senha")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CAMPOS_INVALIDOS"));
+    }
+
+    @Test
+    void deveRedefinirSenhaComCodigo() throws Exception {
+        String payload = """
+                {
+                  "email": "marina@email.com",
+                  "codigo": "123456",
+                  "novaSenha": "N0vaSenha!"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/redefinir-senha")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Senha redefinida com sucesso."));
+    }
+
+    @Test
+    void deveRetornar400QuandoCodigoAusenteEmRedefinirSenha() throws Exception {
+        String payload = "{\"email\":\"marina@email.com\",\"novaSenha\":\"N0vaSenha!\"}";
+
+        mockMvc.perform(post("/api/v1/auth/redefinir-senha")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CAMPOS_INVALIDOS"));
     }
 }

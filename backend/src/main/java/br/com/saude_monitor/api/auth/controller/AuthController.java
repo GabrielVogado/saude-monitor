@@ -1,7 +1,9 @@
 package br.com.saude_monitor.api.auth.controller;
 
 import br.com.saude_monitor.api.auth.dto.AuthResponse;
+import br.com.saude_monitor.api.auth.dto.EsqueciSenhaRequest;
 import br.com.saude_monitor.api.auth.dto.LoginRequest;
+import br.com.saude_monitor.api.auth.dto.RedefinirSenhaRequest;
 import br.com.saude_monitor.api.auth.dto.RefreshRequest;
 import br.com.saude_monitor.api.auth.service.AuthService;
 import br.com.saude_monitor.api.user.dto.UserRequest;
@@ -68,5 +70,22 @@ public class AuthController {
     @SecurityRequirements
     public ResponseEntity<Map<String, Object>> logout(@Valid @RequestBody RefreshRequest request) {
         return ResponseEntity.ok(authService.logout(request));
+    }
+
+    /**
+     * 🔓 Envia um código de 6 dígitos por e-mail para redefinir a senha ("esqueci minha
+     * senha"). Resposta sempre genérica — não revela se o e-mail existe.
+     */
+    @PostMapping("/esqueci-senha")
+    @SecurityRequirements
+    public ResponseEntity<Map<String, Object>> esqueciSenha(@Valid @RequestBody EsqueciSenhaRequest request) {
+        return ResponseEntity.ok(authService.esqueciSenha(request));
+    }
+
+    /** 🔓 Confirma o código enviado por e-mail e define a nova senha. */
+    @PostMapping("/redefinir-senha")
+    @SecurityRequirements
+    public ResponseEntity<Map<String, Object>> redefinirSenha(@Valid @RequestBody RedefinirSenhaRequest request) {
+        return ResponseEntity.ok(authService.redefinirSenha(request));
     }
 }

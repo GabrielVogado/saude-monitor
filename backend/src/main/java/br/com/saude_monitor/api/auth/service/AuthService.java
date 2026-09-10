@@ -1,7 +1,9 @@
 package br.com.saude_monitor.api.auth.service;
 
 import br.com.saude_monitor.api.auth.dto.AuthResponse;
+import br.com.saude_monitor.api.auth.dto.EsqueciSenhaRequest;
 import br.com.saude_monitor.api.auth.dto.LoginRequest;
+import br.com.saude_monitor.api.auth.dto.RedefinirSenhaRequest;
 import br.com.saude_monitor.api.auth.dto.RefreshRequest;
 import jakarta.validation.Valid;
 
@@ -23,4 +25,16 @@ public interface AuthService {
      * Tokens já expirados/malformados são aceitos (idempotente) — nada a revogar.
      */
     Map<String, Object> logout(@Valid RefreshRequest request);
+
+    /**
+     * Envia um código de 6 dígitos por e-mail para redefinir a senha. Sempre devolve a
+     * mesma resposta genérica, exista ou não o e-mail (não revela cadastro).
+     */
+    Map<String, Object> esqueciSenha(@Valid EsqueciSenhaRequest request);
+
+    /**
+     * Confirma o código e define a nova senha. Invalida refresh tokens emitidos antes
+     * deste momento (ver {@link #refresh}).
+     */
+    Map<String, Object> redefinirSenha(@Valid RedefinirSenhaRequest request);
 }

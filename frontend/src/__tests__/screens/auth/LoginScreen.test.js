@@ -219,6 +219,16 @@ describe("LoginScreen", () => {
     expect(NAVEGACAO.navigate).toHaveBeenCalledWith("Privacidade");
   });
 
+  test("o link 'Esqueci minha senha' navega para EsqueciSenha (E8-05/BUG-03)", () => {
+    // Removido em 08/09/2026 (BUG-03) por não ter tela nem endpoint por trás; restaurado
+    // agora que a feature existe de verdade.
+    renderizar();
+
+    fireEvent.press(screen.getByLabelText("Esqueci minha senha"));
+
+    expect(NAVEGACAO.navigate).toHaveBeenCalledWith("EsqueciSenha");
+  });
+
   test("'Continuar sem conta' volta sem exigir login — a jornada principal é anônima", () => {
     // Padrao-UI-UX v2.0 §4.4: a conta é opcional. Sem este botão, a tela de Login
     // se comporta como um gate obrigatório e não como um passo dispensável.

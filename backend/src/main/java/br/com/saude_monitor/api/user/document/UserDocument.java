@@ -53,4 +53,12 @@ public class UserDocument {
 	private Instant createdAt;
 
 	private Instant updatedAt;
+
+	/**
+	 * Momento da última redefinição de senha via "esqueci minha senha" (nulo se nunca
+	 * usada). Refresh tokens emitidos antes deste instante são recusados em
+	 * {@code AuthServiceImpl.refresh()} — fecha a sessão de quem tinha um refresh token
+	 * válido antes do reset.
+	 */
+	private Instant senhaAlteradaEm;
 }

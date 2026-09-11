@@ -1,17 +1,21 @@
 package br.com.saude_monitor.api.auth.service.impl;
 
 import br.com.saude_monitor.api.auth.dto.AuthResponse;
+import br.com.saude_monitor.api.auth.dto.ConfirmarEmailRequest;
 import br.com.saude_monitor.api.auth.dto.EsqueciSenhaRequest;
 import br.com.saude_monitor.api.auth.dto.LoginRequest;
 import br.com.saude_monitor.api.auth.dto.RedefinirSenhaRequest;
+import br.com.saude_monitor.api.auth.dto.ReenviarConfirmacaoRequest;
 import br.com.saude_monitor.api.auth.dto.RefreshRequest;
 import br.com.saude_monitor.api.auth.dto.UsuarioDto;
 import br.com.saude_monitor.api.auth.email.EmailService;
-import br.com.saude_monitor.api.auth.passwordreset.PasswordResetTokenDocument;
-import br.com.saude_monitor.api.auth.passwordreset.PasswordResetTokenRepository;
+import br.com.saude_monitor.api.auth.verificacao.CodigoVerificacaoDocument;
+import br.com.saude_monitor.api.auth.verificacao.CodigoVerificacaoRepository;
+import br.com.saude_monitor.api.auth.verificacao.Proposito;
 import br.com.saude_monitor.api.auth.revogacao.RefreshTokenRevogadoDocument;
 import br.com.saude_monitor.api.auth.revogacao.RefreshTokenRevogadoRepository;
 import br.com.saude_monitor.api.auth.service.AuthService;
+import br.com.saude_monitor.api.config.exception.EmailNaoConfirmadoException;
 import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.security.JwtService;
 import br.com.saude_monitor.api.user.document.UserDocument;
@@ -33,6 +37,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Implementação de autenticação (F0-01/F0-02).
@@ -59,7 +64,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenRevogadoRepository refreshTokenRevogadoRepository;
-    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final CodigoVerificacaoRepository codigoVerificacaoRepository;
     private final EmailService emailService;
     private final MongoTemplate mongoTemplate;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -73,6 +78,15 @@ public class AuthServiceImpl implements AuthService {
 
         if (!user.isActive()) {
             throw new NaoAutorizadoException("Conta desativada.");
+        }
+
+        // Achado do PO (10/09/2026): sem confirmar o e-mail no cadastro, um endereço com
+        // erro de digitação ou inexistente nunca recebe o código de "esqueci minha senha"
+        // — a conta fica sem recuperação possível. Só alcançável com credenciais corretas
+        // (mesmo ponto de isActive() acima) — não abre canal de enumeração novo.
+        if (!user.isEmailVerificado()) {
+            throw new EmailNaoConfirmadoException(
+                    "E-mail ainda não confirmado. Verifique sua caixa de entrada ou peça um novo código.");
         }
 
         return emitirTokens(user);
@@ -125,7 +139,7 @@ public class AuthServiceImpl implements AuthService {
         boolean existe = userRepository.findByEmail(email).filter(UserDocument::isActive).isPresent();
 
         if (existe) {
-            gerarEEnviarCodigo(email);
+            gerarEEnviarCodigo(email, Proposito.REDEFINIR_SENHA);
         } else {
             // Achado do code-review (10/09/2026): sem isto, o ramo "e-mail existe" fazia
             // um hash BCrypt (~60-100ms) e uma gravação no Mongo que o ramo "não existe"
@@ -148,12 +162,13 @@ public class AuthServiceImpl implements AuthService {
     public Map<String, Object> redefinirSenha(RedefinirSenhaRequest request) {
         String email = normalizeEmail(request.email());
 
-        PasswordResetTokenDocument tokenDoc = passwordResetTokenRepository.findByEmail(email)
+        CodigoVerificacaoDocument tokenDoc = codigoVerificacaoRepository
+                .findByEmailAndProposito(email, Proposito.REDEFINIR_SENHA)
                 .filter(t -> t.getExpiraEm().isAfter(Instant.now()))
                 .orElseThrow(() -> new NaoAutorizadoException(CODIGO_INVALIDO));
 
         if (!passwordEncoder.matches(request.codigo(), tokenDoc.getCodigoHash())) {
-            registrarTentativaFalha(email);
+            registrarTentativaFalha(email, Proposito.REDEFINIR_SENHA);
             throw new NaoAutorizadoException(CODIGO_INVALIDO);
         }
 
@@ -165,12 +180,82 @@ public class AuthServiceImpl implements AuthService {
         user.setSenhaAlteradaEm(Instant.now());
         userRepository.save(user);
 
-        passwordResetTokenRepository.deleteByEmail(email);
+        codigoVerificacaoRepository.deleteByEmailAndProposito(email, Proposito.REDEFINIR_SENHA);
         logger.info("Senha redefinida via código (esqueci minha senha) para email={}", email);
 
         return Map.of(
                 "success", true,
                 "message", "Senha redefinida com sucesso."
+        );
+    }
+
+    @Override
+    public void enviarCodigoConfirmacaoEmail(String email) {
+        gerarEEnviarCodigo(normalizeEmail(email), Proposito.CONFIRMAR_EMAIL);
+    }
+
+    @Override
+    public Map<String, Object> confirmarEmail(ConfirmarEmailRequest request) {
+        String email = normalizeEmail(request.email());
+
+        Optional<CodigoVerificacaoDocument> tokenDocValid = codigoVerificacaoRepository
+                .findByEmailAndProposito(email, Proposito.CONFIRMAR_EMAIL)
+                .filter(t -> t.getExpiraEm().isAfter(Instant.now()));
+
+        if (tokenDocValid.isEmpty()) {
+            // Achado do security-review (10/09/2026): sem este BCrypt dummy, o ramo
+            // "código inexistente ou vencido" respondia ~80 ms mais rápido que "código
+            // errado" — um oráculo de tempo que, com 2 requisições públicas, distingue
+            // "conta ativa não confirmada" (o alvo preferencial da força bruta de código)
+            // da inexistência. Contrabalança o custo de BCrypt, como em esqueciSenha e
+            // reenviarConfirmacaoEmail.
+            passwordEncoder.encode(CODIGO_DUMMY_TEMPO_CONSTANTE);
+            throw new NaoAutorizadoException(CODIGO_INVALIDO);
+        }
+
+        CodigoVerificacaoDocument tokenDoc = tokenDocValid.get();
+
+        if (!passwordEncoder.matches(request.codigo(), tokenDoc.getCodigoHash())) {
+            registrarTentativaFalha(email, Proposito.CONFIRMAR_EMAIL);
+            throw new NaoAutorizadoException(CODIGO_INVALIDO);
+        }
+
+        UserDocument user = userRepository.findByEmail(email)
+                .filter(UserDocument::isActive)
+                .orElseThrow(() -> new NaoAutorizadoException(CODIGO_INVALIDO));
+
+        user.setEmailVerificado(true);
+        userRepository.save(user);
+
+        codigoVerificacaoRepository.deleteByEmailAndProposito(email, Proposito.CONFIRMAR_EMAIL);
+        logger.info("E-mail confirmado no cadastro para email={}", email);
+
+        return Map.of(
+                "success", true,
+                "message", "E-mail confirmado com sucesso."
+        );
+    }
+
+    @Override
+    public Map<String, Object> reenviarConfirmacaoEmail(ReenviarConfirmacaoRequest request) {
+        String email = normalizeEmail(request.email());
+        boolean enviar = userRepository.findByEmail(email)
+                .filter(UserDocument::isActive)
+                .filter(u -> !u.isEmailVerificado())
+                .isPresent();
+
+        if (enviar) {
+            gerarEEnviarCodigo(email, Proposito.CONFIRMAR_EMAIL);
+        } else {
+            // Mesma mitigação de canal lateral de tempo de esqueciSenha: "e-mail não
+            // existe" e "e-mail já confirmado" gastam o mesmo tempo de BCrypt que o ramo
+            // que de fato envia, para a resposta não virar um sinal que os distingue.
+            passwordEncoder.encode(CODIGO_DUMMY_TEMPO_CONSTANTE);
+        }
+
+        return Map.of(
+                "success", true,
+                "message", "Se o e-mail existir e ainda não estiver confirmado, você receberá um novo código."
         );
     }
 
@@ -185,19 +270,27 @@ public class AuthServiceImpl implements AuthService {
      * um 500 em vez da resposta genérica sempre-200. O upsert do Mongo resolve a corrida
      * no próprio banco — não há mais dois inserts concorrentes para capturar.
      */
-    private void gerarEEnviarCodigo(String email) {
+    private void gerarEEnviarCodigo(String email, Proposito proposito) {
         String codigo = "%06d".formatted(secureRandom.nextInt(1_000_000));
         Instant agora = Instant.now();
 
-        Query query = Query.query(Criteria.where("email").is(email));
+        // Chave composta (email, proposito): um titular pode ter um código de reset e um
+        // de confirmação pendentes ao mesmo tempo, sem colidir (generalizado em 10/09/2026
+        // para reaproveitar esta infraestrutura na confirmação de e-mail do cadastro).
+        Query query = Query.query(Criteria.where("email").is(email).and("proposito").is(proposito));
         Update update = new Update()
                 .set("email", email)
+                .set("proposito", proposito)
                 .set("codigoHash", passwordEncoder.encode(codigo))
                 .set("tentativas", 0)
                 .set("criadoEm", agora)
                 .set("expiraEm", agora.plus(CODIGO_EXPIRACAO_MINUTOS, ChronoUnit.MINUTES));
-        mongoTemplate.upsert(query, update, PasswordResetTokenDocument.class);
-        emailService.enviarCodigoRedefinicaoSenha(email, codigo);
+        mongoTemplate.upsert(query, update, CodigoVerificacaoDocument.class);
+
+        switch (proposito) {
+            case REDEFINIR_SENHA -> emailService.enviarCodigoRedefinicaoSenha(email, codigo);
+            case CONFIRMAR_EMAIL -> emailService.enviarCodigoConfirmacaoEmail(email, codigo);
+        }
     }
 
     /**
@@ -208,14 +301,14 @@ public class AuthServiceImpl implements AuthService {
      * e deixando o atacante ultrapassar as 5 tentativas pretendidas. Estourou o limite: o
      * token é descartado — o usuário precisa pedir um novo código.
      */
-    private void registrarTentativaFalha(String email) {
-        Query query = Query.query(Criteria.where("email").is(email));
+    private void registrarTentativaFalha(String email, Proposito proposito) {
+        Query query = Query.query(Criteria.where("email").is(email).and("proposito").is(proposito));
         Update update = new Update().inc("tentativas", 1);
-        PasswordResetTokenDocument atualizado = mongoTemplate.findAndModify(
-                query, update, FindAndModifyOptions.options().returnNew(true), PasswordResetTokenDocument.class);
+        CodigoVerificacaoDocument atualizado = mongoTemplate.findAndModify(
+                query, update, FindAndModifyOptions.options().returnNew(true), CodigoVerificacaoDocument.class);
 
         if (atualizado != null && atualizado.getTentativas() >= CODIGO_MAX_TENTATIVAS) {
-            passwordResetTokenRepository.deleteByEmail(email);
+            codigoVerificacaoRepository.deleteByEmailAndProposito(email, proposito);
         }
     }
 

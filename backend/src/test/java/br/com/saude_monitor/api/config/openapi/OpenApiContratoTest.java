@@ -27,9 +27,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>O CA pede que a especificação "cubra os endpoints REST atuais". Eram 31 endpoints na
  * entrega original (E8-09); a feature de recuperação de senha ("esqueci minha senha",
- * 10/09/2026) acrescentou 2 (`/auth/esqueci-senha`, `/auth/redefinir-senha`), somando
- * **33**. Este teste mede o total de operações que o springdoc realmente gera, não
- * presume que bateu.</p>
+ * 10/09/2026) acrescentou 2 (`/auth/esqueci-senha`, `/auth/redefinir-senha`), somando 33;
+ * a confirmação obrigatória de e-mail no cadastro (mesmo dia) acrescentou mais 2
+ * (`/auth/confirmar-email`, `/auth/reenviar-confirmacao`), somando **35**. Este teste mede
+ * o total de operações que o springdoc realmente gera, não presume que bateu.</p>
  */
 @Testcontainers
 @SpringBootTest
@@ -76,7 +77,7 @@ class OpenApiContratoTest {
             }
         }
 
-        assertThat(operacoes).isEqualTo(33);
+        assertThat(operacoes).isEqualTo(35);
     }
 
     /**
@@ -87,7 +88,8 @@ class OpenApiContratoTest {
      * `permitAll` recebem {@code @SecurityRequirements} vazio para sobrepor o global;
      * este teste mede que a sobreposição chegou ao contrato publicado — e que nenhum
      * dos demais ganhou a mesma isenção por engano. Lista ampliada em 10/09/2026 com os
-     * 2 endpoints de "esqueci minha senha" (17 públicos ao todo).
+     * 2 endpoints de "esqueci minha senha" e os 2 de confirmação de e-mail (19 públicos
+     * ao todo).
      */
     @Test
     void devePublicarSegurancaCoerenteComOSecurityConfig() throws Exception {
@@ -98,6 +100,8 @@ class OpenApiContratoTest {
                 "POST /api/v1/auth/logout",
                 "POST /api/v1/auth/esqueci-senha",
                 "POST /api/v1/auth/redefinir-senha",
+                "POST /api/v1/auth/confirmar-email",
+                "POST /api/v1/auth/reenviar-confirmacao",
                 "POST /api/v1/visitas/checkin",
                 "POST /api/v1/visitas/{id}/checkout",
                 "POST /api/v1/visitas/{id}/heartbeat",

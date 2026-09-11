@@ -10,6 +10,7 @@ import {Building2, Home as HomeIcon, Map as MapIcon, User as UserIcon} from "luc
 import HomeScreen from "./src/screens/home/view/HomeScreen.js";
 import LoginScreen from "./src/screens/auth/view/LoginScreen.js";
 import EsqueciSenhaScreen from "./src/screens/auth/view/EsqueciSenhaScreen.js";
+import ConfirmarEmailScreen from "./src/screens/auth/view/ConfirmarEmailScreen.js";
 import UserScreen from "./src/screens/user/view/UserScreen.js";
 import GeoLocalizacaoScreen from "./src/screens/geolocalizacao/view/GeoLocalizacaoScreen.js";
 import HospitaisScreen from "./src/screens/hospitais/view/HospitaisScreen.js";
@@ -75,6 +76,7 @@ function PerfilStack() {
             <Stack.Screen name="Historico" component={HistoricoScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="EsqueciSenha" component={EsqueciSenhaScreen} />
+            <Stack.Screen name="ConfirmarEmail" component={ConfirmarEmailScreen} />
             <Stack.Screen name="Cadastro" component={UserScreen} />
             <Stack.Screen name="Privacidade" component={PrivacidadeScreen} />
             <Stack.Screen name="Notificacoes" component={NotificacoesScreen} />

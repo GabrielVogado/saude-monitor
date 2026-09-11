@@ -1,18 +1,23 @@
 package br.com.saude_monitor.api.integracao;
 
+import br.com.saude_monitor.api.auth.email.EmailService;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -37,6 +42,12 @@ class AuthFluxoIntegracaoTest extends IntegracaoTestBase {
 
     private static final String SENHA = "S3nh@Forte!";
 
+    // Substitui o Resend real (sem chamada HTTP externa em teste) e, principalmente,
+    // permite capturar o código de 6 dígitos gerado no cadastro — o teste não tem como
+    // lê-lo de outro jeito, já que só o hash BCrypt é persistido no Mongo.
+    @MockitoBean
+    private EmailService emailService;
+
     private String registrar(String email) throws Exception {
         String corpo = """
                 {
@@ -55,6 +66,23 @@ class AuthFluxoIntegracaoTest extends IntegracaoTestBase {
         return email;
     }
 
+    /** Registra e confirma o e-mail (capturando o código enviado ao {@link EmailService} mockado). */
+    private String registrarEConfirmar(String email) throws Exception {
+        registrar(email);
+
+        ArgumentCaptor<String> codigoCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).enviarCodigoConfirmacaoEmail(eq(email), codigoCaptor.capture());
+
+        String corpoConfirmacao = """
+                { "email": "%s", "codigo": "%s" }
+                """.formatted(email, codigoCaptor.getValue());
+        mockMvc.perform(post("/api/v1/auth/confirmar-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoConfirmacao))
+                .andExpect(status().isOk());
+        return email;
+    }
+
     private JsonNode login(String email, String senha) throws Exception {
         String corpo = """
                 { "email": "%s", "password": "%s", "rememberDevice": false }
@@ -70,7 +98,7 @@ class AuthFluxoIntegracaoTest extends IntegracaoTestBase {
 
     @Test
     void deveRegistrarLogarRenovarERevogarNoLogout() throws Exception {
-        String email = registrar("marina-fluxo-auth@saude-teste.com");
+        String email = registrarEConfirmar("marina-fluxo-auth@saude-teste.com");
 
         JsonNode tokensLogin = login(email, SENHA);
         String refreshOriginal = tokensLogin.get("refreshToken").asText();
@@ -113,7 +141,7 @@ class AuthFluxoIntegracaoTest extends IntegracaoTestBase {
 
     @Test
     void deveRecusarLoginComSenhaErrada() throws Exception {
-        String email = registrar("marina-senha-errada@saude-teste.com");
+        String email = registrarEConfirmar("marina-senha-errada@saude-teste.com");
 
         String corpo = """
                 { "email": "%s", "password": "senha-errada-qualquer", "rememberDevice": false }
@@ -124,4 +152,5 @@ class AuthFluxoIntegracaoTest extends IntegracaoTestBase {
                         .content(corpo))
                 .andExpect(status().isUnauthorized());
     }
+
 }

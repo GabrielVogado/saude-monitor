@@ -1,15 +1,19 @@
 package br.com.saude_monitor.api.auth.service.impl;
 
 import br.com.saude_monitor.api.auth.dto.AuthResponse;
+import br.com.saude_monitor.api.auth.dto.ConfirmarEmailRequest;
 import br.com.saude_monitor.api.auth.dto.EsqueciSenhaRequest;
 import br.com.saude_monitor.api.auth.dto.LoginRequest;
 import br.com.saude_monitor.api.auth.dto.RedefinirSenhaRequest;
+import br.com.saude_monitor.api.auth.dto.ReenviarConfirmacaoRequest;
 import br.com.saude_monitor.api.auth.dto.RefreshRequest;
 import br.com.saude_monitor.api.auth.email.EmailService;
-import br.com.saude_monitor.api.auth.passwordreset.PasswordResetTokenDocument;
-import br.com.saude_monitor.api.auth.passwordreset.PasswordResetTokenRepository;
+import br.com.saude_monitor.api.auth.verificacao.CodigoVerificacaoDocument;
+import br.com.saude_monitor.api.auth.verificacao.CodigoVerificacaoRepository;
+import br.com.saude_monitor.api.auth.verificacao.Proposito;
 import br.com.saude_monitor.api.auth.revogacao.RefreshTokenRevogadoDocument;
 import br.com.saude_monitor.api.auth.revogacao.RefreshTokenRevogadoRepository;
+import br.com.saude_monitor.api.config.exception.EmailNaoConfirmadoException;
 import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.security.JwtProperties;
 import br.com.saude_monitor.api.config.security.JwtService;
@@ -58,7 +62,7 @@ class AuthServiceImplTest {
     private UserRepository userRepository;
     private JwtService jwtService;
     private RefreshTokenRevogadoRepository revogadoRepository;
-    private PasswordResetTokenRepository passwordResetTokenRepository;
+    private CodigoVerificacaoRepository codigoVerificacaoRepository;
     private EmailService emailService;
     private PasswordEncoder passwordEncoder;
     private MongoTemplate mongoTemplate;
@@ -67,7 +71,7 @@ class AuthServiceImplTest {
     void setup() {
         userRepository = mock(UserRepository.class);
         revogadoRepository = mock(RefreshTokenRevogadoRepository.class);
-        passwordResetTokenRepository = mock(PasswordResetTokenRepository.class);
+        codigoVerificacaoRepository = mock(CodigoVerificacaoRepository.class);
         emailService = mock(EmailService.class);
         mongoTemplate = mock(MongoTemplate.class);
         passwordEncoder = new BCryptPasswordEncoder();
@@ -81,9 +85,10 @@ class AuthServiceImplTest {
 
         authService = new AuthServiceImpl(
                 userRepository, passwordEncoder, jwtService, revogadoRepository,
-                passwordResetTokenRepository, emailService, mongoTemplate);
+                codigoVerificacaoRepository, emailService, mongoTemplate);
     }
 
+    /** "Ativo" aqui inclui e-mail confirmado — a maioria dos testes não exercita esse eixo. */
     private UserDocument usuarioAtivo(String email) {
         return UserDocument.builder()
                 .id("1")
@@ -92,6 +97,7 @@ class AuthServiceImplTest {
                 .senhaHash("hash")
                 .papel(Papel.USER)
                 .active(true)
+                .emailVerificado(true)
                 .build();
     }
 
@@ -105,6 +111,7 @@ class AuthServiceImplTest {
                 .senhaHash(senhaHash)
                 .papel(Papel.USER)
                 .active(true)
+                .emailVerificado(true)
                 .build();
 
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(user));
@@ -116,6 +123,27 @@ class AuthServiceImplTest {
         assertEquals(900, response.expiraEm());
         assertEquals("marina@email.com", response.usuario().email());
         assertEquals("USER", response.usuario().papel());
+    }
+
+    @Test
+    void deveRejeitarLoginComEmailNaoConfirmado() {
+        // Achado do PO (10/09/2026): sem confirmar o e-mail no cadastro, um endereço com
+        // erro de digitação ou inexistente nunca recebe o código de "esqueci minha senha".
+        String senhaHash = new BCryptPasswordEncoder().encode("S3nh@Forte!");
+        UserDocument user = UserDocument.builder()
+                .id("1")
+                .email("marina@email.com")
+                .senhaHash(senhaHash)
+                .papel(Papel.USER)
+                .active(true)
+                .emailVerificado(false)
+                .build();
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(user));
+
+        EmailNaoConfirmadoException ex = assertThrows(EmailNaoConfirmadoException.class,
+                () -> authService.login(new LoginRequest("marina@email.com", "S3nh@Forte!", false)));
+
+        assertEquals("EMAIL_NAO_CONFIRMADO", ex.getCode());
     }
 
     @Test
@@ -244,7 +272,7 @@ class AuthServiceImplTest {
         assertTrue((Boolean) resposta.get("success"));
         // Upsert atômico (achado do code-review: find-then-save corria com o retry
         // idempotente do frontend e estourava DuplicateKeyException sem captura).
-        verify(mongoTemplate).upsert(any(Query.class), any(Update.class), eq(PasswordResetTokenDocument.class));
+        verify(mongoTemplate).upsert(any(Query.class), any(Update.class), eq(CodigoVerificacaoDocument.class));
         verify(emailService).enviarCodigoRedefinicaoSenha(eq("marina@email.com"), matches("\\d{6}"));
     }
 
@@ -259,7 +287,7 @@ class AuthServiceImplTest {
         authService.esqueciSenha(new EsqueciSenhaRequest("marina@email.com"));
 
         ArgumentCaptor<Update> updateCaptor = ArgumentCaptor.forClass(Update.class);
-        verify(mongoTemplate).upsert(any(Query.class), updateCaptor.capture(), eq(PasswordResetTokenDocument.class));
+        verify(mongoTemplate).upsert(any(Query.class), updateCaptor.capture(), eq(CodigoVerificacaoDocument.class));
         Document setDoc = (Document) updateCaptor.getValue().getUpdateObject().get("$set");
         assertEquals(0, setDoc.getInteger("tentativas"));
         assertTrue(setDoc.getString("codigoHash") != null && !setDoc.getString("codigoHash").isBlank());
@@ -273,7 +301,7 @@ class AuthServiceImplTest {
 
         assertTrue((Boolean) resposta.get("success"));
         verify(emailService, never()).enviarCodigoRedefinicaoSenha(anyString(), anyString());
-        verify(mongoTemplate, never()).upsert(any(), any(), eq(PasswordResetTokenDocument.class));
+        verify(mongoTemplate, never()).upsert(any(), any(), eq(CodigoVerificacaoDocument.class));
     }
 
     @Test
@@ -290,7 +318,7 @@ class AuthServiceImplTest {
         PasswordEncoder encoderMockado = mock(PasswordEncoder.class);
         AuthServiceImpl service = new AuthServiceImpl(
                 userRepository, encoderMockado, jwtService, revogadoRepository,
-                passwordResetTokenRepository, emailService, mongoTemplate);
+                codigoVerificacaoRepository, emailService, mongoTemplate);
         when(userRepository.findByEmail("fantasma@email.com")).thenReturn(Optional.empty());
 
         service.esqueciSenha(new EsqueciSenhaRequest("fantasma@email.com"));
@@ -300,10 +328,11 @@ class AuthServiceImplTest {
 
     // ------------------------------------------------ Redefinir senha ----------------------------------------------
 
-    private PasswordResetTokenDocument tokenValido(String email, String codigo) {
-        return PasswordResetTokenDocument.builder()
+    private CodigoVerificacaoDocument tokenValido(String email, String codigo, Proposito proposito) {
+        return CodigoVerificacaoDocument.builder()
                 .id("token-1")
                 .email(email)
+                .proposito(proposito)
                 .codigoHash(passwordEncoder.encode(codigo))
                 .tentativas(0)
                 .criadoEm(Instant.now())
@@ -314,8 +343,8 @@ class AuthServiceImplTest {
     @Test
     void redefinirSenhaComCodigoCertoTrocaASenhaEConsomeOToken() {
         UserDocument user = usuarioAtivo("marina@email.com");
-        when(passwordResetTokenRepository.findByEmail("marina@email.com"))
-                .thenReturn(Optional.of(tokenValido("marina@email.com", "123456")));
+        when(codigoVerificacaoRepository.findByEmailAndProposito("marina@email.com", Proposito.REDEFINIR_SENHA))
+                .thenReturn(Optional.of(tokenValido("marina@email.com", "123456", Proposito.REDEFINIR_SENHA)));
         when(userRepository.findByEmail("marina@email.com")).thenReturn(Optional.of(user));
 
         Map<String, Object> resposta = authService.redefinirSenha(
@@ -325,7 +354,7 @@ class AuthServiceImplTest {
         verify(userRepository).save(argThat((UserDocument u) ->
                 passwordEncoder.matches("N0vaSenha!", u.getSenhaHash())
                         && u.getSenhaAlteradaEm() != null));
-        verify(passwordResetTokenRepository).deleteByEmail("marina@email.com");
+        verify(codigoVerificacaoRepository).deleteByEmailAndProposito("marina@email.com", Proposito.REDEFINIR_SENHA);
     }
 
     @Test
@@ -334,62 +363,64 @@ class AuthServiceImplTest {
         // salvar) corre quando duas tentativas erradas chegam em paralelo — as duas leem
         // o mesmo valor, e um incremento se perde. `findAndModify` com `$inc` resolve a
         // soma no próprio Mongo, sem essa janela.
-        when(passwordResetTokenRepository.findByEmail("marina@email.com"))
-                .thenReturn(Optional.of(tokenValido("marina@email.com", "123456")));
-        PasswordResetTokenDocument depoisDoIncremento = tokenValido("marina@email.com", "123456");
+        when(codigoVerificacaoRepository.findByEmailAndProposito("marina@email.com", Proposito.REDEFINIR_SENHA))
+                .thenReturn(Optional.of(tokenValido("marina@email.com", "123456", Proposito.REDEFINIR_SENHA)));
+        CodigoVerificacaoDocument depoisDoIncremento = tokenValido("marina@email.com", "123456", Proposito.REDEFINIR_SENHA);
         depoisDoIncremento.setTentativas(1);
         when(mongoTemplate.findAndModify(
-                any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(PasswordResetTokenDocument.class)))
+                any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(CodigoVerificacaoDocument.class)))
                 .thenReturn(depoisDoIncremento);
 
         assertThrows(NaoAutorizadoException.class, () -> authService.redefinirSenha(
                 new RedefinirSenhaRequest("marina@email.com", "000000", "N0vaSenha!")));
 
         verify(mongoTemplate).findAndModify(
-                any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(PasswordResetTokenDocument.class));
-        verify(passwordResetTokenRepository, never()).deleteByEmail(anyString());
+                any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(CodigoVerificacaoDocument.class));
+        verify(codigoVerificacaoRepository, never()).deleteByEmailAndProposito(anyString(), any(Proposito.class));
         verify(userRepository, never()).save(any(UserDocument.class));
     }
 
     @Test
     void redefinirSenhaDescartaOTokenAoEsgotarAsTentativas() {
-        PasswordResetTokenDocument quaseNoLimite = tokenValido("marina@email.com", "123456");
+        CodigoVerificacaoDocument quaseNoLimite = tokenValido("marina@email.com", "123456", Proposito.REDEFINIR_SENHA);
         quaseNoLimite.setTentativas(4);
-        when(passwordResetTokenRepository.findByEmail("marina@email.com")).thenReturn(Optional.of(quaseNoLimite));
-        PasswordResetTokenDocument depoisDoIncremento = tokenValido("marina@email.com", "123456");
+        when(codigoVerificacaoRepository.findByEmailAndProposito("marina@email.com", Proposito.REDEFINIR_SENHA))
+                .thenReturn(Optional.of(quaseNoLimite));
+        CodigoVerificacaoDocument depoisDoIncremento = tokenValido("marina@email.com", "123456", Proposito.REDEFINIR_SENHA);
         depoisDoIncremento.setTentativas(5);
         when(mongoTemplate.findAndModify(
-                any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(PasswordResetTokenDocument.class)))
+                any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(CodigoVerificacaoDocument.class)))
                 .thenReturn(depoisDoIncremento);
 
         assertThrows(NaoAutorizadoException.class, () -> authService.redefinirSenha(
                 new RedefinirSenhaRequest("marina@email.com", "000000", "N0vaSenha!")));
 
-        verify(passwordResetTokenRepository).deleteByEmail("marina@email.com");
-        verify(passwordResetTokenRepository, never()).save(any(PasswordResetTokenDocument.class));
+        verify(codigoVerificacaoRepository).deleteByEmailAndProposito("marina@email.com", Proposito.REDEFINIR_SENHA);
+        verify(codigoVerificacaoRepository, never()).save(any(CodigoVerificacaoDocument.class));
     }
 
     @Test
     void redefinirSenhaComCodigoErradoNaoQuebraSeOTokenSumiuEntreALeituraEOIncremento() {
         // Corrida rara: outra requisição apagou o token (ex.: esgotou tentativas em
         // paralelo) entre o findByEmail e o findAndModify desta chamada.
-        when(passwordResetTokenRepository.findByEmail("marina@email.com"))
-                .thenReturn(Optional.of(tokenValido("marina@email.com", "123456")));
+        when(codigoVerificacaoRepository.findByEmailAndProposito("marina@email.com", Proposito.REDEFINIR_SENHA))
+                .thenReturn(Optional.of(tokenValido("marina@email.com", "123456", Proposito.REDEFINIR_SENHA)));
         when(mongoTemplate.findAndModify(
-                any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(PasswordResetTokenDocument.class)))
+                any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(CodigoVerificacaoDocument.class)))
                 .thenReturn(null);
 
         assertThrows(NaoAutorizadoException.class, () -> authService.redefinirSenha(
                 new RedefinirSenhaRequest("marina@email.com", "000000", "N0vaSenha!")));
 
-        verify(passwordResetTokenRepository, never()).deleteByEmail(anyString());
+        verify(codigoVerificacaoRepository, never()).deleteByEmailAndProposito(anyString(), any(Proposito.class));
     }
 
     @Test
     void redefinirSenhaRejeitaTokenExpirado() {
-        PasswordResetTokenDocument expirado = tokenValido("marina@email.com", "123456");
+        CodigoVerificacaoDocument expirado = tokenValido("marina@email.com", "123456", Proposito.REDEFINIR_SENHA);
         expirado.setExpiraEm(Instant.now().minus(1, ChronoUnit.MINUTES));
-        when(passwordResetTokenRepository.findByEmail("marina@email.com")).thenReturn(Optional.of(expirado));
+        when(codigoVerificacaoRepository.findByEmailAndProposito("marina@email.com", Proposito.REDEFINIR_SENHA))
+                .thenReturn(Optional.of(expirado));
 
         assertThrows(NaoAutorizadoException.class, () -> authService.redefinirSenha(
                 new RedefinirSenhaRequest("marina@email.com", "123456", "N0vaSenha!")));
@@ -399,10 +430,87 @@ class AuthServiceImplTest {
 
     @Test
     void redefinirSenhaRejeitaQuandoNaoHaTokenParaOEmail() {
-        when(passwordResetTokenRepository.findByEmail("marina@email.com")).thenReturn(Optional.empty());
+        when(codigoVerificacaoRepository.findByEmailAndProposito("marina@email.com", Proposito.REDEFINIR_SENHA))
+                .thenReturn(Optional.empty());
 
         assertThrows(NaoAutorizadoException.class, () -> authService.redefinirSenha(
                 new RedefinirSenhaRequest("marina@email.com", "123456", "N0vaSenha!")));
+    }
+
+    // ------------------------------------------------ Confirmação de e-mail no cadastro ----------------------------
+
+    @Test
+    void enviarCodigoConfirmacaoEmailGeraCodigoEEnvia() {
+        authService.enviarCodigoConfirmacaoEmail("marina@email.com");
+
+        verify(mongoTemplate).upsert(any(Query.class), any(Update.class), eq(CodigoVerificacaoDocument.class));
+        verify(emailService).enviarCodigoConfirmacaoEmail(eq("marina@email.com"), matches("\\d{6}"));
+        verify(emailService, never()).enviarCodigoRedefinicaoSenha(anyString(), anyString());
+    }
+
+    @Test
+    void confirmarEmailComCodigoCertoMarcaVerificadoEConsomeOToken() {
+        UserDocument user = UserDocument.builder()
+                .id("1").email("marina@email.com").senhaHash("hash").papel(Papel.USER)
+                .active(true).emailVerificado(false).build();
+        when(codigoVerificacaoRepository.findByEmailAndProposito("marina@email.com", Proposito.CONFIRMAR_EMAIL))
+                .thenReturn(Optional.of(tokenValido("marina@email.com", "123456", Proposito.CONFIRMAR_EMAIL)));
+        when(userRepository.findByEmail("marina@email.com")).thenReturn(Optional.of(user));
+
+        Map<String, Object> resposta = authService.confirmarEmail(
+                new ConfirmarEmailRequest("marina@email.com", "123456"));
+
+        assertTrue((Boolean) resposta.get("success"));
+        verify(userRepository).save(argThat(UserDocument::isEmailVerificado));
+        verify(codigoVerificacaoRepository).deleteByEmailAndProposito("marina@email.com", Proposito.CONFIRMAR_EMAIL);
+    }
+
+    @Test
+    void confirmarEmailComCodigoErradoIncrementaTentativasENaoConfirma() {
+        when(codigoVerificacaoRepository.findByEmailAndProposito("marina@email.com", Proposito.CONFIRMAR_EMAIL))
+                .thenReturn(Optional.of(tokenValido("marina@email.com", "123456", Proposito.CONFIRMAR_EMAIL)));
+
+        assertThrows(NaoAutorizadoException.class, () -> authService.confirmarEmail(
+                new ConfirmarEmailRequest("marina@email.com", "000000")));
+
+        verify(userRepository, never()).save(any(UserDocument.class));
+    }
+
+    @Test
+    void reenviarConfirmacaoEnviaQuandoAindaNaoConfirmado() {
+        UserDocument user = UserDocument.builder()
+                .id("1").email("marina@email.com").senhaHash("hash").papel(Papel.USER)
+                .active(true).emailVerificado(false).build();
+        when(userRepository.findByEmail("marina@email.com")).thenReturn(Optional.of(user));
+
+        Map<String, Object> resposta = authService.reenviarConfirmacaoEmail(
+                new ReenviarConfirmacaoRequest("marina@email.com"));
+
+        assertTrue((Boolean) resposta.get("success"));
+        verify(emailService).enviarCodigoConfirmacaoEmail(eq("marina@email.com"), matches("\\d{6}"));
+    }
+
+    @Test
+    void reenviarConfirmacaoNaoEnviaQuandoJaConfirmadoMasRespostaEIgual() {
+        UserDocument user = usuarioAtivo("marina@email.com"); // emailVerificado=true
+        when(userRepository.findByEmail("marina@email.com")).thenReturn(Optional.of(user));
+
+        Map<String, Object> resposta = authService.reenviarConfirmacaoEmail(
+                new ReenviarConfirmacaoRequest("marina@email.com"));
+
+        assertTrue((Boolean) resposta.get("success"));
+        verify(emailService, never()).enviarCodigoConfirmacaoEmail(anyString(), anyString());
+    }
+
+    @Test
+    void reenviarConfirmacaoNaoEnviaQuandoEmailNaoExisteMasRespostaEIgual() {
+        when(userRepository.findByEmail("fantasma@email.com")).thenReturn(Optional.empty());
+
+        Map<String, Object> resposta = authService.reenviarConfirmacaoEmail(
+                new ReenviarConfirmacaoRequest("fantasma@email.com"));
+
+        assertTrue((Boolean) resposta.get("success"));
+        verify(emailService, never()).enviarCodigoConfirmacaoEmail(anyString(), anyString());
     }
 
     // ------------------------------------------------ Refresh após reset (invalida sessão antiga) -------------------
@@ -466,5 +574,20 @@ class AuthServiceImplTest {
         AuthResponse response = authService.refresh(new RefreshRequest(refreshToken));
 
         assertNotNull(response.accessToken());
+    }
+
+    @Test
+    void confirmarEmailRejeitaQuandoNaoHaCodigoValidoParaOEmail() {
+        // Sem documento de código válido (nunca emitido, expirado ou já consumido): 401
+        // genérico e nada de marcar o e-mail como verificado. O custo de BCrypt é
+        // contabilizado neste ramo para não virar oráculo de tempo (achado do
+        // security-review desta PR — ver M-013).
+        when(codigoVerificacaoRepository.findByEmailAndProposito("marina@email.com", Proposito.CONFIRMAR_EMAIL))
+                .thenReturn(Optional.empty());
+
+        assertThrows(NaoAutorizadoException.class, () -> authService.confirmarEmail(
+                new ConfirmarEmailRequest("marina@email.com", "123456")));
+
+        verify(userRepository, never()).save(any(UserDocument.class));
     }
 }

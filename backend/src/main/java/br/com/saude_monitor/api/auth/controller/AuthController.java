@@ -1,9 +1,11 @@
 package br.com.saude_monitor.api.auth.controller;
 
 import br.com.saude_monitor.api.auth.dto.AuthResponse;
+import br.com.saude_monitor.api.auth.dto.ConfirmarEmailRequest;
 import br.com.saude_monitor.api.auth.dto.EsqueciSenhaRequest;
 import br.com.saude_monitor.api.auth.dto.LoginRequest;
 import br.com.saude_monitor.api.auth.dto.RedefinirSenhaRequest;
+import br.com.saude_monitor.api.auth.dto.ReenviarConfirmacaoRequest;
 import br.com.saude_monitor.api.auth.dto.RefreshRequest;
 import br.com.saude_monitor.api.auth.service.AuthService;
 import br.com.saude_monitor.api.user.dto.UserRequest;
@@ -87,5 +89,25 @@ public class AuthController {
     @SecurityRequirements
     public ResponseEntity<Map<String, Object>> redefinirSenha(@Valid @RequestBody RedefinirSenhaRequest request) {
         return ResponseEntity.ok(authService.redefinirSenha(request));
+    }
+
+    /**
+     * 🔓 Confirma o e-mail do cadastro com o código de 6 dígitos enviado por
+     * {@code POST /registro}. Sem confirmar, o login é recusado (403 EMAIL_NAO_CONFIRMADO).
+     */
+    @PostMapping("/confirmar-email")
+    @SecurityRequirements
+    public ResponseEntity<Map<String, Object>> confirmarEmail(@Valid @RequestBody ConfirmarEmailRequest request) {
+        return ResponseEntity.ok(authService.confirmarEmail(request));
+    }
+
+    /**
+     * 🔓 Reenvia o código de confirmação de e-mail. Resposta sempre genérica — não
+     * revela se o e-mail existe nem se já está confirmado.
+     */
+    @PostMapping("/reenviar-confirmacao")
+    @SecurityRequirements
+    public ResponseEntity<Map<String, Object>> reenviarConfirmacao(@Valid @RequestBody ReenviarConfirmacaoRequest request) {
+        return ResponseEntity.ok(authService.reenviarConfirmacaoEmail(request));
     }
 }

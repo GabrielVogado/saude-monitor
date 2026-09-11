@@ -15,4 +15,13 @@ public interface EmailService {
      * virar um sinal diferente para quem está tentando descobrir e-mails cadastrados.</p>
      */
     void enviarCodigoRedefinicaoSenha(String destinatario, String codigo);
+
+    /**
+     * Envia o código de 6 dígitos para confirmar o e-mail no cadastro (10/09/2026).
+     *
+     * <p>Mesmo contrato de não-propagação de falha do método acima — o cadastro não pode
+     * falhar por causa de uma falha de envio; o usuário sempre pode pedir um novo código
+     * pelo endpoint de reenvio.</p>
+     */
+    void enviarCodigoConfirmacaoEmail(String destinatario, String codigo);
 }

@@ -179,6 +179,32 @@ class LoginService {
   }
 
   /**
+   * Confirma o e-mail do cadastro com o código de 6 dígitos enviado por `registro`
+   * (confirmação obrigatória, 10/09/2026). Sem confirmar, `login` é recusado (403
+   * EMAIL_NAO_CONFIRMADO).
+   *
+   * Sem `idempotente`: mesma razão de `redefinirSenha` — repetir depois que o código já
+   * foi consumido devolveria um erro confuso.
+   */
+  static async confirmarEmail({ email, codigo }) {
+    return post(`${BASE_PATH}/confirmar-email`, {
+      email: email?.trim() || "",
+      codigo: codigo?.trim() || "",
+    });
+  }
+
+  /**
+   * Reenvia o código de confirmação de e-mail. Resposta sempre genérica — não revela se
+   * o e-mail existe nem se já está confirmado.
+   *
+   * `idempotente: true`: mesma razão de `esqueciSenha` — o backend faz upsert por
+   * (e-mail, propósito), reenviar só troca o código.
+   */
+  static async reenviarConfirmacaoEmail(email) {
+    return post(`${BASE_PATH}/reenviar-confirmacao`, { email: email?.trim() || "" }, { idempotente: true });
+  }
+
+  /**
    * Exclui a conta do usuário autenticado (F0-05/LGPD).
    *
    * Envia `DELETE /api/v1/contas/exclusao` com o access token e, em caso de

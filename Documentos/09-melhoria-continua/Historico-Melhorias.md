@@ -28,6 +28,7 @@
 | **M-008** | 08/09/2026 | Auditoria de código morto/lógica ambígua/erros silenciosos (pedido direto do PO) | 4 erros silenciosos críticos de auth/LGPD corrigidos: cadastro duplicado "com sucesso" (201), logout que mascarava falha real de revogação, seed de admin com senha vazia sem aviso, exclusão de conta afirmando remover uma coleção nunca escrita | #98 | ✅ Aplicada |
 | **M-009** | 08/09/2026 | Auditoria de código morto/lógica ambígua/erros silenciosos (pedido direto do PO), mesmo pedido do M-008 | 5 bugs de comportamento do frontend corrigidos: geofencing nativo não parava no logout/exclusão de conta; botão "Sair" do Perfil nunca revogava o refresh token no servidor; notificação de feedback abria o formulário mesmo vencido (RN-09) — e, achado do `code-review` deste mesmo PR, também abria com dados da visita errada quando a pendência já tinha sido substituída; link "Esqueci minha senha" e botão "Voltar" do cadastro sem `onPress`; telas de moderação de sugestões inacessíveis removidas | #100 | ✅ Aplicada |
 | **M-011** | 09/09/2026 | Bug relatado pelo PO em uso real (UBS 05 do Recanto das Emas ausente no mapa com "Todos") | Listagem sem filtro geoespacial (mapa "Todos" e aba Hospitais) truncava em 100/20 hospitais por chamada, sem `Sort` estável — de 340 hospitais ativos, até 240 nunca apareciam no mapa e 320 nunca na lista sem busca por nome. Corrigido: `Sort` estável (nome + id) no backend, paginação completa no mapa e scroll infinito com guard de geração/reentrância na aba Hospitais **e** no Ranking (mesma falha pré-existente, achado do `code-review` deste PR) | #105 | ✅ Aplicada |
+| **M-013** | 10/09/2026 | Lacuna identificada pelo PO na feature de recuperação de senha (#110) | Confirmação obrigatória de e-mail no cadastro: sem verificar, um endereço com erro de digitação ou inexistente nunca recebe o código de "esqueci minha senha" e a conta fica sem recuperação. `POST /auth/registro` passa a enviar código de 6 dígitos (reaproveitando a infra de OTP generalizada), `login` recusa (403 `EMAIL_NAO_CONFIRMADO`) até a confirmação, backfill migra contas antigas para `emailVerificado=true`, tela `ConfirmarEmailScreen` guia o usuário | (este PR) | ✅ Aplicada |
 
 ---
 
@@ -868,6 +869,54 @@ autenticada só para fechar uma janela de 15 minutos.
    que o mock-maker padrão do Mockito não intercepta) — a correção não foi
    contornar com `verify` mais frouxo, foi isolar a verificação num
    `PasswordEncoder` mockado por interface, só naquele teste.
+
+---
+
+## M-013 — Confirmação obrigatória de e-mail no cadastro
+
+**Data:** 10/09/2026 · **PR:** (este PR)
+
+### O que aconteceu
+
+O PO abriu uma lacuna na feature de recuperação de senha (#110): sem confirmar o
+e-mail no cadastro, um endereço com erro de digitação ou inexistente nunca recebe o
+código de "esqueci minha senha" — a conta fica sem recuperação possível. Só é
+possível entregar o reset de senha de forma honesta se o e-mail do cadastro for de
+fato do usuário.
+
+### O que mudou
+
+- `POST /auth/registro` (via `UserServiceImpl.saveUser`) dispara, logo após criar a
+  conta, o envio de um **código de 6 dígitos** — reutilizando a infraestrutura de OTP
+  já criada para o reset de senha, **generalizada** de
+  `PasswordResetTokenDocument` para `CodigoVerificacaoDocument` (chave composta
+  `email + proposito`, upsert atômico, TTL de 15 min, limite de 5 tentativas com
+  `$inc` — as duas correções de concorrência anteriores valem para os dois fluxos).
+- `login` passa a recusar **403 `EMAIL_NAO_CONFIRMADO`** até a confirmação — depois
+  de validar a senha, portanto sem abrir canal novo de enumeração. É 403, não 401: a
+  credencial está correta, o acesso é que está condicionado à confirmação.
+- `POST /auth/confirmar-email` e `POST /auth/reenviar-confirmacao` (públicos,
+  resposta genérica em ambos os ramos do reenvio — e-mail inexistente e já confirmado
+  gastam o mesmo BCrypt dummy que o ramo que envia, sem canal lateral de tempo).
+- `EmailVerificadoBackfillRunner` (ApplicationRunner) migra, no startup, as contas
+  anteriores à feature para `emailVerificado=true` (`$exists: false` → idempotente):
+  sem isso, todo usuário já cadastrado seria trancado para fora no próximo login — o
+  "efeito cobra" que uma correção não pode causar.
+- Frontend: tela nova `ConfirmarEmailScreen`, alcançada tanto do sucesso do cadastro
+  (`UserScreen`) quanto do bloqueio do login (`LoginScreen`), testada de ponta a
+  ponta pelo novo `ConfirmacaoEmailFluxoIntegracaoTest` (o código é capturado do
+  `EmailService` mockado — só o hash BCrypt é persistido, não há outro jeito de lê-lo).
+
+### Achados do review deste PR
+
+1. **Oráculo de tempo em `confirmarEmail`** (`security-review`): o ramo "código
+   inexistente ou vencido" respondia ~80 ms mais rápido que "código errado" (sem o
+   BCrypt `matches`) — um canal lateral que, com 2 requisições públicas, distinguia
+   contas ativas não confirmadas (preservando o alvo preferencial da força bruta de
+   código). Corrigido com o BCrypt dummy no ramo de ausência, igualando os custos.
+2. **Skill `code-review` em execução forked travou em loop de deliberação** (0 tool
+   uses, 47 s) no momento de revisar este diff — o portão foi cumprido manualmente
+   em vez de relançar a skill às cegas ([OBS-005](../../skill-observations/OBS-005-code-review-forked-travado.md)).
 
 ---
 

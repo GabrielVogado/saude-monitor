@@ -32,3 +32,4 @@ O agente **propõe**; quem decide o que vira regra é o PO.
 | [OBS-002](./OBS-002-ativacao-de-skills-por-dominio.md) | Skills não são ativadas conforme a área de atuação | ✅ Aplicada (UPD-002) |
 | [OBS-003](./OBS-003-skill-anunciada-nao-e-skill-ativada.md) | Skill anunciada não é skill ativada, e o portão de `code-review` foi pulado | 🟡 Parcialmente aplicada (UPD-003) |
 | [OBS-004](./OBS-004-skill-ativada-que-nao-cobre-a-tarefa.md) | Skill ativada pela matriz que não cobre nada da tarefa (`expo-skills` não fala de `expo-location`/geofencing) | 🔵 Aberta — depende do PO |
+| [OBS-005](./OBS-005-code-review-forked-travado.md) | `code-review` em execução forked travou em loop de deliberação (0 tool uses) e não entregou revisão do diff | 🔵 Aberta — depende do PO |

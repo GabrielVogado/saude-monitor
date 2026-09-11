@@ -1,9 +1,11 @@
 package br.com.saude_monitor.api.auth.controller;
 
 import br.com.saude_monitor.api.auth.dto.AuthResponse;
+import br.com.saude_monitor.api.auth.dto.ConfirmarEmailRequest;
 import br.com.saude_monitor.api.auth.dto.EsqueciSenhaRequest;
 import br.com.saude_monitor.api.auth.dto.LoginRequest;
 import br.com.saude_monitor.api.auth.dto.RedefinirSenhaRequest;
+import br.com.saude_monitor.api.auth.dto.ReenviarConfirmacaoRequest;
 import br.com.saude_monitor.api.auth.dto.RefreshRequest;
 import br.com.saude_monitor.api.auth.dto.UsuarioDto;
 import br.com.saude_monitor.api.auth.service.AuthService;
@@ -56,6 +58,22 @@ class AuthControllerTest {
         @Override
         public Map<String, Object> redefinirSenha(RedefinirSenhaRequest request) {
             return Map.of("success", true, "message", "Senha redefinida com sucesso.");
+        }
+
+        @Override
+        public void enviarCodigoConfirmacaoEmail(String email) {
+            // no-op no teste de controller
+        }
+
+        @Override
+        public Map<String, Object> confirmarEmail(ConfirmarEmailRequest request) {
+            return Map.of("success", true, "message", "E-mail confirmado com sucesso.");
+        }
+
+        @Override
+        public Map<String, Object> reenviarConfirmacaoEmail(ReenviarConfirmacaoRequest request) {
+            return Map.of("success", true,
+                    "message", "Se o e-mail existir e ainda não estiver confirmado, você receberá um novo código.");
         }
     };
 
@@ -238,6 +256,51 @@ class AuthControllerTest {
         String payload = "{\"email\":\"marina@email.com\",\"novaSenha\":\"N0vaSenha!\"}";
 
         mockMvc.perform(post("/api/v1/auth/redefinir-senha")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CAMPOS_INVALIDOS"));
+    }
+
+    @Test
+    void deveConfirmarEmailComCodigo() throws Exception {
+        String payload = "{\"email\":\"marina@email.com\",\"codigo\":\"123456\"}";
+
+        mockMvc.perform(post("/api/v1/auth/confirmar-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("E-mail confirmado com sucesso."));
+    }
+
+    @Test
+    void deveRetornar400QuandoCodigoAusenteEmConfirmarEmail() throws Exception {
+        String payload = "{\"email\":\"marina@email.com\"}";
+
+        mockMvc.perform(post("/api/v1/auth/confirmar-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CAMPOS_INVALIDOS"));
+    }
+
+    @Test
+    void deveReenviarConfirmacaoDeEmail() throws Exception {
+        String payload = "{\"email\":\"marina@email.com\"}";
+
+        mockMvc.perform(post("/api/v1/auth/reenviar-confirmacao")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void deveRetornar400QuandoEmailInvalidoEmReenviarConfirmacao() throws Exception {
+        String payload = "{\"email\":\"nao-e-email\"}";
+
+        mockMvc.perform(post("/api/v1/auth/reenviar-confirmacao")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isBadRequest())

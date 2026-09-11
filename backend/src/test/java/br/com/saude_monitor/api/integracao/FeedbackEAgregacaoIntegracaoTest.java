@@ -1,7 +1,9 @@
 package br.com.saude_monitor.api.integracao;
 
 import br.com.saude_monitor.api.agregado.repository.AgregadoHospitalRepository;
+import br.com.saude_monitor.api.auth.email.EmailService;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -9,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -17,6 +20,8 @@ import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -50,6 +55,11 @@ class FeedbackEAgregacaoIntegracaoTest extends IntegracaoTestBase {
     @Autowired
     private AgregadoHospitalRepository agregadoHospitalRepository;
 
+    // Substitui o Resend real e permite capturar o código de confirmação gerado no
+    // cadastro (10/09/2026) — não há outro jeito de lê-lo, só o hash BCrypt é persistido.
+    @MockitoBean
+    private EmailService emailService;
+
     private String tokenDeUsuarioNovo(String email) throws Exception {
         String corpoRegistro = """
                 {
@@ -63,6 +73,16 @@ class FeedbackEAgregacaoIntegracaoTest extends IntegracaoTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(corpoRegistro))
                 .andExpect(status().isCreated());
+
+        ArgumentCaptor<String> codigoCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).enviarCodigoConfirmacaoEmail(eq(email), codigoCaptor.capture());
+        String corpoConfirmacao = """
+                { "email": "%s", "codigo": "%s" }
+                """.formatted(email, codigoCaptor.getValue());
+        mockMvc.perform(post("/api/v1/auth/confirmar-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoConfirmacao))
+                .andExpect(status().isOk());
 
         String corpoLogin = """
                 { "email": "%s", "password": "%s", "rememberDevice": false }

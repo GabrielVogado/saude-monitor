@@ -39,28 +39,47 @@ public class ResendEmailService implements EmailService {
     }
 
     @Override
+    @Async
     public void enviarCodigoRedefinicaoSenha(String destinatario, String codigo) {
+        enviar(destinatario, "Código de redefinição de senha", corpoRedefinicao(codigo));
+    }
+
+    @Override
+    @Async
+    public void enviarCodigoConfirmacaoEmail(String destinatario, String codigo) {
+        enviar(destinatario, "Confirme seu e-mail", corpoConfirmacao(codigo));
+    }
+
+    private void enviar(String destinatario, String assunto, String corpoHtml) {
         try {
             restClient.post()
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of(
                             "from", remetente,
                             "to", List.of(destinatario),
-                            "subject", "Código de redefinição de senha",
-                            "html", corpoHtml(codigo)
+                            "subject", assunto,
+                            "html", corpoHtml
                     ))
                     .retrieve()
                     .toBodilessEntity();
         } catch (RuntimeException ex) {
-            log.warn("Falha ao enviar e-mail de redefinição de senha via Resend: {}", ex.getMessage());
+            log.warn("Falha ao enviar e-mail ('{}') via Resend: {}", assunto, ex.getMessage());
         }
     }
 
-    private String corpoHtml(String codigo) {
+    private String corpoRedefinicao(String codigo) {
         return """
                 <p>Use o código abaixo para redefinir sua senha no Saúde Monitor:</p>
                 <h2>%s</h2>
                 <p>Válido por 15 minutos. Se você não pediu essa redefinição, ignore este e-mail.</p>
+                """.formatted(codigo);
+    }
+
+    private String corpoConfirmacao(String codigo) {
+        return """
+                <p>Use o código abaixo para confirmar seu e-mail no Saúde Monitor:</p>
+                <h2>%s</h2>
+                <p>Válido por 15 minutos. Se você não criou esta conta, ignore este e-mail.</p>
                 """.formatted(codigo);
     }
 }

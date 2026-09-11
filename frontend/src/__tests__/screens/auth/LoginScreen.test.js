@@ -127,6 +127,21 @@ describe("LoginScreen", () => {
     expect(NAVEGACAO.navigate).not.toHaveBeenCalledWith("Perfil");
   });
 
+  test("e-mail não confirmado leva direto para ConfirmarEmail em vez de só avisar (10/09/2026)", async () => {
+    const erro = new Error("E-mail ainda não confirmado. Verifique sua caixa de entrada ou peça um novo código.");
+    erro.data = { code: "EMAIL_NAO_CONFIRMADO" };
+    LoginService.login.mockRejectedValueOnce(erro);
+    renderizar();
+    preencherCredenciais("ana@exemplo.com", "segredo123");
+
+    tocarEntrar();
+
+    await waitFor(() =>
+      expect(NAVEGACAO.navigate).toHaveBeenCalledWith("ConfirmarEmail", { email: "ana@exemplo.com" })
+    );
+    expect(Alert.alert).not.toHaveBeenCalledWith("Erro no login", expect.anything());
+  });
+
   test("erro sem mensagem cai no texto padrão — o ramo `|| 'Erro inesperado.'`", async () => {
     LoginService.login.mockRejectedValueOnce({});
     renderizar();

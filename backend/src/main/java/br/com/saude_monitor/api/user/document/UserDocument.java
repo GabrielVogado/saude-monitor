@@ -61,4 +61,14 @@ public class UserDocument {
 	 * válido antes do reset.
 	 */
 	private Instant senhaAlteradaEm;
+
+	/**
+	 * E-mail confirmado via código de 6 dígitos no cadastro (10/09/2026). Sem isso, um
+	 * e-mail com erro de digitação ou inexistente nunca recebe o código de "esqueci
+	 * minha senha" — a conta fica sem recuperação possível. {@code false} por padrão
+	 * (novas contas); contas anteriores a esta feature são migradas para {@code true}
+	 * por {@code EmailVerificadoBackfillRunner} — sem isso, todo usuário já cadastrado
+	 * ficaria trancado para fora no próximo login.
+	 */
+	private boolean emailVerificado;
 }

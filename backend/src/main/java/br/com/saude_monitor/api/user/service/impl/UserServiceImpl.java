@@ -1,6 +1,7 @@
 package br.com.saude_monitor.api.user.service.impl;
 
 import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.auth.service.AuthService;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
 import br.com.saude_monitor.api.config.exception.ValidacaoNegocioException;
@@ -58,6 +59,7 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final MongoTemplate mongoTemplate;
     private final AgregadoService agregadoService;
+    private final AuthService authService;
 
     @Override
     public UserResponse saveUser(UserRequest request) {
@@ -81,9 +83,16 @@ public class UserServiceImpl implements UserService {
                 .papel(Papel.USER)
                 .consentimentos(consentimentosRegistrados(consent, now))
                 .active(true)
+                .emailVerificado(false)
                 .createdAt(now)
                 .updatedAt(now)
                 .build());
+
+        // Confirmação obrigatória de e-mail (10/09/2026): sem isto, um e-mail com erro de
+        // digitação ou inexistente nunca recebe o código de "esqueci minha senha" — a
+        // conta fica sem recuperação possível. O login fica bloqueado até confirmar
+        // (AuthServiceImpl.login()).
+        authService.enviarCodigoConfirmacaoEmail(normalizedEmail);
 
         return new UserResponse(
                 true,

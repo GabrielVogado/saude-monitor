@@ -1,6 +1,7 @@
 package br.com.saude_monitor.api.user.service.impl;
 
 import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.auth.service.AuthService;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
 import br.com.saude_monitor.api.config.exception.ValidacaoNegocioException;
@@ -34,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -51,18 +53,21 @@ class UserServiceImplTest {
     private UserRepository userRepository;
     private MongoTemplate mongoTemplate;
     private AgregadoService agregadoService;
+    private AuthService authService;
 
     @BeforeEach
     void setup() {
         userRepository = mock(UserRepository.class);
         mongoTemplate = mock(MongoTemplate.class);
         agregadoService = mock(AgregadoService.class);
+        authService = mock(AuthService.class);
 
         userService = new UserServiceImpl(
                 userRepository,
                 new BCryptPasswordEncoder(),
                 mongoTemplate,
-                agregadoService);
+                agregadoService,
+                authService);
     }
 
     private UserDocument usuario(String id) {
@@ -123,6 +128,10 @@ class UserServiceImplTest {
         ConsentimentoItem termos = captor.getValue().getConsentimentos().getTermosUso();
         assertTrue(termos.isAceito());
         assertEquals("1.0", termos.getVersao());
+        // Confirmação obrigatória de e-mail (10/09/2026): sem isto, um e-mail com erro de
+        // digitação nunca recebe nenhum código e a conta fica sem recuperação possível.
+        assertFalse(captor.getValue().isEmailVerificado());
+        verify(authService).enviarCodigoConfirmacaoEmail("marina@email.com");
     }
 
     @Test
@@ -138,6 +147,7 @@ class UserServiceImplTest {
 
         assertThrows(ConflitoException.class, () -> userService.saveUser(request));
         verify(userRepository, never()).save(any(UserDocument.class));
+        verify(authService, never()).enviarCodigoConfirmacaoEmail(anyString());
     }
 
     @Test
@@ -149,6 +159,7 @@ class UserServiceImplTest {
 
         assertThrows(ValidacaoNegocioException.class, () -> userService.saveUser(request));
         verify(userRepository, never()).save(any(UserDocument.class));
+        verify(authService, never()).enviarCodigoConfirmacaoEmail(anyString());
     }
 
     @Test

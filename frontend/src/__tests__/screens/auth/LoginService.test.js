@@ -226,4 +226,64 @@ describe("LoginService (Fase 0)", () => {
       LoginService.redefinirSenha({ email: "marina@email.com", codigo: "000000", novaSenha: "x" })
     ).rejects.toThrow("Código inválido ou expirado.");
   });
+
+  // ------------------------------------------------ Confirmação de e-mail no cadastro ---
+
+  test("confirmarEmail envia email/codigo para /auth/confirmar-email", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      jsonResponse({ success: true, message: "E-mail confirmado com sucesso." })
+    );
+
+    const resp = await LoginService.confirmarEmail({ email: " marina@email.com ", codigo: " 123456 " });
+
+    const [url, config] = global.fetch.mock.calls[0];
+    expect(url).toContain("/api/v1/auth/confirmar-email");
+    const body = JSON.parse(config.body);
+    expect(body.email).toBe("marina@email.com");
+    expect(body.codigo).toBe("123456");
+    expect(resp.success).toBe(true);
+  });
+
+  test("confirmarEmail NÃO marca a chamada como idempotente", async () => {
+    const spy = jest
+      .spyOn(httpModule, "fetchComRetry")
+      .mockResolvedValue(jsonResponse({ success: true }));
+
+    await LoginService.confirmarEmail({ email: "marina@email.com", codigo: "123456" });
+
+    expect(spy).toHaveBeenCalledWith(expect.any(String), expect.any(Object), { idempotente: false });
+    spy.mockRestore();
+  });
+
+  test("confirmarEmail propaga o erro genérico de código inválido/expirado", async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "Código inválido ou expirado." }, 401));
+
+    await expect(
+      LoginService.confirmarEmail({ email: "marina@email.com", codigo: "000000" })
+    ).rejects.toThrow("Código inválido ou expirado.");
+  });
+
+  test("reenviarConfirmacaoEmail envia o e-mail para /auth/reenviar-confirmacao", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      jsonResponse({ success: true, message: "Se o e-mail existir e ainda não estiver confirmado, você receberá um novo código." })
+    );
+
+    const resp = await LoginService.reenviarConfirmacaoEmail("  marina@email.com  ");
+
+    const [url, config] = global.fetch.mock.calls[0];
+    expect(url).toContain("/api/v1/auth/reenviar-confirmacao");
+    expect(JSON.parse(config.body).email).toBe("marina@email.com");
+    expect(resp.success).toBe(true);
+  });
+
+  test("reenviarConfirmacaoEmail marca a chamada como idempotente", async () => {
+    const spy = jest
+      .spyOn(httpModule, "fetchComRetry")
+      .mockResolvedValue(jsonResponse({ success: true }));
+
+    await LoginService.reenviarConfirmacaoEmail("marina@email.com");
+
+    expect(spy).toHaveBeenCalledWith(expect.any(String), expect.any(Object), { idempotente: true });
+    spy.mockRestore();
+  });
 });

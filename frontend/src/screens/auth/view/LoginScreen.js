@@ -42,6 +42,13 @@ export default function LoginScreen({navigation}) {
             await LoginService.login({email, password, rememberDevice});
             redirectToAreaLogada();
         } catch (error) {
+            // Confirmação obrigatória de e-mail (10/09/2026): em vez de só informar o
+            // erro, leva direto para a tela de confirmação — a credencial está correta,
+            // só falta esse passo.
+            if (error.data?.code === "EMAIL_NAO_CONFIRMADO") {
+                navigation?.navigate?.("ConfirmarEmail", { email: email.trim() });
+                return;
+            }
             Alert.alert("Erro no login", error.message || "Erro inesperado.");
         } finally {
             setLoading(false);

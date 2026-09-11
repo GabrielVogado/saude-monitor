@@ -1,9 +1,11 @@
 package br.com.saude_monitor.api.auth.service;
 
 import br.com.saude_monitor.api.auth.dto.AuthResponse;
+import br.com.saude_monitor.api.auth.dto.ConfirmarEmailRequest;
 import br.com.saude_monitor.api.auth.dto.EsqueciSenhaRequest;
 import br.com.saude_monitor.api.auth.dto.LoginRequest;
 import br.com.saude_monitor.api.auth.dto.RedefinirSenhaRequest;
+import br.com.saude_monitor.api.auth.dto.ReenviarConfirmacaoRequest;
 import br.com.saude_monitor.api.auth.dto.RefreshRequest;
 import jakarta.validation.Valid;
 
@@ -37,4 +39,19 @@ public interface AuthService {
      * deste momento (ver {@link #refresh}).
      */
     Map<String, Object> redefinirSenha(@Valid RedefinirSenhaRequest request);
+
+    /**
+     * Envia o código de 6 dígitos para confirmar o e-mail do cadastro (10/09/2026).
+     * Chamado pelo {@code UserServiceImpl} logo após criar a conta.
+     */
+    void enviarCodigoConfirmacaoEmail(String email);
+
+    /** Confirma o e-mail com o código enviado no cadastro; libera o login. */
+    Map<String, Object> confirmarEmail(@Valid ConfirmarEmailRequest request);
+
+    /**
+     * Reenvia o código de confirmação. Sempre devolve a mesma resposta genérica,
+     * exista o e-mail ou não, e mesmo se já estiver confirmado.
+     */
+    Map<String, Object> reenviarConfirmacaoEmail(@Valid ReenviarConfirmacaoRequest request);
 }

@@ -58,12 +58,17 @@ const HospitalRegisterScreen = ({navigation}) => {
                 consentimento: { termosUso: true, versaoTermos: "1.0" },
             });
 
-            Alert.alert('Cadastro realizado', 'Seu cadastro foi enviado com sucesso.');
+            // Confirmação obrigatória de e-mail (10/09/2026): sem confirmar, o login é
+            // recusado. Leva direto para a tela de confirmação em vez de só avisar e
+            // deixar o usuário descobrir sozinho no próximo login.
+            const emailCadastrado = email.trim();
             setFullName('');
             setEmail('');
             setPhone('');
             setPassword('');
             setAgreeTerms(false);
+            Alert.alert('Cadastro realizado', 'Enviamos um código de confirmação para o seu e-mail.');
+            navigation?.navigate?.('ConfirmarEmail', { email: emailCadastrado });
         } catch (error) {
             Alert.alert('Falha no cadastro', error.message || 'Nao foi possivel concluir o cadastro.');
         } finally {

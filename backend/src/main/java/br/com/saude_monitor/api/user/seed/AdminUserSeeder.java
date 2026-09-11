@@ -59,6 +59,7 @@ public class AdminUserSeeder implements ApplicationRunner {
                 .senhaHash(passwordEncoder.encode(properties.senha()))
                 .papel(Papel.ADMIN)
                 .active(true)
+                .emailVerificado(true)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build();

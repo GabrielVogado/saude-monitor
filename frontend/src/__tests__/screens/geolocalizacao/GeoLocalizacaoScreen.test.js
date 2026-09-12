@@ -195,6 +195,26 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     );
   });
 
+  test("BUG-10: o ponto do hospital ancora na coordenada, não no centro da linha ponto+rótulo", async () => {
+    // Regressão relatada em 12/09/2026 com evidência em aparelho: o ponto aparecia
+    // FORA do círculo do geofence com pouco zoom e "centralizava" ao aproximar.
+    // Causa na renderização, não no dado: o filho do `MarkerView` é uma linha
+    // `[ponto + rótulo]` e a âncora padrão (`{x: 0.5, y: 0.5}`) centraliza a linha
+    // inteira — o ponto deslocava ~metade da largura da linha em px fixos, e o
+    // círculo pequeno (pouco zoom) não o continha. Marcador e polígono nascem do
+    // mesmo `centroDoHospital`, então a coordenada aqui tem que ser exatamente a do
+    // centroide do hospital de teste.
+    renderizar();
+
+    const marcador = await screen.findByTestId("marcador-hospital-h1");
+    // Centroide do ANEL de teste: lng (-47.89-47.88-47.88-47.89)/4, lat idem —
+    // o mesmo ponto que o polígono usa (ambos saem de `centroDoHospital`).
+    // `toBeCloseTo` porque a média em ponto flutuante dá -47.885000000000005.
+    expect(marcador.props.coordinate[0]).toBeCloseTo(-47.885, 9);
+    expect(marcador.props.coordinate[1]).toBeCloseTo(-15.7875, 9);
+    expect(marcador.props.anchor).toEqual({ x: 0, y: 0.5 });
+  });
+
   test("BUG-04: o mapa sai da árvore ANTES de a navegação acontecer", async () => {
     // Esta é a regressão do ANR, não um detalhe de implementação. Navegar com o mapa
     // ainda montado deixava o React Navigation apenas ESCONDER a view: a thread de

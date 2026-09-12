@@ -366,10 +366,26 @@ function GeolocalizacaoContent({ navigation }) {
               if (!centroide) {
                 return null;
               }
+              // BUG-10 — o ponto ficava FORA do círculo do geofence. O filho deste
+              // `MarkerView` é uma linha `[ponto + rótulo]`, e a âncora padrão do
+              // Mapbox (`{x: 0.5, y: 0.5}`) centraliza a LINHA inteira na
+              // coordenada — o ponto era empurrado para a esquerda em ~metade da
+              // largura da linha (px de tela, constante). Com pouco zoom o círculo
+              // tem poucos px e o ponto caía fora dele; aproximando, o círculo
+              // cresce em px e o deslocamento fixo "sumia" — o relato do PO. Não é
+              // dado: marcador e polígono nascem do mesmo `centroDoHospital`, só a
+              // renderização discordava. `anchor={{x: 0, y: 0.5}}` põe a coordenada
+              // na borda esquerda da linha (= borda do ponto, primeiro filho sem
+              // margem); resta meio ponto (~7 px), irrelevante ante raios de
+              // dezenas de metros. O ponto do usuário e o ícone do detalhe são
+              // simétricos e seguem com âncora central — mexer neles INTRODUZIRIA
+              // o mesmo defeito.
               return (
                 <MarkerView
                   key={hospital.id}
+                  testID={`marcador-hospital-${hospital.id}`}
                   coordinate={[centroide.longitude, centroide.latitude]}
+                  anchor={{ x: 0, y: 0.5 }}
                 >
                   <View
                     style={styles.hospitalMarker}

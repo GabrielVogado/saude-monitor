@@ -132,20 +132,41 @@ export function coordenadasDoHospital(hospital) {
 }
 
 /**
- * Monta a FeatureCollection dos geofences dos hospitais para o mapa (F-07).
+ * Raio fixo do halo desenhado no mapa da lista (F-07), em metros.
+ *
+ * Exibição ≠ detecção: o raio de detecção (`raioMetros`, 75–100 m, regra de negócio
+ * do backend) desenhado por extenso cobre quarteirões e empilha círculos em complexos
+ * densos, confundindo a leitura ("o círculo sugere que a unidade ocupa tudo aquilo").
+ * O halo de 25 m — ordem de grandeza da precisão do GPS (5–20 m nas telas) — marca
+ * *onde* está a unidade sem fingir que delimita sua área. A detecção (geofencing
+ * nativo, E2-01/02) e o polígono verdadeiro da tela de detalhe não mudam.
+ */
+export const RAIO_EXIBICAO_METROS = 25;
+
+/** Vértices do halo de exibição: círculo fixo de {@link RAIO_EXIBICAO_METROS} no centro. */
+export function coordenadasParaExibicao(hospital) {
+  const centro = centroDoHospital(hospital);
+  if (!centro) {
+    return [];
+  }
+  return circuloParaCoordenadas(centro, RAIO_EXIBICAO_METROS);
+}
+
+/**
+ * Monta a FeatureCollection dos halos das unidades para o mapa (F-07).
  *
  * O GeoJSON é agnóstico ao SDK de mapa (MapLibre antes, Mapbox `ShapeSource` agora).
  *
  * Cada feature carrega `id` e `nome` nas propriedades, para que o toque no
- * polígono consiga identificar o hospital de origem. Hospitais sem geofence
+ * polígono consiga identificar o hospital de origem. Hospitais sem centro
  * válido são descartados — o mapa não deve quebrar por dado incompleto.
  *
- * Desde E8-03 a geometria vem de `coordenadasDoHospital`, que aceita tanto o
- * polígono completo quanto o par centro + raio devolvido pela listagem.
+ * A geometria é o halo de {@link RAIO_EXIBICAO_METROS}, não o geofence de detecção
+ * (ver acima) — por isso ignora `raioMetros` e o polígono completo de propósito.
  */
 export function geofencesParaFeatureCollection(hospitais) {
   const features = (hospitais || [])
-    .map((hospital) => ({ hospital, vertices: coordenadasDoHospital(hospital) }))
+    .map((hospital) => ({ hospital, vertices: coordenadasParaExibicao(hospital) }))
     .filter(({ vertices }) => vertices.length > 0)
     .map(({ hospital, vertices }) => ({
       type: "Feature",

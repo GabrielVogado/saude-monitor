@@ -97,8 +97,33 @@ describe("utils/geojson — geofencesParaFeatureCollection (F-07)", () => {
       type: "Feature",
       id: "h1",
       properties: { id: "h1", nome: "Hospital Alfa" },
-      geometry: { type: "Polygon", coordinates: [ANEL] },
+      geometry: { type: "Polygon" },
     });
+  });
+
+  test("o polígono desenhado é o halo de exibição, não o geofence de detecção", () => {
+    // Regressão do mapa confuso (12/09/2026): desenhar o raio de detecção
+    // (75–150 m) cobria quarteirões e empilhava círculos. O mapa desenha um halo
+    // fixo de RAIO_EXIBICAO_METROS no centro — mesmo que a entrada traga o
+    // polígono verdadeiro ou um raioMetros grande.
+    const { haversineMetros } = require("../../utils/distancia");
+    const { RAIO_EXIBICAO_METROS } = require("../../utils/geojson");
+    const fc = geofencesParaFeatureCollection([
+      {
+        id: "h1",
+        nome: "Hospital Alfa",
+        localizacao: { latitude: -15.78, longitude: -47.88 },
+        raioMetros: 150,
+      },
+    ]);
+
+    const anel = fc.features[0].geometry.coordinates[0];
+    const distancias = anel.map(([lon, lat]) =>
+      haversineMetros({ latitude: -15.78, longitude: -47.88 }, { latitude: lat, longitude: lon })
+    );
+    expect(RAIO_EXIBICAO_METROS).toBe(25);
+    expect(Math.max(...distancias)).toBeLessThanOrEqual(26);
+    expect(Math.min(...distancias)).toBeGreaterThanOrEqual(24);
   });
 
   test("descarta hospitais sem geofence válido em vez de quebrar o mapa", () => {

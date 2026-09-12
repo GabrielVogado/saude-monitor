@@ -164,6 +164,10 @@ jobs:
           # Render, com o diff parecendo correto. Os dois foram virados juntos de
           # proposito.
           EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL || 'https://saude-monitor-backend-dev-uly57kmmia-rj.a.run.app' }}
+          # Migração Mapbox (`feature/mapbox-migration`): o bundle precisa do token
+          # público para baixar os tiles `Street`. Secret criado em 12/09/2026; sem
+          # ele o APK compila, mas o mapa monta vazio.
+          EXPO_PUBLIC_MAPBOX_TOKEN: ${{ secrets.EXPO_PUBLIC_MAPBOX_TOKEN }}
         working-directory: frontend/android
         run: |
           set -euo pipefail

@@ -132,7 +132,9 @@ export function coordenadasDoHospital(hospital) {
 }
 
 /**
- * Monta a FeatureCollection dos geofences dos hospitais para o MapLibre (F-07).
+ * Monta a FeatureCollection dos geofences dos hospitais para o mapa (F-07).
+ *
+ * O GeoJSON é agnóstico ao SDK de mapa (MapLibre antes, Mapbox `ShapeSource` agora).
  *
  * Cada feature carrega `id` e `nome` nas propriedades, para que o toque no
  * polígono consiga identificar o hospital de origem. Hospitais sem geofence

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { Camera, GeoJSONSource, Layer, Map, Marker } from "@maplibre/maplibre-react-native";
+import { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from "@rnmapbox/maps";
 import { Building2, Clock, Mail, MapPin, Phone } from "lucide-react-native";
 import {
   CSBadge,
@@ -22,7 +22,7 @@ import {
   coordenadasParaGeoJson,
   geojsonParaCoordenadas,
 } from "../../../utils/geojson";
-import { getInitialViewState, OSM_RASTER_STYLE } from "../../../utils/mapStyle";
+import { getInitialViewState, MAPBOX_STYLE } from "../../../utils/mapStyle";
 import {
   formatarData,
   formatarDuracao,
@@ -192,6 +192,11 @@ export default function HospitalDetalheScreen({ navigation, route }) {
     return BRASIL_REGION;
   }, [centroide]);
 
+  // Posição da câmera no formato do Mapbox; recalculada quando o hospital carrega
+  // (antes do `carregar`, `region` é BRASIL_REGION). Fica antes dos `return`
+  // condicionais, junto dos demais hooks.
+  const cameraDaRegiao = useMemo(() => getInitialViewState(region), [region]);
+
   // Formata o tempo decorrido como hh:mm:ss (temporizador do check-in manual).
   // IMPORTANTE: precisa ficar antes dos `return` condicionais abaixo — hooks não podem
   // ser chamados condicionalmente (Regras de Hooks). Estar depois deles fazia o número
@@ -285,32 +290,29 @@ export default function HospitalDetalheScreen({ navigation, route }) {
 
         {coordenadas.length > 0 ? (
           <View style={styles.mapContainer}>
-            <Map
-              androidView="texture"
-              style={styles.map}
-              mapStyle={OSM_RASTER_STYLE}
-            >
-              <Camera initialViewState={getInitialViewState(region)} />
-              <GeoJSONSource id="geofence" data={geofenceGeoJson}>
-                <Layer
-                  type="fill"
+            <MapView style={styles.map} styleURL={MAPBOX_STYLE}>
+              <Camera
+                centerCoordinate={cameraDaRegiao.centerCoordinate}
+                zoomLevel={cameraDaRegiao.zoomLevel}
+              />
+              <ShapeSource id="geofence" shape={geofenceGeoJson}>
+                <FillLayer
                   id="geofence-fill"
-                  paint={{ "fill-color": "rgba(0,97,147,0.16)" }}
+                  style={{ fillColor: "rgba(0,97,147,0.16)" }}
                 />
-                <Layer
-                  type="line"
+                <LineLayer
                   id="geofence-line"
-                  paint={{ "line-color": colors.primary, "line-width": 2 }}
+                  style={{ lineColor: colors.primary, lineWidth: 2 }}
                 />
-              </GeoJSONSource>
+              </ShapeSource>
               {centroide ? (
-                <Marker lngLat={[centroide.longitude, centroide.latitude]}>
+                <MarkerView coordinate={[centroide.longitude, centroide.latitude]}>
                   <View style={styles.mapMarker}>
                     <Building2 size={18} color={colors.onPrimary} />
                   </View>
-                </Marker>
+                </MarkerView>
               ) : null}
-            </Map>
+            </MapView>
           </View>
         ) : null}
 

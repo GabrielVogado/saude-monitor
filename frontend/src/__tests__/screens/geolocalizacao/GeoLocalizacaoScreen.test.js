@@ -13,7 +13,7 @@ import { useGeolocalizacao } from "../../../screens/geolocalizacao/service/GeoLo
 
 jest.mock("../../../screens/hospitais/service/HospitalService");
 
-// @maplibre/maplibre-react-native: componentes nativos não suportados pelo Jest;
+// @rnmapbox/maps: componentes nativos não suportados pelo Jest;
 // substituídos por Views que preservam os props (mesmo padrão do App.test.js).
 /**
  * Espiões COMPARTILHADOS da câmera.
@@ -23,18 +23,18 @@ jest.mock("../../../screens/hospitais/service/HospitalService");
  * enquadramento. Era por isso que a correção da câmera passava sem cobertura: removê-la
  * mantinha a suíte verde (mutação M-C sobreviveu).
  */
-const mockCamera = { easeTo: jest.fn(), fitBounds: jest.fn() };
+const mockCamera = { setCamera: jest.fn(), fitBounds: jest.fn() };
 
-jest.mock("@maplibre/maplibre-react-native", () => {
+jest.mock("@rnmapbox/maps", () => {
   const ReactMock = require("react");
   const { View } = require("react-native");
   const stub = ({ children, ...props }) => <View {...props}>{children}</View>;
 
-  // A Camera é acessada por ref (easeTo/fitBounds) pela tela; o stub precisa
+  // A Camera é acessada por ref (setCamera/fitBounds) pela tela; o stub precisa
   // expor esses métodos, senão o enquadramento derruba o render nos testes.
   const Camera = ReactMock.forwardRef(({ children, ...props }, ref) => {
     ReactMock.useImperativeHandle(ref, () => ({
-      easeTo: (...args) => mockCamera.easeTo(...args),
+      setCamera: (...args) => mockCamera.setCamera(...args),
       fitBounds: (...args) => mockCamera.fitBounds(...args),
     }));
     return <View {...props}>{children}</View>;
@@ -42,11 +42,14 @@ jest.mock("@maplibre/maplibre-react-native", () => {
 
   return {
     __esModule: true,
-    Map: stub,
+    default: { setAccessToken: jest.fn(), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
+    StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
+    MapView: stub,
     Camera,
-    Marker: stub,
-    GeoJSONSource: stub,
-    Layer: stub,
+    MarkerView: stub,
+    ShapeSource: stub,
+    FillLayer: stub,
+    LineLayer: stub,
   };
 });
 
@@ -111,8 +114,8 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     renderizar();
 
     const fonte = await screen.findByTestId("geofences-hospitais");
-    expect(fonte.props.data.features).toHaveLength(1);
-    expect(fonte.props.data.features[0].properties).toEqual({ id: "h1", nome: "Hospital Alfa" });
+    expect(fonte.props.shape.features).toHaveLength(1);
+    expect(fonte.props.shape.features[0].properties).toEqual({ id: "h1", nome: "Hospital Alfa" });
   });
 
   test("sem raio selecionado, carrega o catálogo completo", async () => {
@@ -238,9 +241,9 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
   });
 
   test("BUG-04: ao voltar, o mapa é reenquadrado nos hospitais — não no Brasil inteiro", async () => {
-    // O remonte cria uma `<Camera>` NOVA, cujo `initialViewState` é BRASIL_REGION (zoom
+    // O remonte cria uma `<Camera>` NOVA, cuja posição inicial é BRASIL_REGION (zoom
     // 3, o país inteiro). Se o enquadramento não rodar de novo, quem aproximou o próprio
-    // bairro, tocou num hospital e voltou encontra o mapa zerado — e rebaixando tiles.
+    // bairro, tocou num hospital e voltou encontra o mapa zerado.
     // A identidade de `hospitais` não muda no desmonte/remonte, então o efeito só
     // dispara porque `mapaMontado` está nas dependências dele. É isso que este teste
     // protege: sem o `mapaMontado` lá, a mutação sobrevivia.

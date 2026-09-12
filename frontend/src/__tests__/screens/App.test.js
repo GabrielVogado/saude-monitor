@@ -11,22 +11,24 @@ import * as Notifications from "expo-notifications";
 import App from "../../../App";
 import * as FeedbackNotificationService from "../../screens/feedback/service/FeedbackNotificationService";
 
-// @maplibre/maplibre-react-native: expõe componentes nativos (MapLibre) não
+// @rnmapbox/maps: expõe componentes nativos (Mapbox) não
 // suportados pelo Jest; substituímos por Views textuais para o smoke test.
-jest.mock("@maplibre/maplibre-react-native", () => {
+jest.mock("@rnmapbox/maps", () => {
   const { View } = require("react-native");
   const stub = (props) => <View {...props} />;
   return {
     __esModule: true,
-    Map: stub,
+    default: { setAccessToken: jest.fn(), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
+    StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
+    MapView: stub,
     Camera: stub,
-    Marker: stub,
-    GeoJSONSource: stub,
+    MarkerView: stub,
+    ShapeSource: stub,
     LineLayer: stub,
     FillLayer: stub,
     CircleLayer: stub,
-    RasterLayer: stub,
-    ShapeSource: stub,
+    SymbolLayer: stub,
+    UserLocation: stub,
   };
 });
 

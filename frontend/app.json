@@ -50,7 +50,7 @@
       }
     },
     "plugins": [
-      "@maplibre/maplibre-react-native",
+      "@rnmapbox/maps",
       [
         "expo-location",
         {

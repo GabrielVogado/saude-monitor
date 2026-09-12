@@ -6,12 +6,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Camera, GeoJSONSource, Layer, Map, Marker } from "@maplibre/maplibre-react-native";
+import { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from "@rnmapbox/maps";
 import {
   GeolocalizacaoProvider,
   useGeolocalizacao,
 } from "../service/GeoLocalizacaoService";
-import { getInitialViewState, OSM_RASTER_STYLE } from "../../../utils/mapStyle";
+import { getInitialViewState, MAPBOX_STYLE } from "../../../utils/mapStyle";
 import {
   centroDoHospital,
   geofencesParaFeatureCollection,
@@ -156,7 +156,7 @@ function GeolocalizacaoContent({ navigation }) {
    * BUG-04 — o mapa precisa ser DESTRUÍDO, não apenas escondido, antes de sair da tela.
    *
    * Navegar direto daqui congelava o app (ANR de 30 a 40 s, 8 ocorrências registradas
-   * entre 02/09 e 04/09/2026). A corrida, medida no logcat do S24 Ultra:
+   * entre 02/09 e 04/09/2026, sob o MapLibre). A corrida, medida no logcat do S24 Ultra:
    *
    *   14:40:04.115  dedo sobe
    *   14:40:04.140  navigation.navigate      → React Navigation esconde a aba Mapa
@@ -164,23 +164,16 @@ function GeolocalizacaoContent({ navigation }) {
    *   14:40:04.330  handleMessage TAP        → o Android entrega o toque CONFIRMADO,
    *                                            164 ms depois do teardown
    *
-   * Esse toque atrasado (o Android segura ~215 ms para distinguir de duplo-toque) cai
-   * no `AnnotationManager` do MapLibre, que chama `queryRenderedFeatures` — uma JNI
-   * **síncrona** que enfileira trabalho na thread de renderização e bloqueia a thread
-   * principal esperando o resultado. Sem renderizador, o `future` nunca é cumprido e
-   * não há timeout: a UI trava até o usuário matar o app.
+   * Esse toque atrasado (o Android segura ~215 ms para distinguir de duplo-toque)
+   * caía no mapa sem renderizador vivo e travava a thread principal sem timeout, até
+   * o usuário matar o app. A ordem abaixo elimina a corrida em vez de adivinhar o
+   * atraso: desmonta o `<MapView>` primeiro, e só no efeito seguinte — depois de o
+   * desmonte estar comprometido na árvore — é que navega.
    *
-   * A saída está no próprio MapLibre. `NativeMapView.queryRenderedFeatures` começa com
-   * `if (checkState(...)) return new ArrayList<>();`, e `checkState` devolve `true`
-   * quando o campo `destroyed` está marcado (verificado no bytecode do
-   * `android-sdk-opengl-13.2.0.aar`). Esconder a view **não** marca esse campo — mata o
-   * renderizador e deixa o mapa se julgando vivo, que é exatamente o estado que trava.
-   * Desmontar marca: `onDropViewInstance` → `dispose()` → `onDestroy()`.
-   *
-   * Por isso a ordem aqui é explícita e não temporal: desmonta o `<Map>`, e só no efeito
-   * seguinte — depois de o desmonte estar comprometido na árvore — é que navega. Não
-   * dependemos de adivinhar o atraso do duplo-toque; dependemos de uma ordem que nós
-   * controlamos. A margem medida é de 164 ms contra ~16 ms de um quadro.
+   * Mantido na migração Mapbox (`feature/mapbox-migration`): o mecanismo da trava foi
+   * verificado no bytecode do MapLibre, não no Mapbox — mas desmontar-antes-de-navegar
+   * continua sendo a ordem segura também aqui (view destruída não recebe toque
+   * atrasado), e os testes de regressão abaixo seguem protegendo a ORDEM.
    */
   const [mapaMontado, setMapaMontado] = useState(true);
   const hospitalPendente = useRef(null);
@@ -231,12 +224,18 @@ function GeolocalizacaoContent({ navigation }) {
 
   const centralizar = () => {
     const alvo = getInitialViewState(regionAtual);
-    cameraRef.current?.easeTo({
-      center: alvo.center,
-      zoom: alvo.zoom,
-      duration: 500,
+    cameraRef.current?.setCamera({
+      centerCoordinate: alvo.centerCoordinate,
+      zoomLevel: alvo.zoomLevel,
+      animationDuration: 500,
     });
   };
+
+  // Posição inicial da câmera, calculada uma vez por montagem: a `Camera` do Mapbox
+  // acompanha mudanças de props, então recalcular a cada render moveria o mapa
+  // sozinho sempre que o GPS atualizasse. O enquadramento nos hospitais continua
+  // por conta do efeito `enquadrarHospitais` (fitBounds) abaixo.
+  const cameraInicial = useMemo(() => getInitialViewState(BRASIL_REGION), []);
 
   // Enquadra a câmera para cobrir todos os hospitais cadastrados (item 05) sempre
   // que a lista carregar — assim o "todos os hospitais" é visível de imediato.
@@ -259,11 +258,11 @@ function GeolocalizacaoContent({ navigation }) {
   }, [hospitais]);
 
   // `mapaMontado` entra nas dependências porque o remonte cria uma `<Camera>` NOVA, com
-  // `initialViewState` de volta em BRASIL_REGION (zoom 3, o país inteiro). Sem re-rodar
+  // a posição inicial de volta em BRASIL_REGION (zoom 3, o país inteiro). Sem re-rodar
   // o enquadramento aqui, quem aproximasse o próprio bairro, tocasse num hospital e
-  // voltasse encontraria o mapa zerado — e ainda rebaixando tiles. As outras
-  // dependências não bastam: a identidade de `hospitais` não muda no desmonte/remonte,
-  // então o efeito não dispararia sozinho.
+  // voltasse encontraria o mapa zerado. As outras dependências não bastam: a
+  // identidade de `hospitais` não muda no desmonte/remonte, então o efeito não
+  // dispararia sozinho.
   useEffect(() => {
     if (mapaMontado && hospitais.length > 0) {
       enquadrarHospitais();
@@ -312,68 +311,54 @@ function GeolocalizacaoContent({ navigation }) {
       </View>
 
       {/*
-       * BUG-05 — o recorte do mapa é NOSSO, porque o MapLibre desliga o dele.
+       * BUG-05 — o recorte do mapa é NOSSO, porque a biblioteca desliga o dela.
        *
        * Ao arrastar o mapa, os nomes dos hospitais apareciam por cima do cabeçalho e
        * da caixa de informações — cobrindo justamente os chips de raio, que ficavam
-       * ilegíveis e sem alvo visível.
+       * ilegíveis e sem alvo visível. Cada marcador (`MarkerView`) é uma View comum,
+       * posicionada por coordenada absoluta de projeção: fora da viewport a posição
+       * fica negativa (ou maior que a altura) e o desenho escapa para o resto da tela.
        *
-       * Não é acidente de estilo nosso: é o que a biblioteca faz de propósito. Cada
-       * marcador é uma View Android comum, filha direta da MapView, posicionada por
-       * coordenada absoluta em `MarkerViewManager.updateMarkerPosition`
-       * (`view.x = screenPos.x - ...`, linhas 74-75 do `MarkerViewManager.kt` da
-       * 11.3.6). `screenPos` vem da projeção do mapa e fica NEGATIVO — ou maior que a
-       * altura — assim que o ponto sai da viewport. E o `addMarker` (linhas 40-42)
-       * desliga o recorte que conteria isso:
-       *
-       *     mapView.clipChildren = false
-       *     mapView.clipToPadding = false
-       *     mapView.clipToOutline = false
-       *
-       * Sem clipping na MapView, o desenho do marcador escapa para o resto da tela.
        * Basta um ancestral recortando para conter tudo: `overflow: "hidden"` neste
-       * container faz o `dispatchDraw` do RN limitar o canvas à área do mapa, e o
-       * recorte do canvas é herdado por toda a subárvore — nenhum descendente o
-       * desfaz. Quem sustenta a correção é esse mecanismo, e não a analogia com o
-       * `HospitalDetalheScreen`: aquela tela tem um container parecido (`mapContainer`,
-       * lá por causa do border-radius) e nunca mostrou o defeito, mas também usa
-       * `androidView="texture"`, um marcador só e câmera enquadrada na carga — a
-       * imunidade dela tem mais de uma explicação candidata.
+       * container faz o RN limitar o canvas à área do mapa. Mantido na migração
+       * Mapbox — o `MarkerView` tem o mesmo modelo de posicionamento.
        *
        * O container também substitui o placeholder que existia aqui: ele tem `flex: 1`
-       * e permanece montado quando o `<Map>` sai (ver `abrirHospital`), então a caixa
-       * de informações não salta para junto do cabeçalho no quadro da transição.
+       * e permanece montado quando o `<MapView>` sai (ver `abrirHospital`), então a
+       * caixa de informações não salta para junto do cabeçalho no quadro da transição.
        */}
       <View style={styles.mapContainer} testID="mapa-container">
         {/* Desmontado de propósito antes de navegar — ver o comentário do `abrirHospital`. */}
         {mapaMontado ? (
-          <Map style={styles.map} mapStyle={OSM_RASTER_STYLE}>
-            <Camera ref={cameraRef} initialViewState={getInitialViewState(BRASIL_REGION)} />
+          <MapView style={styles.map} styleURL={MAPBOX_STYLE}>
+            <Camera
+              ref={cameraRef}
+              centerCoordinate={cameraInicial.centerCoordinate}
+              zoomLevel={cameraInicial.zoomLevel}
+            />
 
             {!coordenadas && !hospitais.length && (
-              <Marker lngLat={[BRASIL_REGION.longitude, BRASIL_REGION.latitude]}>
+              <MarkerView coordinate={[BRASIL_REGION.longitude, BRASIL_REGION.latitude]}>
                 <View style={styles.markerDot} />
-              </Marker>
+              </MarkerView>
             )}
 
             {geofencesFeatureCollection.features.length > 0 && (
-              <GeoJSONSource
+              <ShapeSource
                 id="geofences-hospitais"
                 testID="geofences-hospitais"
-                data={geofencesFeatureCollection}
+                shape={geofencesFeatureCollection}
                 onPress={aoTocarGeofence}
               >
-                <Layer
+                <FillLayer
                   id="geofences-preenchimento"
-                  type="fill"
-                  paint={{ "fill-color": colors.primary, "fill-opacity": 0.18 }}
+                  style={{ fillColor: colors.primary, fillOpacity: 0.18 }}
                 />
-                <Layer
+                <LineLayer
                   id="geofences-contorno"
-                  type="line"
-                  paint={{ "line-color": colors.primary, "line-width": 2 }}
+                  style={{ lineColor: colors.primary, lineWidth: 2 }}
                 />
-              </GeoJSONSource>
+              </ShapeSource>
             )}
 
             {hospitais.map((hospital) => {
@@ -382,7 +367,10 @@ function GeolocalizacaoContent({ navigation }) {
                 return null;
               }
               return (
-                <Marker key={hospital.id} lngLat={[centroide.longitude, centroide.latitude]}>
+                <MarkerView
+                  key={hospital.id}
+                  coordinate={[centroide.longitude, centroide.latitude]}
+                >
                   <View
                     style={styles.hospitalMarker}
                     accessibilityRole="button"
@@ -397,16 +385,16 @@ function GeolocalizacaoContent({ navigation }) {
                       </Text>
                     </View>
                   </View>
-                </Marker>
+                </MarkerView>
               );
             })}
 
             {coordenadas && (
-              <Marker lngLat={[coordenadas.longitude, coordenadas.latitude]}>
+              <MarkerView coordinate={[coordenadas.longitude, coordenadas.latitude]}>
                 <View style={styles.userDot} />
-              </Marker>
+              </MarkerView>
             )}
-          </Map>
+          </MapView>
         ) : null}
       </View>
 
@@ -500,9 +488,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.s2,
   },
   // `overflow: "hidden"` não é enfeite: é o único recorte da subárvore do mapa.
-  // Ver o comentário do JSX (BUG-05) — o MapLibre desliga o clipping da MapView
-  // para poder posicionar marcadores fora dela, e sem este container os rótulos
-  // dos hospitais vazam por cima do cabeçalho e da caixa de informações.
+  // Ver o comentário do JSX (BUG-05) — o `MarkerView` posiciona marcadores fora da
+  // viewport, e sem este container os rótulos dos hospitais vazam por cima do
+  // cabeçalho e da caixa de informações.
   mapContainer: { flex: 1, overflow: "hidden" },
   map: { flex: 1 },
   infoBox: {

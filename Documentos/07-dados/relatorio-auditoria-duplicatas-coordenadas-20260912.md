@@ -49,7 +49,21 @@ Mecanismo provado (`SeedMapper.java:67-74,216-223`, `SeedRunner.java:187-219`, +
 ## 5. Endurecimento do seed (implementado — `SeedRunner`, mesma branch)
 
 Two-phase na execução: fase 1 monta tudo em memória; fase 2a grava os docs **com** CNES registrando a chave `categoria|nome canônico|bairro canônico`; fase 2b grava os sem-CNEs **exceto** gêmeos de chave já registrada (log `Gêmeo sem CNES ignorado`, contador no sumário). Pontos distintos sem gêmeo CNES (Papuda ×5) passam intactos — pontos não são fundidos. Cobertura: `SeedRunnerGemeosTest` (gêmeo ignorado × preservado × homônimos de RAs distintas), com fixtures `.shp`/`.dbf` mínimos gerados no teste.
-Índice único esparso em `codigoCnes` foi avaliado e **rejeitado**: não teria evitado o DUP-01 (chaves distintas) e travaria a subida se o banco já contiver colisão.
+Correção factual: índices únicos esparsos em `codigoCnes`, `importKey` e `cnpj` **existem** no banco (verificado em 12/09/2026) — e mesmo assim os 23 duplicados coexistem, porque têm chaves *distintas* (CNES × importKey). Índice único impede colisão de chave, não duplicata lógica: a decisão de não criar índice novo continua válida, pelo motivo certo.
+
+## 6b. Histórico CNES (20–21/08) — o que ele já sabia e o que faltou
+
+Três relatórios contam a usabilidade do CNES como chave — e antecipam este achado:
+
+- **`relatorio-enriquecimento-cnes.md` (20/08):** base com 340 docs, 100 sem CNES. Casamento fuzzy+geo contra o DATASUS: 92% com CNES identificado, 60 reimportados. E o ponto central: §"Duplicados de registro existente" (17) — *"a fonte tem camadas sobrepostas — o mesmo estabelecimento aparece com CNES numa camada e sem CNES em outra"* — e §"Duplicados internos" (15), incluindo "Ubs São Sebastião" → `0010790` **cinco vezes** e "Ubs 3 - São Sebastião" → `0010790`. Ou seja: o DUP-01 foi **identificado em 20/08 e nunca removido** — reimportar (escrever CNES) não deleta o gêmeo sem-CNEs, e o seed de 26/08 o recriou do zero.
+- **`relatorio-auditoria-campos-categorias-cnes.md` (21/08):** 300 com CNES / 40 importKey, "nenhuma incoerência" — retrato do ETL, não do seed atual (hoje: 240/100, pois o seed lê os DBFs crus, sem o backfill do enriquecimento).
+- **`relatorio-importacao-CNES_PUBLICOS_COMPLEMENTARES_20260909.md`:** o CNES como fonte complementar funciona (1 hospital genuinamente ausente importado), com a lição de não confiar só em `CO_NATUREZA_JUR`.
+
+**Usabilidade do CNES, em uma frase:** como *chave* ele é sound (upsert + índice único esparso o impõem); como *cobertura* ele é furado (100/340 sem CNES porque as camadas Indígena/Rua/Prisionais não têm a coluna) — e foi exatamente nesse furo que os duplicados nasceram. O two-phase do §5 é o elo que faltava entre o diagnóstico de 20/08 e o seed.
+
+**Residuais que nem o two-phase pega (declarados, não varridos para baixo do tapete):**
+- "Ubs 3 - São Sebastião" (sem CNES) é gêmeo de `0010790` por *fuzzy+geo* (nome difere de "Ubs 1") — só casamento aproximado ou limpeza manual resolve.
+- DUP-03 refinado via Mongo: `Ubs 01 Riacho Fundo I` (CNES `0011169`) × `Ubs 03 Riacho Fundo Ii` (CNES `2660199`) — **dois CNES distintos no mesmo ponto**, endereços distintos (Qn 09 × Qn 07). Pelo menos um CNES tem coordenada errada na fonte; correção manual em campo/CNES.
 
 ## 6. Correção entregue no mapa (BUG-11)
 

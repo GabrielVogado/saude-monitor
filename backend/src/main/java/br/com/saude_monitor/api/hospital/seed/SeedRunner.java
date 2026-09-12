@@ -13,9 +13,12 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Seed de estabelecimentos de saúde a partir de DBF (atributos) + SHP (geometria).
@@ -84,8 +87,13 @@ public class SeedRunner implements ApplicationRunner {
         int novos = 0;
         int atualizados = 0;
         int descartados = 0;
+        int gemeosIgnorados = 0;
         int camadasProcessadas = 0;
 
+        // Fase 1 — monta todos os documentos em memória, sem gravar. A ordem é
+        // determinística (camadas em ordem alfabética, linhas em ordem) para logs
+        // e testes reproduzíveis.
+        List<DocPendente> pendentes = new ArrayList<>();
         try (var fluxo = Files.list(diretorio)) {
             for (Path shp : fluxo
                     .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".shp"))
@@ -126,14 +134,10 @@ public class SeedRunner implements ApplicationRunner {
                         continue;
                     }
                     lidos++;
-                    switch (salvarUpsert(doc)) {
-                        case NOVO -> novos++;
-                        case ATUALIZADO -> atualizados++;
-                        case IGNORADO_TIPO_DIVERGENTE -> descartados++;
-                    }
+                    pendentes.add(new DocPendente(doc, stem));
                 }
                 camadasProcessadas++;
-                log.info("[Seed] Camada '{}': {} registro(s) lidos/gravados.", stem, lidos);
+                log.info("[Seed] Camada '{}': {} registro(s) montados.", stem, lidos);
             }
         } catch (Exception e) {
             log.error("[Seed] Falha ao processar o diretório de dados.", e);
@@ -152,21 +156,75 @@ public class SeedRunner implements ApplicationRunner {
                         continue;
                     }
                     lidos++;
-                    switch (salvarUpsert(doc)) {
-                        case NOVO -> novos++;
-                        case ATUALIZADO -> atualizados++;
-                        case IGNORADO_TIPO_DIVERGENTE -> descartados++;
-                    }
+                    pendentes.add(new DocPendente(doc, jsonPublicosComplementares.getFileName().toString()));
                 }
-                log.info("[Seed] Arquivo '{}': {} registro(s) lidos/gravados.",
+                log.info("[Seed] Arquivo '{}': {} registro(s) montados.",
                         jsonPublicosComplementares.getFileName(), lidos);
             } catch (Exception e) {
                 log.error("[Seed] Falha ao processar {}.", jsonPublicosComplementares.getFileName(), e);
             }
         }
 
-        log.info("[Seed] Concluído — camadas: {}, novos: {}, atualizados: {}, descartados: {}.",
-                camadasProcessadas, novos, atualizados, descartados);
+        // Fase 2a — documentos COM CNES primeiro (versão autoritativa: coordenadas e
+        // atributos completos), registrando a chave de gêmeo de cada um.
+        Set<String> chavesCnes = new HashSet<>();
+        for (DocPendente pendente : pendentes) {
+            if (pendente.doc().getCodigoCnes() == null) {
+                continue;
+            }
+            chavesCnes.add(chaveGemea(pendente.doc()));
+            switch (salvarUpsert(pendente.doc())) {
+                case NOVO -> novos++;
+                case ATUALIZADO -> atualizados++;
+                case IGNORADO_TIPO_DIVERGENTE -> descartados++;
+            }
+        }
+
+        // Fase 2b — documentos SEM CNES, exceto gêmeos de um CNES já importado nesta
+        // execução. É o caso das camadas sem coluna CNES (ex.: UBS Indígena/Rua) que
+        // repetem unidades da camada principal com coordenadas ligeiramente
+        // diferentes: sem este filtro, cada versão vira um documento (círculos
+        // amontoados no mapa — auditoria em `07-dados/relatorio-auditoria-duplicatas-coordenadas-20260912.md`).
+        // Unidades sem gêmeo CNES (ex.: prisionais com nome sintético) passam — pontos
+        // distintos com o mesmo nome são preservados, não fundidos.
+        for (DocPendente pendente : pendentes) {
+            if (pendente.doc().getCodigoCnes() != null) {
+                continue;
+            }
+            if (chavesCnes.contains(chaveGemea(pendente.doc()))) {
+                gemeosIgnorados++;
+                log.info("[Seed] Gêmeo sem CNES ignorado (versão CNES importada): {} [{}].",
+                        pendente.doc().getNome(), pendente.origem());
+                continue;
+            }
+            switch (salvarUpsert(pendente.doc())) {
+                case NOVO -> novos++;
+                case ATUALIZADO -> atualizados++;
+                case IGNORADO_TIPO_DIVERGENTE -> descartados++;
+            }
+        }
+
+        log.info("[Seed] Concluído — camadas: {}, novos: {}, atualizados: {}, descartados: {}, gêmeos ignorados: {}.",
+                camadasProcessadas, novos, atualizados, descartados, gemeosIgnorados);
+    }
+
+    /** Documento montado aguardando gravação, com a origem para log. */
+    private record DocPendente(HospitalDocument doc, String origem) {
+    }
+
+    /**
+     * Chave de gêmeo entre camadas: {@code categoria|nome canônico|bairro canônico}.
+     * O bairro (RA nas camadas de UBS) impede fundir homônimos de regiões distintas;
+     * unidades sem gêmeo CNES nunca colidem aqui — a regra só filtra quando a chave
+     * já foi registrada por um documento COM CNES na fase 2a.
+     */
+    private static String chaveGemea(HospitalDocument doc) {
+        String bairro = doc.getEndereco() != null && doc.getEndereco().getBairro() != null
+                ? doc.getEndereco().getBairro()
+                : "";
+        return doc.getCategoria().name() + "|"
+                + EstabelecimentoNormalizador.canonicalizar(doc.getNome()) + "|"
+                + EstabelecimentoNormalizador.canonicalizar(bairro);
     }
 
     /** Resultado de {@link #salvarUpsert}, distinto de um simples booleano para poder

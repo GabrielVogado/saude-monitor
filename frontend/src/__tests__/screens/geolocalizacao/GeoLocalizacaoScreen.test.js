@@ -253,6 +253,35 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     }
   });
 
+  test("BUG-11: nomes repetidos ganham sufixo de distância para distinguir", async () => {
+    // "Ubs São Sebastião" ×5 no complexo da Papuda: 5 botões idênticos não
+    // servem para escolher. Com GPS, o repetido leva "· N m" (haversine do ponto
+    // do hospital); sem hospital correspondente na lista, volta ao nome puro.
+    const { Alert } = require("react-native");
+    const alertaSpy = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    try {
+      renderizar();
+      const fonte = await screen.findByTestId("geofences-hospitais");
+
+      act(() => {
+        fonte.props.onPress({
+          features: [
+            { properties: { id: "h1", nome: "Hospital Alfa" } },
+            { properties: { id: "h2", nome: "Hospital Alfa" } },
+          ],
+        });
+      });
+
+      expect(alertaSpy).toHaveBeenCalledTimes(1);
+      const botoes = alertaSpy.mock.calls[0][2];
+      // h1 está na lista (centroide ~278 m do GPS mockado); h2 não está.
+      expect(botoes[0].text).toMatch(/^Hospital Alfa · \d+ m$/);
+      expect(botoes[1].text).toBe("Hospital Alfa");
+    } finally {
+      alertaSpy.mockRestore();
+    }
+  });
+
   test("BUG-11: toque com um único polígono não mostra diálogo", async () => {
     const { Alert } = require("react-native");
     const alertaSpy = jest.spyOn(Alert, "alert").mockImplementation(() => {});

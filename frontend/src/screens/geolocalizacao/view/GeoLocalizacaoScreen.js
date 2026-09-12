@@ -16,6 +16,7 @@ import {
   centroDoHospital,
   geofencesParaFeatureCollection,
 } from "../../../utils/geojson";
+import { formatarDistancia, haversineMetros } from "../../../utils/distancia";
 import HospitalService from "../../hospitais/service/HospitalService";
 import { CSChip } from "../../../components";
 import { colors, typography, spacing, radii } from "../../../theme";
@@ -236,14 +237,31 @@ function GeolocalizacaoContent({ navigation }) {
       abrirHospital(unico?.properties?.id || unico?.id);
       return;
     }
+    // Nomes repetidos (ex.: "Ubs São Sebastião" ×5 no complexo da Papuda) não
+    // distinguem os botões — sufixa a distância do GPS quando houver colisão.
+    // Sem GPS, volta ao nome puro: botão duplicado ainda abre a unidade certa
+    // pelo `id`, só a escolha é menos confortável.
+    const nomes = features.map((f) => f?.properties?.nome || "Unidade");
+    const rotulo = (id, nome) => {
+      if (nomes.filter((n) => n === nome).length < 2) {
+        return nome;
+      }
+      const hospital = hospitais.find((h) => h.id === id);
+      const metros = haversineMetros(posicaoRef.current, hospital ? centroDoHospital(hospital) : null);
+      const texto = formatarDistancia(metros);
+      return texto ? `${nome} · ${texto}` : nome;
+    };
     Alert.alert(
       "Várias unidades neste local",
       "Escolha qual abrir:",
       [
-        ...features.map((f) => ({
-          text: f?.properties?.nome || "Unidade",
-          onPress: () => abrirHospital(f?.properties?.id || f?.id),
-        })),
+        ...features.map((f) => {
+          const id = f?.properties?.id || f?.id;
+          return {
+            text: rotulo(id, f?.properties?.nome || "Unidade"),
+            onPress: () => abrirHospital(id),
+          };
+        }),
         { text: "Cancelar", style: "cancel" },
       ]
     );

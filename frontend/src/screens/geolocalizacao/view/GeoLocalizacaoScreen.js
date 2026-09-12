@@ -4,7 +4,7 @@
 // Esta tela permanece apenas como ferramenta de depuração/mapa com `watchPositionAsync`
 // em foreground — não dispara check-in/checkout e não deve ser alterada para isso.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from "@rnmapbox/maps";
 import {
@@ -218,8 +218,35 @@ function GeolocalizacaoContent({ navigation }) {
   }, [navigation]);
 
   const aoTocarGeofence = (evento) => {
-    const feature = evento?.features?.[0];
-    abrirHospital(feature?.properties?.id || feature?.id);
+    // BUG-11 — unidades empilhadas eram inalcançáveis: com 2+ geofences sobrepostos
+    // (duplicatas de seed — ver `07-dados/relatorio-auditoria-duplicatas-20260912.md`
+    // — ou unidades vizinhas reais como UPA + UBS + Casa de Parto), o toque abria
+    // sempre `features[0]` e as demais nunca eram acessíveis. Com mais de uma
+    // unidade no ponto, oferece a lista para escolha em vez de adivinhar.
+    const features = (evento?.features || []).filter(
+      (f, i, arr) =>
+        (f?.properties?.id || f?.id) &&
+        arr.findIndex((g) => (g?.properties?.id || g?.id) === (f?.properties?.id || f?.id)) === i
+    );
+    if (features.length === 0) {
+      return;
+    }
+    if (features.length === 1) {
+      const unico = features[0];
+      abrirHospital(unico?.properties?.id || unico?.id);
+      return;
+    }
+    Alert.alert(
+      "Várias unidades neste local",
+      "Escolha qual abrir:",
+      [
+        ...features.map((f) => ({
+          text: f?.properties?.nome || "Unidade",
+          onPress: () => abrirHospital(f?.properties?.id || f?.id),
+        })),
+        { text: "Cancelar", style: "cancel" },
+      ]
+    );
   };
 
   const centralizar = () => {

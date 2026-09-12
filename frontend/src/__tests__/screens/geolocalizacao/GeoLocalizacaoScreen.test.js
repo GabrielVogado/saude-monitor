@@ -215,6 +215,62 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     expect(marcador.props.anchor).toEqual({ x: 0, y: 0.5 });
   });
 
+  test("BUG-11: toque sobre geofences empilhados oferece a lista em vez de abrir só o primeiro", async () => {
+    // Regressão relatada em 12/09/2026 com evidência em aparelho (São Sebastião):
+    // UPA + UBSs + Casa de Parto com círculos sobrepostos — o toque abria sempre
+    // `features[0]` e as demais unidades eram inalcançáveis. Empilhamento tem duas
+    // origens (duplicatas de seed E vizinhas reais), então a correção é na
+    // desambiguação, não no dado: ver `07-dados/relatorio-auditoria-duplicatas-20260912.md`.
+    const { Alert } = require("react-native");
+    const alertaSpy = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    try {
+      renderizar();
+      const fonte = await screen.findByTestId("geofences-hospitais");
+
+      act(() => {
+        fonte.props.onPress({
+          features: [
+            { properties: { id: "h1", nome: "Hospital Alfa" } },
+            { properties: { id: "h2", nome: "Hospital Beta" } },
+          ],
+        });
+      });
+
+      expect(alertaSpy).toHaveBeenCalledTimes(1);
+      const botoes = alertaSpy.mock.calls[0][2];
+      // 2 unidades + Cancelar — sem Cancelar o usuário ficaria preso no diálogo.
+      expect(botoes.map((b) => b.text)).toEqual(["Hospital Alfa", "Hospital Beta", "Cancelar"]);
+      expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
+
+      // Escolher a SEGUNDA unidade navega para ela — antes do fix, só a primeira
+      // era alcançável.
+      act(() => {
+        botoes[1].onPress();
+      });
+      await waitFor(() => expect(NAVEGACAO.navigate).toHaveBeenCalledWith("HospitalDetalhe", { id: "h2" }));
+    } finally {
+      alertaSpy.mockRestore();
+    }
+  });
+
+  test("BUG-11: toque com um único polígono não mostra diálogo", async () => {
+    const { Alert } = require("react-native");
+    const alertaSpy = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    try {
+      renderizar();
+      const fonte = await screen.findByTestId("geofences-hospitais");
+
+      act(() => {
+        fonte.props.onPress({ features: [{ properties: { id: "h1", nome: "Hospital Alfa" } }] });
+      });
+
+      expect(alertaSpy).not.toHaveBeenCalled();
+      await waitFor(() => expect(NAVEGACAO.navigate).toHaveBeenCalledWith("HospitalDetalhe", { id: "h1" }));
+    } finally {
+      alertaSpy.mockRestore();
+    }
+  });
+
   test("BUG-04: o mapa sai da árvore ANTES de a navegação acontecer", async () => {
     // Esta é a regressão do ANR, não um detalhe de implementação. Navegar com o mapa
     // ainda montado deixava o React Navigation apenas ESCONDER a view: a thread de

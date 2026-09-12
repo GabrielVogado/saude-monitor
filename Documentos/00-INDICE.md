@@ -95,7 +95,7 @@ Documentos/
 │   └── Plano-Sprints-v2.1.md                 ← S0–S8 executadas, S7 adiada, S9–S12 planejadas (§22)
 │
 ├── 07-dados/                                 ← relatórios de importação e enriquecimento de dados
-│   └── (6 relatórios de ETL CNES/DATASUS, auditoria de campos e auditoria de duplicatas/coordenadas 12/09/2026)
+│   └── (7 relatórios de ETL CNES/DATASUS, auditoria de campos, auditoria de duplicatas e validação do georreferenciamento 12/09/2026)
 │
 ├── 08-analise tecnica/                       ← auditoria técnica e consolidação de pendências
 │   ├── Consolidacao-Tecnica-e-Backlog-Pendente-v1.1.md ← fonte única do que está entregue, pendente e priorizado

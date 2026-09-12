@@ -90,6 +90,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if ("GET".equals(method) && uri.startsWith("/api/v1/hospitais")) {
             return true;
         }
+        // GET de camadas geográficas (F-11, §5): leitura pública de recurso estático.
+        if ("GET".equals(method) && uri.startsWith("/api/v1/camadas")) {
+            return true;
+        }
         // Feedback anônimo (Épico 03): criação pública.
         if ("POST".equals(method) && uri.startsWith("/api/v1/feedbacks")) {
             return true;

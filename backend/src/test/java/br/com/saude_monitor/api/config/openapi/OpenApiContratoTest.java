@@ -29,7 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * entrega original (E8-09); a feature de recuperação de senha ("esqueci minha senha",
  * 10/09/2026) acrescentou 2 (`/auth/esqueci-senha`, `/auth/redefinir-senha`), somando 33;
  * a confirmação obrigatória de e-mail no cadastro (mesmo dia) acrescentou mais 2
- * (`/auth/confirmar-email`, `/auth/reenviar-confirmacao`), somando **35**. Este teste mede
+ * (`/auth/confirmar-email`, `/auth/reenviar-confirmacao`), somando 35; as camadas
+ * geográficas (F-11, §5 — `GET /api/v1/camadas/{tipo}`) somam **36**. Este teste mede
  * o total de operações que o springdoc realmente gera, não presume que bateu.</p>
  */
 @Testcontainers
@@ -77,19 +78,19 @@ class OpenApiContratoTest {
             }
         }
 
-        assertThat(operacoes).isEqualTo(35);
+        assertThat(operacoes).isEqualTo(36);
     }
 
     /**
      * O bean {@link OpenApiConfig} declara um requisito de segurança **global**
      * (Bearer/JWT) para poder documentar os endpoints protegidos — mas isso, sozinho,
      * marcaria também os públicos como exigindo token, contradizendo o
-     * {@code SecurityConfig} real (achado do code-review deste PR). Os 15 endpoints
-     * `permitAll` recebem {@code @SecurityRequirements} vazio para sobrepor o global;
-     * este teste mede que a sobreposição chegou ao contrato publicado — e que nenhum
-     * dos demais ganhou a mesma isenção por engano. Lista ampliada em 10/09/2026 com os
-     * 2 endpoints de "esqueci minha senha" e os 2 de confirmação de e-mail (19 públicos
-     * ao todo).
+ * {@code SecurityConfig} real (achado do code-review deste PR). Os 15 endpoints
+ * `permitAll` recebem {@code @SecurityRequirements} vazio para sobrepor o global;
+ * este teste mede que a sobreposição chegou ao contrato publicado — e que nenhum
+ * dos demais ganhou a mesma isenção por engano. Lista ampliada em 10/09/2026 com os
+ * 2 endpoints de "esqueci minha senha" e os 2 de confirmação de e-mail (19 públicos
+ * ao todo), e com `GET /api/v1/camadas/{tipo}` (F-11, §5 — 20 públicos ao todo).
      */
     @Test
     void devePublicarSegurancaCoerenteComOSecurityConfig() throws Exception {
@@ -112,7 +113,8 @@ class OpenApiContratoTest {
                 "GET /api/v1/hospitais/{id}",
                 "GET /api/v1/hospitais/{id}/geofence",
                 "GET /api/v1/hospitais/{id}/indicadores",
-                "POST /api/v1/hospitais/sugestoes");
+                "POST /api/v1/hospitais/sugestoes",
+                "GET /api/v1/camadas/{tipo}");
 
         String corpo = mockMvc.perform(get("/v3/api-docs").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())

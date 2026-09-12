@@ -1,10 +1,8 @@
-# 🔍 Relatório de Aderência — Features × Código Real (v3.7)
+# 🔍 Relatório de Aderência — Features × Código Real (v3.6)
 
 > **Verificação do que existe implementado vs. o que as Features propõem**
 >
-> Data: Atualizada — v3.7 (12/09/2026; migração do mapa para Mapbox + backend das camadas F-11)
-> Alterações da v3.7: §F-07 realinhado ao código da branch `feature/mapbox-migration` (`@rnmapbox/maps` v10 no lugar de MapLibre; BUG-10 corrigido); registrada a entrega parcial de F-11 — `GET /api/v1/camadas/{tipo}` servindo as 4 camadas (UI do painel segue fora do escopo, sem mudar status). Versão anterior (3.6) preservada em `_historico/Relatorio-Aderencia-Codigo-vs-Features-v3.6.md`.
-> Data anterior: v3.6 (02/09/2026; acrescenta o §1.1 — Aderência operacional)
+> Data: Atualizada — v3.6 (02/09/2026; acrescenta o §1.1 — Aderência operacional)
 > Alterações da v3.6: a v3.5 concluía que a `develop` está "100% coberta" nas 9 features do escopo. **Isso continua correto e continua insuficiente.** A v3.6 acrescenta o **§1.1**, que verifica o código contra os requisitos **não funcionais** — e ali a aderência não é de 100%: o RNF-02 (resposta < 300 ms p95; tela pública em < 2 s) é violado por uma ordem de grandeza. Nenhum status de feature foi alterado.
 > Data anterior: v3.5 (01/09/2026; Sprint S8 entregue — E4-05 UI, F-07 mapa, E5-03 PDF, E5-05, E6-05)
 > Alterações desta versão: A **v3.5** registra a entrega da **Sprint S8**, que fecha todos os itens que a v3.4 listava como "fora do escopo do MVP": (1) **E4-05 UI** — `RankingScreen` com ordenação NOTA/TEMPO, filtro por tipo e paginação; (2) **F-07** — polígonos das geofences no mapa (`@maplibre/maplibre-react-native`) e filtro por raio; (3) **E5-03** — exportação dos dados do titular em **PDF** (`GET /api/v1/contas/export/pdf`, OpenPDF) com download/compartilhamento no app, escolhido no lugar de CSV por acessibilidade à população; (4) **E5-05** — novo **`PUT /api/v1/contas/consentimentos`** auditando a decisão do titular (LGPD art. 8º §5º) + revogação nativa que leva às configurações do SO e resincroniza no retorno; e (5) **E6-05** — tela dedicada de opt-in de notificações no Perfil, desacoplada do fluxo de feedback (E3-01). Restam fora do escopo apenas o **Épico 7 / Painel Admin Web (F-11)**. A **v3.4** havia registrado a execução das decisões de contrato abertas na v3.3: (1) cadastro migrado de `/api/user/cadastro` para **`POST /api/v1/auth/registro`** com **consentimento LGPD obrigatório** no request; (2) **`GET /api/v1/usuarios/me` removido** do contrato (perfil segue no payload do login); e (3) o namespace **`me/`** foi substituído por **`/api/v1/contas`** (responsabilidade lógica do titular). Também implementa o **backend de E5-03** (histórico paginado de visitas/feedbacks + **exportação LGPD art. 18** em `GET /api/v1/contas/export`), que passou de "fora do escopo" para **parcialmente coberto** (UI do histórico segue na Sprint S8). As v3.2/v3.3 registraram, respectivamente, as 3 correções de estória (RN-07, RN-10/11, E3-03) e o logout server-side (F0-02).
@@ -41,7 +39,7 @@
 
 **Causa:** comum a todos os sintomas — a instância do backend. O `render.yaml` declara `plan: free`, que suspende o serviço após ~15 min sem tráfego (os 109 s e o 503 da primeira abertura) e entrega fração de vCPU compartilhada (o piso de ~1 s por requisição, mesmo sem tocar o banco). O relato do Product Owner de que "login está lento, lista está lenta, cadastro está lento, envio de feedback está lento" descreve **um problema, não quatro** — e nenhum deles está no código do aplicativo.
 
-**Consequência para a leitura deste relatório:** o ✅ ao lado de cada feature abaixo significa *"o código existe, faz o que a feature pede e tem teste automatizado"*. **Não significa** que a feature seja utilizável pelo cidadão hoje. Para o estado de produto, ver `Features-MVP-v2.2.md` §2.1; para o tratamento, o **Épico 8** do `Backlog-MVP-v2.1.md` e a **Sprint S9** do `Plano-Sprints-v2.1.md`.
+**Consequência para a leitura deste relatório:** o ✅ ao lado de cada feature abaixo significa *"o código existe, faz o que a feature pede e tem teste automatizado"*. **Não significa** que a feature seja utilizável pelo cidadão hoje. Para o estado de produto, ver `Features-MVP-v2.1.md` §2.1; para o tratamento, o **Épico 8** do `Backlog-MVP-v2.1.md` e a **Sprint S9** do `Plano-Sprints-v2.1.md`.
 
 **Também não verificável por leitura de arquivo (e não atendido):** cobertura de testes ≥ 70% (nunca medida), contrato OpenAPI (inexistente), testes de integração com contexto Spring (inexistentes), auditoria WCAG 2.2 AA (nunca executada) e analytics de produto (inexistente) — 5 dos 7 critérios de DoD do MVP.
 
@@ -137,12 +135,12 @@
 ---
 
 ### ✅ F-07 — Mapa e Busca de Hospitais
-**Status: FUNCIONAL — entregue na Sprint S8 e migrado para `@rnmapbox/maps` v10 na branch **feature/mapbox-migration** (12/09/2026), na aba **Mapa** da navegação de 4 abas (Início, Hospitais, Mapa, Perfil).**
+**Status: FUNCIONAL — entregue na Sprint S8 sobre `@maplibre/maplibre-react-native`, na aba **Mapa** da navegação de 4 abas (Início, Hospitais, Mapa, Perfil).**
 
-| Entregue na S8 | Pós-S8 (v3.7) |
-|---|---|
-| ✅ `GET /api/v1/hospitais?latitude&longitude&raioKm` consumido pelo front com **filtro por raio** (chips 1/5/10/25 km + "Todos") na aba **Mapa** | ✅ Mapa sobre `@rnmapbox/maps` v10 (estilo `Street`): geofences em `ShapeSource` + `FillLayer`/`LineLayer`, marcadores em `MarkerView`, câmera por `centerCoordinate`/`zoomLevel`; token em `EXPO_PUBLIC_MAPBOX_TOKEN` (secret no CI); sem Expo Go (APK via `cd-mobile-apk.yml`) |
-| ✅ Polígonos das geofences renderizados via `GeoJSONSource` + `Layer` (`fill`/`line`) do MapLibre; toque no polígono/marcador abre o `HospitalDetalhe` | ✅ **BUG-10 (12/09/2026):** ponto do hospital fora do círculo com pouco zoom (âncora centralizava a linha `[ponto + rótulo]`) — corrigido com `anchor={{x: 0, y: 0.5}}` + regressão em `GeoLocalizacaoScreen.test.js` |
+| Entregue na S8 |
+|---|
+| ✅ `GET /api/v1/hospitais?latitude&longitude&raioKm` consumido pelo front com **filtro por raio** (chips 1/5/10/25 km + "Todos") na aba **Mapa** |
+| ✅ Polígonos das geofences renderizados via `GeoJSONSource` + `Layer` (`fill`/`line`) do MapLibre; toque no polígono/marcador abre o `HospitalDetalhe` |
 
 ---
 
@@ -186,9 +184,9 @@
     - **E5-03 backend + UI implementados:** histórico paginado de visitas e de feedbacks + exportação de dados do titular; **UI** `HistoricoScreen` criada na aba Perfil (visitas com nome do hospital anexado pelo backend + avaliações, RN-22) com acesso por "Meu histórico" e navegação pós-login para Perfil. A exportação em **PDF** e o `PUT /api/v1/contas/consentimentos` (E5-05) foram entregues na S8 (item 5).
 5. **Sprint S8 entregue (01/09/2026)** — uma branch/commit por estória (`feature/e4-05-ui-ranking`, `feature/f-07-mapa-geofences-filtro-raio`, `feature/e5-03-exportacao-dados-pdf`, `feature/e5-05-revogacao-consentimento-nativa`, `feature/e6-05-optin-notificacoes`), ordem de merge E4-05 → F-07 → E5-03 → E5-05 → E6-05:
     - **E4-05 UI:** `RankingScreen` (NOTA/TEMPO, filtro por tipo, paginação) com estados de loading/erro/vazio e tokens do Design System.
-    - **F-07:** geofences como polígonos (MapLibre na S8; **Mapbox v10 desde 12/09/2026**) + filtro por raio consumindo `GET /api/v1/hospitais`.
+    - **F-07:** geofences como polígonos no MapLibre + filtro por raio consumindo `GET /api/v1/hospitais`.
     - **E5-03 (PDF):** `ExportacaoPdfService` (OpenPDF) e `GET /api/v1/contas/export/pdf` devolvendo `application/pdf` com `Content-Disposition: attachment`; no app, botão "Exportar meus dados (PDF)" no histórico com download (`expo-file-system`) e compartilhamento (`expo-sharing`), com fallback web. **PDF em vez de CSV** por decisão de acessibilidade à população (LGPD art. 18).
     - **E5-05:** `PUT /api/v1/contas/consentimentos` (`AtualizarConsentimentosRequest`/`ConsentimentosResponse`) grava `aceito`/`data`/`versao` por finalidade; no app, a revogação leva às configurações do SO (`Linking.openSettings`) e o retorno é resincronizado via `AppState` (art. 8º §5º).
     - **E6-05:** helpers de permissão extraídos para `src/services/NotificacaoPermissao.js` e nova `NotificacoesScreen` no Perfil, com a decisão auditada no mesmo endpoint de consentimentos.
     - **Verificação:** backend `./gradlew clean build` verde (112 testes) e frontend `npm test` 22 suítes/141 testes + `npm run typecheck` sem erros.
-6. **Fora do escopo do MVP** (não é pendência desta auditoria): apenas o **Painel Admin Web** (Épico 7/F-11, cujo fluxo de moderação de sugestões absorve as telas mobile de F-10). **Parcial de backend em 12/09/2026 (não muda o status):** `GET /api/v1/camadas/{tipo}` serve as 4 camadas geográficas (GeoJSON simplificado, 919 KB — `Especificacao-API-v2.2.md` §3.6); sem UI, nenhuma estória E7 muda de estado.
+6. **Fora do escopo do MVP** (não é pendência desta auditoria): apenas o **Painel Admin Web** (Épico 7/F-11, cujo fluxo de moderação de sugestões absorve as telas mobile de F-10).

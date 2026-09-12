@@ -1,7 +1,15 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 02/09/2026 · Responsável: Gabriel Vogado
+> Última atualização: 12/09/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 12/09/2026 — Migração Mapbox + camadas geográficas (branch `feature/mapbox-migration`)
+
+**O que entrou:** mapa mobile MapLibre → `@rnmapbox/maps` v10 (token `EXPO_PUBLIC_MAPBOX_TOKEN`, BUG-10 da âncora corrigido) e backend servindo as 4 camadas em `GET /api/v1/camadas/{tipo}` (919 KB, sem Mongo).
+**Documentos versionados:** `Especificacao-API` v2.1 → v2.2 · `Features-MVP` v2.1 → v2.2 · `Arvore-Tecnologica` v2.0 → v2.1 · `Relatorio-Aderencia` v3.6 → v3.7 (anteriores preservadas em `_historico/`).
+**Sem mudança de status:** F-07 já era ✅; nenhuma estória E7 muda (F-11 segue sem UI) — `De-Para-Backlog-Features.md` intencionalmente intocado.
 
 ---
 
@@ -51,7 +59,7 @@
 Este repositório de documentação segue uma estrutura versionada:
 
 - **`_historico/`** — documentos das fases anteriores, preservados como memória institucional (não editar).
-- **Documentos ativos** — a documentação vigente do produto, organizada por domínio. Após a revisão de 02/09/2026, as versões correntes são: Negocial v2.0 · Arquitetura v2.0 · UI/UX v2.0 · **Backlog v2.1** · **Features v2.1** · **Plano de Sprints v2.1** · **Aderência v3.6** · **Consolidação Técnica v1.1**.
+- **Documentos ativos** — a documentação vigente do produto, organizada por domínio. Após a revisão de 12/09/2026, as versões correntes são: Negocial v2.0 · Arquitetura v2.1 · UI/UX v2.0 · **Backlog v2.1** · **Features v2.2** · **Plano de Sprints v2.1** · **Aderência v3.7** · **Consolidação Técnica v1.1** · **API v2.2** (revisão de 02/09/2026 mantida no histórico abaixo).
 
 Regra de versionamento: toda alteração relevante de um documento ativo deve gerar uma **nova versão** (ex.: `v2.0` → `v2.1`) e o conteúdo antigo é movido para `_historico/`. Nunca sobrescreva o histórico.
 
@@ -67,8 +75,8 @@ Documentos/
 │   └── Documento-Negocial-v2.0.md            ← problema, público, jornada, regras de negócio, LGPD, KPIs
 │
 ├── 02-arquitetura-tecnica/                   ← visão técnica e de engenharia
-│   ├── Arvore-Tecnologica-v2.0.md            ← stack atual vs. proposta, manter/refatorar, ADRs, roadmap
-│   ├── Especificacao-API-v2.1.md             ← contratos REST (OpenAPI), modelo de dados MongoDB, fluxos
+│   ├── Arvore-Tecnologica-v2.1.md            ← stack atual vs. proposta, manter/refatorar, ADRs, roadmap
+│   ├── Especificacao-API-v2.2.md             ← contratos REST (OpenAPI), modelo de dados MongoDB, fluxos (+ §3.6 camadas)
 │   └── Plano-Tecnico-Painel-Administrativo-Web-v1.0.md  ← stack, estrutura de pastas e consumo de API do painel web (F-11)
 │
 ├── 03-ui-ux/                                 ← padrão de experiência e interface
@@ -78,8 +86,8 @@ Documentos/
 │   └── Backlog-MVP-v2.1.md                   ← épicos/estórias priorizadas (MoSCoW), critérios de aceite, Épico 8, sprints
 │
 ├── 05-features/                              ← features detalhadas + aderência ao código real
-│   ├── Features-MVP-v2.1.md                  ← 11 features com status real, estado operacional (§2.1), DoDs, rastreabilidade
-│   ├── Relatorio-Aderencia-Codigo-vs-Features.md ← verificação arquivo a arquivo + aderência operacional (§1.1)
+│   ├── Features-MVP-v2.2.md                  ← 11 features com status real, estado operacional (§2.1), DoDs, rastreabilidade
+│   ├── Relatorio-Aderencia-Codigo-vs-Features.md ← verificação arquivo a arquivo (v3.7) + aderência operacional (§1.1)
 │   ├── Pendencias-Epico-01.md                ← débitos do ETL CNES/DATASUS e divergências de contrato
 │   └── Registro-Correcao-Checkin-Manual-e-Performance-v1.0.md ← RN-03A (exclusividade de visita ativa)
 │
@@ -107,10 +115,12 @@ Documentos/
     ├── v1.2-design-clinical-sanctuary/       ← fase 3: design system "Clinical Sanctuary" (painel institucional)
     ├── v2.0-design-ui-ux/                    ← rascunho da v1 do documento UI/UX (substituído pela versão em 03-ui-ux)
     ├── 08-analise-tecnica-v3.0/              ← auditoria v3.0, ADRs v3.0 e Consolidação v1.0 (substituídos em 02/09/2026)
-    ├── Features-MVP-v2.0.md                  ← substituído pela v2.1 em 02/09/2026
+    ├── Features-MVP-v2.0.md / -v2.1.md       ← v2.1 substituída pela v2.2 em 12/09/2026
     ├── Backlog-MVP-v2.0.md                   ← substituído pela v2.1 em 02/09/2026
     ├── Plano-Sprints-v2.0.md                 ← substituído pela v2.1 em 02/09/2026
-    ├── Relatorio-Aderencia-Codigo-vs-Features-v1.md / -v3.5.md
+    ├── Especificacao-API-v2.0.md / -v2.1.md  ← v2.1 substituída pela v2.2 em 12/09/2026
+    ├── Arvore-Tecnologica-v2.0.md            ← substituída pela v2.1 em 12/09/2026
+    ├── Relatorio-Aderencia-Codigo-vs-Features-v1.md / -v3.5.md / -v3.6.md
     └── De-Para-Backlog-Features-v1.md / -v2.md ← retratos anteriores do status das estórias
 ```
 
@@ -121,15 +131,15 @@ Documentos/
 | # | Documento | Versão | Status | Resumo |
 |---|---|---|---|---|
 | 1 | [Documento Negocial](./01-negocio/Documento-Negocial-v2.0.md) | 2.0 | ✅ Ativo | Problema, proposta de valor, público, jornada do usuário, regras de negócio do geofence/feedback, modelo de dados conceitual, KPIs, roadmap e conformidade LGPD. |
-| 2 | [Árvore Tecnológica](./02-arquitetura-tecnica/Arvore-Tecnologica-v2.0.md) | 2.0 | ✅ Ativo | Mapa da stack atual (Spring Boot 4 + MongoDB + Expo 55), decisões manter/refatorar/adicionar, matriz comparativa, ADRs e plano de evolução. |
-| 3 | [Especificação da API](./02-arquitetura-tecnica/Especificacao-API-v2.1.md) | **2.1** | ✅ Ativo | Contratos REST de todos os endpoints (auth, hospitais, visitas, feedbacks, agregados), coleções MongoDB com índices/GeoJSON e fluxo geofence → API. **v2.1 (06/09/2026):** fecha CONT-01/CONT-02 (E8-14) — documento alinhado ao código (`password`, coleção `users`), não o inverso. |
+| 2 | [Árvore Tecnológica](./02-arquitetura-tecnica/Arvore-Tecnologica-v2.1.md) | **2.1** | ✅ Ativo | Mapa da stack atual (Spring Boot 4 + MongoDB + Expo 55 + **Mapbox v10**), decisões manter/refatorar/adicionar, matriz comparativa, ADRs e plano de evolução. **v2.1 (12/09/2026):** linhagem do mapa (`react-native-maps` → MapLibre → Mapbox) + contexto `regiao`. |
+| 3 | [Especificação da API](./02-arquitetura-tecnica/Especificacao-API-v2.2.md) | **2.2** | ✅ Ativo | Contratos REST de todos os endpoints (auth, hospitais, visitas, feedbacks, agregados, **camadas**), coleções MongoDB com índices/GeoJSON e fluxo geofence → API. **v2.2 (12/09/2026):** novo §3.6 `GET /api/v1/camadas/{tipo}` (F-11). v2.1 (06/09/2026) fechava CONT-01/CONT-02 (E8-14). |
 | 3b | [Plano Técnico — Painel Administrativo Web](./02-arquitetura-tecnica/Plano-Tecnico-Painel-Administrativo-Web-v1.0.md) | 1.0 | 🟡 Proposta | Stack (React + Vite + Leaflet), estrutura de pastas de `web-admin/` e estratégia de consumo da API existente para o painel administrativo (F-11). |
 | 4 | [Padrão UI/UX](./03-ui-ux/Padrao-UI-UX-v2.0.md) | 2.0 | ✅ Ativo | Princípios de UX, personas, jornada ponta a ponta, arquitetura de informação, design system completo (tokens, componentes), acessibilidade WCAG AA, LGPD por design e protótipos ASCII. |
 | 5 | [Backlog do MVP](./04-backlog/Backlog-MVP-v2.1.md) | **2.1** | ✅ Ativo | Backlog priorizado (Fase 0 + 8 épicos), decisões de priorização (§2.1), **Épico 8 — Estabilização e Desempenho**, sequência real S0–S8 + planejada S9–S12, DoD com situação real e regra de atualização documental. |
 | 6 | [Plano de Sprints](./06-sprints/Plano-Sprints-v2.1.md) | **2.1** | ✅ Ativo | S0–S6 e S8 concluídas, S7 adiada, **S9–S12 planejadas (§22)** com diagnóstico de desempenho medido, velocity, riscos, cerimônias e métricas. |
-| 7 | [Registro de Correção - Check-in Manual e Performance](./05-features/Registro-Correcao-Checkin-Manual-e-Performance-v1.0.md) | 1.0 | ✅ Implementado | Exclusividade de visita ativa (RN-03A), correção da interação do card e da latência artificial na primeira carga da lista. A validação pendente nº 5 (*"medir login e primeira lista no ambiente de destino"*) foi executada em 02/09/2026 — resultado no `Features-MVP-v2.1.md` §2.1. |
-| 8 | [Features do MVP](./05-features/Features-MVP-v2.1.md) | **2.1** | ✅ Ativo | As 11 features com status real por feature, **§2.1 — estado operacional** (implementado ≠ utilizável), DoD por feature, matriz de rastreabilidade e roteiro de validação V-01..V-12 com situação de cada uma. |
-| 9 | [Relatório de Aderência Código × Features](./05-features/Relatorio-Aderencia-Codigo-vs-Features.md) | **3.6** | ✅ Ativo | Verificação arquivo a arquivo das 9 features do escopo (100% cobertas) + **§1.1 aderência operacional**, que reprova o RNF-02 por medição. |
+| 7 | [Registro de Correção - Check-in Manual e Performance](./05-features/Registro-Correcao-Checkin-Manual-e-Performance-v1.0.md) | 1.0 | ✅ Implementado | Exclusividade de visita ativa (RN-03A), correção da interação do card e da latência artificial na primeira carga da lista. A validação pendente nº 5 (*"medir login e primeira lista no ambiente de destino"*) foi executada em 02/09/2026 — resultado no `Features-MVP-v2.2.md` §2.1 (apontador atualizado na revisão de 12/09/2026; conteúdo inalterado). |
+| 8 | [Features do MVP](./05-features/Features-MVP-v2.2.md) | **2.2** | ✅ Ativo | As 11 features com status real por feature, **§2.1 — estado operacional** (implementado ≠ utilizável), DoD por feature, matriz de rastreabilidade e roteiro de validação V-01..V-12 com situação de cada uma. **v2.2 (12/09/2026):** F-07 Mapbox + BUG-10; F-11 com backend parcial. |
+| 9 | [Relatório de Aderência Código × Features](./05-features/Relatorio-Aderencia-Codigo-vs-Features.md) | **3.7** | ✅ Ativo | Verificação arquivo a arquivo das 9 features do escopo (100% cobertas) + **§1.1 aderência operacional**, que reprova o RNF-02 por medição. **v3.7 (12/09/2026):** §F-07 Mapbox; parcial F-11 registrado sem mudar status. |
 | 10 | [De-Para Backlog × Features](./De-Para-Backlog-Features.md) | 02/09/2026 | ✅ Ativo | **Fonte de verdade do status de cada estória.** Placar: 42 de 43 estórias do app entregues; Épico 7 adiado; Épico 8 aberto. |
 | 11 | [Consolidação Técnica e Backlog Pendente](./08-analise%20tecnica/Consolidacao-Tecnica-e-Backlog-Pendente-v1.1.md) | **1.1** | ✅ Ativo | Fonte única do que está entregue, do que está pendente (48 itens + PERF) e da **ordem de execução em 6 ondas**, com as decisões do PO registradas literalmente. |
 | 12 | [Relatório de Auditoria Técnica](./08-analise%20tecnica/relatorio_auditoria_tecnica.md) | **3.1** | 🟡 Proposta | 11 problemas de arquitetura do frontend. A v3.1 declara o commit-base e **corrige 3 afirmações** que não se sustentaram na reverificação. |

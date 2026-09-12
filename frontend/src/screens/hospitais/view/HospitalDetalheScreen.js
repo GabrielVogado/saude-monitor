@@ -19,8 +19,10 @@ import VisitaService from "../../visitas/service/VisitaService";
 import { agendarFeedback } from "../../feedback/service/FeedbackNotificationService";
 import {
   calcularCentroide,
+  circuloParaCoordenadas,
   coordenadasParaGeoJson,
   geojsonParaCoordenadas,
+  RAIO_EXIBICAO_METROS,
 } from "../../../utils/geojson";
 import { getInitialViewState, MAPBOX_STYLE } from "../../../utils/mapStyle";
 import {
@@ -170,23 +172,32 @@ export default function HospitalDetalheScreen({ navigation, route }) {
     }
   };
 
-  const coordenadas = useMemo(
-    () => (hospital?.geofence ? geojsonParaCoordenadas(hospital.geofence) : []),
-    [hospital]
+  // O mapa do detalhe mostra o mesmo halo de 25 m da aba Mapa (consistência com a
+  // decisão exibição-≠-detecção da F-07): o polígono verdadeiro do backend continua
+  // existindo só no servidor, para a detecção. Sem centro (sem geofence e sem
+  // localização), não há mapa — mesmo comportamento de antes.
+  const centroide = useMemo(() => {
+    if (hospital?.geofence) {
+      return calcularCentroide(geojsonParaCoordenadas(hospital.geofence));
+    }
+    const loc = hospital?.localizacao;
+    return loc && Number.isFinite(loc.latitude) && Number.isFinite(loc.longitude) ? loc : null;
+  }, [hospital]);
+  const haloGeoJson = useMemo(
+    () => (centroide ? coordenadasParaGeoJson(circuloParaCoordenadas(centroide, RAIO_EXIBICAO_METROS)) : null),
+    [centroide]
   );
-  const geofenceGeoJson = useMemo(
-    () => coordenadasParaGeoJson(coordenadas),
-    [coordenadas]
-  );
-  const centroide = useMemo(() => calcularCentroide(coordenadas), [coordenadas]);
 
+  // Enquadramento fechado (~zoom 17): com o halo de 25 m, o enquadramento largo
+  // anterior (delta 0.02, ~zoom 14) deixaria o círculo invisível — e mostra o
+  // prédio da unidade em vez do bairro.
   const region = useMemo(() => {
     if (centroide) {
       return {
         latitude: centroide.latitude,
         longitude: centroide.longitude,
-        latitudeDelta: 0.02,
-        longitudeDelta: 0.02,
+        latitudeDelta: 0.002,
+        longitudeDelta: 0.002,
       };
     }
     return BRASIL_REGION;
@@ -288,14 +299,14 @@ export default function HospitalDetalheScreen({ navigation, route }) {
           </CSCard>
         )}
 
-        {coordenadas.length > 0 ? (
+        {haloGeoJson ? (
           <View style={styles.mapContainer}>
             <MapView style={styles.map} styleURL={MAPBOX_STYLE}>
               <Camera
                 centerCoordinate={cameraDaRegiao.centerCoordinate}
                 zoomLevel={cameraDaRegiao.zoomLevel}
               />
-              <ShapeSource id="geofence" shape={geofenceGeoJson}>
+              <ShapeSource id="geofence" shape={haloGeoJson}>
                 <FillLayer
                   id="geofence-fill"
                   style={{ fillColor: "rgba(0,97,147,0.16)" }}

@@ -179,23 +179,26 @@ function GeolocalizacaoContent({ navigation }) {
   const [mapaMontado, setMapaMontado] = useState(true);
   const hospitalPendente = useRef(null);
 
-  const abrirHospital = (hospitalId) => {
-    if (!hospitalId) {
-      return;
-    }
+  const abrirHospital = useCallback(
+    (hospitalId) => {
+      if (!hospitalId) {
+        return;
+      }
 
-    // Só desmonta se houver para onde ir. Desmontar primeiro e descobrir depois que a
-    // navegação não acontece deixaria a tela SEM MAPA e sem saída: quem remonta é o
-    // evento `focus`, que exige a tela ter perdido o foco antes — e ela não perde se a
-    // navegação não ocorreu. O usuário ficaria olhando um buraco entre o cabeçalho e a
-    // caixa de informações até trocar de aba.
-    if (typeof navigation?.navigate !== "function") {
-      return;
-    }
+      // Só desmonta se houver para onde ir. Desmontar primeiro e descobrir depois que a
+      // navegação não acontece deixaria a tela SEM MAPA e sem saída: quem remonta é o
+      // evento `focus`, que exige a tela ter perdido o foco antes — e ela não perde se a
+      // navegação não ocorreu. O usuário ficaria olhando um buraco entre o cabeçalho e a
+      // caixa de informações até trocar de aba.
+      if (typeof navigation?.navigate !== "function") {
+        return;
+      }
 
-    hospitalPendente.current = hospitalId;
-    setMapaMontado(false);
-  };
+      hospitalPendente.current = hospitalId;
+      setMapaMontado(false);
+    },
+    [navigation]
+  );
 
   useEffect(() => {
     if (mapaMontado || !hospitalPendente.current) {
@@ -218,63 +221,66 @@ function GeolocalizacaoContent({ navigation }) {
     return () => remover?.();
   }, [navigation]);
 
-  const aoTocarGeofence = (evento) => {
-    // BUG-11 — unidades empilhadas eram inalcançáveis: com 2+ geofences sobrepostos
-    // (duplicatas de seed — ver `07-dados/relatorio-auditoria-duplicatas-20260912.md`
-    // — ou unidades vizinhas reais como UPA + UBS + Casa de Parto), o toque abria
-    // sempre `features[0]` e as demais nunca eram acessíveis. Com mais de uma
-    // unidade no ponto, oferece a lista para escolha em vez de adivinhar.
-    const features = (evento?.features || []).filter(
-      (f, i, arr) =>
-        (f?.properties?.id || f?.id) &&
-        arr.findIndex((g) => (g?.properties?.id || g?.id) === (f?.properties?.id || f?.id)) === i
-    );
-    if (features.length === 0) {
-      return;
-    }
-    if (features.length === 1) {
-      const unico = features[0];
-      abrirHospital(unico?.properties?.id || unico?.id);
-      return;
-    }
-    // Nomes repetidos (ex.: "Ubs São Sebastião" ×5 no complexo da Papuda) não
-    // distinguem os botões — sufixa a distância do GPS quando houver colisão.
-    // Sem GPS, volta ao nome puro: botão duplicado ainda abre a unidade certa
-    // pelo `id`, só a escolha é menos confortável.
-    const nomes = features.map((f) => f?.properties?.nome || "Unidade");
-    const rotulo = (id, nome) => {
-      if (nomes.filter((n) => n === nome).length < 2) {
-        return nome;
+  const aoTocarGeofence = useCallback(
+    (evento) => {
+      // BUG-11 — unidades empilhadas eram inalcançáveis: com 2+ geofences sobrepostos
+      // (duplicatas de seed — ver `07-dados/relatorio-auditoria-duplicatas-20260912.md`
+      // — ou unidades vizinhas reais como UPA + UBS + Casa de Parto), o toque abria
+      // sempre `features[0]` e as demais nunca eram acessíveis. Com mais de uma
+      // unidade no ponto, oferece a lista para escolha em vez de adivinhar.
+      const features = (evento?.features || []).filter(
+        (f, i, arr) =>
+          (f?.properties?.id || f?.id) &&
+          arr.findIndex((g) => (g?.properties?.id || g?.id) === (f?.properties?.id || f?.id)) === i
+      );
+      if (features.length === 0) {
+        return;
       }
-      const hospital = hospitais.find((h) => h.id === id);
-      const metros = haversineMetros(posicaoRef.current, hospital ? centroDoHospital(hospital) : null);
-      const texto = formatarDistancia(metros);
-      return texto ? `${nome} · ${texto}` : nome;
-    };
-    Alert.alert(
-      "Várias unidades neste local",
-      "Escolha qual abrir:",
-      [
-        ...features.map((f) => {
-          const id = f?.properties?.id || f?.id;
-          return {
-            text: rotulo(id, f?.properties?.nome || "Unidade"),
-            onPress: () => abrirHospital(id),
-          };
-        }),
-        { text: "Cancelar", style: "cancel" },
-      ]
-    );
-  };
+      if (features.length === 1) {
+        const unico = features[0];
+        abrirHospital(unico?.properties?.id || unico?.id);
+        return;
+      }
+      // Nomes repetidos (ex.: "Ubs São Sebastião" ×5 no complexo da Papuda) não
+      // distinguem os botões — sufixa a distância do GPS quando houver colisão.
+      // Sem GPS, volta ao nome puro: botão duplicado ainda abre a unidade certa
+      // pelo `id`, só a escolha é menos confortável.
+      const nomes = features.map((f) => f?.properties?.nome || "Unidade");
+      const rotulo = (id, nome) => {
+        if (nomes.filter((n) => n === nome).length < 2) {
+          return nome;
+        }
+        const hospital = hospitais.find((h) => h.id === id);
+        const metros = haversineMetros(posicaoRef.current, hospital ? centroDoHospital(hospital) : null);
+        const texto = formatarDistancia(metros);
+        return texto ? `${nome} · ${texto}` : nome;
+      };
+      Alert.alert(
+        "Várias unidades neste local",
+        "Escolha qual abrir:",
+        [
+          ...features.map((f) => {
+            const id = f?.properties?.id || f?.id;
+            return {
+              text: rotulo(id, f?.properties?.nome || "Unidade"),
+              onPress: () => abrirHospital(id),
+            };
+          }),
+          { text: "Cancelar", style: "cancel" },
+        ]
+      );
+    },
+    [hospitais, abrirHospital]
+  );
 
-  const centralizar = () => {
+  const centralizar = useCallback(() => {
     const alvo = getInitialViewState(regionAtual);
     cameraRef.current?.setCamera({
       centerCoordinate: alvo.centerCoordinate,
       zoomLevel: alvo.zoomLevel,
       animationDuration: 500,
     });
-  };
+  }, [regionAtual]);
 
   // Posição inicial da câmera, calculada uma vez por montagem: a `Camera` do Mapbox
   // acompanha mudanças de props, então recalcular a cada render moveria o mapa
@@ -553,7 +559,9 @@ const styles = StyleSheet.create({
   // viewport, e sem este container os rótulos dos hospitais vazam por cima do
   // cabeçalho e da caixa de informações.
   mapContainer: { flex: 1, overflow: "hidden" },
-  map: { flex: 1 },
+  // BUG-06: cor de fundo enquanto os tiles do estilo remoto carregam, ou se a
+  // rede/token falhar — sem isso o fundo é o preto-azulado do renderizador nativo.
+  map: { flex: 1, backgroundColor: colors.surfaceContainerLow },
   infoBox: {
     backgroundColor: colors.surface,
     borderTopWidth: 1,

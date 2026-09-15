@@ -6,6 +6,8 @@
  * do GPS do usuário distingue ("Ubs São Sebastião · 120 m").
  */
 
+import { formatarDecimalPtBr } from "./format";
+
 /** Distância haversine em metros entre dois pontos { latitude, longitude }. */
 export function haversineMetros(a, b) {
   if (!a || !b) {
@@ -33,5 +35,5 @@ export function formatarDistancia(metros) {
   if (metros < 1000) {
     return `${Math.round(metros)} m`;
   }
-  return `${(metros / 1000).toFixed(1).replace(".", ",")} km`;
+  return `${formatarDecimalPtBr(metros / 1000)} km`;
 }

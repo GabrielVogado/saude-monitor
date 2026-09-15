@@ -172,10 +172,15 @@ public class SeedRunner implements ApplicationRunner {
             if (pendente.doc().getCodigoCnes() == null) {
                 continue;
             }
-            chavesCnes.add(chaveGemea(pendente.doc()));
             switch (salvarUpsert(pendente.doc())) {
-                case NOVO -> novos++;
-                case ATUALIZADO -> atualizados++;
+                case NOVO -> {
+                    novos++;
+                    chavesCnes.add(chaveGemea(pendente.doc()));
+                }
+                case ATUALIZADO -> {
+                    atualizados++;
+                    chavesCnes.add(chaveGemea(pendente.doc()));
+                }
                 case IGNORADO_TIPO_DIVERGENTE -> descartados++;
             }
         }
@@ -186,7 +191,10 @@ public class SeedRunner implements ApplicationRunner {
         // diferentes: sem este filtro, cada versão vira um documento (círculos
         // amontoados no mapa — auditoria em `07-dados/relatorio-auditoria-duplicatas-coordenadas-20260912.md`).
         // Unidades sem gêmeo CNES (ex.: prisionais com nome sintético) passam — pontos
-        // distintos com o mesmo nome são preservados, não fundidos.
+        // distintos com o mesmo nome são preservados, não fundidos: fundir duas
+        // unidades sem CNES entre si arrisca perder dado real (podem ser unidades
+        // distintas do mesmo complexo), diferente do caso com CNES, onde a versão
+        // autoritativa já foi confirmada na fase 2a.
         for (DocPendente pendente : pendentes) {
             if (pendente.doc().getCodigoCnes() != null) {
                 continue;

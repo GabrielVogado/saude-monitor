@@ -177,8 +177,11 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   // existindo só no servidor, para a detecção. Sem centro (sem geofence e sem
   // localização), não há mapa — mesmo comportamento de antes.
   const centroide = useMemo(() => {
-    if (hospital?.geofence) {
-      return calcularCentroide(geojsonParaCoordenadas(hospital.geofence));
+    const doGeofence = hospital?.geofence
+      ? calcularCentroide(geojsonParaCoordenadas(hospital.geofence))
+      : null;
+    if (doGeofence) {
+      return doGeofence;
     }
     const loc = hospital?.localizacao;
     return loc && Number.isFinite(loc.latitude) && Number.isFinite(loc.longitude) ? loc : null;
@@ -468,9 +471,12 @@ const styles = StyleSheet.create({
   checkoutButton: {
     marginTop: spacing.s2,
   },
+  // BUG-06: cor de fundo enquanto os tiles do estilo remoto carregam, ou se a
+  // rede/token falhar — sem isso o fundo é o preto-azulado do renderizador nativo.
   map: {
     height: 200,
     width: "100%",
+    backgroundColor: colors.surfaceContainerLow,
   },
   mapMarker: {
     width: 32,

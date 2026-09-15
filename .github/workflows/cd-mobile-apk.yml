@@ -99,7 +99,10 @@ jobs:
           restore-keys: gradle-apk-
 
       - name: Instalar dependências
-        run: npm ci
+        # `npm install`, não `npm ci`: ver nota em `ci.yml` (subárvore de
+        # dependências opcionais wasm32, inconsistente entre npm no Windows
+        # e no Linux do runner).
+        run: npm install --legacy-peer-deps
 
       # A variante `release` assina com `signingConfigs.debug` (android/app/build.gradle),
       # e o debug.keystore e ignorado pelo .gitignore (`*.keystore`). Sem ele o Gradle

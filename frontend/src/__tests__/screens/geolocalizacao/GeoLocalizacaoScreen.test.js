@@ -221,83 +221,70 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     // `features[0]` e as demais unidades eram inalcançáveis. Empilhamento tem duas
     // origens (duplicatas de seed E vizinhas reais), então a correção é na
     // desambiguação, não no dado: ver `07-dados/relatorio-auditoria-duplicatas-20260912.md`.
-    const { Alert } = require("react-native");
-    const alertaSpy = jest.spyOn(Alert, "alert").mockImplementation(() => {});
-    try {
-      renderizar();
-      const fonte = await screen.findByTestId("geofences-hospitais");
+    // Usa `CSOptionSheet` em vez de `Alert.alert`: no Android, `Alert.alert` só
+    // exibe os 3 primeiros botões — insuficiente para o cenário de 5+ unidades
+    // que motivou o bug.
+    renderizar();
+    const fonte = await screen.findByTestId("geofences-hospitais");
 
-      act(() => {
-        fonte.props.onPress({
-          features: [
-            { properties: { id: "h1", nome: "Hospital Alfa" } },
-            { properties: { id: "h2", nome: "Hospital Beta" } },
-          ],
-        });
+    act(() => {
+      fonte.props.onPress({
+        features: [
+          { properties: { id: "h1", nome: "Hospital Alfa" } },
+          { properties: { id: "h2", nome: "Hospital Beta" } },
+          { properties: { id: "h3", nome: "Hospital Gama" } },
+        ],
       });
+    });
 
-      expect(alertaSpy).toHaveBeenCalledTimes(1);
-      const botoes = alertaSpy.mock.calls[0][2];
-      // 2 unidades + Cancelar — sem Cancelar o usuário ficaria preso no diálogo.
-      expect(botoes.map((b) => b.text)).toEqual(["Hospital Alfa", "Hospital Beta", "Cancelar"]);
-      expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
+    // Busca escopada ao seletor: "Hospital Alfa" também rotula o marcador do
+    // mapa (h1), então uma busca global por texto seria ambígua.
+    const sheet = within(await screen.findByTestId("option-sheet"));
+    expect(await sheet.findByText("Hospital Alfa")).toBeTruthy();
+    expect(await sheet.findByText("Hospital Beta")).toBeTruthy();
+    expect(await sheet.findByText("Hospital Gama")).toBeTruthy();
+    expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
 
-      // Escolher a SEGUNDA unidade navega para ela — antes do fix, só a primeira
-      // era alcançável.
-      act(() => {
-        botoes[1].onPress();
-      });
-      await waitFor(() => expect(NAVEGACAO.navigate).toHaveBeenCalledWith("HospitalDetalhe", { id: "h2" }));
-    } finally {
-      alertaSpy.mockRestore();
-    }
+    // Escolher a TERCEIRA unidade navega para ela — o `Alert.alert` do Android
+    // cortaria exatamente esta opção antes da correção.
+    fireEvent.press(sheet.getByText("Hospital Gama"));
+    await waitFor(() => expect(NAVEGACAO.navigate).toHaveBeenCalledWith("HospitalDetalhe", { id: "h3" }));
   });
 
   test("BUG-11: nomes repetidos ganham sufixo de distância para distinguir", async () => {
-    // "Ubs São Sebastião" ×5 no complexo da Papuda: 5 botões idênticos não
+    // "Ubs São Sebastião" ×5 no complexo da Papuda: 5 opções idênticas não
     // servem para escolher. Com GPS, o repetido leva "· N m" (haversine do ponto
     // do hospital); sem hospital correspondente na lista, volta ao nome puro.
-    const { Alert } = require("react-native");
-    const alertaSpy = jest.spyOn(Alert, "alert").mockImplementation(() => {});
-    try {
-      renderizar();
-      const fonte = await screen.findByTestId("geofences-hospitais");
+    renderizar();
+    const fonte = await screen.findByTestId("geofences-hospitais");
 
-      act(() => {
-        fonte.props.onPress({
-          features: [
-            { properties: { id: "h1", nome: "Hospital Alfa" } },
-            { properties: { id: "h2", nome: "Hospital Alfa" } },
-          ],
-        });
+    act(() => {
+      fonte.props.onPress({
+        features: [
+          { properties: { id: "h1", nome: "Hospital Alfa" } },
+          { properties: { id: "h2", nome: "Hospital Alfa" } },
+        ],
       });
+    });
 
-      expect(alertaSpy).toHaveBeenCalledTimes(1);
-      const botoes = alertaSpy.mock.calls[0][2];
-      // h1 está na lista (centroide ~278 m do GPS mockado); h2 não está.
-      expect(botoes[0].text).toMatch(/^Hospital Alfa · \d+ m$/);
-      expect(botoes[1].text).toBe("Hospital Alfa");
-    } finally {
-      alertaSpy.mockRestore();
-    }
+    // h1 está na lista (centroide ~278 m do GPS mockado): ganha sufixo de
+    // distância. h2 não está na lista: volta ao nome puro. Busca escopada ao
+    // seletor: "Hospital Alfa" também rotula o marcador do mapa (h1).
+    const sheet = within(await screen.findByTestId("option-sheet"));
+    expect(await sheet.findByText(/^Hospital Alfa · \d+ m$/)).toBeTruthy();
+    expect(await sheet.findByText("Hospital Alfa")).toBeTruthy();
   });
 
   test("BUG-11: toque com um único polígono não mostra diálogo", async () => {
-    const { Alert } = require("react-native");
-    const alertaSpy = jest.spyOn(Alert, "alert").mockImplementation(() => {});
-    try {
-      renderizar();
-      const fonte = await screen.findByTestId("geofences-hospitais");
+    renderizar();
+    const fonte = await screen.findByTestId("geofences-hospitais");
 
-      act(() => {
-        fonte.props.onPress({ features: [{ properties: { id: "h1", nome: "Hospital Alfa" } }] });
-      });
+    act(() => {
+      fonte.props.onPress({ features: [{ properties: { id: "h1", nome: "Hospital Alfa" } }] });
+    });
 
-      expect(alertaSpy).not.toHaveBeenCalled();
-      await waitFor(() => expect(NAVEGACAO.navigate).toHaveBeenCalledWith("HospitalDetalhe", { id: "h1" }));
-    } finally {
-      alertaSpy.mockRestore();
-    }
+    expect(screen.queryByTestId("option-sheet")).toBeNull();
+    await waitFor(() => expect(NAVEGACAO.navigate).toHaveBeenCalledWith("HospitalDetalhe", { id: "h1" }));
   });
 
   test("BUG-04: o mapa sai da árvore ANTES de a navegação acontecer", async () => {

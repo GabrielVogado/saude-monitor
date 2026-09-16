@@ -4,7 +4,7 @@
 // Esta tela permanece apenas como ferramenta de depuração/mapa com `watchPositionAsync`
 // em foreground — não dispara check-in/checkout e não deve ser alterada para isso.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from "@rnmapbox/maps";
 import {
@@ -18,7 +18,7 @@ import {
 } from "../../../utils/geojson";
 import { formatarDistancia, haversineMetros } from "../../../utils/distancia";
 import HospitalService from "../../hospitais/service/HospitalService";
-import { CSChip } from "../../../components";
+import { CSChip, CSOptionSheet } from "../../../components";
 import { colors, typography, spacing, radii } from "../../../theme";
 
 // F-07: filtro geo por raio. "Todos" mantém o comportamento anterior (catálogo
@@ -178,6 +178,9 @@ function GeolocalizacaoContent({ navigation }) {
    */
   const [mapaMontado, setMapaMontado] = useState(true);
   const hospitalPendente = useRef(null);
+  // BUG-11: opções de unidades sobrepostas aguardando escolha do usuário (null =
+  // seletor fechado). Ver `aoTocarGeofence` abaixo.
+  const [opcoesGeofence, setOpcoesGeofence] = useState(null);
 
   const abrirHospital = useCallback(
     (hospitalId) => {
@@ -227,7 +230,10 @@ function GeolocalizacaoContent({ navigation }) {
       // (duplicatas de seed — ver `07-dados/relatorio-auditoria-duplicatas-20260912.md`
       // — ou unidades vizinhas reais como UPA + UBS + Casa de Parto), o toque abria
       // sempre `features[0]` e as demais nunca eram acessíveis. Com mais de uma
-      // unidade no ponto, oferece a lista para escolha em vez de adivinhar.
+      // unidade no ponto, oferece a lista para escolha em vez de adivinhar — via
+      // `CSOptionSheet` (não `Alert.alert`: no Android, `Alert.alert` só exibe os 3
+      // primeiros botões, e o próprio cenário que motivou o BUG-11 tem 5 unidades
+      // no mesmo ponto — metade delas continuaria inalcançável).
       const features = (evento?.features || []).filter(
         (f, i, arr) =>
           (f?.properties?.id || f?.id) &&
@@ -242,8 +248,8 @@ function GeolocalizacaoContent({ navigation }) {
         return;
       }
       // Nomes repetidos (ex.: "Ubs São Sebastião" ×5 no complexo da Papuda) não
-      // distinguem os botões — sufixa a distância do GPS quando houver colisão.
-      // Sem GPS, volta ao nome puro: botão duplicado ainda abre a unidade certa
+      // distinguem as opções — sufixa a distância do GPS quando houver colisão.
+      // Sem GPS, volta ao nome puro: opção duplicada ainda abre a unidade certa
       // pelo `id`, só a escolha é menos confortável.
       const nomes = features.map((f) => f?.properties?.nome || "Unidade");
       const rotulo = (id, nome) => {
@@ -255,23 +261,30 @@ function GeolocalizacaoContent({ navigation }) {
         const texto = formatarDistancia(metros);
         return texto ? `${nome} · ${texto}` : nome;
       };
-      Alert.alert(
-        "Várias unidades neste local",
-        "Escolha qual abrir:",
-        [
-          ...features.map((f) => {
-            const id = f?.properties?.id || f?.id;
-            return {
-              text: rotulo(id, f?.properties?.nome || "Unidade"),
-              onPress: () => abrirHospital(id),
-            };
-          }),
-          { text: "Cancelar", style: "cancel" },
-        ]
+      setOpcoesGeofence(
+        features.map((f) => {
+          const id = f?.properties?.id || f?.id;
+          return { id, label: rotulo(id, f?.properties?.nome || "Unidade") };
+        })
       );
     },
     [hospitais, abrirHospital]
   );
+
+  const escolherHospitalDoSheet = useCallback(
+    (hospitalId) => {
+      // Fecha o seletor antes de acionar `abrirHospital` para não deixá-lo
+      // visível por um frame durante o desmonte do mapa (ver comentário de
+      // `abrirHospital` acima sobre a ordem desmontar-antes-de-navegar).
+      setOpcoesGeofence(null);
+      abrirHospital(hospitalId);
+    },
+    [abrirHospital]
+  );
+
+  const aoCancelarSheet = useCallback(() => {
+    setOpcoesGeofence(null);
+  }, []);
 
   const centralizar = useCallback(() => {
     const alvo = getInitialViewState(regionAtual);
@@ -526,6 +539,17 @@ function GeolocalizacaoContent({ navigation }) {
           </TouchableOpacity>
         )}
       </View>
+
+      <CSOptionSheet
+        visible={!!opcoesGeofence}
+        title="Várias unidades neste local"
+        options={(opcoesGeofence || []).map((opcao) => ({
+          key: opcao.id,
+          label: opcao.label,
+          onPress: () => escolherHospitalDoSheet(opcao.id),
+        }))}
+        onClose={aoCancelarSheet}
+      />
     </SafeAreaView>
   );
 }

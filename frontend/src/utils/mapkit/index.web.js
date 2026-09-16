@@ -10,9 +10,11 @@
 import React, {
   createContext,
   forwardRef,
+  useCallback,
   useContext,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -86,18 +88,25 @@ export const Camera = forwardRef(function Camera({ centerCoordinate, zoomLevel }
 export function ShapeSource({ id, shape, onPress, children }) {
   const mapa = useContext(MapContext);
   const layerIdsRef = useRef([]);
+  const shapeInicialRef = useRef(shape);
+  useEffect(() => {
+    shapeInicialRef.current = shape;
+  }, [shape]);
 
   // Criação preguiçosa: React roda os `useEffect` dos filhos (FillLayer/LineLayer)
   // ANTES do efeito deste componente pai, então esperar o próprio efeito do
   // ShapeSource para chamar `addSource` deixava as camadas tentando se registrar
   // numa fonte que ainda não existia (`source "..." not found`). Cada camada chama
   // `garantirFonte()` no seu próprio efeito — quem rodar primeiro cria a fonte.
-  // Fecha sobre `shape` direto (redefinida a cada render): não precisa de ref.
-  const garantirFonte = () => {
+  // `useCallback` com deps só de `mapa`/`id`: manter a IDENTIDADE estável entre
+  // renders é o que permite memoizar `origem` (abaixo) e evitar que FillLayer/
+  // LineLayer removam e recriem a layer a cada re-render do pai (ex.: a cada leitura
+  // de GPS em GeoLocalizacaoScreen) — achado do code-review desta correção.
+  const garantirFonte = useCallback(() => {
     if (mapa && !mapa.getSource(id)) {
-      mapa.addSource(id, { type: "geojson", data: shape });
+      mapa.addSource(id, { type: "geojson", data: shapeInicialRef.current });
     }
-  };
+  }, [mapa, id]);
 
   useEffect(() => {
     garantirFonte();
@@ -109,8 +118,7 @@ export function ShapeSource({ id, shape, onPress, children }) {
       layerIdsRef.current = [];
       if (mapa.getSource(id)) mapa.removeSource(id);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- registro de source/layers é por montagem; dados atualizam via setData abaixo.
-  }, [mapa, id]);
+  }, [mapa, id, garantirFonte]);
 
   useEffect(() => {
     if (mapa && mapa.getSource(id)) {
@@ -118,30 +126,35 @@ export function ShapeSource({ id, shape, onPress, children }) {
     }
   }, [mapa, id, shape]);
 
+  // Não depende de `children`: as layers já registradas em `layerIdsRef` no
+  // momento do efeito (via `registrarLayer`, que roda antes — filhos montam
+  // primeiro) bastam. Lidas de dentro do handler para pegar altas/baixas de
+  // layer sem precisar reassinar o clique a cada render.
   useEffect(() => {
     if (!mapa || !onPress) return undefined;
     const layerIds = layerIdsRef.current;
     const handler = (evento) => {
-      const features = mapa.queryRenderedFeatures(evento.point, { layers: layerIds });
+      const features = mapa.queryRenderedFeatures(evento.point, { layers: layerIdsRef.current });
       onPress({ features });
     };
     layerIds.forEach((layerId) => mapa.on("click", layerId, handler));
     return () => {
       layerIds.forEach((layerId) => mapa.off("click", layerId, handler));
     };
-  }, [mapa, onPress, children]);
+  }, [mapa, onPress]);
 
-  const registrarLayer = (layerId) => {
+  const registrarLayer = useCallback((layerId) => {
     if (!layerIdsRef.current.includes(layerId)) {
       layerIdsRef.current = [...layerIdsRef.current, layerId];
     }
-  };
+  }, []);
 
-  return (
-    <SourceContext.Provider value={{ sourceId: id, garantirFonte, registrarLayer }}>
-      {children}
-    </SourceContext.Provider>
+  const origem = useMemo(
+    () => ({ sourceId: id, garantirFonte, registrarLayer }),
+    [id, garantirFonte, registrarLayer]
   );
+
+  return <SourceContext.Provider value={origem}>{children}</SourceContext.Provider>;
 }
 
 function useCamadaGeoJson(tipo, id, converterEstilo) {

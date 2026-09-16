@@ -69,7 +69,18 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Instalar dependências
-        run: npm ci
+        # `npm ci` (não usado aqui de propósito): exige o lockfile
+        # byte-a-byte sincronizado com package.json, incluindo a árvore
+        # completa de dependências opcionais específicas de plataforma
+        # (ex.: `@unrs/resolver-binding-wasm32-wasi`, puxado transitivamente
+        # por `eslint-config-expo`). O npm no Windows não escreve essa
+        # subárvore de forma consistente (confirmado: `npm ci` falhava aqui
+        # mesmo logo após um `npm install` bem-sucedido na mesma máquina,
+        # independente da versão fixada via `overrides`) — então o lockfile
+        # gerado localmente nunca fica "puro" o bastante para `npm ci` no
+        # Linux do runner. `npm install` tolera essa divergência e resolve
+        # a árvore normalmente.
+        run: npm install --legacy-peer-deps
 
       - name: Typecheck
         # Atenção: este passo não verifica o código. O `tsconfig.json` tem

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { Camera, GeoJSONSource, Layer, Map, Marker } from "@maplibre/maplibre-react-native";
+import { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from "@rnmapbox/maps";
 import { Building2, Clock, Mail, MapPin, Phone } from "lucide-react-native";
 import {
   CSBadge,
@@ -19,10 +19,12 @@ import VisitaService from "../../visitas/service/VisitaService";
 import { agendarFeedback } from "../../feedback/service/FeedbackNotificationService";
 import {
   calcularCentroide,
+  circuloParaCoordenadas,
   coordenadasParaGeoJson,
   geojsonParaCoordenadas,
+  RAIO_EXIBICAO_METROS,
 } from "../../../utils/geojson";
-import { getInitialViewState, OSM_RASTER_STYLE } from "../../../utils/mapStyle";
+import { getInitialViewState, MAPBOX_STYLE } from "../../../utils/mapStyle";
 import {
   formatarData,
   formatarDuracao,
@@ -170,27 +172,44 @@ export default function HospitalDetalheScreen({ navigation, route }) {
     }
   };
 
-  const coordenadas = useMemo(
-    () => (hospital?.geofence ? geojsonParaCoordenadas(hospital.geofence) : []),
-    [hospital]
+  // O mapa do detalhe mostra o mesmo halo de 25 m da aba Mapa (consistência com a
+  // decisão exibição-≠-detecção da F-07): o polígono verdadeiro do backend continua
+  // existindo só no servidor, para a detecção. Sem centro (sem geofence e sem
+  // localização), não há mapa — mesmo comportamento de antes.
+  const centroide = useMemo(() => {
+    const doGeofence = hospital?.geofence
+      ? calcularCentroide(geojsonParaCoordenadas(hospital.geofence))
+      : null;
+    if (doGeofence) {
+      return doGeofence;
+    }
+    const loc = hospital?.localizacao;
+    return loc && Number.isFinite(loc.latitude) && Number.isFinite(loc.longitude) ? loc : null;
+  }, [hospital]);
+  const haloGeoJson = useMemo(
+    () => (centroide ? coordenadasParaGeoJson(circuloParaCoordenadas(centroide, RAIO_EXIBICAO_METROS)) : null),
+    [centroide]
   );
-  const geofenceGeoJson = useMemo(
-    () => coordenadasParaGeoJson(coordenadas),
-    [coordenadas]
-  );
-  const centroide = useMemo(() => calcularCentroide(coordenadas), [coordenadas]);
 
+  // Enquadramento fechado (~zoom 17): com o halo de 25 m, o enquadramento largo
+  // anterior (delta 0.02, ~zoom 14) deixaria o círculo invisível — e mostra o
+  // prédio da unidade em vez do bairro.
   const region = useMemo(() => {
     if (centroide) {
       return {
         latitude: centroide.latitude,
         longitude: centroide.longitude,
-        latitudeDelta: 0.02,
-        longitudeDelta: 0.02,
+        latitudeDelta: 0.002,
+        longitudeDelta: 0.002,
       };
     }
     return BRASIL_REGION;
   }, [centroide]);
+
+  // Posição da câmera no formato do Mapbox; recalculada quando o hospital carrega
+  // (antes do `carregar`, `region` é BRASIL_REGION). Fica antes dos `return`
+  // condicionais, junto dos demais hooks.
+  const cameraDaRegiao = useMemo(() => getInitialViewState(region), [region]);
 
   // Formata o tempo decorrido como hh:mm:ss (temporizador do check-in manual).
   // IMPORTANTE: precisa ficar antes dos `return` condicionais abaixo — hooks não podem
@@ -283,34 +302,31 @@ export default function HospitalDetalheScreen({ navigation, route }) {
           </CSCard>
         )}
 
-        {coordenadas.length > 0 ? (
+        {haloGeoJson ? (
           <View style={styles.mapContainer}>
-            <Map
-              androidView="texture"
-              style={styles.map}
-              mapStyle={OSM_RASTER_STYLE}
-            >
-              <Camera initialViewState={getInitialViewState(region)} />
-              <GeoJSONSource id="geofence" data={geofenceGeoJson}>
-                <Layer
-                  type="fill"
+            <MapView style={styles.map} styleURL={MAPBOX_STYLE}>
+              <Camera
+                centerCoordinate={cameraDaRegiao.centerCoordinate}
+                zoomLevel={cameraDaRegiao.zoomLevel}
+              />
+              <ShapeSource id="geofence" shape={haloGeoJson}>
+                <FillLayer
                   id="geofence-fill"
-                  paint={{ "fill-color": "rgba(0,97,147,0.16)" }}
+                  style={{ fillColor: "rgba(0,97,147,0.16)" }}
                 />
-                <Layer
-                  type="line"
+                <LineLayer
                   id="geofence-line"
-                  paint={{ "line-color": colors.primary, "line-width": 2 }}
+                  style={{ lineColor: colors.primary, lineWidth: 2 }}
                 />
-              </GeoJSONSource>
+              </ShapeSource>
               {centroide ? (
-                <Marker lngLat={[centroide.longitude, centroide.latitude]}>
+                <MarkerView coordinate={[centroide.longitude, centroide.latitude]}>
                   <View style={styles.mapMarker}>
                     <Building2 size={18} color={colors.onPrimary} />
                   </View>
-                </Marker>
+                </MarkerView>
               ) : null}
-            </Map>
+            </MapView>
           </View>
         ) : null}
 
@@ -455,9 +471,12 @@ const styles = StyleSheet.create({
   checkoutButton: {
     marginTop: spacing.s2,
   },
+  // BUG-06: cor de fundo enquanto os tiles do estilo remoto carregam, ou se a
+  // rede/token falhar — sem isso o fundo é o preto-azulado do renderizador nativo.
   map: {
     height: 200,
     width: "100%",
+    backgroundColor: colors.surfaceContainerLow,
   },
   mapMarker: {
     width: 32,

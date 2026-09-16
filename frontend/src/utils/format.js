@@ -19,13 +19,18 @@ export function formatarDuracao(minutos) {
   return `${horas}h${String(resto).padStart(2, "0")}`;
 }
 
+/** "4.2" → "4,2" (vírgula decimal, pt-BR, uma casa). */
+export function formatarDecimalPtBr(numero) {
+  return Number(numero).toFixed(1).replace(".", ",");
+}
+
 /** Formata nota com uma casa decimal (ex.: 4.2). */
 export function formatarNota(nota) {
   if (nota === null || nota === undefined || Number.isNaN(Number(nota))) {
     return null;
   }
 
-  return Number(nota).toFixed(1).replace(".", ",");
+  return formatarDecimalPtBr(nota);
 }
 
 /** Formata data ISO em dd/mm/aaaa (pt-BR, fuso UTC). Retorna null se inválida. */

@@ -20,5 +20,28 @@ allprojects {
   }
 }
 
+// Migração Mapbox (`feature/mapbox-migration`): repositório Maven dos artefatos
+// nativos (`com.mapbox.maps:*`, `mapbox-sdk-turf`), que não estão no Central.
+// Mesmo conteúdo que o plugin `@rnmapbox/maps` injeta no `expo prebuild`
+// (`plugin/build/withMapbox.js` → `gradleMaven`); versionado aqui porque o CI
+// compila `frontend/android` direto, sem prebuild. Autenticação opcional:
+// sem token baixa do repo público; com `MAPBOX_DOWNLOADS_TOKEN`
+// (gradle.properties) ou `RNMAPBOX_MAPS_DOWNLOAD_TOKEN` (env) usa basic auth.
+allprojects {
+  repositories {
+    maven {
+      url 'https://api.mapbox.com/downloads/v2/releases/maven'
+      def token = project.properties['MAPBOX_DOWNLOADS_TOKEN'] ?: System.getenv('RNMAPBOX_MAPS_DOWNLOAD_TOKEN')
+      if (token) {
+        authentication { basic(BasicAuthentication) }
+        credentials {
+          username = 'mapbox'
+          password = token
+        }
+      }
+    }
+  }
+}
+
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"

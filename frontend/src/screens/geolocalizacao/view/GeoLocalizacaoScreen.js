@@ -4,18 +4,19 @@
 // Esta tela permanece apenas como ferramenta de depuração/mapa com `watchPositionAsync`
 // em foreground — não dispara check-in/checkout e não deve ser alterada para isso.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Camera, GeoJSONSource, Layer, Map, Marker } from "@maplibre/maplibre-react-native";
+import { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from "@rnmapbox/maps";
 import {
   GeolocalizacaoProvider,
   useGeolocalizacao,
 } from "../service/GeoLocalizacaoService";
-import { getInitialViewState, OSM_RASTER_STYLE } from "../../../utils/mapStyle";
+import { getInitialViewState, MAPBOX_STYLE } from "../../../utils/mapStyle";
 import {
   centroDoHospital,
   geofencesParaFeatureCollection,
 } from "../../../utils/geojson";
+import { formatarDistancia, haversineMetros } from "../../../utils/distancia";
 import HospitalService from "../../hospitais/service/HospitalService";
 import { CSChip } from "../../../components";
 import { colors, typography, spacing, radii } from "../../../theme";
@@ -156,7 +157,7 @@ function GeolocalizacaoContent({ navigation }) {
    * BUG-04 — o mapa precisa ser DESTRUÍDO, não apenas escondido, antes de sair da tela.
    *
    * Navegar direto daqui congelava o app (ANR de 30 a 40 s, 8 ocorrências registradas
-   * entre 02/09 e 04/09/2026). A corrida, medida no logcat do S24 Ultra:
+   * entre 02/09 e 04/09/2026, sob o MapLibre). A corrida, medida no logcat do S24 Ultra:
    *
    *   14:40:04.115  dedo sobe
    *   14:40:04.140  navigation.navigate      → React Navigation esconde a aba Mapa
@@ -164,44 +165,40 @@ function GeolocalizacaoContent({ navigation }) {
    *   14:40:04.330  handleMessage TAP        → o Android entrega o toque CONFIRMADO,
    *                                            164 ms depois do teardown
    *
-   * Esse toque atrasado (o Android segura ~215 ms para distinguir de duplo-toque) cai
-   * no `AnnotationManager` do MapLibre, que chama `queryRenderedFeatures` — uma JNI
-   * **síncrona** que enfileira trabalho na thread de renderização e bloqueia a thread
-   * principal esperando o resultado. Sem renderizador, o `future` nunca é cumprido e
-   * não há timeout: a UI trava até o usuário matar o app.
+   * Esse toque atrasado (o Android segura ~215 ms para distinguir de duplo-toque)
+   * caía no mapa sem renderizador vivo e travava a thread principal sem timeout, até
+   * o usuário matar o app. A ordem abaixo elimina a corrida em vez de adivinhar o
+   * atraso: desmonta o `<MapView>` primeiro, e só no efeito seguinte — depois de o
+   * desmonte estar comprometido na árvore — é que navega.
    *
-   * A saída está no próprio MapLibre. `NativeMapView.queryRenderedFeatures` começa com
-   * `if (checkState(...)) return new ArrayList<>();`, e `checkState` devolve `true`
-   * quando o campo `destroyed` está marcado (verificado no bytecode do
-   * `android-sdk-opengl-13.2.0.aar`). Esconder a view **não** marca esse campo — mata o
-   * renderizador e deixa o mapa se julgando vivo, que é exatamente o estado que trava.
-   * Desmontar marca: `onDropViewInstance` → `dispose()` → `onDestroy()`.
-   *
-   * Por isso a ordem aqui é explícita e não temporal: desmonta o `<Map>`, e só no efeito
-   * seguinte — depois de o desmonte estar comprometido na árvore — é que navega. Não
-   * dependemos de adivinhar o atraso do duplo-toque; dependemos de uma ordem que nós
-   * controlamos. A margem medida é de 164 ms contra ~16 ms de um quadro.
+   * Mantido na migração Mapbox (`feature/mapbox-migration`): o mecanismo da trava foi
+   * verificado no bytecode do MapLibre, não no Mapbox — mas desmontar-antes-de-navegar
+   * continua sendo a ordem segura também aqui (view destruída não recebe toque
+   * atrasado), e os testes de regressão abaixo seguem protegendo a ORDEM.
    */
   const [mapaMontado, setMapaMontado] = useState(true);
   const hospitalPendente = useRef(null);
 
-  const abrirHospital = (hospitalId) => {
-    if (!hospitalId) {
-      return;
-    }
+  const abrirHospital = useCallback(
+    (hospitalId) => {
+      if (!hospitalId) {
+        return;
+      }
 
-    // Só desmonta se houver para onde ir. Desmontar primeiro e descobrir depois que a
-    // navegação não acontece deixaria a tela SEM MAPA e sem saída: quem remonta é o
-    // evento `focus`, que exige a tela ter perdido o foco antes — e ela não perde se a
-    // navegação não ocorreu. O usuário ficaria olhando um buraco entre o cabeçalho e a
-    // caixa de informações até trocar de aba.
-    if (typeof navigation?.navigate !== "function") {
-      return;
-    }
+      // Só desmonta se houver para onde ir. Desmontar primeiro e descobrir depois que a
+      // navegação não acontece deixaria a tela SEM MAPA e sem saída: quem remonta é o
+      // evento `focus`, que exige a tela ter perdido o foco antes — e ela não perde se a
+      // navegação não ocorreu. O usuário ficaria olhando um buraco entre o cabeçalho e a
+      // caixa de informações até trocar de aba.
+      if (typeof navigation?.navigate !== "function") {
+        return;
+      }
 
-    hospitalPendente.current = hospitalId;
-    setMapaMontado(false);
-  };
+      hospitalPendente.current = hospitalId;
+      setMapaMontado(false);
+    },
+    [navigation]
+  );
 
   useEffect(() => {
     if (mapaMontado || !hospitalPendente.current) {
@@ -224,19 +221,72 @@ function GeolocalizacaoContent({ navigation }) {
     return () => remover?.();
   }, [navigation]);
 
-  const aoTocarGeofence = (evento) => {
-    const feature = evento?.features?.[0];
-    abrirHospital(feature?.properties?.id || feature?.id);
-  };
+  const aoTocarGeofence = useCallback(
+    (evento) => {
+      // BUG-11 — unidades empilhadas eram inalcançáveis: com 2+ geofences sobrepostos
+      // (duplicatas de seed — ver `07-dados/relatorio-auditoria-duplicatas-20260912.md`
+      // — ou unidades vizinhas reais como UPA + UBS + Casa de Parto), o toque abria
+      // sempre `features[0]` e as demais nunca eram acessíveis. Com mais de uma
+      // unidade no ponto, oferece a lista para escolha em vez de adivinhar.
+      const features = (evento?.features || []).filter(
+        (f, i, arr) =>
+          (f?.properties?.id || f?.id) &&
+          arr.findIndex((g) => (g?.properties?.id || g?.id) === (f?.properties?.id || f?.id)) === i
+      );
+      if (features.length === 0) {
+        return;
+      }
+      if (features.length === 1) {
+        const unico = features[0];
+        abrirHospital(unico?.properties?.id || unico?.id);
+        return;
+      }
+      // Nomes repetidos (ex.: "Ubs São Sebastião" ×5 no complexo da Papuda) não
+      // distinguem os botões — sufixa a distância do GPS quando houver colisão.
+      // Sem GPS, volta ao nome puro: botão duplicado ainda abre a unidade certa
+      // pelo `id`, só a escolha é menos confortável.
+      const nomes = features.map((f) => f?.properties?.nome || "Unidade");
+      const rotulo = (id, nome) => {
+        if (nomes.filter((n) => n === nome).length < 2) {
+          return nome;
+        }
+        const hospital = hospitais.find((h) => h.id === id);
+        const metros = haversineMetros(posicaoRef.current, hospital ? centroDoHospital(hospital) : null);
+        const texto = formatarDistancia(metros);
+        return texto ? `${nome} · ${texto}` : nome;
+      };
+      Alert.alert(
+        "Várias unidades neste local",
+        "Escolha qual abrir:",
+        [
+          ...features.map((f) => {
+            const id = f?.properties?.id || f?.id;
+            return {
+              text: rotulo(id, f?.properties?.nome || "Unidade"),
+              onPress: () => abrirHospital(id),
+            };
+          }),
+          { text: "Cancelar", style: "cancel" },
+        ]
+      );
+    },
+    [hospitais, abrirHospital]
+  );
 
-  const centralizar = () => {
+  const centralizar = useCallback(() => {
     const alvo = getInitialViewState(regionAtual);
-    cameraRef.current?.easeTo({
-      center: alvo.center,
-      zoom: alvo.zoom,
-      duration: 500,
+    cameraRef.current?.setCamera({
+      centerCoordinate: alvo.centerCoordinate,
+      zoomLevel: alvo.zoomLevel,
+      animationDuration: 500,
     });
-  };
+  }, [regionAtual]);
+
+  // Posição inicial da câmera, calculada uma vez por montagem: a `Camera` do Mapbox
+  // acompanha mudanças de props, então recalcular a cada render moveria o mapa
+  // sozinho sempre que o GPS atualizasse. O enquadramento nos hospitais continua
+  // por conta do efeito `enquadrarHospitais` (fitBounds) abaixo.
+  const cameraInicial = useMemo(() => getInitialViewState(BRASIL_REGION), []);
 
   // Enquadra a câmera para cobrir todos os hospitais cadastrados (item 05) sempre
   // que a lista carregar — assim o "todos os hospitais" é visível de imediato.
@@ -259,11 +309,11 @@ function GeolocalizacaoContent({ navigation }) {
   }, [hospitais]);
 
   // `mapaMontado` entra nas dependências porque o remonte cria uma `<Camera>` NOVA, com
-  // `initialViewState` de volta em BRASIL_REGION (zoom 3, o país inteiro). Sem re-rodar
+  // a posição inicial de volta em BRASIL_REGION (zoom 3, o país inteiro). Sem re-rodar
   // o enquadramento aqui, quem aproximasse o próprio bairro, tocasse num hospital e
-  // voltasse encontraria o mapa zerado — e ainda rebaixando tiles. As outras
-  // dependências não bastam: a identidade de `hospitais` não muda no desmonte/remonte,
-  // então o efeito não dispararia sozinho.
+  // voltasse encontraria o mapa zerado. As outras dependências não bastam: a
+  // identidade de `hospitais` não muda no desmonte/remonte, então o efeito não
+  // dispararia sozinho.
   useEffect(() => {
     if (mapaMontado && hospitais.length > 0) {
       enquadrarHospitais();
@@ -312,68 +362,54 @@ function GeolocalizacaoContent({ navigation }) {
       </View>
 
       {/*
-       * BUG-05 — o recorte do mapa é NOSSO, porque o MapLibre desliga o dele.
+       * BUG-05 — o recorte do mapa é NOSSO, porque a biblioteca desliga o dela.
        *
        * Ao arrastar o mapa, os nomes dos hospitais apareciam por cima do cabeçalho e
        * da caixa de informações — cobrindo justamente os chips de raio, que ficavam
-       * ilegíveis e sem alvo visível.
+       * ilegíveis e sem alvo visível. Cada marcador (`MarkerView`) é uma View comum,
+       * posicionada por coordenada absoluta de projeção: fora da viewport a posição
+       * fica negativa (ou maior que a altura) e o desenho escapa para o resto da tela.
        *
-       * Não é acidente de estilo nosso: é o que a biblioteca faz de propósito. Cada
-       * marcador é uma View Android comum, filha direta da MapView, posicionada por
-       * coordenada absoluta em `MarkerViewManager.updateMarkerPosition`
-       * (`view.x = screenPos.x - ...`, linhas 74-75 do `MarkerViewManager.kt` da
-       * 11.3.6). `screenPos` vem da projeção do mapa e fica NEGATIVO — ou maior que a
-       * altura — assim que o ponto sai da viewport. E o `addMarker` (linhas 40-42)
-       * desliga o recorte que conteria isso:
-       *
-       *     mapView.clipChildren = false
-       *     mapView.clipToPadding = false
-       *     mapView.clipToOutline = false
-       *
-       * Sem clipping na MapView, o desenho do marcador escapa para o resto da tela.
        * Basta um ancestral recortando para conter tudo: `overflow: "hidden"` neste
-       * container faz o `dispatchDraw` do RN limitar o canvas à área do mapa, e o
-       * recorte do canvas é herdado por toda a subárvore — nenhum descendente o
-       * desfaz. Quem sustenta a correção é esse mecanismo, e não a analogia com o
-       * `HospitalDetalheScreen`: aquela tela tem um container parecido (`mapContainer`,
-       * lá por causa do border-radius) e nunca mostrou o defeito, mas também usa
-       * `androidView="texture"`, um marcador só e câmera enquadrada na carga — a
-       * imunidade dela tem mais de uma explicação candidata.
+       * container faz o RN limitar o canvas à área do mapa. Mantido na migração
+       * Mapbox — o `MarkerView` tem o mesmo modelo de posicionamento.
        *
        * O container também substitui o placeholder que existia aqui: ele tem `flex: 1`
-       * e permanece montado quando o `<Map>` sai (ver `abrirHospital`), então a caixa
-       * de informações não salta para junto do cabeçalho no quadro da transição.
+       * e permanece montado quando o `<MapView>` sai (ver `abrirHospital`), então a
+       * caixa de informações não salta para junto do cabeçalho no quadro da transição.
        */}
       <View style={styles.mapContainer} testID="mapa-container">
         {/* Desmontado de propósito antes de navegar — ver o comentário do `abrirHospital`. */}
         {mapaMontado ? (
-          <Map style={styles.map} mapStyle={OSM_RASTER_STYLE}>
-            <Camera ref={cameraRef} initialViewState={getInitialViewState(BRASIL_REGION)} />
+          <MapView style={styles.map} styleURL={MAPBOX_STYLE}>
+            <Camera
+              ref={cameraRef}
+              centerCoordinate={cameraInicial.centerCoordinate}
+              zoomLevel={cameraInicial.zoomLevel}
+            />
 
             {!coordenadas && !hospitais.length && (
-              <Marker lngLat={[BRASIL_REGION.longitude, BRASIL_REGION.latitude]}>
+              <MarkerView coordinate={[BRASIL_REGION.longitude, BRASIL_REGION.latitude]}>
                 <View style={styles.markerDot} />
-              </Marker>
+              </MarkerView>
             )}
 
             {geofencesFeatureCollection.features.length > 0 && (
-              <GeoJSONSource
+              <ShapeSource
                 id="geofences-hospitais"
                 testID="geofences-hospitais"
-                data={geofencesFeatureCollection}
+                shape={geofencesFeatureCollection}
                 onPress={aoTocarGeofence}
               >
-                <Layer
+                <FillLayer
                   id="geofences-preenchimento"
-                  type="fill"
-                  paint={{ "fill-color": colors.primary, "fill-opacity": 0.18 }}
+                  style={{ fillColor: colors.primary, fillOpacity: 0.18 }}
                 />
-                <Layer
+                <LineLayer
                   id="geofences-contorno"
-                  type="line"
-                  paint={{ "line-color": colors.primary, "line-width": 2 }}
+                  style={{ lineColor: colors.primary, lineWidth: 2 }}
                 />
-              </GeoJSONSource>
+              </ShapeSource>
             )}
 
             {hospitais.map((hospital) => {
@@ -381,8 +417,27 @@ function GeolocalizacaoContent({ navigation }) {
               if (!centroide) {
                 return null;
               }
+              // BUG-10 — o ponto ficava FORA do círculo do geofence. O filho deste
+              // `MarkerView` é uma linha `[ponto + rótulo]`, e a âncora padrão do
+              // Mapbox (`{x: 0.5, y: 0.5}`) centraliza a LINHA inteira na
+              // coordenada — o ponto era empurrado para a esquerda em ~metade da
+              // largura da linha (px de tela, constante). Com pouco zoom o círculo
+              // tem poucos px e o ponto caía fora dele; aproximando, o círculo
+              // cresce em px e o deslocamento fixo "sumia" — o relato do PO. Não é
+              // dado: marcador e polígono nascem do mesmo `centroDoHospital`, só a
+              // renderização discordava. `anchor={{x: 0, y: 0.5}}` põe a coordenada
+              // na borda esquerda da linha (= borda do ponto, primeiro filho sem
+              // margem); resta meio ponto (~7 px), irrelevante ante raios de
+              // dezenas de metros. O ponto do usuário e o ícone do detalhe são
+              // simétricos e seguem com âncora central — mexer neles INTRODUZIRIA
+              // o mesmo defeito.
               return (
-                <Marker key={hospital.id} lngLat={[centroide.longitude, centroide.latitude]}>
+                <MarkerView
+                  key={hospital.id}
+                  testID={`marcador-hospital-${hospital.id}`}
+                  coordinate={[centroide.longitude, centroide.latitude]}
+                  anchor={{ x: 0, y: 0.5 }}
+                >
                   <View
                     style={styles.hospitalMarker}
                     accessibilityRole="button"
@@ -397,16 +452,16 @@ function GeolocalizacaoContent({ navigation }) {
                       </Text>
                     </View>
                   </View>
-                </Marker>
+                </MarkerView>
               );
             })}
 
             {coordenadas && (
-              <Marker lngLat={[coordenadas.longitude, coordenadas.latitude]}>
+              <MarkerView coordinate={[coordenadas.longitude, coordenadas.latitude]}>
                 <View style={styles.userDot} />
-              </Marker>
+              </MarkerView>
             )}
-          </Map>
+          </MapView>
         ) : null}
       </View>
 
@@ -500,11 +555,13 @@ const styles = StyleSheet.create({
     marginTop: spacing.s2,
   },
   // `overflow: "hidden"` não é enfeite: é o único recorte da subárvore do mapa.
-  // Ver o comentário do JSX (BUG-05) — o MapLibre desliga o clipping da MapView
-  // para poder posicionar marcadores fora dela, e sem este container os rótulos
-  // dos hospitais vazam por cima do cabeçalho e da caixa de informações.
+  // Ver o comentário do JSX (BUG-05) — o `MarkerView` posiciona marcadores fora da
+  // viewport, e sem este container os rótulos dos hospitais vazam por cima do
+  // cabeçalho e da caixa de informações.
   mapContainer: { flex: 1, overflow: "hidden" },
-  map: { flex: 1 },
+  // BUG-06: cor de fundo enquanto os tiles do estilo remoto carregam, ou se a
+  // rede/token falhar — sem isso o fundo é o preto-azulado do renderizador nativo.
+  map: { flex: 1, backgroundColor: colors.surfaceContainerLow },
   infoBox: {
     backgroundColor: colors.surface,
     borderTopWidth: 1,

@@ -13,7 +13,7 @@ import { useGeolocalizacao } from "../../../screens/geolocalizacao/service/GeoLo
 
 jest.mock("../../../screens/hospitais/service/HospitalService");
 
-// @maplibre/maplibre-react-native: componentes nativos não suportados pelo Jest;
+// @rnmapbox/maps: componentes nativos não suportados pelo Jest;
 // substituídos por Views que preservam os props (mesmo padrão do App.test.js).
 /**
  * Espiões COMPARTILHADOS da câmera.
@@ -23,18 +23,18 @@ jest.mock("../../../screens/hospitais/service/HospitalService");
  * enquadramento. Era por isso que a correção da câmera passava sem cobertura: removê-la
  * mantinha a suíte verde (mutação M-C sobreviveu).
  */
-const mockCamera = { easeTo: jest.fn(), fitBounds: jest.fn() };
+const mockCamera = { setCamera: jest.fn(), fitBounds: jest.fn() };
 
-jest.mock("@maplibre/maplibre-react-native", () => {
+jest.mock("@rnmapbox/maps", () => {
   const ReactMock = require("react");
   const { View } = require("react-native");
   const stub = ({ children, ...props }) => <View {...props}>{children}</View>;
 
-  // A Camera é acessada por ref (easeTo/fitBounds) pela tela; o stub precisa
+  // A Camera é acessada por ref (setCamera/fitBounds) pela tela; o stub precisa
   // expor esses métodos, senão o enquadramento derruba o render nos testes.
   const Camera = ReactMock.forwardRef(({ children, ...props }, ref) => {
     ReactMock.useImperativeHandle(ref, () => ({
-      easeTo: (...args) => mockCamera.easeTo(...args),
+      setCamera: (...args) => mockCamera.setCamera(...args),
       fitBounds: (...args) => mockCamera.fitBounds(...args),
     }));
     return <View {...props}>{children}</View>;
@@ -42,11 +42,14 @@ jest.mock("@maplibre/maplibre-react-native", () => {
 
   return {
     __esModule: true,
-    Map: stub,
+    default: { setAccessToken: jest.fn(), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
+    StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
+    MapView: stub,
     Camera,
-    Marker: stub,
-    GeoJSONSource: stub,
-    Layer: stub,
+    MarkerView: stub,
+    ShapeSource: stub,
+    FillLayer: stub,
+    LineLayer: stub,
   };
 });
 
@@ -111,8 +114,8 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     renderizar();
 
     const fonte = await screen.findByTestId("geofences-hospitais");
-    expect(fonte.props.data.features).toHaveLength(1);
-    expect(fonte.props.data.features[0].properties).toEqual({ id: "h1", nome: "Hospital Alfa" });
+    expect(fonte.props.shape.features).toHaveLength(1);
+    expect(fonte.props.shape.features[0].properties).toEqual({ id: "h1", nome: "Hospital Alfa" });
   });
 
   test("sem raio selecionado, carrega o catálogo completo", async () => {
@@ -192,6 +195,111 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     );
   });
 
+  test("BUG-10: o ponto do hospital ancora na coordenada, não no centro da linha ponto+rótulo", async () => {
+    // Regressão relatada em 12/09/2026 com evidência em aparelho: o ponto aparecia
+    // FORA do círculo do geofence com pouco zoom e "centralizava" ao aproximar.
+    // Causa na renderização, não no dado: o filho do `MarkerView` é uma linha
+    // `[ponto + rótulo]` e a âncora padrão (`{x: 0.5, y: 0.5}`) centraliza a linha
+    // inteira — o ponto deslocava ~metade da largura da linha em px fixos, e o
+    // círculo pequeno (pouco zoom) não o continha. Marcador e polígono nascem do
+    // mesmo `centroDoHospital`, então a coordenada aqui tem que ser exatamente a do
+    // centroide do hospital de teste.
+    renderizar();
+
+    const marcador = await screen.findByTestId("marcador-hospital-h1");
+    // Centroide do ANEL de teste: lng (-47.89-47.88-47.88-47.89)/4, lat idem —
+    // o mesmo ponto que o polígono usa (ambos saem de `centroDoHospital`).
+    // `toBeCloseTo` porque a média em ponto flutuante dá -47.885000000000005.
+    expect(marcador.props.coordinate[0]).toBeCloseTo(-47.885, 9);
+    expect(marcador.props.coordinate[1]).toBeCloseTo(-15.7875, 9);
+    expect(marcador.props.anchor).toEqual({ x: 0, y: 0.5 });
+  });
+
+  test("BUG-11: toque sobre geofences empilhados oferece a lista em vez de abrir só o primeiro", async () => {
+    // Regressão relatada em 12/09/2026 com evidência em aparelho (São Sebastião):
+    // UPA + UBSs + Casa de Parto com círculos sobrepostos — o toque abria sempre
+    // `features[0]` e as demais unidades eram inalcançáveis. Empilhamento tem duas
+    // origens (duplicatas de seed E vizinhas reais), então a correção é na
+    // desambiguação, não no dado: ver `07-dados/relatorio-auditoria-duplicatas-20260912.md`.
+    const { Alert } = require("react-native");
+    const alertaSpy = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    try {
+      renderizar();
+      const fonte = await screen.findByTestId("geofences-hospitais");
+
+      act(() => {
+        fonte.props.onPress({
+          features: [
+            { properties: { id: "h1", nome: "Hospital Alfa" } },
+            { properties: { id: "h2", nome: "Hospital Beta" } },
+          ],
+        });
+      });
+
+      expect(alertaSpy).toHaveBeenCalledTimes(1);
+      const botoes = alertaSpy.mock.calls[0][2];
+      // 2 unidades + Cancelar — sem Cancelar o usuário ficaria preso no diálogo.
+      expect(botoes.map((b) => b.text)).toEqual(["Hospital Alfa", "Hospital Beta", "Cancelar"]);
+      expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
+
+      // Escolher a SEGUNDA unidade navega para ela — antes do fix, só a primeira
+      // era alcançável.
+      act(() => {
+        botoes[1].onPress();
+      });
+      await waitFor(() => expect(NAVEGACAO.navigate).toHaveBeenCalledWith("HospitalDetalhe", { id: "h2" }));
+    } finally {
+      alertaSpy.mockRestore();
+    }
+  });
+
+  test("BUG-11: nomes repetidos ganham sufixo de distância para distinguir", async () => {
+    // "Ubs São Sebastião" ×5 no complexo da Papuda: 5 botões idênticos não
+    // servem para escolher. Com GPS, o repetido leva "· N m" (haversine do ponto
+    // do hospital); sem hospital correspondente na lista, volta ao nome puro.
+    const { Alert } = require("react-native");
+    const alertaSpy = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    try {
+      renderizar();
+      const fonte = await screen.findByTestId("geofences-hospitais");
+
+      act(() => {
+        fonte.props.onPress({
+          features: [
+            { properties: { id: "h1", nome: "Hospital Alfa" } },
+            { properties: { id: "h2", nome: "Hospital Alfa" } },
+          ],
+        });
+      });
+
+      expect(alertaSpy).toHaveBeenCalledTimes(1);
+      const botoes = alertaSpy.mock.calls[0][2];
+      // h1 está na lista (centroide ~278 m do GPS mockado); h2 não está.
+      expect(botoes[0].text).toMatch(/^Hospital Alfa · \d+ m$/);
+      expect(botoes[1].text).toBe("Hospital Alfa");
+    } finally {
+      alertaSpy.mockRestore();
+    }
+  });
+
+  test("BUG-11: toque com um único polígono não mostra diálogo", async () => {
+    const { Alert } = require("react-native");
+    const alertaSpy = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    try {
+      renderizar();
+      const fonte = await screen.findByTestId("geofences-hospitais");
+
+      act(() => {
+        fonte.props.onPress({ features: [{ properties: { id: "h1", nome: "Hospital Alfa" } }] });
+      });
+
+      expect(alertaSpy).not.toHaveBeenCalled();
+      await waitFor(() => expect(NAVEGACAO.navigate).toHaveBeenCalledWith("HospitalDetalhe", { id: "h1" }));
+    } finally {
+      alertaSpy.mockRestore();
+    }
+  });
+
   test("BUG-04: o mapa sai da árvore ANTES de a navegação acontecer", async () => {
     // Esta é a regressão do ANR, não um detalhe de implementação. Navegar com o mapa
     // ainda montado deixava o React Navigation apenas ESCONDER a view: a thread de
@@ -238,9 +346,9 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
   });
 
   test("BUG-04: ao voltar, o mapa é reenquadrado nos hospitais — não no Brasil inteiro", async () => {
-    // O remonte cria uma `<Camera>` NOVA, cujo `initialViewState` é BRASIL_REGION (zoom
+    // O remonte cria uma `<Camera>` NOVA, cuja posição inicial é BRASIL_REGION (zoom
     // 3, o país inteiro). Se o enquadramento não rodar de novo, quem aproximou o próprio
-    // bairro, tocou num hospital e voltou encontra o mapa zerado — e rebaixando tiles.
+    // bairro, tocou num hospital e voltou encontra o mapa zerado.
     // A identidade de `hospitais` não muda no desmonte/remonte, então o efeito só
     // dispara porque `mapaMontado` está nas dependências dele. É isso que este teste
     // protege: sem o `mapaMontado` lá, a mutação sobrevivia.

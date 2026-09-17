@@ -75,9 +75,12 @@ def glifo_svg(cor_pin: str, cor_ondas: str, com_cruz: bool, escala: float = 1.0)
     '''
 
 
-def pagina(conteudo_svg: str, bg_css: str) -> str:
+def pagina(conteudo_svg: str) -> str:
+    # Fundo da PAGINA sempre "transparent": quem decide a transparencia real do
+    # PNG rasterizado e a flag --default-background-color=00000000 do Chrome
+    # (passo 2 do cabecalho), nao este CSS — nao ha variacao a parametrizar aqui.
     return f'''<!doctype html><html><head><meta charset="utf-8"><style>
-    html,body{{margin:0;padding:0;width:1024px;height:1024px;background:{bg_css};}}
+    html,body{{margin:0;padding:0;width:1024px;height:1024px;background:transparent;}}
     svg{{display:block;width:1024px;height:1024px;}}
     </style></head><body>
     <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -86,34 +89,33 @@ def pagina(conteudo_svg: str, bg_css: str) -> str:
     </body></html>'''
 
 
-OUT = r"D:\saude-monitor\frontend\assets\icon-src"
+OUT = os.path.dirname(os.path.abspath(__file__))
 os.makedirs(OUT, exist_ok=True)
 
 TEAL = "#006193"
-TEAL_LIGHT = "#007bb8"
 BRANCO = "#ffffff"
 
 # 1) icon-full: fundo solido + glifo branco (icone nao-adaptativo / web favicon)
 #    Sem recorte de mascara do SO aqui, entao cabe uma escala maior (so uma margem
 #    de respiro dentro do rounded-square).
 fundo_full = f'<rect x="0" y="0" width="100" height="100" rx="22" fill="{TEAL}"/>'
-full = pagina(fundo_full + glifo_svg(BRANCO, BRANCO, True, escala=0.92), "transparent")
+full = pagina(fundo_full + glifo_svg(BRANCO, BRANCO, True, escala=0.92))
 open(f"{OUT}/icon-full.html", "w", encoding="utf-8").write(full)
 
 # 2) foreground: transparente, glifo branco (fica sobre o background solido do adaptive icon)
 #    Escala menor: "zona segura" (~66%) do icone adaptativo do Android, para nao
 #    cortar pontas em mascaras circulares/squircle.
-fg = pagina(glifo_svg(BRANCO, BRANCO, True, escala=0.8), "transparent")
+fg = pagina(glifo_svg(BRANCO, BRANCO, True, escala=0.8))
 open(f"{OUT}/icon-foreground.html", "w", encoding="utf-8").write(fg)
 
 # 3) background: preenchimento solido (camada de baixo do adaptive icon)
 bg_conteudo = f'<rect x="0" y="0" width="100" height="100" fill="{TEAL}"/>'
-bg = pagina(bg_conteudo, "transparent")
+bg = pagina(bg_conteudo)
 open(f"{OUT}/icon-background.html", "w", encoding="utf-8").write(bg)
 
 # 4) monochrome: transparente, silhueta branca so do glifo (Android 13+ themed icon)
 #    Mesma zona segura do foreground.
-mono = pagina(glifo_svg(BRANCO, BRANCO, True, escala=0.8), "transparent")
+mono = pagina(glifo_svg(BRANCO, BRANCO, True, escala=0.8))
 open(f"{OUT}/icon-monochrome.html", "w", encoding="utf-8").write(mono)
 
 print("arquivos gerados em", OUT)

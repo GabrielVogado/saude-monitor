@@ -95,6 +95,15 @@ CLAUDE.md
 .opencode/
 .spec/
 
+# Ciclo de observacao do agente (skill-observations/ + skill-updates/): processo
+# do agente, nao produto. Ja estavam versionados por descuido -- destrackeados em
+# 16/09/2026 (retirados do git, mantidos em disco).
+skill-observations/
+skill-updates/
+
+# Nota pessoal de ambiente (uma maquina especifica) -- mesmo motivo acima
+FRONTEND-ANDROID-SUBIDA-EMULADOR-SEM-GARGALO.md
+
 # Cache e saida de build
 .gradle/
 frontend/android/.gradle/

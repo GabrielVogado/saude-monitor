@@ -28,6 +28,21 @@ mapboxgl.accessToken = process.env.EXPO_PUBLIC_MAPBOX_TOKEN || "";
 const MapContext = createContext(null);
 const SourceContext = createContext(null);
 
+// React desmonta uma árvore de cima para baixo: quando `mapaMontado` vira false em
+// GeoLocalizacaoScreen, o cleanup do PRÓPRIO `MapView` (`mapa.remove()`) roda antes
+// dos cleanups de ShapeSource/FillLayer/LineLayer, que tentam `getLayer`/`removeLayer`/
+// `removeSource` num mapa que o mapbox-gl já destruiu por dentro — lança
+// "Cannot read properties of undefined" (achado ao clicar num marcador de hospital
+// no mapa: a tela ficava em branco). Cleanup de mapa é best-effort por natureza — se
+// o mapa já não existe mais, não há nada a desfazer.
+function operacaoSegura(fn) {
+  try {
+    fn();
+  } catch {
+    // mapa já destruído — nada a fazer.
+  }
+}
+
 export function MapView({ style, styleURL, children }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -112,11 +127,13 @@ export function ShapeSource({ id, shape, onPress, children }) {
     garantirFonte();
     return () => {
       if (!mapa) return;
-      layerIdsRef.current.forEach((layerId) => {
-        if (mapa.getLayer(layerId)) mapa.removeLayer(layerId);
+      operacaoSegura(() => {
+        layerIdsRef.current.forEach((layerId) => {
+          if (mapa.getLayer(layerId)) mapa.removeLayer(layerId);
+        });
+        layerIdsRef.current = [];
+        if (mapa.getSource(id)) mapa.removeSource(id);
       });
-      layerIdsRef.current = [];
-      if (mapa.getSource(id)) mapa.removeSource(id);
     };
   }, [mapa, id, garantirFonte]);
 
@@ -169,18 +186,22 @@ function useCamadaGeoJson(tipo, id, converterEstilo) {
       mapa.addLayer({ id, type: tipo, source: origem.sourceId, paint: converterEstilo() });
     }
     return () => {
-      if (mapa.getLayer(id)) mapa.removeLayer(id);
+      operacaoSegura(() => {
+        if (mapa.getLayer(id)) mapa.removeLayer(id);
+      });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- adiciona a layer uma vez; paint é reaplicado no efeito abaixo.
   }, [mapa, origem, id]);
 
   useEffect(() => {
-    if (mapa && mapa.getLayer(id)) {
-      const paint = converterEstilo();
-      Object.entries(paint).forEach(([propriedade, valor]) => {
-        mapa.setPaintProperty(id, propriedade, valor);
-      });
-    }
+    operacaoSegura(() => {
+      if (mapa && mapa.getLayer(id)) {
+        const paint = converterEstilo();
+        Object.entries(paint).forEach(([propriedade, valor]) => {
+          mapa.setPaintProperty(id, propriedade, valor);
+        });
+      }
+    });
   });
 }
 
@@ -226,7 +247,7 @@ export function MarkerView({ coordinate, anchor, children }) {
       .setLngLat([longitude, latitude])
       .addTo(mapa);
     marcadorRef.current = marcador;
-    return () => marcador.remove();
+    return () => operacaoSegura(() => marcador.remove());
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reposicionamento tratado no efeito de coordenadas abaixo.
   }, [mapa, elemento]);
 
@@ -243,7 +264,16 @@ export function MarkerView({ coordinate, anchor, children }) {
 
   useEffect(() => {
     const raizAtual = raizRef.current;
-    return () => raizAtual?.unmount();
+    return () => {
+      // Desmontagem em massa (ex.: sair do mapa com ~300 marcadores montados)
+      // aciona os cleanups de TODOS os MarkerView no mesmo commit do React-Native-
+      // Web. `root.unmount()` de um `createRoot` separado é, ele mesmo, uma
+      // desmontagem síncrona — chamá-la aqui dispara "Attempted to synchronously
+      // unmount a root while React was already rendering" em cada marcador e deixa
+      // a tela em branco (achado ao testar o clique num marcador real). Adiar para
+      // depois do commit atual resolve.
+      queueMicrotask(() => raizAtual?.unmount());
+    };
   }, []);
 
   return null;

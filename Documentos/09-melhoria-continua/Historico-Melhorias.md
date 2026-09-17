@@ -968,14 +968,31 @@ fazia o efeito de `FillLayer`/`LineLayer` (dependente da identidade de `origem`)
 remover e recriar a layer do geofence continuamente — um "piscar" visível, a mesma
 categoria de quebra que este PR corrige. Memoizado com `useMemo`/`useCallback`.
 
+### Achado ao testar o fluxo real (não coberto pelos testes automatizados)
+
+Depois do primeiro deploy da correção, clicar num marcador de hospital **no mapa**
+(não na lista) para abrir o detalhe deixava a tela em branco — os testes com mock
+não pegam porque não exercitam o desmonte real do `mapbox-gl`. Causa: React desmonta
+a árvore de cima para baixo; ao sair da aba Mapa, o cleanup do próprio `MapView`
+(`mapa.remove()`) roda **antes** dos cleanups de `ShapeSource`/`FillLayer`/
+`LineLayer`/`MarkerView`, que tentam operar num mapa que o mapbox-gl já destruiu por
+dentro. Com o catálogo completo (~300 marcadores) montado, o mesmo desmonte em massa
+também chamava `root.unmount()` de cada `createRoot` do `MarkerView` de forma
+síncrona em pleno commit do React-Native-Web — "Attempted to synchronously unmount a
+root while React was already rendering", centenas de vezes. Corrigido envolvendo as
+operações de cleanup em try/catch silencioso (cleanup de mapa é best-effort: se ele
+já não existe, não há nada a desfazer) e adiando `root.unmount()` com
+`queueMicrotask`.
+
 ### Verificação
 
 Backend local + MongoDB descartável (container à parte, sem tocar no volume
 existente nem no Atlas de dev compartilhado) com os ~339 estabelecimentos reais
 importados pelo seed: lista de hospitais, detalhe com geofence, mapa com ~330
-marcadores e o seletor de sobreposição do BUG-11 testados manualmente no navegador,
-sem erros no console. `npx jest` (390/390) e `npx eslint` (0 erros/avisos nos
-arquivos novos ou alterados) sem regressão.
+marcadores, clique num marcador do mapa (abrir → voltar → abrir outro, em ciclo) e o
+seletor de sobreposição do BUG-11 testados manualmente no navegador, sem erros no
+console. `npx jest` (390/390) e `npx eslint` (0 erros/avisos nos arquivos novos ou
+alterados) sem regressão.
 
 ---
 

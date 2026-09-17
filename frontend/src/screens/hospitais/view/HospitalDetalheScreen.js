@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from "@rnmapbox/maps";
+import { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from "../../../utils/mapkit";
 import { Building2, Clock, Mail, MapPin, Phone } from "lucide-react-native";
 import {
   CSBadge,

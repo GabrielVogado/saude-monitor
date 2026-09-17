@@ -6,7 +6,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from "@rnmapbox/maps";
+import { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from "../../../utils/mapkit";
 import {
   GeolocalizacaoProvider,
   useGeolocalizacao,

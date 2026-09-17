@@ -31,6 +31,7 @@
 | **M-011** | 09/09/2026 | Bug relatado pelo PO em uso real (UBS 05 do Recanto das Emas ausente no mapa com "Todos") | Listagem sem filtro geoespacial (mapa "Todos" e aba Hospitais) truncava em 100/20 hospitais por chamada, sem `Sort` estável — de 340 hospitais ativos, até 240 nunca apareciam no mapa e 320 nunca na lista sem busca por nome. Corrigido: `Sort` estável (nome + id) no backend, paginação completa no mapa e scroll infinito com guard de geração/reentrância na aba Hospitais **e** no Ranking (mesma falha pré-existente, achado do `code-review` deste PR) | #105 | ✅ Aplicada |
 | **M-012** | 10/09/2026 | Pedido direto do PO: "Esqueci minha senha" — o link existia sem `onPress` e foi removido em 08/09 até virar estória própria | Recuperação de senha por código de 6 dígitos (OTP): `esqueci-senha`/`redefinir-senha` sob o rate limit de `/api/v1/auth/**` já existente, token hasheado (BCrypt) com TTL 15 min, reset invalida refresh tokens anteriores, tela `EsqueciSenhaScreen`; infraestrutura de e-mail criada do zero (Resend, `@Async`). 4 achados reais do `code-review` aplicados: corrida no upsert, canal lateral de tempo, corrida no contador, precisão do `iat` | #110 | ✅ Aplicada |
 | **M-013** | 10/09/2026 | Lacuna identificada pelo PO na feature de recuperação de senha (#110) | Confirmação obrigatória de e-mail no cadastro: sem verificar, um endereço com erro de digitação ou inexistente nunca recebe o código de "esqueci minha senha" e a conta fica sem recuperação. `POST /auth/registro` passa a enviar código de 6 dígitos (reaproveitando a infra de OTP generalizada), `login` recusa (403 `EMAIL_NAO_CONFIRMADO`) até a confirmação, backfill migra contas antigas para `emailVerificado=true`, tela `ConfirmarEmailScreen` guia o usuário | (este PR) | ✅ Aplicada |
+| **M-014** | 16/09/2026 | Descoberto ao testar os fluxos ao vivo no Expo Web para uma tarefa de documentação (não relatado antes) | Mapa (`GeoLocalizacaoScreen`) e Detalhe do Hospital quebravam com tela preta na Web desde a migração Mapbox: `@rnmapbox/maps` é nativo, sem build Web, e os componentes chegavam `undefined`. Módulo `utils/mapkit` reexporta o SDK nativo no mobile e, via `index.web.js`, implementa o mesmo subconjunto de API com `mapbox-gl` (já dependência não usada) na Web — geofences, marcadores e o seletor de sobreposição (BUG-11) voltam a funcionar no navegador | #117 | ✅ Aplicada |
 
 ---
 
@@ -919,6 +920,79 @@ fato do usuário.
 2. **Skill `code-review` em execução forked travou em loop de deliberação** (0 tool
    uses, 47 s) no momento de revisar este diff — o portão foi cumprido manualmente
    em vez de relançar a skill às cegas ([OBS-005](../../skill-observations/OBS-005-code-review-forked-travado.md)).
+
+---
+
+## M-014 — Mapa e Detalhe do Hospital quebrados na Web pós-migração Mapbox
+
+**Data:** 16/09/2026 · **PR:** #117
+
+### O que aconteceu
+
+Não foi um relato do PO: apareceu durante a verificação ao vivo dos fluxos do app
+no Expo Web para escrever um tutorial de usuário (`/documentation-writer`). A aba
+Mapa e o Detalhe do Hospital renderizavam tela preta, com o React acusando
+`Element type is invalid... Check the render method of HospitalDetalheScreen` /
+`GeolocalizacaoContent`.
+
+### Diagnóstico
+
+A migração MapLibre → Mapbox (`@rnmapbox/maps` v10, já em `develop`) importa os
+componentes de mapa (`MapView`, `Camera`, `ShapeSource`, `FillLayer`, `LineLayer`,
+`MarkerView`) direto de `@rnmapbox/maps` nas duas telas. Essa biblioteca é nativa
+(iOS/Android) e não publica build Web — no navegador os componentes chegam
+`undefined`, e o React lança o erro ao tentar renderizá-los. `mapbox-gl` (a lib JS
+equivalente) já estava no `package.json` desde a migração, mas nunca foi conectada
+a nenhuma tela.
+
+### O que mudou
+
+- `frontend/src/utils/mapkit/index.js` (nativo): reexporta `@rnmapbox/maps` sem
+  alterar comportamento — Android/iOS não mudam.
+- `frontend/src/utils/mapkit/index.web.js`: implementa o mesmo subconjunto de API
+  com `mapbox-gl`, cobrindo só o que as duas telas usam de fato — câmera imperativa
+  (`setCamera`/`fitBounds`), geofences como fonte GeoJSON com clique detectando
+  todas as features sobrepostas no ponto (mesmo contrato que o BUG-11 depende para
+  oferecer a lista de escolha), e marcadores React renderizados via portal
+  (`react-dom/client`) dentro de um `mapboxgl.Marker`.
+- `frontend/src/utils/mapStyle.web.js`: variante Web da URL de estilo e do token de
+  acesso (o arquivo original chama `Mapbox.setAccessToken`, inexistente na Web).
+- Import trocado de `@rnmapbox/maps` para `../../../utils/mapkit` nas duas telas —
+  a resolução por plataforma (`.web.js`) é automática no bundler, sem `if (Platform...)`.
+
+### Achado do `code-review` deste PR
+
+O `value` do `SourceContext.Provider` em `ShapeSource` era um objeto literal novo a
+cada render. Como `GeoLocalizacaoScreen` re-renderiza a cada leitura de GPS, isso
+fazia o efeito de `FillLayer`/`LineLayer` (dependente da identidade de `origem`)
+remover e recriar a layer do geofence continuamente — um "piscar" visível, a mesma
+categoria de quebra que este PR corrige. Memoizado com `useMemo`/`useCallback`.
+
+### Achado ao testar o fluxo real (não coberto pelos testes automatizados)
+
+Depois do primeiro deploy da correção, clicar num marcador de hospital **no mapa**
+(não na lista) para abrir o detalhe deixava a tela em branco — os testes com mock
+não pegam porque não exercitam o desmonte real do `mapbox-gl`. Causa: React desmonta
+a árvore de cima para baixo; ao sair da aba Mapa, o cleanup do próprio `MapView`
+(`mapa.remove()`) roda **antes** dos cleanups de `ShapeSource`/`FillLayer`/
+`LineLayer`/`MarkerView`, que tentam operar num mapa que o mapbox-gl já destruiu por
+dentro. Com o catálogo completo (~300 marcadores) montado, o mesmo desmonte em massa
+também chamava `root.unmount()` de cada `createRoot` do `MarkerView` de forma
+síncrona em pleno commit do React-Native-Web — "Attempted to synchronously unmount a
+root while React was already rendering", centenas de vezes. Corrigido envolvendo as
+operações de cleanup em try/catch silencioso (cleanup de mapa é best-effort: se ele
+já não existe, não há nada a desfazer) e adiando `root.unmount()` com
+`queueMicrotask`.
+
+### Verificação
+
+Backend local + MongoDB descartável (container à parte, sem tocar no volume
+existente nem no Atlas de dev compartilhado) com os ~339 estabelecimentos reais
+importados pelo seed: lista de hospitais, detalhe com geofence, mapa com ~330
+marcadores, clique num marcador do mapa (abrir → voltar → abrir outro, em ciclo) e o
+seletor de sobreposição do BUG-11 testados manualmente no navegador, sem erros no
+console. `npx jest` (390/390) e `npx eslint` (0 erros/avisos nos arquivos novos ou
+alterados) sem regressão.
 
 ---
 

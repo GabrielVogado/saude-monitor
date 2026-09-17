@@ -106,8 +106,9 @@ Na aba **Perfil**, além de entrar ou criar conta, você pode:
 
 - **Permitir ou revogar a localização** a qualquer momento — negar não bloqueia o
   restante do app, só desliga a detecção automática de visita;
-- **Ativar notificações** para receber um lembrete único de avaliação depois de sair
-  de um hospital (opcional: sem elas, você ainda pode avaliar pelo próprio app);
+- **Ativar notificações** para receber um convite para avaliar sua visita e, se você
+  não responder, um lembrete único depois (opcional: sem elas, você ainda pode
+  avaliar pelo próprio app);
 - Ler a **Política de Privacidade e Termos de Uso**.
 
 ![Tela de gerenciamento de notificações](imagens/10-notificacoes.png)

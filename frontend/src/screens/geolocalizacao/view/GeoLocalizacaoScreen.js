@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Building2, X } from "lucide-react-native";
 import { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from "../../../utils/mapkit";
 import {
   GeolocalizacaoProvider,
@@ -18,8 +19,8 @@ import {
 } from "../../../utils/geojson";
 import { formatarDistancia, haversineMetros } from "../../../utils/distancia";
 import HospitalService from "../../hospitais/service/HospitalService";
-import { CSChip, CSOptionSheet } from "../../../components";
-import { colors, typography, spacing, radii } from "../../../theme";
+import { CSChip, CSHospitalCard, CSIconButton, CSOptionSheet } from "../../../components";
+import { colors, typography, spacing, radii, shadows } from "../../../theme";
 
 // F-07: filtro geo por raio. "Todos" mantém o comportamento anterior (catálogo
 // completo); os demais dependem do GPS e são resolvidos pelo backend
@@ -182,6 +183,27 @@ function GeolocalizacaoContent({ navigation }) {
   // seletor fechado). Ver `aoTocarGeofence` abaixo.
   const [opcoesGeofence, setOpcoesGeofence] = useState(null);
 
+  // Hospital selecionado no mapa: o card com as informações básicas aparece sobre o
+  // mapa e é ele — não o marcador — que leva ao detalhe. Guarda só o `id` e deriva o
+  // hospital da lista: se o hospital sair do resultado, o card some em vez de exibir um
+  // dado que já não está no mapa. Trocar o raio fecha o card de propósito (ver o chip):
+  // só derivar deixava o `id` guardado, e o card voltava sozinho ao restaurar o raio.
+  const [hospitalSelecionadoId, setHospitalSelecionadoId] = useState(null);
+  const hospitalSelecionado = useMemo(
+    () => hospitais.find((h) => h.id === hospitalSelecionadoId) || null,
+    [hospitais, hospitalSelecionadoId]
+  );
+
+  // Distância do GPS até o hospital do card (F-07, critério 3). Sem GPS, `null` — o
+  // card omite a linha em vez de mostrar um valor inventado.
+  const distanciaDoCard = useMemo(
+    () =>
+      hospitalSelecionado
+        ? formatarDistancia(haversineMetros(coordenadas, centroDoHospital(hospitalSelecionado)))
+        : null,
+    [hospitalSelecionado, coordenadas]
+  );
+
   const abrirHospital = useCallback(
     (hospitalId) => {
       if (!hospitalId) {
@@ -224,6 +246,40 @@ function GeolocalizacaoContent({ navigation }) {
     return () => remover?.();
   }, [navigation]);
 
+  const selecionarHospital = useCallback(
+    (hospitalId) => {
+      if (!hospitalId) {
+        return;
+      }
+      setHospitalSelecionadoId(hospitalId);
+
+      // Centraliza o marcador no mapa: o card ocupa a parte de baixo e cobriria um
+      // marcador tocado perto da borda inferior. Só a posição — o zoom é do usuário.
+      const hospital = hospitais.find((h) => h.id === hospitalId);
+      const centro = hospital ? centroDoHospital(hospital) : null;
+      if (centro) {
+        cameraRef.current?.setCamera({
+          centerCoordinate: [centro.longitude, centro.latitude],
+          animationDuration: 300,
+        });
+      }
+    },
+    [hospitais]
+  );
+
+  const fecharCard = useCallback(() => {
+    setHospitalSelecionadoId(null);
+  }, []);
+
+  // O card devolve o próprio hospital (contrato do `CSHospitalCard`, ARQ-05). É aqui,
+  // e só aqui, que o mapa é desmontado para navegar — ver `abrirHospital` (BUG-04).
+  const aoTocarCard = useCallback(
+    (hospital) => {
+      abrirHospital(hospital?.id);
+    },
+    [abrirHospital]
+  );
+
   const aoTocarGeofence = useCallback(
     (evento) => {
       // BUG-11 — unidades empilhadas eram inalcançáveis: com 2+ geofences sobrepostos
@@ -244,7 +300,7 @@ function GeolocalizacaoContent({ navigation }) {
       }
       if (features.length === 1) {
         const unico = features[0];
-        abrirHospital(unico?.properties?.id || unico?.id);
+        selecionarHospital(unico?.properties?.id || unico?.id);
         return;
       }
       // Nomes repetidos (ex.: "Ubs São Sebastião" ×5 no complexo da Papuda) não
@@ -268,18 +324,17 @@ function GeolocalizacaoContent({ navigation }) {
         })
       );
     },
-    [hospitais, abrirHospital]
+    [hospitais, selecionarHospital]
   );
 
   const escolherHospitalDoSheet = useCallback(
     (hospitalId) => {
-      // Fecha o seletor antes de acionar `abrirHospital` para não deixá-lo
-      // visível por um frame durante o desmonte do mapa (ver comentário de
-      // `abrirHospital` acima sobre a ordem desmontar-antes-de-navegar).
+      // A escolha no seletor seleciona a unidade — mesmo caminho do toque num
+      // marcador: card sobre o mapa, e o detalhe só depois do toque no card.
       setOpcoesGeofence(null);
-      abrirHospital(hospitalId);
+      selecionarHospital(hospitalId);
     },
-    [abrirHospital]
+    [selecionarHospital]
   );
 
   const aoCancelarSheet = useCallback(() => {
@@ -350,6 +405,42 @@ function GeolocalizacaoContent({ navigation }) {
     }
   }, [mapaMontado, coordenadas, regionAtual, hospitais.length]);
 
+  // BUG-10 — o marcador do hospital ficava FORA do círculo do geofence: o filho era
+  // uma linha `[ponto + rótulo]` e a âncora padrão (`{x: 0.5, y: 0.5}`) centralizava a
+  // LINHA inteira na coordenada, empurrando o ponto ~metade da largura da linha para
+  // o lado (px de tela, constante) — com pouco zoom o círculo tem poucos px e não o
+  // continha. Agora o marcador é um ícone SIMÉTRICO: a âncora padrão (centro) põe o
+  // centro do ícone exatamente na coordenada, a mesma de `centroDoHospital` que
+  // desenha o polígono. Por isso NÃO se passa `anchor` aqui — reintroduzir um
+  // filho assimétrico (rótulo ao lado) reabriria o BUG-10.
+  const renderizarMarcador = (hospital, selecionado) => {
+    const centroide = centroDoHospital(hospital);
+    if (!centroide) {
+      return null;
+    }
+    return (
+      <MarkerView
+        key={selecionado ? `selecionado-${hospital.id}` : hospital.id}
+        testID={`marcador-hospital-${hospital.id}`}
+        coordinate={[centroide.longitude, centroide.latitude]}
+      >
+        <View
+          style={[styles.hospitalMarker, selecionado && styles.hospitalMarkerSelecionado]}
+          accessibilityRole="button"
+          accessibilityLabel={`Ver informações de ${hospital.nome}`}
+          accessibilityState={{ selected: selecionado }}
+          onStartShouldSetResponder={() => true}
+          onResponderRelease={() => selecionarHospital(hospital.id)}
+        >
+          <Building2
+            size={selecionado ? 22 : 20}
+            color={selecionado ? colors.onPrimary : colors.primary}
+          />
+        </View>
+      </MarkerView>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.screenHeader}>
@@ -362,7 +453,10 @@ function GeolocalizacaoContent({ navigation }) {
               key={r.label}
               label={r.label}
               selected={raioKm === r.value}
-              onPress={() => setRaioKm(r.value)}
+              onPress={() => {
+                setRaioKm(r.value);
+                fecharCard();
+              }}
             />
           ))}
         </View>
@@ -425,49 +519,13 @@ function GeolocalizacaoContent({ navigation }) {
               </ShapeSource>
             )}
 
-            {hospitais.map((hospital) => {
-              const centroide = centroDoHospital(hospital);
-              if (!centroide) {
-                return null;
-              }
-              // BUG-10 — o ponto ficava FORA do círculo do geofence. O filho deste
-              // `MarkerView` é uma linha `[ponto + rótulo]`, e a âncora padrão do
-              // Mapbox (`{x: 0.5, y: 0.5}`) centraliza a LINHA inteira na
-              // coordenada — o ponto era empurrado para a esquerda em ~metade da
-              // largura da linha (px de tela, constante). Com pouco zoom o círculo
-              // tem poucos px e o ponto caía fora dele; aproximando, o círculo
-              // cresce em px e o deslocamento fixo "sumia" — o relato do PO. Não é
-              // dado: marcador e polígono nascem do mesmo `centroDoHospital`, só a
-              // renderização discordava. `anchor={{x: 0, y: 0.5}}` põe a coordenada
-              // na borda esquerda da linha (= borda do ponto, primeiro filho sem
-              // margem); resta meio ponto (~7 px), irrelevante ante raios de
-              // dezenas de metros. O ponto do usuário e o ícone do detalhe são
-              // simétricos e seguem com âncora central — mexer neles INTRODUZIRIA
-              // o mesmo defeito.
-              return (
-                <MarkerView
-                  key={hospital.id}
-                  testID={`marcador-hospital-${hospital.id}`}
-                  coordinate={[centroide.longitude, centroide.latitude]}
-                  anchor={{ x: 0, y: 0.5 }}
-                >
-                  <View
-                    style={styles.hospitalMarker}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Abrir detalhe de ${hospital.nome}`}
-                    onStartShouldSetResponder={() => true}
-                    onResponderRelease={() => abrirHospital(hospital.id)}
-                  >
-                    <View style={styles.hospitalDot} />
-                    <View style={styles.hospitalLabelBox}>
-                      <Text style={styles.hospitalLabel} numberOfLines={1}>
-                        {hospital.nome}
-                      </Text>
-                    </View>
-                  </View>
-                </MarkerView>
-              );
-            })}
+            {/* O selecionado sai da lista e é desenhado logo abaixo, por último: marcador
+                filho posterior fica por cima do anterior (nativo e Web), e com ~340
+                ícones sobrepostos o destacado não pode ficar escondido atrás de outro. */}
+            {hospitais.map((hospital) =>
+              hospital.id === hospitalSelecionadoId ? null : renderizarMarcador(hospital, false)
+            )}
+            {hospitalSelecionado ? renderizarMarcador(hospitalSelecionado, true) : null}
 
             {coordenadas && (
               <MarkerView coordinate={[coordenadas.longitude, coordenadas.latitude]}>
@@ -475,6 +533,26 @@ function GeolocalizacaoContent({ navigation }) {
               </MarkerView>
             )}
           </MapView>
+        ) : null}
+
+        {/* Card do hospital selecionado, sobre o mapa. Fica FORA do `MapView`: continua
+            visível durante o desmonte-antes-de-navegar e ao voltar do detalhe. O botão
+            de fechar vem depois do card no JSX para ficar por cima dele. */}
+        {hospitalSelecionado ? (
+          <View style={styles.cardSobreMapa} pointerEvents="box-none" testID="card-hospital-mapa">
+            <CSHospitalCard
+              hospital={hospitalSelecionado}
+              onPress={aoTocarCard}
+              distancia={distanciaDoCard}
+            />
+            <CSIconButton
+              icon={X}
+              size={20}
+              accessibilityLabel="Fechar informações do hospital"
+              onPress={fecharCard}
+              style={styles.cardFechar}
+            />
+          </View>
         ) : null}
       </View>
 
@@ -636,28 +714,40 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: colors.surfaceContainerLowest,
   },
+  // Marcador de hospital: ícone em caixa branca (referência: mapa de resultados de
+  // hospedagem do Decolar). Simétrico de propósito — ver `renderizarMarcador` (BUG-10).
   hospitalMarker: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  hospitalDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: colors.geoActive,
-    borderWidth: 3,
-    borderColor: colors.surfaceContainerLowest,
-  },
-  hospitalLabelBox: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
     backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radii.xs,
-    paddingHorizontal: spacing.s2,
-    paddingVertical: 2,
-    marginLeft: spacing.s1,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    alignItems: "center",
+    justifyContent: "center",
+    ...shadows.cloud1,
   },
-  hospitalLabel: {
-    ...typography.labelSm,
-    color: colors.onSurface,
-    maxWidth: 140,
+  hospitalMarkerSelecionado: {
+    width: 46,
+    height: 46,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  cardSobreMapa: {
+    position: "absolute",
+    left: spacing.s3,
+    right: spacing.s3,
+    bottom: spacing.s3,
+  },
+  // Metade para fora do canto do card, como o "X" do card de referência — assim não
+  // cobre o nome do hospital nem os selos.
+  cardFechar: {
+    position: "absolute",
+    top: -20,
+    right: spacing.s2,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    ...shadows.cloud1,
   },
 });

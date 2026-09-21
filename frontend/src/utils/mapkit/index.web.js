@@ -58,7 +58,18 @@ export function MapView({ style, styleURL, children }) {
     });
     mapRef.current = mapa;
     mapa.once("load", () => setMapa(mapa));
+
+    // O `mapbox-gl` só reage a resize da JANELA. Aqui o container muda de altura sem a
+    // janela mudar (a mensagem de GPS negado e o botão "Tentar novamente" entram depois
+    // do mapa montar e encolhem o `mapContainer`): o canvas ficava com a altura antiga
+    // (615 px num container de 526) — mapa descentralizado e ~90 px cortados embaixo.
+    // Na versão nativa isso é automático; aqui é o observador que faz o papel.
+    const observador =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => mapa.resize()) : null;
+    observador?.observe(containerRef.current);
+
     return () => {
+      observador?.disconnect();
       mapa.remove();
       mapRef.current = null;
       setMapa(null);
@@ -88,7 +99,13 @@ export const Camera = forwardRef(function Camera({ centerCoordinate, zoomLevel }
     ref,
     () => ({
       setCamera: ({ centerCoordinate: centro, zoomLevel: zoom, animationDuration }) => {
-        mapa?.flyTo({ center: centro, zoom, duration: animationDuration ?? 0 });
+        // Só repassa o que veio: no `mapbox-gl`, `flyTo({ zoom: undefined })` conta como
+        // "zoom informado" (`'zoom' in options`), vira NaN e o voo é descartado sem erro —
+        // a câmera simplesmente não se mexia ao centralizar sem alterar o zoom.
+        const opcoes = { duration: animationDuration ?? 0 };
+        if (centro !== undefined) opcoes.center = centro;
+        if (zoom !== undefined) opcoes.zoom = zoom;
+        mapa?.flyTo(opcoes);
       },
       fitBounds: (nordeste, sudoeste, padding, duration) => {
         mapa?.fitBounds([sudoeste, nordeste], { padding: padding ?? 0, duration: duration ?? 0 });
@@ -221,20 +238,10 @@ export function LineLayer({ id, style = {} }) {
   return null;
 }
 
-// BUG-10 (ver GeoLocalizacaoScreen): âncora {x:0,y:0.5} centraliza a coordenada na
-// borda esquerda do marcador. mapbox-gl não aceita frações — só as palavras-chave
-// abaixo — por isso o conversor cobre só as combinações realmente usadas no app.
-function converterAncora(anchor) {
-  if (!anchor) return "center";
-  const { x = 0.5, y = 0.5 } = anchor;
-  if (x <= 0.1 && Math.abs(y - 0.5) < 0.1) return "left";
-  if (x >= 0.9 && Math.abs(y - 0.5) < 0.1) return "right";
-  if (y <= 0.1) return "top";
-  if (y >= 0.9) return "bottom";
-  return "center";
-}
-
-export function MarkerView({ coordinate, anchor, children }) {
+// Sem `anchor`: os marcadores do app são simétricos e a âncora padrão (centro) põe a
+// coordenada no meio do ícone — ver BUG-10 em GeoLocalizacaoScreen. O `mapbox-gl` só
+// aceita palavras-chave de âncora, não frações como `{x: 0, y: 0.5}` do SDK nativo.
+export function MarkerView({ coordinate, children }) {
   const mapa = useContext(MapContext);
   const [elemento] = useState(() => document.createElement("div"));
   const marcadorRef = useRef(null);
@@ -243,7 +250,7 @@ export function MarkerView({ coordinate, anchor, children }) {
 
   useEffect(() => {
     if (!mapa) return undefined;
-    const marcador = new mapboxgl.Marker({ element: elemento, anchor: converterAncora(anchor) })
+    const marcador = new mapboxgl.Marker({ element: elemento })
       .setLngLat([longitude, latitude])
       .addTo(mapa);
     marcadorRef.current = marcador;

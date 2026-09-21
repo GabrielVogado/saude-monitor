@@ -1,7 +1,15 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 12/09/2026 · Responsável: Gabriel Vogado
+> Última atualização: 20/09/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 20/09/2026 — Card do hospital sobre o mapa (`feat/mapa-card-hospital`)
+
+**O que entrou:** na aba Mapa, tocar num marcador passa a abrir um card com as informações básicas do hospital (padrão "Decolar"); tocar no card leva ao detalhe. Antes, o marcador navegava direto.
+**Documentos versionados:** `Relatorio-Aderencia` v3.7 → v3.8 (anterior preservada em `_historico/`). Registro em `Historico-Melhorias.md` (M-015).
+**Sem mudança:** `Features-MVP` (o critério 3 da F-07 já pedia esse card — o código é que não cumpria) e `De-Para-Backlog-Features.md` (nenhuma estória muda de status).
 
 ---
 
@@ -87,7 +95,7 @@ Documentos/
 │
 ├── 05-features/                              ← features detalhadas + aderência ao código real
 │   ├── Features-MVP-v2.2.md                  ← 11 features com status real, estado operacional (§2.1), DoDs, rastreabilidade
-│   ├── Relatorio-Aderencia-Codigo-vs-Features.md ← verificação arquivo a arquivo (v3.7) + aderência operacional (§1.1)
+│   ├── Relatorio-Aderencia-Codigo-vs-Features.md ← verificação arquivo a arquivo (v3.8) + aderência operacional (§1.1)
 │   ├── Pendencias-Epico-01.md                ← débitos do ETL CNES/DATASUS e divergências de contrato
 │   └── Registro-Correcao-Checkin-Manual-e-Performance-v1.0.md ← RN-03A (exclusividade de visita ativa)
 │
@@ -120,7 +128,7 @@ Documentos/
     ├── Plano-Sprints-v2.0.md                 ← substituído pela v2.1 em 02/09/2026
     ├── Especificacao-API-v2.0.md / -v2.1.md  ← v2.1 substituída pela v2.2 em 12/09/2026
     ├── Arvore-Tecnologica-v2.0.md            ← substituída pela v2.1 em 12/09/2026
-    ├── Relatorio-Aderencia-Codigo-vs-Features-v1.md / -v3.5.md / -v3.6.md
+    ├── Relatorio-Aderencia-Codigo-vs-Features-v1.md / -v3.5.md / -v3.6.md / -v3.7.md
     └── De-Para-Backlog-Features-v1.md / -v2.md ← retratos anteriores do status das estórias
 ```
 
@@ -139,7 +147,7 @@ Documentos/
 | 6 | [Plano de Sprints](./06-sprints/Plano-Sprints-v2.1.md) | **2.1** | ✅ Ativo | S0–S6 e S8 concluídas, S7 adiada, **S9–S12 planejadas (§22)** com diagnóstico de desempenho medido, velocity, riscos, cerimônias e métricas. |
 | 7 | [Registro de Correção - Check-in Manual e Performance](./05-features/Registro-Correcao-Checkin-Manual-e-Performance-v1.0.md) | 1.0 | ✅ Implementado | Exclusividade de visita ativa (RN-03A), correção da interação do card e da latência artificial na primeira carga da lista. A validação pendente nº 5 (*"medir login e primeira lista no ambiente de destino"*) foi executada em 02/09/2026 — resultado no `Features-MVP-v2.2.md` §2.1 (apontador atualizado na revisão de 12/09/2026; conteúdo inalterado). |
 | 8 | [Features do MVP](./05-features/Features-MVP-v2.2.md) | **2.2** | ✅ Ativo | As 11 features com status real por feature, **§2.1 — estado operacional** (implementado ≠ utilizável), DoD por feature, matriz de rastreabilidade e roteiro de validação V-01..V-12 com situação de cada uma. **v2.2 (12/09/2026):** F-07 Mapbox + BUG-10; F-11 com backend parcial. |
-| 9 | [Relatório de Aderência Código × Features](./05-features/Relatorio-Aderencia-Codigo-vs-Features.md) | **3.7** | ✅ Ativo | Verificação arquivo a arquivo das 9 features do escopo (100% cobertas) + **§1.1 aderência operacional**, que reprova o RNF-02 por medição. **v3.7 (12/09/2026):** §F-07 Mapbox; parcial F-11 registrado sem mudar status. |
+| 9 | [Relatório de Aderência Código × Features](./05-features/Relatorio-Aderencia-Codigo-vs-Features.md) | **3.8** | ✅ Ativo | Verificação arquivo a arquivo das 9 features do escopo (100% cobertas) + **§1.1 aderência operacional**, que reprova o RNF-02 por medição. **v3.8 (20/09/2026):** §F-07 card do hospital sobre o mapa. **v3.7 (12/09/2026):** §F-07 Mapbox; parcial F-11 registrado sem mudar status. |
 | 10 | [De-Para Backlog × Features](./De-Para-Backlog-Features.md) | 02/09/2026 | ✅ Ativo | **Fonte de verdade do status de cada estória.** Placar: 42 de 43 estórias do app entregues; Épico 7 adiado; Épico 8 aberto. |
 | 11 | [Consolidação Técnica e Backlog Pendente](./08-analise%20tecnica/Consolidacao-Tecnica-e-Backlog-Pendente-v1.1.md) | **1.1** | ✅ Ativo | Fonte única do que está entregue, do que está pendente (48 itens + PERF) e da **ordem de execução em 6 ondas**, com as decisões do PO registradas literalmente. |
 | 12 | [Relatório de Auditoria Técnica](./08-analise%20tecnica/relatorio_auditoria_tecnica.md) | **3.1** | 🟡 Proposta | 11 problemas de arquitetura do frontend. A v3.1 declara o commit-base e **corrige 3 afirmações** que não se sustentaram na reverificação. |

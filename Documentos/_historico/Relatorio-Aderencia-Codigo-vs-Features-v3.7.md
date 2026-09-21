@@ -1,10 +1,8 @@
-# 🔍 Relatório de Aderência — Features × Código Real (v3.8)
+# 🔍 Relatório de Aderência — Features × Código Real (v3.7)
 
 > **Verificação do que existe implementado vs. o que as Features propõem**
 >
-> Data: Atualizada — v3.8 (20/09/2026; card do hospital sobre o mapa)
-> Alterações da v3.8: §F-07 — o toque num marcador do mapa **deixou de abrir o `HospitalDetalhe` direto**: agora seleciona o hospital (marcador destacado, mapa centraliza) e abre um card com as informações básicas; o toque no card é que navega ao detalhe. Isso cumpre o critério de aceite 3 da F-07, que o código não cumpria. Nenhum status de estória muda. Versão anterior (3.7) preservada em `_historico/Relatorio-Aderencia-Codigo-vs-Features-v3.7.md`.
-> Data anterior: v3.7 (12/09/2026; migração do mapa para Mapbox + backend das camadas F-11)
+> Data: Atualizada — v3.7 (12/09/2026; migração do mapa para Mapbox + backend das camadas F-11)
 > Alterações da v3.7: §F-07 realinhado ao código da branch `feature/mapbox-migration` (`@rnmapbox/maps` v10 no lugar de MapLibre; BUG-10 corrigido); registrada a entrega parcial de F-11 — `GET /api/v1/camadas/{tipo}` servindo as 4 camadas (UI do painel segue fora do escopo, sem mudar status). Versão anterior (3.6) preservada em `_historico/Relatorio-Aderencia-Codigo-vs-Features-v3.6.md`.
 > Data anterior: v3.6 (02/09/2026; acrescenta o §1.1 — Aderência operacional)
 > Alterações da v3.6: a v3.5 concluía que a `develop` está "100% coberta" nas 9 features do escopo. **Isso continua correto e continua insuficiente.** A v3.6 acrescenta o **§1.1**, que verifica o código contra os requisitos **não funcionais** — e ali a aderência não é de 100%: o RNF-02 (resposta < 300 ms p95; tela pública em < 2 s) é violado por uma ordem de grandeza. Nenhum status de feature foi alterado.
@@ -141,11 +139,10 @@
 ### ✅ F-07 — Mapa e Busca de Hospitais
 **Status: FUNCIONAL — entregue na Sprint S8 e migrado para `@rnmapbox/maps` v10 na branch **feature/mapbox-migration** (12/09/2026), na aba **Mapa** da navegação de 4 abas (Início, Hospitais, Mapa, Perfil).**
 
-| Entregue na S8 | Pós-S8 (v3.7 e v3.8) |
+| Entregue na S8 | Pós-S8 (v3.7) |
 |---|---|
 | ✅ `GET /api/v1/hospitais?latitude&longitude&raioKm` consumido pelo front com **filtro por raio** (chips 1/5/10/25 km + "Todos") na aba **Mapa** | ✅ Mapa sobre `@rnmapbox/maps` v10 (estilo `Street`): geofences em `ShapeSource` + `FillLayer`/`LineLayer`, marcadores em `MarkerView`, câmera por `centerCoordinate`/`zoomLevel`; token em `EXPO_PUBLIC_MAPBOX_TOKEN` (secret no CI); sem Expo Go (APK via `cd-mobile-apk.yml`) |
 | ✅ Polígonos das geofences renderizados via `GeoJSONSource` + `Layer` (`fill`/`line`) do MapLibre; toque no polígono/marcador abre o `HospitalDetalhe` | ✅ **BUG-10 (12/09/2026):** ponto do hospital fora do círculo com pouco zoom (âncora centralizava a linha `[ponto + rótulo]`) — corrigido com `anchor={{x: 0, y: 0.5}}` + regressão em `GeoLocalizacaoScreen.test.js` |
-| | ✅ **Card do hospital sobre o mapa (v3.8, 20/09/2026):** toque no marcador seleciona o hospital (marcador vira azul e passa para o topo; a câmera o centraliza sem mudar o zoom) e abre um `CSHospitalCard` sobre o mapa — nome, tipo, categoria, nota/tempo médio e, com GPS, "N km de você"; **toque no card → `HospitalDetalhe`**, botão X fecha. O card vive fora do `MapView`, então sobrevive ao desmonte-antes-de-navegar (BUG-04) e, ao voltar do detalhe, a seleção persiste. Marcador simétrico, só ícone de prédio (`Building2`) num quadrado branco arredondado, sem rótulo de texto ao lado (mantém o BUG-10 fechado). Sobreposição de geofences continua abrindo o seletor (BUG-11). ⚠️ **Divergência conhecida da spec:** o critério 3 pede card "glass" com `CSRatingPill`; foi reaproveitado o `CSHospitalCard` da lista (mesma informação, visual da lista). Web: sem GPS no navegador, a linha de distância não aparece. Validado no app Web real; **não** validado em aparelho físico. |
 
 ---
 

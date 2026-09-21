@@ -998,7 +998,7 @@ alterados) sem regressão.
 
 ## M-015 — Mapa: card do hospital ao tocar no marcador (padrão "Decolar")
 
-**Data:** 20/09/2026 · **PR:** #123 (substitui o #122, fechado pelo GitHub ao renomear a branch)
+**Data:** 20/09/2026 · **PR:** #123 (substitui o #122, fechado pelo GitHub ao renomear a branch) · reenquadramento ao voltar: #124
 
 ### O que o PO pediu
 

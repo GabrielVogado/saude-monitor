@@ -998,7 +998,7 @@ alterados) sem regressão.
 
 ## M-015 — Mapa: card do hospital ao tocar no marcador (padrão "Decolar")
 
-**Data:** 20/09/2026 · **PR:** _(preencher ao abrir)_
+**Data:** 20/09/2026 · **PR:** #122
 
 ### O que o PO pediu
 

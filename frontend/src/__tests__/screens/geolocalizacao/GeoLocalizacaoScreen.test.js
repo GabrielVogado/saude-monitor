@@ -31,6 +31,7 @@ jest.mock("../../../screens/hospitais/service/HospitalService");
  * mantinha a suíte verde (mutação M-C sobreviveu).
  */
 const mockCamera = { setCamera: jest.fn(), fitBounds: jest.fn() };
+const mockMapView = { props: null };
 
 jest.mock("@rnmapbox/maps", () => {
   const ReactMock = require("react");
@@ -51,7 +52,10 @@ jest.mock("@rnmapbox/maps", () => {
     __esModule: true,
     default: { setAccessToken: jest.fn(), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
     StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
-    MapView: stub,
+    MapView: ({ children, ...props }) => {
+      mockMapView.props = props;
+      return <View {...props}>{children}</View>;
+    },
     Camera,
     MarkerView: stub,
     ShapeSource: stub,
@@ -403,6 +407,20 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
 
     await screen.findByTestId("geofences-hospitais");
     await waitFor(() => expect(mockCamera.fitBounds).toHaveBeenCalled());
+  });
+
+  test("o mapa reenquadra os hospitais quando termina de carregar (a Camera só existe depois do load na Web)", async () => {
+    // No Web os filhos do mapa montam depois do `load`: o efeito de enquadramento roda
+    // antes, com `cameraRef` nulo, e não repete. `onDidFinishLoadingMap` é o gancho que
+    // roda com a câmera pronta.
+    renderizar();
+    await screen.findByTestId("geofences-hospitais");
+    await waitFor(() => expect(mockCamera.fitBounds).toHaveBeenCalled());
+    mockCamera.fitBounds.mockClear();
+
+    act(() => mockMapView.props.onDidFinishLoadingMap());
+
+    expect(mockCamera.fitBounds).toHaveBeenCalledTimes(1);
   });
 
   test("BUG-04: sem `navigate`, o mapa NÃO é desmontado", async () => {

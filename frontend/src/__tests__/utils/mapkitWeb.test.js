@@ -69,6 +69,30 @@ describe("mapkit web — Camera.setCamera", () => {
   });
 });
 
+describe("mapkit web — MapView e onDidFinishLoadingMap", () => {
+  test("avisa a tela quando o mapa carrega, com a Camera já montada (ref ligado)", () => {
+    // O `fitBounds` da tela precisa achar a Camera: no Web ela só monta depois do `load`.
+    const cameraRef = React.createRef();
+    let cameraProntaNoAviso = null;
+    const aoCarregar = jest.fn(() => {
+      cameraProntaNoAviso = cameraRef.current !== null;
+    });
+
+    render(
+      <MapView style={{ flex: 1 }} onDidFinishLoadingMap={aoCarregar}>
+        <Camera ref={cameraRef} centerCoordinate={[-47.9, -15.8]} zoomLevel={10} />
+      </MapView>
+    );
+
+    expect(aoCarregar).toHaveBeenCalledTimes(1);
+    expect(cameraProntaNoAviso).toBe(true);
+  });
+
+  test("sem o callback, o mapa carrega normalmente", () => {
+    expect(() => render(<MapView style={{ flex: 1 }} />)).not.toThrow();
+  });
+});
+
 describe("mapkit web — MapView e o tamanho do container", () => {
   const observadores = [];
   const ResizeObserverOriginal = global.ResizeObserver;

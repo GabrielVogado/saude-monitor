@@ -488,7 +488,11 @@ function GeolocalizacaoContent({ navigation }) {
       <View style={styles.mapContainer} testID="mapa-container">
         {/* Desmontado de propósito antes de navegar — ver o comentário do `abrirHospital`. */}
         {mapaMontado ? (
-          <MapView style={styles.map} styleURL={MAPBOX_STYLE}>
+          <MapView
+            style={styles.map}
+            styleURL={MAPBOX_STYLE}
+            onDidFinishLoadingMap={enquadrarHospitais}
+          >
             <Camera
               ref={cameraRef}
               centerCoordinate={cameraInicial.centerCoordinate}

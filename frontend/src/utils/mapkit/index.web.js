@@ -43,10 +43,20 @@ function operacaoSegura(fn) {
   }
 }
 
-export function MapView({ style, styleURL, children }) {
+export function MapView({ style, styleURL, onDidFinishLoadingMap, children }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const [mapa, setMapa] = useState(null);
+
+  // Os filhos (a `Camera` entre eles) só montam DEPOIS do `load`, então o `cameraRef` da
+  // tela ainda é `null` quando o efeito dela roda no remonte — o `fitBounds` de "voltar do
+  // detalhe" caía no vazio e o mapa ficava no Brasil inteiro. Este efeito roda depois do
+  // commit que monta os filhos (refs já ligados): é o momento em que o nativo também
+  // chama `onDidFinishLoadingMap`, com a câmera pronta.
+  useEffect(() => {
+    if (mapa) onDidFinishLoadingMap?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só quando o mapa carrega; o efeito nasce no mesmo render em que `mapa` muda, então já enxerga o callback atual.
+  }, [mapa]);
 
   useEffect(() => {
     const mapa = new mapboxgl.Map({

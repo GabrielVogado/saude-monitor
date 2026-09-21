@@ -1032,6 +1032,14 @@ container que reserva espaço, âncora simétrica, seletor de sobreposição).
   2. `mapbox-gl` v2 só reage a resize da janela; o container encolhia quando a
      mensagem de GPS entrava (canvas 615 px num container de 526 → mapa descentrado,
      ~90 px cortados). Agora um `ResizeObserver` chama `map.resize()`.
+  3. Os filhos do mapa (a `Camera` entre eles) só montam depois do evento `load`; ao
+     **voltar do detalhe**, o efeito de enquadramento da tela rodava com `cameraRef`
+     nulo e o `fitBounds` caía no vazio — o mapa reaparecia no Brasil inteiro, com os
+     ~340 marcadores num borrão. Achado ao repetir o fluxo com cliques reais (o teste
+     BUG-04 de "reenquadrar ao voltar" usa mock síncrono e passava). Agora o `MapView`
+     do shim chama `onDidFinishLoadingMap` (mesma prop do `@rnmapbox/maps`) depois da
+     montagem dos filhos, e a tela reenquadra nesse gancho. Anterior a este PR, mas
+     estragava o fluxo "voltar com o card aberto".
 
 ### Achados do `code-review` deste PR
 
@@ -1059,12 +1067,14 @@ Aceitos, com o motivo:
 
 ### Verificação
 
-- `npx jest`: 407/407; `npm run lint`: 0 erros, 16 avisos = o teto (nenhum novo).
+- `npx jest`: 410/410; `npm run lint`: 0 erros, 16 avisos = o teto (nenhum novo).
 - **Mutação** (o critério do PO): 10 mutações na tela/card e 4 no shim Web, todas mortas
   pelos testes; arquivo restaurado e conferido por `diff` depois de cada rodada.
-- App Web real contra a API de dev (~340 marcadores): marcador → card → detalhe → voltar
-  (seleção persiste) → trocar de hospital → fechar; marcador selecionado exatamente no
-  centro do mapa; zero erros no console.
+- App Web real contra a API de dev (~340 marcadores), com **cliques reais** e capturas de
+  tela: marcador → card → detalhe → voltar (seleção persiste e o mapa reenquadra o DF) →
+  trocar de hospital (marcador selecionado exatamente no centro do mapa) → fechar pelo X →
+  trocar o raio (o card fecha e não volta ao restaurar "Todos"; canvas 526 px = container);
+  zero erros no console.
 
 ### O que **não** foi validado
 

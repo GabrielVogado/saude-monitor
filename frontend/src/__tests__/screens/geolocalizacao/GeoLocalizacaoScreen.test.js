@@ -6,7 +6,14 @@
  * ao backend (`GET /api/v1/hospitais?latitude&longitude&raioKm`) quando há GPS.
  */
 import React from "react";
-import { act, render, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
+import {
+  act,
+  render,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react-native";
 import GeoLocalizacaoScreen from "../../../screens/geolocalizacao/view/GeoLocalizacaoScreen";
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
 import { useGeolocalizacao } from "../../../screens/geolocalizacao/service/GeoLocalizacaoService";
@@ -103,6 +110,33 @@ function renderizar() {
   return render(<GeoLocalizacaoScreen navigation={NAVEGACAO} />);
 }
 
+function hospitalTeste(id, nome, extra = {}) {
+  return { id, nome, geofence: { type: "Polygon", coordinates: [ANEL] }, ...extra };
+}
+
+/**
+ * Abrir um hospital pelo mapa são DOIS toques: selecionar (marcador ou polígono) e
+ * tocar no card que aparece sobre o mapa. Só o segundo navega.
+ */
+async function selecionarPeloPoligono(id = "h1") {
+  const fonte = await screen.findByTestId("geofences-hospitais");
+  act(() => {
+    fonte.props.onPress({ features: [{ properties: { id } }] });
+  });
+  return fonte;
+}
+
+async function tocarNoCard(nome = "Hospital Alfa") {
+  const card = await screen.findByTestId("card-hospital-mapa");
+  fireEvent.press(within(card).getByLabelText(new RegExp(`^${nome},`)));
+}
+
+// O marcador usa o sistema de responder do RN (não `onPress`) — mesmo mecanismo de
+// antes desta mudança, mantido por não poder ser validado em aparelho aqui.
+function tocarNoMarcador(elemento) {
+  fireEvent(elemento, "responderRelease");
+}
+
 describe("GeoLocalizacaoScreen (F-07)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -179,17 +213,18 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     expect(HospitalService.listar).toHaveBeenLastCalledWith({ page: 0, size: 100 });
   });
 
-  test("tocar num polígono abre o detalhe do hospital correspondente na própria pilha do Mapa", async () => {
+  test("tocar no card do hospital selecionado abre o detalhe na própria pilha do Mapa", async () => {
     // Achado de 10/09/2026: navegar para a pilha da aba Hospitais em vez da
     // própria pilha da aba Mapa ("MapaStack" em App.js) trocava de aba por baixo
     // dos panos — voltar do detalhe pousava na lista de Hospitais, não no mapa.
     renderizar();
 
-    const fonte = await screen.findByTestId("geofences-hospitais");
-    act(() => {
-      fonte.props.onPress({ features: [{ properties: { id: "h1" } }] });
-    });
+    await selecionarPeloPoligono("h1");
+    // O toque no polígono só seleciona: o card aparece, nada navega ainda.
+    expect(await screen.findByTestId("card-hospital-mapa")).toBeTruthy();
+    expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
 
+    await tocarNoCard();
     await waitFor(() =>
       expect(NAVEGACAO.navigate).toHaveBeenCalledWith("HospitalDetalhe", { id: "h1" })
     );
@@ -212,7 +247,11 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     // `toBeCloseTo` porque a média em ponto flutuante dá -47.885000000000005.
     expect(marcador.props.coordinate[0]).toBeCloseTo(-47.885, 9);
     expect(marcador.props.coordinate[1]).toBeCloseTo(-15.7875, 9);
-    expect(marcador.props.anchor).toEqual({ x: 0, y: 0.5 });
+    // O marcador agora é um ícone SIMÉTRICO: a âncora padrão (centro) já põe o centro
+    // do ícone na coordenada. Uma âncora explícita só faz sentido para um filho
+    // assimétrico (o antigo "ponto + rótulo" pedia `{x: 0, y: 0.5}`) — reaparecer
+    // aqui significa que o deslocamento do BUG-10 voltou.
+    expect(marcador.props.anchor).toBeUndefined();
   });
 
   test("BUG-11: toque sobre geofences empilhados oferece a lista em vez de abrir só o primeiro", async () => {
@@ -224,6 +263,13 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     // Usa `CSOptionSheet` em vez de `Alert.alert`: no Android, `Alert.alert` só
     // exibe os 3 primeiros botões — insuficiente para o cenário de 5+ unidades
     // que motivou o bug.
+    HospitalService.listar.mockResolvedValue({
+      content: [
+        hospitalTeste("h1", "Hospital Alfa"),
+        hospitalTeste("h2", "Hospital Beta"),
+        hospitalTeste("h3", "Hospital Gama"),
+      ],
+    });
     renderizar();
     const fonte = await screen.findByTestId("geofences-hospitais");
 
@@ -237,17 +283,22 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
       });
     });
 
-    // Busca escopada ao seletor: "Hospital Alfa" também rotula o marcador do
-    // mapa (h1), então uma busca global por texto seria ambígua.
     const sheet = within(await screen.findByTestId("option-sheet"));
     expect(await sheet.findByText("Hospital Alfa")).toBeTruthy();
     expect(await sheet.findByText("Hospital Beta")).toBeTruthy();
     expect(await sheet.findByText("Hospital Gama")).toBeTruthy();
     expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
 
-    // Escolher a TERCEIRA unidade navega para ela — o `Alert.alert` do Android
-    // cortaria exatamente esta opção antes da correção.
+    // Escolher a TERCEIRA unidade a seleciona (card do Gama sobre o mapa) e só o
+    // toque no card navega — o `Alert.alert` do Android cortaria exatamente esta
+    // opção antes da correção.
     fireEvent.press(sheet.getByText("Hospital Gama"));
+    const card = await screen.findByTestId("card-hospital-mapa");
+    expect(within(card).getByText("Hospital Gama")).toBeTruthy();
+    expect(screen.queryByTestId("option-sheet")).toBeNull();
+    expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
+
+    await tocarNoCard("Hospital Gama");
     await waitFor(() => expect(NAVEGACAO.navigate).toHaveBeenCalledWith("HospitalDetalhe", { id: "h3" }));
   });
 
@@ -268,14 +319,13 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     });
 
     // h1 está na lista (centroide ~278 m do GPS mockado): ganha sufixo de
-    // distância. h2 não está na lista: volta ao nome puro. Busca escopada ao
-    // seletor: "Hospital Alfa" também rotula o marcador do mapa (h1).
+    // distância. h2 não está na lista: volta ao nome puro.
     const sheet = within(await screen.findByTestId("option-sheet"));
     expect(await sheet.findByText(/^Hospital Alfa · \d+ m$/)).toBeTruthy();
     expect(await sheet.findByText("Hospital Alfa")).toBeTruthy();
   });
 
-  test("BUG-11: toque com um único polígono não mostra diálogo", async () => {
+  test("BUG-11: toque com um único polígono não mostra diálogo — seleciona direto", async () => {
     renderizar();
     const fonte = await screen.findByTestId("geofences-hospitais");
 
@@ -284,7 +334,8 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     });
 
     expect(screen.queryByTestId("option-sheet")).toBeNull();
-    await waitFor(() => expect(NAVEGACAO.navigate).toHaveBeenCalledWith("HospitalDetalhe", { id: "h1" }));
+    expect(await screen.findByTestId("card-hospital-mapa")).toBeTruthy();
+    expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
   });
 
   test("BUG-04: o mapa sai da árvore ANTES de a navegação acontecer", async () => {
@@ -297,17 +348,18 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     // Desmontado, o `NativeMapView.destroyed` fica marcado e a mesma chamada retorna
     // lista vazia sem tocar no nativo. Por isso a ORDEM é o que precisa ser garantido —
     // afirmar só que a navegação ocorreu deixaria o defeito passar de novo.
+    //
+    // Com o card, o gatilho da navegação é o toque NO CARD (o marcador só seleciona) —
+    // é ele que chama `abrirHospital`, então é ele que precisa respeitar a ordem.
     renderizar();
-    const fonte = await screen.findByTestId("geofences-hospitais");
+    await selecionarPeloPoligono();
 
     let mapaAindaMontado = null;
     NAVEGACAO.navigate.mockImplementation(() => {
       mapaAindaMontado = screen.queryByTestId("geofences-hospitais") !== null;
     });
 
-    act(() => {
-      fonte.props.onPress({ features: [{ properties: { id: "h1" } }] });
-    });
+    await tocarNoCard();
 
     await waitFor(() => expect(NAVEGACAO.navigate).toHaveBeenCalled());
     expect(mapaAindaMontado).toBe(false);
@@ -318,11 +370,8 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     // troca um app travado por uma aba de mapa permanentemente vazia — pior do que o
     // defeito original, porque não dá nem para fechar e reabrir a tela.
     renderizar();
-    const fonte = await screen.findByTestId("geofences-hospitais");
-
-    act(() => {
-      fonte.props.onPress({ features: [{ properties: { id: "h1" } }] });
-    });
+    await selecionarPeloPoligono();
+    await tocarNoCard();
     await waitFor(() => expect(NAVEGACAO.navigate).toHaveBeenCalled());
     expect(screen.queryByTestId("geofences-hospitais")).toBeNull();
 
@@ -330,6 +379,8 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     act(() => ouvintes.focus?.());
 
     expect(await screen.findByTestId("geofences-hospitais")).toBeTruthy();
+    // O card também volta a estar lá: a seleção sobrevive à ida e volta do detalhe.
+    expect(screen.getByTestId("card-hospital-mapa")).toBeTruthy();
   });
 
   test("BUG-04: ao voltar, o mapa é reenquadrado nos hospitais — não no Brasil inteiro", async () => {
@@ -340,12 +391,11 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     // dispara porque `mapaMontado` está nas dependências dele. É isso que este teste
     // protege: sem o `mapaMontado` lá, a mutação sobrevivia.
     renderizar();
-    const fonte = await screen.findByTestId("geofences-hospitais");
+    await screen.findByTestId("geofences-hospitais");
     await waitFor(() => expect(mockCamera.fitBounds).toHaveBeenCalled());
 
-    act(() => {
-      fonte.props.onPress({ features: [{ properties: { id: "h1" } }] });
-    });
+    await selecionarPeloPoligono();
+    await tocarNoCard();
     await waitFor(() => expect(NAVEGACAO.navigate).toHaveBeenCalled());
 
     mockCamera.fitBounds.mockClear();
@@ -359,11 +409,8 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     // Desmontar antes de saber se há para onde ir deixaria a tela sem mapa e sem
     // conserto: quem remonta é o `focus`, e ele só vem se a tela tiver perdido o foco.
     render(<GeoLocalizacaoScreen navigation={{ addListener: jest.fn() }} />);
-    const fonte = await screen.findByTestId("geofences-hospitais");
-
-    act(() => {
-      fonte.props.onPress({ features: [{ properties: { id: "h1" } }] });
-    });
+    await selecionarPeloPoligono();
+    await tocarNoCard();
 
     expect(screen.queryByTestId("geofences-hospitais")).not.toBeNull();
   });
@@ -381,6 +428,8 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
 
     expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
     expect(screen.queryByTestId("geofences-hospitais")).not.toBeNull();
+    // Sem `id` também não há o que selecionar: nenhum card vazio sobre o mapa.
+    expect(screen.queryByTestId("card-hospital-mapa")).toBeNull();
   });
 
   test("BUG-05: o mapa fica dentro de um container que recorta o que vaza", async () => {
@@ -407,14 +456,161 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     // navegação, a caixa de informações salta para junto do cabeçalho no quadro da
     // transição — piscada visível em aparelho lento.
     renderizar();
-    const fonte = await screen.findByTestId("geofences-hospitais");
-
-    act(() => {
-      fonte.props.onPress({ features: [{ properties: { id: "h1" } }] });
-    });
+    await selecionarPeloPoligono();
+    await tocarNoCard();
 
     await waitFor(() => expect(screen.queryByTestId("geofences-hospitais")).toBeNull());
     expect(screen.getByTestId("mapa-container")).toHaveStyle({ flex: 1 });
+    // O card mora no mesmo container: continua na tela durante a transição, em vez de
+    // piscar junto com o mapa que sai.
+    expect(within(screen.getByTestId("mapa-container")).getByTestId("card-hospital-mapa")).toBeTruthy();
+  });
+
+  describe("card do hospital sobre o mapa", () => {
+    const INDICADORES = { notaMedia: 4.2, nAvaliacoes: 12, tempoMedianoMinutos: 95 };
+
+    test("tocar no marcador seleciona o hospital e mostra o card com as informações básicas", async () => {
+      HospitalService.listar.mockResolvedValue({
+        content: [
+          hospitalTeste("h1", "Hospital Alfa", {
+            categoria: "UPA",
+            tipo: "PUBLICO",
+            indicadores: INDICADORES,
+          }),
+        ],
+      });
+      renderizar();
+
+      const marcador = await screen.findByLabelText("Ver informações de Hospital Alfa");
+      // Antes do toque: nenhum card, e o marcador é só ícone — o nome não vira rótulo
+      // solto no mapa (com ~340 hospitais os rótulos se sobrepunham).
+      expect(screen.queryByTestId("card-hospital-mapa")).toBeNull();
+      expect(screen.queryByText("Hospital Alfa")).toBeNull();
+
+      tocarNoMarcador(marcador);
+
+      const card = await screen.findByTestId("card-hospital-mapa");
+      expect(within(card).getByText("Hospital Alfa")).toBeTruthy();
+      expect(within(card).getByText("UPA")).toBeTruthy();
+      expect(within(card).getByText("Público")).toBeTruthy();
+      expect(within(card).getByText("12 avaliações")).toBeTruthy();
+      expect(within(card).getByText("Tempo médio: 1h35")).toBeTruthy();
+      // Selecionar não navega: o detalhe só abre pelo toque no card.
+      expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
+    });
+
+    test("o card mostra a distância do GPS até o hospital (F-07, critério 3)", async () => {
+      renderizar();
+
+      tocarNoMarcador(await screen.findByLabelText("Ver informações de Hospital Alfa"));
+
+      const card = await screen.findByTestId("card-hospital-mapa");
+      // Centroide do ANEL de teste a ~278 m do GPS mockado (ver o teste do BUG-11).
+      expect(within(card).getByText(/^\d+ m de você$/)).toBeTruthy();
+    });
+
+    test("sem GPS, o card não mostra distância", async () => {
+      comGps(null);
+      renderizar();
+
+      tocarNoMarcador(await screen.findByLabelText("Ver informações de Hospital Alfa"));
+
+      const card = await screen.findByTestId("card-hospital-mapa");
+      expect(within(card).getByText("Hospital Alfa")).toBeTruthy();
+      expect(within(card).queryByText(/de você/)).toBeNull();
+    });
+
+    test("o marcador selecionado é destacado e desenhado por último, acima dos demais", async () => {
+      HospitalService.listar.mockResolvedValue({
+        content: [hospitalTeste("h1", "Hospital Alfa"), hospitalTeste("h2", "Hospital Beta")],
+      });
+      renderizar();
+
+      tocarNoMarcador(await screen.findByLabelText("Ver informações de Hospital Alfa"));
+      await screen.findByTestId("card-hospital-mapa");
+
+      // Marcador filho posterior fica por cima do anterior: com centenas de ícones
+      // sobrepostos, o destacado tem de ser o último — mesmo sendo o primeiro da lista.
+      const ordem = screen.getAllByTestId(/^marcador-hospital-/).map((m) => m.props.testID);
+      expect(ordem).toEqual(["marcador-hospital-h2", "marcador-hospital-h1"]);
+      expect(screen.getByLabelText("Ver informações de Hospital Alfa")).toBeSelected();
+      expect(screen.getByLabelText("Ver informações de Hospital Beta")).not.toBeSelected();
+    });
+
+    test("selecionar centraliza a câmera no hospital, sem alterar o zoom", async () => {
+      HospitalService.listar.mockResolvedValue({ content: [hospitalTeste("h1", "Hospital Alfa")] });
+      renderizar();
+
+      const marcador = await screen.findByLabelText("Ver informações de Hospital Alfa");
+      mockCamera.setCamera.mockClear();
+      tocarNoMarcador(marcador);
+
+      await waitFor(() => expect(mockCamera.setCamera).toHaveBeenCalledTimes(1));
+      const config = mockCamera.setCamera.mock.calls[0][0];
+      // Mesmo centroide do polígono e do marcador (ver BUG-10).
+      expect(config.centerCoordinate[0]).toBeCloseTo(-47.885, 9);
+      expect(config.centerCoordinate[1]).toBeCloseTo(-15.7875, 9);
+      // O card cobre a parte de baixo do mapa; o zoom continua sendo do usuário.
+      expect(config.zoomLevel).toBeUndefined();
+    });
+
+    test("fechar o card desfaz a seleção sem navegar", async () => {
+      renderizar();
+      tocarNoMarcador(await screen.findByLabelText("Ver informações de Hospital Alfa"));
+      await screen.findByTestId("card-hospital-mapa");
+
+      fireEvent.press(screen.getByLabelText("Fechar informações do hospital"));
+
+      expect(screen.queryByTestId("card-hospital-mapa")).toBeNull();
+      expect(screen.getByLabelText("Ver informações de Hospital Alfa")).not.toBeSelected();
+      expect(NAVEGACAO.navigate).not.toHaveBeenCalled();
+    });
+
+    test("tocar em outro marcador troca o hospital do card", async () => {
+      HospitalService.listar.mockResolvedValue({
+        content: [hospitalTeste("h1", "Hospital Alfa"), hospitalTeste("h2", "Hospital Beta")],
+      });
+      renderizar();
+
+      tocarNoMarcador(await screen.findByLabelText("Ver informações de Hospital Alfa"));
+      const card = await screen.findByTestId("card-hospital-mapa");
+      expect(within(card).getByText("Hospital Alfa")).toBeTruthy();
+
+      tocarNoMarcador(screen.getByLabelText("Ver informações de Hospital Beta"));
+
+      await waitFor(() =>
+        expect(within(screen.getByTestId("card-hospital-mapa")).getByText("Hospital Beta")).toBeTruthy()
+      );
+      expect(within(screen.getByTestId("card-hospital-mapa")).queryByText("Hospital Alfa")).toBeNull();
+    });
+
+    test("trocar o raio fecha o card na hora, sem esperar a resposta do backend", async () => {
+      renderizar();
+      tocarNoMarcador(await screen.findByLabelText("Ver informações de Hospital Alfa"));
+      await screen.findByTestId("card-hospital-mapa");
+
+      // Resposta que nunca chega: se o card só sumisse quando o resultado novo excluísse o
+      // hospital (em vez de fechar no toque), ele ficaria na tela enquanto o mapa carrega.
+      HospitalService.listar.mockReturnValue(new Promise(() => {}));
+      fireEvent.press(screen.getByText("5 km"));
+
+      expect(screen.queryByTestId("card-hospital-mapa")).toBeNull();
+    });
+
+    test("o card fechado pela troca de raio não volta sozinho quando o raio é restaurado", async () => {
+      renderizar();
+      tocarNoMarcador(await screen.findByLabelText("Ver informações de Hospital Alfa"));
+      await screen.findByTestId("card-hospital-mapa");
+
+      // Mesmo resultado nos dois raios: o hospital selecionado continua na lista, então só
+      // um `id` guardado poderia trazer o card de volta.
+      fireEvent.press(screen.getByText("5 km"));
+      expect(screen.queryByTestId("card-hospital-mapa")).toBeNull();
+      fireEvent.press(screen.getByText("Todos"));
+
+      await screen.findByLabelText("Ver informações de Hospital Alfa");
+      expect(screen.queryByTestId("card-hospital-mapa")).toBeNull();
+    });
   });
 
   test("falha ao carregar hospitais exibe mensagem sem derrubar o mapa", async () => {

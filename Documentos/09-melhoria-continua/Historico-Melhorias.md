@@ -996,6 +996,85 @@ alterados) sem regressão.
 
 ---
 
+## M-015 — Mapa: card do hospital ao tocar no marcador (padrão "Decolar")
+
+**Data:** 20/09/2026 · **PR:** #123 (substitui o #122, fechado pelo GitHub ao renomear a branch)
+
+### O que o PO pediu
+
+Na aba Mapa, ícones de hospital; ao selecionar um, abrir um card com as informações
+básicas; ao tocar no card aberto, ir para a página de detalhe (referência: telas de
+hospedagem do Decolar, com marcador destacado e card com botão de fechar).
+
+### Achado ao investigar
+
+O critério de aceite 3 da F-07 (`Features-MVP` v2.2) **já exigia** isso — "toque no pin
+exibe card de detalhe rápido; toque no card navega para o Detalhe". O código fazia o
+contrário: tocar no marcador navegava direto. O Relatório de Aderência dizia
+"F-07 funcional" sem notar a diferença. Por isso os testes de BUG-04/05/10/11 —
+escritos contra o comportamento antigo — quebraram (8) e foram **adaptados**, não
+apagados: cada um continua provando o mesmo risco (desmontar o mapa antes de navegar,
+container que reserva espaço, âncora simétrica, seletor de sobreposição).
+
+### O que mudou
+
+- `GeoLocalizacaoScreen`: estado `hospitalSelecionadoId`; toque no marcador seleciona,
+  destaca (azul, ordem de renderização por último para ficar por cima) e centraliza a
+  câmera sem mexer no zoom; o card (`CSHospitalCard` reaproveitado, com `CSIconButton`
+  para fechar) fica **fora** do `MapView` — sobrevive ao desmonte-antes-de-navegar do
+  BUG-04 e a seleção persiste ao voltar do detalhe. Marcador vira só ícone.
+- `CSHospitalCard`: prop opcional `distancia` ("1,2 km de você"); ausente, a linha some
+  (nunca "N/D").
+- `mapkit/index.web.js` — **dois defeitos do shim Web só apareceram rodando o app real**
+  (o mock do Jest não os pega):
+  1. `flyTo({ zoom: undefined })` no `mapbox-gl` vira NaN e descarta o voo: o mapa não
+     se mexia ao centralizar sem alterar o zoom. Agora só repassa as chaves informadas.
+  2. `mapbox-gl` v2 só reage a resize da janela; o container encolhia quando a
+     mensagem de GPS entrava (canvas 615 px num container de 526 → mapa descentrado,
+     ~90 px cortados). Agora um `ResizeObserver` chama `map.resize()`.
+
+### Achados do `code-review` deste PR
+
+Corrigidos:
+- **Seleção pendurada:** o `id` do hospital selecionado ficava guardado quando o raio o
+  tirava da lista, e o card **voltava sozinho** ao restaurar o raio. Trocar o raio agora
+  fecha o card (2 testes; mutação da correção morta).
+- `converterAncora`/prop `anchor` do `MarkerView` Web: código morto depois do BUG-10
+  (nenhum chamador em `src`), com comentário que ainda descrevia a âncora assimétrica.
+  Removidos.
+- Docstring do `CSHospitalCard` dizia que lista e mapa mostram distância (critérios 3 e
+  4); só o mapa passa a prop. **O critério 4 da F-07 (distância na lista) segue em aberto.**
+
+Aceitos, com o motivo:
+- **Card cortado em tela muito curta:** o "X" fica 20 px acima do card, dentro de um
+  container com `overflow: hidden`; some se a área do mapa tiver menos de ~230 px. O app é
+  `portrait`, então só ocorre em aparelhos de altura útil < ~560 dp. Não validável aqui.
+- **Toque no marcador também dispara o `ShapeSource` (Web):** medido no app real em zoom
+  alto — com unidades empilhadas abre o card da de cima **e** o seletor "Várias unidades
+  neste local" (que atualiza o card ao escolher). Já ocorria antes do PR e ajuda no caso
+  empilhado; com uma unidade só, a seleção dupla é idempotente.
+- Área de toque de 40 px (< 48 dp do RNF-01), remontagem dos 2 marcadores a cada troca de
+  seleção e três varreduras lineares na lista de ~340: custo baixo, sem aparelho para
+  medir; ficam como follow-up.
+
+### Verificação
+
+- `npx jest`: 407/407; `npm run lint`: 0 erros, 16 avisos = o teto (nenhum novo).
+- **Mutação** (o critério do PO): 10 mutações na tela/card e 4 no shim Web, todas mortas
+  pelos testes; arquivo restaurado e conferido por `diff` depois de cada rodada.
+- App Web real contra a API de dev (~340 marcadores): marcador → card → detalhe → voltar
+  (seleção persiste) → trocar de hospital → fechar; marcador selecionado exatamente no
+  centro do mapa; zero erros no console.
+
+### O que **não** foi validado
+
+Aparelho físico: o toque no marcador usa props de responder do RN (não há como validar
+gesto real aqui) e a área de toque é 40 px, abaixo dos 48 dp do RNF-01. No Web não há GPS
+no navegador, então a linha de distância não aparece lá. Possíveis evoluções (fora deste
+PR): ícone por categoria (UPA/UBS/hospital), tocar no mapa para fechar o card.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

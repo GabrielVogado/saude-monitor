@@ -26,6 +26,11 @@ const CATEGORIA_LABEL = {
  * Navegação revisada: aceita `onCheckin`/`checkinLoading`/`checkinAtivo` para exibir um
  * botão compacto de check-in manual no próprio card (sem abrir o detalhe). O controle
  * fica fora do Pressable que abre o detalhe para evitar duas navegações no mesmo toque.
+ *
+ * `distancia` (texto já formatado, ex.: "1,2 km") é opcional — F-07, critério 3: o card
+ * do mapa mostra a distância quando há GPS. Só o mapa passa a prop; a lista de
+ * hospitais e o ranking ainda não (critério 4 da F-07, em aberto). Sem GPS a tela não
+ * passa nada e a linha simplesmente não existe (nunca "N/D").
  */
 function CSHospitalCard({
   hospital,
@@ -34,6 +39,7 @@ function CSHospitalCard({
   checkinLoading,
   checkinAtivo,
   checkinDesabilitado = false,
+  distancia = null,
 }) {
   // ARQ-05: o card devolve o proprio `hospital` ao chamador. Antes, a tela precisava
   // criar `onPress={() => abrirDetalhe(item)}` por item, o que gerava uma prop nova a
@@ -82,6 +88,7 @@ function CSHospitalCard({
               {tipoUnidade}
             </Text>
           ) : null}
+          {distancia ? <Text style={styles.distance}>{distancia} de você</Text> : null}
           {temIndicadores ? (
             <View style={styles.ratingRow}>
               <CSRatingStars nota={indicadores.notaMedia} size={16} />
@@ -173,6 +180,10 @@ const styles = StyleSheet.create({
     gap: spacing.s2,
   },
   unitType: {
+    ...typography.bodySm,
+    color: colors.onSurfaceVariant,
+  },
+  distance: {
     ...typography.bodySm,
     color: colors.onSurfaceVariant,
   },

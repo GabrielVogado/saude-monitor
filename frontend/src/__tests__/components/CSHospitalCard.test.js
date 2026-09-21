@@ -86,4 +86,17 @@ describe("CSHospitalCard", () => {
     expect(screen.getByText("Ainda sem avaliações suficientes")).toBeTruthy();
     expect(screen.queryByText("3 avaliações")).toBeNull();
   });
+
+  test("com `distancia`, mostra a distância já formatada (F-07, critério 3)", () => {
+    render(<CSHospitalCard hospital={hospital} distancia="1,2 km" />);
+
+    expect(screen.getByText("1,2 km de você")).toBeTruthy();
+  });
+
+  test("sem `distancia`, não mostra linha de distância — nunca um 'N/D'", () => {
+    render(<CSHospitalCard hospital={hospital} />);
+
+    expect(screen.queryByText(/de você/)).toBeNull();
+    expect(screen.queryByText(/N\/D/)).toBeNull();
+  });
 });

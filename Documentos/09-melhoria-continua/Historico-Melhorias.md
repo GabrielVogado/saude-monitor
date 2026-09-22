@@ -1137,6 +1137,97 @@ aqui para abrir tarefa própria; nenhum arquivo desse teste foi tocado neste PR.
 
 ---
 
+## M-017 — Ambiente de homologação e APK que atualiza sem desinstalar
+
+**Data:** 22/09/2026 · **PRs:** #126 (APK) · #127 (homologação)
+
+### O que o PO pediu
+
+Fechar uma tag de homologação levando a `develop` para a `master`, com ambiente
+separado, e APK versionado que atualize sem desinstalar — até aqui todo APK novo
+exigia desinstalar o anterior (`apk-develop-release-ASSINATURA-EFEMERA-…`).
+
+### Decisões do PO
+
+`master` = homologação (produção fica para `release/<tag>`) · APK em **GitHub
+Releases** · banco `saude_monitor_hom` no mesmo cluster Atlas, com usuário próprio ·
+APK HML **lado a lado** com o de dev.
+
+### Diagnóstico (medido antes de mudar)
+
+- **Por que o APK exigia desinstalar — duas causas, não uma:** o secret da chave nunca
+  foi criado (cada build gerava uma chave nova) **e** o `versionCode` era `1` fixo. Só
+  corrigir a chave não bastaria: sem `versionCode` crescente o Android não reconhece o
+  APK novo como atualização.
+- `master` estava 277 commits atrás da `develop`; o CD do backend mandava `master` para
+  secrets `_PROD` inexistentes; nenhum GitHub Release existia.
+- **Deriva de documentação:** `deploy/google/setup-gcp.sh` criava secrets
+  `saude-monitor-*-dev` que o workflow nunca leu (os de dev em uso se chamam `MONGO_URI`,
+  `JWT_SECRET`, `RESEND_API_KEY`, criados à mão); o manual de git-flow ainda descrevia o
+  Render e `master` = produção.
+
+### O que mudou
+
+- **APK** (`build.gradle` + `cd-mobile-apk.yml`): chave de release lida de secrets;
+  `versionCode`/`versionName` por build; pacote e nome por ambiente (`.dev`/`.hom`;
+  sem sufixo reservado a produção). Homologação **falha** sem a chave, em vez de
+  publicar um APK que ninguém consegue atualizar depois.
+- **`cd-homologacao.yml`** (novo): versão `vX.Y.Z-rc.N` → backend HML + 3 smoke tests →
+  APK apontando para a URL recém-publicada → tag + GitHub Release. Se qualquer etapa
+  falhar, não há tag. Recusa versão menor que a última homologada.
+- **Backend:** `master` → `saude-monitor-backend-hom` com secrets `_HOM`; GitHub
+  Environments (`desenvolvimento`/`homologacao`/`producao`) com histórico de deploy.
+- `deploy/google/setup-homologacao.sh`: cria os secrets `_HOM` sem expor valores (gera o
+  `JWT_SECRET_HOM` sozinho; recusa URI que não aponte para `saude_monitor_hom`).
+
+### Achados do `code-review` (PR do APK), corrigidos antes do PR
+
+Entradas vazias do chamador caíam em valores de dev (URL e versão) · secrets não
+declarados no `workflow_call` deixariam o mapa em branco em silêncio · só 1 dos 4
+secrets da chave era checado (senha errada só aparecia após ~20 min de Gradle — agora
+`keytool -list` antes) · chave de release usável a partir de qualquer branch ·
+concorrência cancelando o APK de homologação · `DEPLOY.md` desatualizado. **Aceito:**
+build local sem `-Pambiente` sai com o pacote sem sufixo (a CLI do Expo abre o app por
+ele; produção ainda não existe).
+
+### Achados do `code-review` (PR do ambiente de homologação), corrigidos antes do PR
+
+- **Disparo manual fora da `master`** publicaria o backend de DEV e uma "rc de
+  homologação" apontando para ele — o job `versao` agora recusa outra ref.
+- **Backend publicado antes do APK:** se o APK falhasse, o HML ficaria com código novo
+  sem rc, e o APK antigo dos testadores falando com uma API que pode ter mudado. A ordem
+  virou **APK → backend → tag**; o APK usa a URL determinística do Cloud Run
+  (`<serviço>-<nº do projeto>.<região>.run.app`, conferida no serviço de dev) e o job
+  final prova que ela responde antes de publicar.
+- **`release.yml` cortava produção da ponta da `master`** — que agora é homologação e
+  pode ter commit não homologado. Passou a receber a **tag da rc validada**.
+- Script de secrets aceitava valor vazio (deixava secret sem versão, tratado como "já
+  existe" na execução seguinte); comentário da fila de concorrência prometia algo que o
+  GitHub não faz (só 1 execução pendente por grupo); clone completo só para ler tags.
+- **Aceito:** toda promoção gera rc, mesmo sem mudança de código — promoção é ato
+  deliberado e a rc é o retrato daquele commit.
+
+### Verificação
+
+- **CI real** (run 35768427033, dispatch na branch): APK `com.gabrielvogado.saudemonitor.dev`,
+  `versionCode 49`, `1.0.0-dev.49`, nome "Radar Saúde DEV" (lido com `aapt2` no APK
+  baixado); assinado pela chave efêmera, como esperado sem os secrets, e com a branch e
+  `-ASSINATURA-EFEMERA` no nome do arquivo.
+- Gradle local (JDK 17): manifesto HML com pacote `.hom`, nome "Radar Saúde HML",
+  versão das propriedades; `signingReport` usa a chave quando fornecida e a `debug` sem
+  ela; ambiente inválido derruba o build.
+- Lógica do workflow simulada fora do CI: assinatura em 8 cenários e cálculo de versão
+  em 6 contra um remoto local (primeira rc, sequência, re-execução no mesmo commit, troca
+  de base, versão menor recusada, `1.10.0` sem confundir com `1.1.0`).
+
+### O que ainda não foi validado
+
+A cadeia inteira (`cd-homologacao.yml`) só roda de verdade no primeiro push na
+`master`, depois que o PO criar a chave e os secrets. E "instalar por cima sem
+desinstalar" só se confirma num aparelho, com duas rcs seguidas.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

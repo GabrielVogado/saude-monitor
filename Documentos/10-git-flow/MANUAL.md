@@ -2,6 +2,14 @@
 
 Manual operacional do sistema de monitoramento hospitalar por geolocalização, cobrindo o fluxo de desenvolvimento, os ambientes, o CI/CD e o processo de release.
 
+> **Revisão 22/09/2026 — ambiente de homologação.** `master` deixou de ser produção e
+> passou a ser **homologação (HML)**: cada push nela publica o backend
+> `saude-monitor-backend-hom`, gera o APK "Radar Saúde HML" e cria a tag
+> `vX.Y.Z-rc.N` com uma GitHub Release. Produção fica para `release/<tag>`. O backend
+> está no **Google Cloud Run** desde 04/09/2026 — as menções ao Render abaixo que não
+> foram reescritas descrevem o caminho de rollback, não o vigente. Versão anterior
+> deste manual: histórico do git.
+
 ---
 
 ## 1. Visão Geral
@@ -10,25 +18,25 @@ O **Clinical Sanctuary** detecta automaticamente a entrada e saída de usuários
 
 - **Backend:** Spring Boot 4 (Java 25) + MongoDB, empacotado em Docker.
 - **Frontend:** React Native / Expo 55 (web via `react-native-web` + APK mobile).
-- **CI/CD:** GitHub Actions + Render (backend) + Gradle no Actions (APK) + EAS (AAB de loja) + MongoDB Atlas (banco). **O frontend web não tem provedor de publicação** — ver §4.1.
+- **CI/CD:** GitHub Actions + Google Cloud Run (backend) + Gradle no Actions (APK) + GitHub Releases (APK de homologação) + EAS (AAB de loja) + MongoDB Atlas (banco). **O frontend web não tem provedor de publicação** — ver §4.1.
 
 ---
 
 ## 2. Ambientes
 
-O projeto prevê ambientes isolados por branch, cada um com seu próprio backend e banco. **Hoje só o `dev` existe** — os demais entram quando forem criados.
+Cada ambiente tem backend, banco, `JWT_SECRET` e APK próprios.
 
-| Ambiente | Branch | Backend (Render) | Frontend web | Banco (Atlas) |
-|----------|--------|------------------|--------------------|---------------|
-| **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | — (sem provedor) | `saude_monitor_dev` |
-| **prod** (produção) | `master` · `release/<tag>` | `saude-monitor-backend-prod` ⚠️ *não criado* | — (sem provedor) | `saude_monitor_prod` ⚠️ *não criado* |
-
-> ⚠️ **Só o ambiente `dev` existe hoje.** O `saude-monitor-backend-dev` é o único Web
-> Service no Render, e é o único com secrets configurados. Homologação deixou de ser
-> um degrau do fluxo porque não tem branch nem ambiente — ela volta ao documento
-> quando for criada.
+| Ambiente | Branch | Backend (Cloud Run) | Banco (Atlas) | APK |
+|----------|--------|---------------------|---------------|-----|
+| **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | `saude_monitor_dev` | "Radar Saúde DEV" (`…saudemonitor.dev`), artefato do Actions (30 dias) |
+| **hom** (homologação) | `master` | `saude-monitor-backend-hom` | `saude_monitor_hom` | "Radar Saúde HML" (`…saudemonitor.hom`), **GitHub Release** por tag `vX.Y.Z-rc.N` |
+| **prod** (produção) | `release/<tag>` | `saude-monitor-backend` ⚠️ *não criado* | `saude_monitor_prod` ⚠️ *não criado* | "Radar Saúde" (`…saudemonitor`) — loja, a definir |
 
 > **Regra de ouro:** cada ambiente usa **banco de dados separado** e **JWT_SECRET diferente**. Nunca compartilhe dados entre ambientes.
+
+DEV e HML são pacotes diferentes: os dois apps convivem no mesmo celular. Dentro de
+cada um, um APK novo **instala por cima** do anterior (mesma chave de release,
+`versionCode` maior) — ver [`deploy/android/README.md`](../../deploy/android/README.md).
 
 ---
 
@@ -36,7 +44,8 @@ O projeto prevê ambientes isolados por branch, cada um com seu próprio backend
 
 ```
 feature/* ──► develop ──► master ──► release/<tag>
- (trabalho)      (dev)      (prod)    (prod, versão fixada)
+ (trabalho)      (dev)      (hom)     (prod, versão fixada)
+                            tag vX.Y.Z-rc.N + GitHub Release com o APK HML
 ```
 
 ### 3.1 Nova funcionalidade
@@ -57,12 +66,14 @@ feature/* ──► develop ──► master ──► release/<tag>
    ```
 2. Desenvolva, commite e abra PR para `develop`.
 
-### 3.3 Promoção para produção
-1. Abra um **Pull Request** de `develop` → `master`. **Só de `develop`:** o check
-   `Origem do PR (master)` reprova qualquer outra origem. `master` é produção, e um PR
-   de feature direto para lá pularia a integração — ninguém teria visto aquele código
-   conviver com o resto antes de ir ao ar.
-2. O CI roda no PR (desde 03/09/2026 — antes disso `master` não tinha CI nenhuma).
+### 3.3 Promoção para homologação
+1. (Opcional) Se a entrega muda a versão, suba `expo.version` em `frontend/app.json`
+   num PR para a `develop` antes da promoção. É dele que sai o `X.Y.Z` da tag.
+2. Abra um **Pull Request** de `develop` → `master`. **Só de `develop`:** o check
+   `Origem do PR (master)` reprova qualquer outra origem. Um PR de feature direto para
+   homologação pularia a integração — ninguém teria visto aquele código conviver com
+   o resto antes de ser homologado.
+3. O CI roda no PR (desde 03/09/2026 — antes disso `master` não tinha CI nenhuma).
 
 > ⚠️ **Nem `develop` nem `master` estão protegidas hoje** (verificado pela API em
 > 03/09/2026 — sem proteção clássica e sem ruleset). A `develop` teve proteção a partir
@@ -88,17 +99,31 @@ feature/* ──► develop ──► master ──► release/<tag>
 > [`.github/rulesets/`](../../.github/rulesets/) — importar em
 > *Settings → Rules → Rulesets → New ruleset → Import a ruleset*. Ver o README de lá
 > para os dois passos que o import não faz sozinho.
-3. Após merge, o **ambiente prod** é atualizado automaticamente.
+4. Após o merge, o **`cd-homologacao.yml`** roda sozinho, nesta ordem, e para no
+   primeiro erro:
+   1. calcula a próxima `vX.Y.Z-rc.N` (recusa versão menor que a última homologada);
+   2. gera o APK HML — primeiro, porque é a etapa que mais falha, e falhar aqui não
+      toca no ambiente;
+   3. publica `saude-monitor-backend-hom` e roda os 3 smoke tests (saúde, leitura do
+      Mongo, filtro por raio);
+   4. confere que a URL embutida no APK responde e cria a tag e a **GitHub Release**
+      (pré-release) com o APK e o changelog desde a rc anterior.
 
-> ⚠️ **Hoje isso falha de propósito.** O ambiente de produção não existe e os secrets
-> `RENDER_API_KEY_PROD` / `RENDER_SERVICE_ID_PROD` não estão configurados; o
-> `cd-backend.yml` interrompe o deploy com mensagem explícita em vez de ficar verde
-> sem publicar. Criar o Web Service e os secrets é o que destrava a promoção.
+   Merges muito seguidos: o GitHub guarda só uma execução na fila, então um commit
+   intermediário pode ficar sem rc própria — o seguinte o contém.
+5. Testadores baixam o APK na página **Releases** do repositório. Quem já tem o HML
+   instalado só instala por cima.
+
+> ⚠️ **Pré-requisitos (uma vez):** a chave de release do APK
+> ([`deploy/android/README.md`](../../deploy/android/README.md)), o banco/usuário
+> `saude_monitor_hom` no Atlas (§5.1) e os secrets `_HOM` no Google Cloud
+> (`bash deploy/google/setup-homologacao.sh`). Sem eles o `cd-homologacao.yml` falha
+> com mensagem explícita, e nenhuma tag é criada.
 
 ### 3.4 Release de produção
-1. Valide em **produção contínua** (`master`) antes de fixar a versão.
-2. No GitHub: **Actions → Release - Gerar branch de produção → Run workflow**, informando a versão (ex.: `1.0.0`).
-3. O workflow cria a branch **`release/1.0.0`** a partir da `master`.
+1. Valide em **homologação** (`master`, a última `vX.Y.Z-rc.N`) antes de fixar a versão.
+2. No GitHub: **Actions → Release - Gerar branch de produção → Run workflow**, informando a **rc validada** (ex.: `v1.0.0-rc.3`).
+3. O workflow cria a branch **`release/1.0.0`** a partir **dessa tag** — não da ponta da `master`, que pode já ter commits ainda não homologados.
 4. O push da branch `release/1.0.0` dispara o deploy do **ambiente prod**.
 5. Após validar em produção, faça merge de `release/1.0.0` de volta em `master` (e `develop`).
 
@@ -111,8 +136,10 @@ feature/* ──► develop ──► master ──► release/<tag>
 | Workflow | Gatilho | Ação |
 |----------|---------|------|
 | `ci.yml` | push/PR em `develop`/`master` | Build + testes do backend e frontend |
-| `cd-backend.yml` | push em `develop`, `master`, `release/**` (caminho `backend/**`) | Docker → GHCR → deploy Render. **Falha com mensagem explícita** se o ambiente não tiver secrets |
-| `cd-mobile-apk.yml` | push em `develop`/`master` (caminho `frontend/**`) **+ manual** | Build do **APK interno** com Gradle no próprio Actions. Publica o APK como artefato do run (30 dias) |
+| `cd-backend-google.yml` | push em `develop`, `release/**` (caminho `backend/**`) + manual + `workflow_call` | Docker → Artifact Registry → deploy no **Cloud Run** + 3 smoke tests. **Falha com mensagem explícita** se o ambiente não tiver secrets |
+| `cd-homologacao.yml` | push em `master` + manual | **Homologação:** versão `vX.Y.Z-rc.N` → backend HML → APK HML → tag + GitHub Release (§3.3) |
+| `cd-mobile-apk.yml` | push em `develop` (caminho `frontend/**`) + manual + `workflow_call` | Build do APK com Gradle no próprio Actions. Artefato do run (30 dias). Pacote, nome e versão por ambiente |
+| `cd-backend-render.yml` | só manual | Rollback para o Render (desativado desde 04/09/2026) |
 | `cd-mobile-eas.yml` | **só manual** (`workflow_dispatch`, a partir de `release/*`) | Build do **AAB de loja** no EAS |
 | `keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` para impedir a hibernação do Render (E8-01) |
 | `release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
@@ -177,20 +204,23 @@ feature/* ──► develop ──► master ──► release/<tag>
 
 ### 4.2 Mapeamento de ambiente (lógica do `resolve-env`)
 
-| Branch | Ambiente | Tag da imagem GHCR |
-|--------|----------|--------------------|
-| `develop` | `dev` | `dev` |
-| `master` | `prod` | `prod` |
-| `release/<tag>` | `prod` | `<tag>` (ex.: `1.0.0`) |
+| Branch | Ambiente | Serviço Cloud Run | Sufixo dos secrets GCP | Tag da imagem |
+|--------|----------|-------------------|------------------------|---------------|
+| `develop` | `dev` | `saude-monitor-backend-dev` | *(nenhum)* | `dev` |
+| `master` | `hom` | `saude-monitor-backend-hom` | `_HOM` | `hom` |
+| `release/<tag>` | `prod` | `saude-monitor-backend` | `_PROD` | `<tag>` (ex.: `1.0.0`) |
 
 ### 4.3 Secrets do GitHub
 
-Cada secret tem sufixo por ambiente (`_DEV`, `_PROD`):
+Credenciais do backend **não** ficam no GitHub: estão no Secret Manager do Google
+Cloud (`MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`, com o sufixo da tabela acima), e o
+Actions se autentica por Workload Identity Federation, sem chave. No GitHub:
 
 | Secret | Descrição |
 |--------|-----------|
-| `RENDER_API_KEY_DEV/PROD` | API Key do Render. O sufixo `_HOM` saiu na P-004: o `resolve-env` só emite `dev` ou `prod`, então um secret `_HOM` nunca seria lido |
-| `RENDER_SERVICE_ID_DEV/PROD` | ID do serviço do backend no Render. Hoje só `_DEV` está configurado |
+| `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_STORE_PASSWORD`, `ANDROID_RELEASE_KEY_ALIAS`, `ANDROID_RELEASE_KEY_PASSWORD` | Chave de release do APK. Obrigatórios para homologação — ver [`deploy/android/README.md`](../../deploy/android/README.md) |
+| `EXPO_PUBLIC_MAPBOX_TOKEN` | Token público do Mapbox embutido no APK |
+| `RENDER_API_KEY_DEV`, `RENDER_SERVICE_ID_DEV` | Só para o rollback manual do Render |
 
 ---
 
@@ -200,12 +230,28 @@ Cada secret tem sufixo por ambiente (`_DEV`, `_PROD`):
 1. Crie um cluster **M0** (free tier).
 2. Crie um usuário com senha.
 3. Libere o IP `0.0.0.0/0` (ou o IP do Render).
-4. Crie os bancos por ambiente. Hoje existe apenas o `saude_monitor_dev`; `saude_monitor_prod` entra quando produção for criada.
+4. Crie os bancos por ambiente: `saude_monitor_dev` (existe), `saude_monitor_hom`
+   (homologação) e, quando houver produção, `saude_monitor_prod`.
+5. **Um usuário por ambiente**, com papel `readWrite` **só** no banco dele
+   (*Database Access → Add New Database User → Specific Privileges*). Assim a URI de
+   homologação não consegue ler nem apagar dados de dev, mesmo por engano.
+6. A URI de cada ambiente termina no banco dele
+   (`mongodb+srv://saude_monitor_hom:<senha>@<cluster>/saude_monitor_hom?...`) e vai
+   para o Secret Manager — para homologação, com `bash deploy/google/setup-homologacao.sh`.
 
-### 5.2 Render (backend)
-1. Crie um Web Service por ambiente, apontando para as imagens GHCR (`:dev`, `:prod`, `:<tag>`). Hoje existe apenas o de `dev`.
-2. Configure as variáveis de ambiente (ver `backend/.env.example`).
-3. Anote os **Service IDs**.
+> O banco de homologação nasce vazio; na primeira subida o backend importa os
+> estabelecimentos (seed de hospitais, que só roda com a coleção vazia).
+
+### 5.2 Google Cloud Run (backend)
+O projeto, a federação de identidade e o Artifact Registry já existem
+([`deploy/google/README.md`](../../deploy/google/README.md)). Por ambiente, só falta
+criar os secrets — o serviço nasce no primeiro deploy:
+
+- **Homologação:** `bash deploy/google/setup-homologacao.sh` (cria `MONGO_URI_HOM`,
+  gera `JWT_SECRET_HOM` aleatório e cria `RESEND_API_KEY_HOM`).
+- **Produção:** o mesmo, com `_PROD`, quando for criada.
+
+O Render ficou só como rollback manual (`cd-backend-render.yml`).
 
 ### 5.3 Frontend web — sem provedor definido
 

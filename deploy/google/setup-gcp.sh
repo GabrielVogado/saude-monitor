@@ -104,15 +104,17 @@ criar_secret() {
   read -rs VALOR
   printf '%s' "$VALOR" | gcloud secrets create "$NOME" --data-file=- --replication-policy=automatic
 }
-criar_secret saude-monitor-mongo-uri-dev   "URI do MongoDB (mongodb+srv://...)"
-criar_secret saude-monitor-jwt-secret-dev  "JWT_SECRET (>= 32 bytes)"
-criar_secret saude-monitor-admin-email-dev "ADMIN_EMAIL"
-criar_secret saude-monitor-admin-senha-dev "ADMIN_SENHA"
+# Nomes REAIS lidos pelo cd-backend-google.yml (dev = sem sufixo). Ate 22/09/2026 este
+# script criava `saude-monitor-*-dev`, que o workflow nunca leu -- os de dev em uso foram
+# criados a mao. ADMIN_EMAIL/ADMIN_SENHA sairam: o deploy roda com APP_SEEDADMIN_ENABLED=false
+# (ver README). Homologacao: setup-homologacao.sh.
+criar_secret MONGO_URI      "URI do MongoDB (mongodb+srv://.../saude_monitor_dev)"
+criar_secret JWT_SECRET     "JWT_SECRET (>= 32 bytes)"
+criar_secret RESEND_API_KEY "chave da API do Resend"
 
 echo "== 7/7 Acesso da identidade de execucao aos secrets =="
 # Só a SA de execucao le os secrets. O deployer nao recebe secretAccessor.
-for SECRET in saude-monitor-mongo-uri-dev saude-monitor-jwt-secret-dev \
-              saude-monitor-admin-email-dev saude-monitor-admin-senha-dev; do
+for SECRET in MONGO_URI JWT_SECRET RESEND_API_KEY; do
   gcloud secrets add-iam-policy-binding "$SECRET" \
     --member="serviceAccount:${RUNTIME_SA}" \
     --role="roles/secretmanager.secretAccessor" >/dev/null
@@ -120,4 +122,4 @@ done
 
 echo
 echo "Pronto. O workflow cd-backend-google.yml ja pode rodar para a branch develop."
-echo "Para o ambiente de producao, repetir os passos 6 e 7 com o sufixo -prod."
+echo "Homologacao: bash deploy/google/setup-homologacao.sh. Producao: o mesmo, com _PROD."

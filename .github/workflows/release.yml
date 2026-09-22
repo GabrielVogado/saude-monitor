@@ -1,36 +1,64 @@
 name: Release - Gerar branch de produção
 
+# Desde 22/09/2026 a `master` e HOMOLOGACAO: a ponta dela pode ter commits que ainda nao
+# viraram rc, ou cuja rc falhou. Por isso a branch de producao nasce da TAG da rc
+# validada (`vX.Y.Z-rc.N`), e nao da `master` -- o que vai para producao e exatamente o
+# que foi homologado. A versao de producao e o `X.Y.Z` dessa tag.
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Versão da release (ex.: 1.0.0)'
+      rc:
+        description: 'rc validada em homologação (ex.: v1.0.0-rc.3)'
         required: true
         type: string
 
 jobs:
   branch:
-    name: Criar branch release/${{ inputs.version }} a partir da master
+    name: Criar release/<versão> a partir de ${{ inputs.rc }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Checkout
+      - name: Validar a rc
+        id: rc
+        env:
+          RC: ${{ inputs.rc }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$RC" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-rc\.[0-9]+$ ]]; then
+            echo "ERRO: '$RC' nao e uma tag de rc (vX.Y.Z-rc.N)."
+            exit 1
+          fi
+          echo "versao=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout da rc
         uses: actions/checkout@v4
         with:
-          ref: master
-          fetch-depth: 0
+          ref: refs/tags/${{ inputs.rc }}
 
-      - name: Validar que está na master
+      # Se a tag nao existir, o checkout acima ja falhou. Aqui so se confere que a rc
+      # saiu mesmo da `master` (homologacao) -- uma tag criada a mao em outra branch nao
+      # e uma versao homologada.
+      - name: Conferir que a rc está na master
         run: |
-          if [[ "$(git rev-parse --abbrev-ref HEAD)" != "master" ]]; then
-            echo "A release só pode ser gerada a partir da master."
+          set -euo pipefail
+          git fetch --no-tags --depth=200 origin master
+          if ! git merge-base --is-ancestor HEAD FETCH_HEAD; then
+            echo "ERRO: ${{ inputs.rc }} nao esta na historia recente da master."
             exit 1
           fi
 
-      - name: Criar e enviar a branch release/${{ inputs.version }}
+      - name: Criar e enviar a branch release/${{ steps.rc.outputs.versao }}
+        env:
+          VERSAO: ${{ steps.rc.outputs.versao }}
         run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "release/$VERSAO" >/dev/null; then
+            echo "ERRO: release/$VERSAO ja existe."
+            exit 1
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "release/${{ inputs.version }}"
-          git push origin "release/${{ inputs.version }}"
+          git checkout -b "release/$VERSAO"
+          git push origin "release/$VERSAO"
+          echo "🚀 \`release/$VERSAO\` criada a partir de \`${{ inputs.rc }}\`." >> "$GITHUB_STEP_SUMMARY"

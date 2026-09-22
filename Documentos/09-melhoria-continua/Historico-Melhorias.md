@@ -1139,7 +1139,7 @@ aqui para abrir tarefa própria; nenhum arquivo desse teste foi tocado neste PR.
 
 ## M-017 — Ambiente de homologação e APK que atualiza sem desinstalar
 
-**Data:** 22/09/2026 · **PRs:** _(preencher ao abrir)_
+**Data:** 22/09/2026 · **PRs:** #126 (APK) · #127 (homologação)
 
 ### O que o PO pediu
 

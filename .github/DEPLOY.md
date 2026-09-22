@@ -1,6 +1,6 @@
 # Deploy CI/CD — Clinical Sanctuary (MVP, 100% gratuito)
 
-Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gratuitos, com ambientes separados por branch (hoje **só `dev` existe** — ver a tabela abaixo).
+Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gratuitos, com ambientes separados por branch: **dev** (`develop`) e **homologação** (`master`, desde 22/09/2026). Produção (`release/<tag>`) ainda não foi criada.
 
 > **Atencao (04/09/2026):** o backend migrou do Render para o **Google Cloud Run**.
 > Este guia ainda descreve o Render como caminho principal e sera revisado. A
@@ -21,17 +21,21 @@ Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gr
 | Ambiente | Branch/Tag | Backend (Cloud Run) | Frontend web | Banco (Atlas) |
 |----------|-----------|------------------|--------------------|---------------|
 | **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` — `https://saude-monitor-backend-dev-uly57kmmia-rj.a.run.app` | — (sem provedor) | `saude_monitor_dev` |
-| **prod** (produção) | `master` · `release/<tag>` | `saude-monitor-backend` ⚠️ *não criado* — os secrets `MONGO_URI_PROD`/`JWT_SECRET_PROD` também não existem, e o deploy em `master` falha de propósito | — (sem provedor) | `saude_monitor_prod` ⚠️ *não criado* |
+| **hom** (homologação) | `master` | `saude-monitor-backend-hom` — criado no 1º deploy do `cd-homologacao.yml`; exige os secrets `_HOM` (`bash deploy/google/setup-homologacao.sh`) | — (sem provedor) | `saude_monitor_hom` |
+| **prod** (produção) | `release/<tag>` | `saude-monitor-backend` ⚠️ *não criado* — os secrets `_PROD` também não existem, e o deploy falha de propósito | — (sem provedor) | `saude_monitor_prod` ⚠️ *não criado* |
 
-> ⚠️ **Só o ambiente `dev` existe hoje** — é o único Web Service no Render e o único com secrets.
+> O APK de homologação ("Radar Saúde HML") é publicado como **GitHub Release** a cada
+> tag `vX.Y.Z-rc.N` e instala por cima da rc anterior. Ver
+> `Documentos/10-git-flow/MANUAL.md` §3.3 e `deploy/android/README.md`.
 
 ## Fluxo
 
 ```
 push/PR → CI (build+teste backend e frontend)
-push em develop → CD dev  (Docker → GHCR:dev  → Render dev)
-push em master  → CD prod (Docker → GHCR:prod → Render prod)
-push em release/<tag> → CD prod (Docker → GHCR:<tag> → Render prod, versao fixada)
+push em develop → CD dev  (Docker → Artifact Registry:dev → Cloud Run -dev) + APK DEV (artefato)
+push em master  → CD homologação: vX.Y.Z-rc.N → Cloud Run -hom (+ smoke tests)
+                  → APK HML → tag + GitHub Release com o APK
+push em release/<tag> → CD prod (Docker → Artifact Registry:<tag> → Cloud Run prod, versao fixada)
 ```
 
 ## Passo a passo
@@ -77,10 +81,10 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 - `APP_SEED_ENABLED=false`
 
 ### 6. Gerar release de produção
-1. Faça merge de `develop` → `master` (produção contínua é deployada automaticamente).
-2. Valide em produção contínua antes de fixar a versão.
-3. No GitHub, **Actions → Release - Gerar branch de produção → Run workflow**, informando a versão (ex.: `1.0.0`).
-4. A branch `release/1.0.0` é criada a partir da `master`. **Nada dispara sozinho**, e a razão não é o filtro de `paths`: o `release.yml` empurra a branch com o `GITHUB_TOKEN`, e a regra de recursão do GitHub não cria execução de workflow para push feito com esse token. O AAB sai por execução manual do `cd-mobile-eas.yml` a partir dessa branch; o deploy do backend depende da P-006.
+1. Faça merge de `develop` → `master` e valide a rc em homologação (a tag e o APK saem sozinhos).
+2. Escolha a rc validada (ex.: `v1.0.0-rc.3`).
+3. No GitHub, **Actions → Release - Gerar branch de produção → Run workflow**, informando essa rc.
+4. A branch `release/1.0.0` é criada a partir **da tag da rc**, não da ponta da `master`. **Nada dispara sozinho**, e a razão não é o filtro de `paths`: o `release.yml` empurra a branch com o `GITHUB_TOKEN`, e a regra de recursão do GitHub não cria execução de workflow para push feito com esse token. O AAB sai por execução manual do `cd-mobile-eas.yml` a partir dessa branch; o deploy do backend depende da P-006.
 5. Após validar, faça merge de `release/1.0.0` de volta em `master` (e `develop`).
 
 ## Workflows
@@ -88,7 +92,8 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 | Arquivo | Gatilho | Ação |
 |---------|---------|------|
 | `.github/workflows/ci.yml` | push/PR em develop/master | Build + testes backend e frontend |
-| `.github/workflows/cd-backend-google.yml` | push develop/master/release **+ caminho `backend/**`** | Docker -> Artifact Registry -> deploy no Google Cloud Run (southamerica-east1). Autenticacao por Workload Identity Federation. Ver `deploy/google/README.md` |
+| `.github/workflows/cd-homologacao.yml` | push master + manual | Homologação: versão → backend HML → APK HML → tag + GitHub Release |
+| `.github/workflows/cd-backend-google.yml` | push develop/release **+ caminho `backend/**`**, manual e `workflow_call` (homologação) | Docker -> Artifact Registry -> deploy no Google Cloud Run (southamerica-east1). Autenticacao por Workload Identity Federation. Ver `deploy/google/README.md` |
 | `.github/workflows/cd-backend-render.yml` | **pausado** -- so `workflow_dispatch` | Docker → GHCR → deploy Render. Falha com mensagem explícita se o ambiente não tiver secrets |
 | `.github/workflows/cd-mobile-apk.yml` | push `develop` (caminho `frontend/**`) + manual + `workflow_call` | APK com Gradle no Actions — sem cota do EAS. Artefato do run, 30 dias. Reutilizável pelo orquestrador de homologação (ambiente, URL e versão) |
 | `.github/workflows/cd-mobile-eas.yml` | **só manual** (`workflow_dispatch`, **a partir de `release/*`** — outras refs são recusadas) | AAB de loja no EAS |

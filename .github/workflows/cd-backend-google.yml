@@ -1,12 +1,21 @@
 name: CD - Backend (Google Cloud Run)
 
 on:
+  # `master` saiu daqui em 22/09/2026: passou a ser HOMOLOGACAO, e quem publica o backend
+  # de la e o `cd-homologacao.yml` (via `workflow_call`, abaixo), porque o APK de
+  # homologacao precisa da URL publicada e a tag so pode nascer depois dos smoke tests.
+  # Com `master` aqui tambem, cada merge publicaria o backend duas vezes em paralelo.
   push:
-    branches: [develop, master, 'release/**']
+    branches: [develop, 'release/**']
     paths:
       - 'backend/**'
       - '.github/workflows/cd-backend-google.yml'
   workflow_dispatch:
+  workflow_call:
+    outputs:
+      url:
+        description: URL publicada do servico no Cloud Run
+        value: ${{ jobs.build-and-deploy.outputs.url }}
 
 concurrency:
   group: cd-backend-google-${{ github.ref }}
@@ -28,6 +37,7 @@ jobs:
       tag: ${{ steps.resolve.outputs.tag }}
       service_suffix: ${{ steps.resolve.outputs.service_suffix }}
       secret_suffix: ${{ steps.resolve.outputs.secret_suffix }}
+      github_env: ${{ steps.resolve.outputs.github_env }}
     steps:
       - id: resolve
         run: |
@@ -36,16 +46,22 @@ jobs:
             echo "tag=${GITHUB_REF#refs/heads/release/}" >> "$GITHUB_OUTPUT"
             echo "service_suffix=" >> "$GITHUB_OUTPUT"
             echo "secret_suffix=_PROD" >> "$GITHUB_OUTPUT"
+            echo "github_env=producao" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
-            echo "env=prod" >> "$GITHUB_OUTPUT"
-            echo "tag=prod" >> "$GITHUB_OUTPUT"
-            echo "service_suffix=" >> "$GITHUB_OUTPUT"
-            echo "secret_suffix=_PROD" >> "$GITHUB_OUTPUT"
+            # Homologacao (decisao do PO, 22/09/2026). Servico, banco e JWT proprios:
+            # os secrets `_HOM` apontam para o banco `saude_monitor_hom`. Sem eles o
+            # deploy falha -- nunca sobe homologacao com credencial de dev.
+            echo "env=hom" >> "$GITHUB_OUTPUT"
+            echo "tag=hom" >> "$GITHUB_OUTPUT"
+            echo "service_suffix=-hom" >> "$GITHUB_OUTPUT"
+            echo "secret_suffix=_HOM" >> "$GITHUB_OUTPUT"
+            echo "github_env=homologacao" >> "$GITHUB_OUTPUT"
           else
             echo "env=dev" >> "$GITHUB_OUTPUT"
             echo "tag=dev" >> "$GITHUB_OUTPUT"
             echo "service_suffix=-dev" >> "$GITHUB_OUTPUT"
             echo "secret_suffix=" >> "$GITHUB_OUTPUT"
+            echo "github_env=desenvolvimento" >> "$GITHUB_OUTPUT"
           fi
 
   build-and-deploy:
@@ -55,6 +71,15 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    # GitHub Environment: historico de deploys e link do servico por ambiente na pagina
+    # do repositorio. Seguro com a federacao do GCP: o `attribute-condition` do provider
+    # confere so `assertion.repository` (verificado em 22/09/2026), nao o `sub` -- que
+    # muda para `environment:<nome>` quando o job declara um ambiente.
+    environment:
+      name: ${{ needs.resolve-env.outputs.github_env }}
+      url: ${{ steps.deploy.outputs.url }}
 
     steps:
       - name: Checkout do repositorio
@@ -105,12 +130,12 @@ jobs:
           # aqui nao teria efeito nenhum -- e sugeriria um isolamento dev/prod que na
           # verdade depende so do banco embutido em cada URI.
           # Nomes conforme existem no Secret Manager do projeto (verificado em
-          # 04/09/2026): MONGO_URI e JWT_SECRET, sem sufixo. O ambiente prod usa
-          # o sufixo _PROD e ainda nao tem secret criado -- o deploy em master vai
-          # falhar de proposito, em vez de subir com credencial de dev.
+          # 04/09/2026): MONGO_URI e JWT_SECRET, sem sufixo. Homologacao (master) usa
+          # `_HOM` e producao (release/**) `_PROD`; enquanto o secret nao existir, o
+          # deploy falha de proposito, em vez de subir com credencial de dev.
           # RESEND_API_KEY (10/09/2026, feature "esqueci minha senha") segue o
-          # mesmo padrao -- so existe a versao sem sufixo por enquanto, mesma
-          # decisao: deploy em master falha ate existir RESEND_API_KEY_PROD.
+          # mesmo padrao: homologacao falha ate existir RESEND_API_KEY_HOM, producao
+          # ate existir RESEND_API_KEY_PROD.
           secrets: |
             MONGO_URI=MONGO_URI${{ needs.resolve-env.outputs.secret_suffix }}:latest
             JWT_SECRET=JWT_SECRET${{ needs.resolve-env.outputs.secret_suffix }}:latest

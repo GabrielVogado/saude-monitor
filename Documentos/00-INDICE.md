@@ -1,7 +1,15 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 20/09/2026 · Responsável: Gabriel Vogado
+> Última atualização: 22/09/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 22/09/2026 — Ambiente de homologação e APK versionado
+
+**O que entrou:** `master` passa a ser **homologação** — cada push nela publica o backend `saude-monitor-backend-hom` (banco `saude_monitor_hom`), gera o APK "Radar Saúde HML" e cria a tag `vX.Y.Z-rc.N` com uma GitHub Release. O APK ganhou chave de release estável e `versionCode` crescente: instala por cima da versão anterior, sem desinstalar. DEV e HML são pacotes diferentes e convivem no mesmo celular.
+**Documentos revistos:** `10-git-flow/MANUAL.md` (ambientes, promoção, workflows, secrets — e o Render substituído pelo Cloud Run onde ainda aparecia como vigente), `.github/DEPLOY.md`, `deploy/google/README.md`, novo `deploy/android/README.md`. Registro em `Historico-Melhorias.md` (M-017).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre o ambiente de homologação).
 
 ---
 

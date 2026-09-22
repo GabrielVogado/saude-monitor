@@ -8,8 +8,26 @@ automatico, como caminho de rollback ate o Cloud Run estar validado.
 
 | Branch | Ambiente | Servico no Cloud Run | Sufixo dos secrets |
 |---|---|---|---|
-| `develop` | dev | `saude-monitor-backend-dev` | `-dev` |
-| `master`, `release/**` | prod | `saude-monitor-backend` | `-prod` |
+| `develop` | dev | `saude-monitor-backend-dev` | *(nenhum)* |
+| `master` | hom (homologacao, 22/09/2026) | `saude-monitor-backend-hom` | `_HOM` |
+| `release/**` | prod | `saude-monitor-backend` | `_PROD` |
+
+Os sufixos sao os nomes REAIS lidos pelo `cd-backend-google.yml` (`MONGO_URI`,
+`MONGO_URI_HOM`, `MONGO_URI_PROD`...). Ate 22/09/2026 esta tabela dizia `-dev`/`-prod`
+e o `setup-gcp.sh` criava `saude-monitor-*-dev` -- nomes que o workflow nunca leu; os
+secrets de dev em uso foram criados a mao sem sufixo. Script e tabela foram alinhados
+a realidade.
+
+Homologacao: `master` e publicada pelo `cd-homologacao.yml` (backend -> APK -> tag e
+GitHub Release), que chama o `cd-backend-google.yml` por `workflow_call`. Secrets:
+
+```bash
+bash deploy/google/setup-homologacao.sh
+```
+
+No Git Bash do Windows o `gcloud` nao esta no PATH por padrao:
+`export PATH="$PATH:/c/Users/$USERNAME/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin"`
+(ou rode no Cloud Shell).
 
 Regiao: `southamerica-east1` (Sao Paulo). Imagens no Artifact Registry
 `southamerica-east1-docker.pkg.dev/<PROJECT_ID>/saude-monitor-google/`.
@@ -42,8 +60,8 @@ Duas identidades, de proposito:
 Nao-sensivel, via `env_vars` do workflow: `MONGO_DATABASE`, `MONGO_AUTH_DB`.
 
 Sensivel, via Secret Manager (`secrets` do workflow): `MONGO_URI` e `JWT_SECRET`
--- os nomes conforme existem no projeto, sem sufixo em `dev` e com `_PROD` em
-producao. Nunca em `env_vars`: valores ali ficam legiveis em texto claro na
+-- os nomes conforme existem no projeto, sem sufixo em `dev`, `_HOM` em homologacao e
+`_PROD` em producao. `RESEND_API_KEY` segue o mesmo padrao. Nunca em `env_vars`: valores ali ficam legiveis em texto claro na
 especificacao da revisao para qualquer um com `viewer`.
 
 **`ADMIN_EMAIL` e `ADMIN_SENHA` nao existem no Secret Manager.** Enquanto for
@@ -60,7 +78,7 @@ e entao trocar `APP_SEEDADMIN_ENABLED=false` por essas duas entradas em `secrets
 
 ## Pontos em aberto
 
-- **Cold start.** `--min-instances=0` mantem o custo em zero e traz de volta o
+- **Cold start (vale para homologacao tambem).** `--min-instances=0` mantem o custo em zero e traz de volta o
   problema que motivou a saida do Render: a primeira requisicao apos ociosidade
   paga o startup do Spring Boot mais o seed DBF/SHP. `--min-instances=1` elimina
   o cold start e passa a cobrar instancia ociosa. Decisao do PO, ainda nao tomada.

@@ -56,7 +56,7 @@ push em release/<tag> → CD prod (Docker → GHCR:<tag> → Render prod, versao
 Não há hospedagem configurada para o frontend web. A esteira `cd-frontend.yml` foi
 **removida**: os segredos `NETLIFY_*` nunca existiram, então ela ficava verde sem
 publicar nada, em 36 execuções. O build `npx expo export --platform web` continua
-sendo validado pelo `ci.yml`. A distribuição hoje é o **APK**, via `cd-mobile-apk.yml` (Gradle no Actions, automático em `develop`/`master` e também manual, sem cota do EAS).
+sendo validado pelo `ci.yml`. A distribuição hoje é o **APK**, via `cd-mobile-apk.yml` (Gradle no Actions, automático em `develop` e também manual, sem cota do EAS). Pacote, nome e versão mudam por ambiente — ver `deploy/android/README.md`.
 
 ### 4. Secrets no GitHub
 No repositório: **Settings → Secrets and variables → Actions → New repository secret**.
@@ -65,7 +65,8 @@ Cada secret tem sufixo `_DEV` ou `_PROD`:
 | Secret | Valor |
 |--------|-------|
 | `RENDER_API_KEY_DEV` / `_PROD` | API Key do Render (pode ser a mesma). O sufixo `_HOM` deixou de existir: depois da P-004 o `resolve-env` só emite `dev` ou `prod`, e um secret `_HOM` nunca seria lido |
-| `ANDROID_KEYSTORE_BASE64` | *(opcional)* keystore do APK em base64. Sem ela o `cd-mobile-apk.yml` gera uma a cada build, e a assinatura deixa de ser estável |
+| `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_STORE_PASSWORD`, `ANDROID_RELEASE_KEY_ALIAS`, `ANDROID_RELEASE_KEY_PASSWORD` | Chave de release do APK (22/09/2026). **Obrigatórios para homologação/produção** — sem eles o build desses ambientes falha. Em dev, sem eles, cada build gera uma chave e o APK não atualiza por cima do anterior. Como criar: `deploy/android/README.md` |
+| `ANDROID_KEYSTORE_BASE64` | *(legado, opcional)* debug.keystore estável para dev enquanto a chave de release não existe |
 | `RENDER_SERVICE_ID_DEV` / `_PROD` | ID do serviço do backend em cada ambiente. Hoje só `_DEV` está configurado |
 
 ### 5. Variáveis de ambiente no Render
@@ -89,7 +90,7 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 | `.github/workflows/ci.yml` | push/PR em develop/master | Build + testes backend e frontend |
 | `.github/workflows/cd-backend-google.yml` | push develop/master/release **+ caminho `backend/**`** | Docker -> Artifact Registry -> deploy no Google Cloud Run (southamerica-east1). Autenticacao por Workload Identity Federation. Ver `deploy/google/README.md` |
 | `.github/workflows/cd-backend-render.yml` | **pausado** -- so `workflow_dispatch` | Docker → GHCR → deploy Render. Falha com mensagem explícita se o ambiente não tiver secrets |
-| `.github/workflows/cd-mobile-apk.yml` | push `develop`/`master` (caminho `frontend/**`) + manual | APK interno com Gradle no Actions — sem cota do EAS. Artefato do run, 30 dias |
+| `.github/workflows/cd-mobile-apk.yml` | push `develop` (caminho `frontend/**`) + manual + `workflow_call` | APK com Gradle no Actions — sem cota do EAS. Artefato do run, 30 dias. Reutilizável pelo orquestrador de homologação (ambiente, URL e versão) |
 | `.github/workflows/cd-mobile-eas.yml` | **só manual** (`workflow_dispatch`, **a partir de `release/*`** — outras refs são recusadas) | AAB de loja no EAS |
 | `.github/workflows/keep-alive-backend.yml` | **desligado** (04/09/2026) — só `workflow_dispatch` | Ping em `/actuator/health` contra a hibernação do Render. Perdeu o objeto com a virada para o Cloud Run; o `cron` está comentado. Ver ADR-011 |
 | `.github/workflows/release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
@@ -98,7 +99,7 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 
 - **O backend não está mais no Render** (04/09/2026). O serviço vigente é `saude-monitor-backend-dev` no Cloud Run, `southamerica-east1`. O Render **continua no ar** — medido em 05/09/2026: `https://saude-monitor.onrender.com/actuator/health` respondeu 200 em 3,13 s — mas serve uma imagem congelada: o `cd-backend-render.yml` está pausado e não recebe mais deploy automático. Ele é o caminho de rollback, não o ambiente corrente.
 - O **Render free** "dorme" após ~15 min de inatividade. O **Cloud Run também** recolhe a instância quando ociosa, e a primeira requisição depois disso devolve **HTTP 503 em ~14,8 s** (medido no log do Cloud Run em 05/09/2026), porque `--min-instances=0`. A diferença em relação ao Render é de grau — 14,8 s contra 109 s —, não de natureza: nos dois casos o app vê uma requisição falhada. Ver ADR-011.
-- O **frontend web** é o build do Expo (`react-native-web`). O APK mobile sai do `cd-mobile-apk.yml` (Actions, automático nas branches de integração e produção, ou manual) e também localmente, via `expo run:android --variant release`.
+- O **frontend web** é o build do Expo (`react-native-web`). O APK mobile sai do `cd-mobile-apk.yml` (Actions, automático na `develop`, ou manual) e também localmente, via `expo run:android --variant release`.
 - Para o frontend web apontar para o backend correto por ambiente, ajuste em `frontend/app.json` → `expo.extra`:
   ```json
   "extra": {

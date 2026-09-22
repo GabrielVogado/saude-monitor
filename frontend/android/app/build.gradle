@@ -89,6 +89,10 @@ def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
  * O pacote sem sufixo fica reservado para produção. Sem a propriedade (build local,
  * `expo run:android`) vale `prod`: pacote e nome iguais aos de sempre, e a CLI do Expo
  * continua achando o app pelo `applicationId` que conhece.
+ * Custo aceito (code-review de 22/09/2026): um build local de `release` sai com o pacote
+ * de produção assinado pela chave `debug`, e não instalaria por cima de um "Radar Saúde"
+ * de produção. Produção ainda não existe; quando existir, rever este padrão (a CLI aceita
+ * `expo run:android --app-id <pacote>` para abrir um pacote com sufixo).
  *
  * O nome vai pelo `manifestPlaceholders`, não por `resValue`: o `strings.xml` já define
  * `app_name`, e um `resValue` com o mesmo nome colidiria na fusão de recursos.

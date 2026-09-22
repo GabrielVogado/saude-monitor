@@ -1087,7 +1087,7 @@ PR): ícone por categoria (UPA/UBS/hospital), tocar no mapa para fechar o card.
 
 ## M-016 — Bottom Tabs atrás da barra de navegação do sistema (Android)
 
-**Data:** 22/09/2026 · **PR:** _(preencher ao abrir)_
+**Data:** 22/09/2026 · **PR:** #125
 
 ### O que o PO reportou
 

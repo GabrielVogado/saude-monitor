@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import {createNativeStackNavigator} from "@react-navigation/native-stack";
 import {createBottomTabNavigator} from "@react-navigation/bottom-tabs";
 import {NavigationContainer} from "@react-navigation/native";
-import {SafeAreaProvider} from "react-native-safe-area-context";
+import {SafeAreaProvider, useSafeAreaInsets} from "react-native-safe-area-context";
 import * as Notifications from "expo-notifications";
 import * as Network from "expo-network";
 import {AppState} from "react-native";
@@ -98,6 +98,15 @@ function FeedbackStack() {
 // Perfil) substituindo o antigo Drawer. O mapa entrou como aba própria (navegação
 // revisada), em vez de botão dentro da Home. Transições suaves via burst.
 function Tabs() {
+    // Barra de sistema (Android, botões na tela — não gestos): o `BottomTabBar` da lib
+    // soma `insets.bottom` sozinho à altura E ao paddingBottom padrão, mas SÓ quando a
+    // tela não define os dois no `tabBarStyle` — um `tabBarStyle` com valores fixos entra
+    // DEPOIS no array de estilos e sobrescreve os dois, jogando fora o inset. Sem essa
+    // soma, o conteúdo da barra ficava atrás dos botões do sistema em aparelhos com barra
+    // de navegação clássica (relatado pelo PO, com captura de tela do físico — a barra
+    // de gestos, sem essa barra, não expõe o bug porque o inset é ~0).
+    const insets = useSafeAreaInsets();
+
     return (
         <Tab.Navigator
             screenOptions={{
@@ -108,8 +117,8 @@ function Tabs() {
                 tabBarStyle: {
                     backgroundColor: colors.surfaceContainerLowest,
                     borderTopColor: colors.outlineVariant,
-                    height: 64,
-                    paddingBottom: 8,
+                    height: 64 + insets.bottom,
+                    paddingBottom: 8 + insets.bottom,
                     paddingTop: 8,
                 },
             }}

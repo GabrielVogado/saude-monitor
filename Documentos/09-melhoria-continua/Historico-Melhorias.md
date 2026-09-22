@@ -1085,6 +1085,58 @@ PR): ícone por categoria (UPA/UBS/hospital), tocar no mapa para fechar o card.
 
 ---
 
+## M-016 — Bottom Tabs atrás da barra de navegação do sistema (Android)
+
+**Data:** 22/09/2026 · **PR:** _(preencher ao abrir)_
+
+### O que o PO reportou
+
+Capturas de tela do aparelho físico: em celular com a barra de navegação clássica do
+Android (os 3 botões na tela, não gestos), a barra de abas (Início/Hospitais/Mapa/Perfil)
+ficava atrás dos botões do sistema — impossível tocar nela.
+
+### Diagnóstico
+
+`Tabs()`, em `App.js`, define `tabBarStyle` com `height: 64` e `paddingBottom: 8` fixos.
+O `@react-navigation/bottom-tabs` soma sozinho a área de sistema (`insets.bottom`) à
+altura e ao padding **quando a tela não define os dois no `tabBarStyle`** — mas um
+`tabBarStyle` customizado entra depois no array de estilos da barra e **sobrescreve** os
+dois, descartando o inset (confirmado no código-fonte da lib, `BottomTabBar.js`:
+`getTabBarHeight` só soma `insets.bottom` se `style.height` não vier definido; o
+`paddingBottom` do array default sofre o mesmo destino). Com a barra de gestos o inset é
+~0 e o bug não aparece — só se manifesta com a barra clássica, que tem inset real. É por
+isso que passou despercebido: a Web e os emuladores usados até aqui não têm barra física.
+
+### O que mudou
+
+- `App.js`: `Tabs()` chama `useSafeAreaInsets()` e soma `insets.bottom` à `height` e ao
+  `paddingBottom` do `tabBarStyle`, em vez de valores fixos.
+- Teste novo em `App.test.js`: o mock de `react-native-safe-area-context` ganhou um
+  `__setMockInsets` (antes devolvia sempre zero, escondendo justamente este bug) para
+  simular um aparelho com barra clássica (`insets.bottom: 48`) e afirmar que a `height`/
+  `paddingBottom` da barra somam o inset.
+
+### Achado à parte, fora do escopo desta correção
+
+Rodando a suíte inteira várias vezes seguidas, `EsqueciSenhaScreen.test.js` (teste
+"'Reenviar código' volta para a etapa e-mail...") falhou de forma intermitente (1 em 4
+execuções) por causa de assincronia: `avancarParaEtapaCodigo()` só espera o **mock do
+serviço** ser chamado, não a **UI** mudar de etapa, e o teste seguinte pressiona
+"Reenviar código" antes de a tela necessariamente já ter trocado de etapa. Não é
+código de produção quebrado — é o teste que corre risco de dar falso negativo. Registrado
+aqui para abrir tarefa própria; nenhum arquivo desse teste foi tocado neste PR.
+
+### Verificação
+
+- Teste novo mata a mutação (altura/padding fixos de volta, e só um dos dois corrigido).
+- `npx jest`: 411/411 (rodado 4× para checar estabilidade — só a flakiness pré-existente
+  acima apareceu, e só 1 das 4 vezes). `npm run lint`: 0 erros, 16 avisos = o teto.
+- Não testado no aparelho físico que reportou o bug — só a lógica confirmada contra o
+  código-fonte da lib e o teste de regressão. Fica como validação pendente do PO no
+  próximo APK.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

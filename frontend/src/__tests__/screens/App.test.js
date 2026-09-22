@@ -6,8 +6,10 @@
  * conforme já feitos em `jest.setup.js`, e valida a árvore de acessibilidade da tab bar.
  */
 import React from "react";
+import { StyleSheet } from "react-native";
 import { render, screen, act } from "@testing-library/react-native";
 import * as Notifications from "expo-notifications";
+import { __setMockInsets } from "react-native-safe-area-context";
 import App from "../../../App";
 import * as FeedbackNotificationService from "../../screens/feedback/service/FeedbackNotificationService";
 
@@ -46,20 +48,29 @@ jest.mock("expo-task-manager", () => ({
 jest.mock("react-native-safe-area-context", () => {
   const React = require("react");
   const { View } = require("react-native");
-  const MOCK_INSETS = { top: 0, right: 0, bottom: 0, left: 0 };
+  // Mutável: o teste da barra de sistema (Android com botões na tela) precisa simular
+  // um `insets.bottom` real (~48), diferente do padrão 0 (equivalente à barra de
+  // gestos, que não expõe o bug corrigido em App.js).
+  let insetsAtuais = { top: 0, right: 0, bottom: 0, left: 0 };
   const SafeAreaProvider = ({ children, ...rest }) =>
     React.createElement(View, { ...rest, style: { flex: 1 }, collapsable: false }, children);
   const SafeAreaView = ({ children, style, ...rest }) =>
     React.createElement(View, { ...rest, style: [{ flex: 1 }, style] }, children);
-  const SafeAreaInsetsContext = React.createContext(MOCK_INSETS);
+  const SafeAreaInsetsContext = React.createContext(insetsAtuais);
   return {
     __esModule: true,
     SafeAreaProvider,
     SafeAreaView,
     SafeAreaInsetsContext,
-    useSafeAreaInsets: () => MOCK_INSETS,
+    useSafeAreaInsets: () => insetsAtuais,
     useSafeAreaFrame: () => ({ x: 0, y: 0, width: 390, height: 844 }),
-    initialWindowMetrics: { insets: MOCK_INSETS, frame: { x: 0, y: 0, width: 390, height: 844 } },
+    get initialWindowMetrics() {
+      return { insets: insetsAtuais, frame: { x: 0, y: 0, width: 390, height: 844 } };
+    },
+    // Só para este arquivo de teste — não existe no módulo real.
+    __setMockInsets: (novo) => {
+      insetsAtuais = novo;
+    },
   };
 });
 
@@ -130,6 +141,31 @@ describe("App — Bottom Tabs (E6-01)", () => {
     expect(abaInicio).toBeOnTheScreen();
     expect(abaMapa).toBeOnTheScreen();
   });
+
+  it("em aparelho com barra de sistema (botões na tela), a tab bar soma o inset — não fica atrás dela", () => {
+    // Relato do PO com captura de tela do físico: a barra ficava atrás dos botões do
+    // Android. `insets.bottom` só é > 0 com a barra de navegação clássica — a de
+    // gestos tem inset ~0 e não expõe o bug. `@react-navigation/bottom-tabs` soma esse
+    // inset sozinho, mas SÓ quando a tela não define `height`/`paddingBottom` fixos no
+    // `tabBarStyle` — um valor fixo entra depois no array de estilos e o sobrescreve.
+    __setMockInsets({ top: 0, right: 0, bottom: 48, left: 0 });
+
+    render(<App />);
+
+    // `getByRole("tablist")` não resolve neste ambiente (RNTL não mapeia esse role em
+    // particular); o elemento existe na árvore com `accessibilityRole="tablist"` — é
+    // o próprio marcador que a lib usa para o container das abas, então é estável.
+    const tablist = screen.UNSAFE_getByProps({ accessibilityRole: "tablist" });
+    const barra = tablist.parent;
+    const estilo = StyleSheet.flatten(barra.props.style);
+
+    expect(estilo.height).toBe(64 + 48);
+    expect(estilo.paddingBottom).toBe(8 + 48);
+  });
+});
+
+afterEach(() => {
+  __setMockInsets({ top: 0, right: 0, bottom: 0, left: 0 });
 });
 
 describe("App — abrir formulário a partir da notificação de feedback (RN-09)", () => {

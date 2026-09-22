@@ -81,6 +81,46 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+/**
+ * Ambiente do APK (`-Pambiente=dev|hom|prod`), passado pelo `cd-mobile-apk.yml`.
+ *
+ * Cada ambiente é um PACOTE diferente, para o APK de desenvolvimento e o de homologação
+ * conviverem no mesmo celular sem um sobrescrever o outro (decisão do PO, 22/09/2026).
+ * O pacote sem sufixo fica reservado para produção. Sem a propriedade (build local,
+ * `expo run:android`) vale `prod`: pacote e nome iguais aos de sempre, e a CLI do Expo
+ * continua achando o app pelo `applicationId` que conhece.
+ *
+ * O nome vai pelo `manifestPlaceholders`, não por `resValue`: o `strings.xml` já define
+ * `app_name`, e um `resValue` com o mesmo nome colidiria na fusão de recursos.
+ */
+def AMBIENTES_APK = [
+    dev : [sufixo: '.dev', nome: 'Radar Saúde DEV'],
+    hom : [sufixo: '.hom', nome: 'Radar Saúde HML'],
+    prod: [sufixo: '',     nome: 'Radar Saúde'],
+]
+def ambienteApk = (findProperty('ambiente') ?: 'prod').toString()
+if (!AMBIENTES_APK.containsKey(ambienteApk)) {
+    throw new GradleException("-Pambiente=${ambienteApk} inválido; use um de ${AMBIENTES_APK.keySet()}")
+}
+
+/**
+ * Versão do APK. O Android só aceita instalar por cima quando o `versionCode` é MAIOR
+ * que o instalado (e a assinatura é a mesma) — com `1` fixo, nenhum APK novo se
+ * reconhecia como atualização. Quem calcula os números é o workflow; sem as
+ * propriedades (build local) ficam os valores de antes.
+ */
+def appVersionCode = (findProperty('appVersionCode') ?: '1').toString().toInteger()
+def appVersionName = (findProperty('appVersionName') ?: '1.0.0').toString()
+
+/**
+ * Chave de RELEASE, lida de variáveis de ambiente que o workflow preenche a partir dos
+ * secrets `ANDROID_RELEASE_*`. Assinatura estável é a outra metade de "atualizar sem
+ * desinstalar": o Android recusa um APK assinado por chave diferente da instalada.
+ * Sem a chave (build local), a `release` continua assinando com a `debug`, como antes —
+ * o workflow é quem se recusa a publicar homologação/produção nessa condição.
+ */
+def keystoreRelease = System.getenv('ANDROID_RELEASE_KEYSTORE_PATH')
+
 android {
     ndkVersion rootProject.ext.ndkVersion
 
@@ -90,10 +130,12 @@ android {
     namespace 'com.gabrielvogado.saudemonitor'
     defaultConfig {
         applicationId 'com.gabrielvogado.saudemonitor'
+        applicationIdSuffix AMBIENTES_APK[ambienteApk].sufixo
+        manifestPlaceholders = [appNome: AMBIENTES_APK[ambienteApk].nome]
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode appVersionCode
+        versionName appVersionName
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -104,15 +146,23 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (keystoreRelease) {
+            release {
+                storeFile file(keystoreRelease)
+                storePassword System.getenv('ANDROID_RELEASE_STORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_RELEASE_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_RELEASE_KEY_PASSWORD')
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Chave própria quando o workflow a fornece; senão a `debug` (ver
+            // `keystoreRelease` no topo do arquivo).
+            signingConfig keystoreRelease ? signingConfigs.release : signingConfigs.debug
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

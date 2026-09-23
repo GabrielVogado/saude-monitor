@@ -5,6 +5,12 @@
 
 ---
 
+## 📌 Revisão 23/09/2026 — Plano de divulgação
+
+**O que entrou:** nova pasta `13-marketing/` com o [`Plano-Divulgacao-v1.0.md`](./13-marketing/Plano-Divulgacao-v1.0.md), um plano de 12 semanas para lançar o Radar Saúde no DF (preparação → beta fechado → lançamento local → crescimento), escrito para quem não tem experiência em marketing. Dez skills de marketing do repositório `kursku/skills` foram copiadas para `.claude/skills/` (o §9 do plano explica como usar cada uma).
+
+---
+
 ## 📌 Revisão 23/09/2026 — Pentest da homologação
 
 **O que entrou:** relatório do teste de segurança autorizado da homologação (`v1.0.0-rc.4`), só na camada de aplicação, em [`12-seguranca/Pentest-HML-2026-09-23.md`](./12-seguranca/Pentest-HML-2026-09-23.md). Sem achado alto/crítico; autenticação, autorização (BOLA/BFLA) e injeção (SQLi/NoSQLi/XSS/SSTI) sólidas. Três achados baixos/informativos — o F-01 (`raioKm` negativo → 500) corrigido no M-020.

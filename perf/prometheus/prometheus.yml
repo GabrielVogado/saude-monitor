@@ -1,0 +1,26 @@
+# Coleta as metricas do backend de HOMOLOGACAO (/actuator/prometheus, papel ADMIN) e
+# recebe as do k6 por remote write (--web.enable-remote-write-receiver).
+#
+# Custo: cada coleta e uma requisicao ao Cloud Run. A cada 10 s = 360/h -- irrelevante
+# frente a cota gratuita de 2 milhoes/mes, mas MANTEM O BACKEND ACORDADO. Por isso o
+# ambiente deve ser desligado ao fim do teste (docker compose down).
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: backend-hom
+    scheme: https
+    metrics_path: /actuator/prometheus
+    scrape_timeout: 8s
+    authorization:
+      type: Bearer
+      credentials_file: /token/admin.jwt
+    static_configs:
+      - targets: ["saude-monitor-backend-hom-767615581088.southamerica-east1.run.app"]
+        labels:
+          ambiente: homologacao
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

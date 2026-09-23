@@ -1,0 +1,4 @@
+# Senhas geradas por scripts/preparar.sh
+.env
+# Saída dos testes (relatórios de análise versionados vão para Documentos/)
+resultados/

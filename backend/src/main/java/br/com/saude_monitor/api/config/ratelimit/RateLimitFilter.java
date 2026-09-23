@@ -8,6 +8,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -19,13 +20,15 @@ import java.util.UUID;
 
 /**
  * Filtro de rate limiting (F0-04): aplica limites por IP conforme o grupo do
- * recurso (auth = 10/min, públicos = 60/min) e responde 429 no envelope padrão
- * da API quando o limite é excedido.
+ * recurso e responde 429 no envelope padrão da API quando o limite é excedido.
+ * Os limites vêm de {@link RateLimitProperties} (padrão: auth 10/min, públicos
+ * 60/min; o deploy de homologação os sobe para os testes de desempenho).
  *
  * <p>Endpoints autenticados (com token JWT) não são limitados aqui — a
  * identificação via token já oferece controle granular e evita bloquear usuários
  * legítimos atrás de um mesmo NAT/IP.</p>
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class RateLimitFilter extends OncePerRequestFilter {
@@ -34,6 +37,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private final RateLimitService rateLimitService;
     private final ObjectMapper objectMapper;
+    private final RateLimitProperties properties;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -47,11 +51,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         String ip = resolverIp(request);
-        boolean permitido = rateLimitService.tentarConsumir(ip, grupo);
+        long feitas = rateLimitService.registrar(ip, grupo);
+        int limite = rateLimitService.limite(grupo);
+        boolean permitido = feitas <= limite;
 
-        response.setHeader(HEADER_LIMITE, String.valueOf(grupo.limite()));
+        response.setHeader(HEADER_LIMITE, String.valueOf(limite));
 
         if (!permitido) {
+            // Registra QUEM foi limitado -- e a forma de conferir, em producao, que a chave e
+            // o IP real do cliente (e nao o do proxy, que limitaria todo mundo junto). So a
+            // PRIMEIRA rejeicao de cada chave por janela: sob ataque, uma linha por minuto
+            // por IP, nao uma por requisicao.
+            if (feitas == limite + 1L) {
+                log.info("[RateLimit] 429 {} para {} em {} {}", grupo, ip, request.getMethod(), request.getRequestURI());
+            }
             escrever429(response, grupo);
             return;
         }
@@ -66,12 +79,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
      *         (ex.: endpoints autenticados).
      */
     RateLimitService.Grupo resolverGrupo(String method, String uri) {
-        // Auth: login e refresh — limite mais restrito (10/min).
+        // Auth: login e refresh — limite mais restrito (padrão 10/min).
         if (uri.startsWith("/api/v1/auth/")) {
             return RateLimitService.Grupo.AUTH;
         }
 
-        // Endpoints públicos diversos: 60/min.
+        // Endpoints públicos diversos (padrão 60/min).
         if (isPublico(method, uri)) {
             return RateLimitService.Grupo.PUBLICO;
         }
@@ -109,14 +122,37 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return false;
     }
 
-    private String resolverIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            int comma = forwarded.indexOf(',');
-            return (comma > 0 ? forwarded.substring(0, comma) : forwarded).trim();
-        }
+    /**
+     * IP do cliente para a chave do limite.
+     *
+     * <p>Cada proxy ACRESCENTA ao fim do {@code X-Forwarded-For} o endereço de quem falou
+     * com ele; o que vem antes foi escrito pelo próprio cliente e não merece confiança.
+     * Por isso vale o N-ésimo endereço contando da direita, com N =
+     * {@link RateLimitProperties#proxiesConfiaveis()}. A versão anterior usava o
+     * PRIMEIRO — um cliente trocando esse valor a cada requisição nunca era limitado.</p>
+     *
+     * <p>Cabeçalho com menos endereços do que proxies declarados (ou N = 0) cai no
+     * endereço da conexão, que ninguém do lado de fora consegue forjar.</p>
+     */
+    String resolverIp(HttpServletRequest request) {
         String remote = request.getRemoteAddr();
-        return remote != null ? remote : "desconhecido";
+        String semCabecalho = remote != null ? remote : "desconhecido";
+
+        int confiaveis = properties.proxiesConfiaveis();
+        // TODAS as linhas do cabecalho, na ordem: um cliente pode mandar mais de uma linha
+        // `X-Forwarded-For`, e ler so a primeira (getHeader) deixaria o endereco do proxy
+        // numa linha que nunca e lida -- reabrindo o contorno que este metodo fecha.
+        String forwarded = String.join(",", java.util.Collections.list(request.getHeaders("X-Forwarded-For")));
+        if (confiaveis <= 0 || forwarded.isBlank()) {
+            return semCabecalho;
+        }
+        String[] enderecos = forwarded.split(",");
+        int indice = enderecos.length - confiaveis;
+        if (indice < 0) {
+            return semCabecalho;
+        }
+        String ip = enderecos[indice].trim();
+        return ip.isEmpty() ? semCabecalho : ip;
     }
 
     private static final int SC_TOO_MANY_REQUESTS = 429;
@@ -131,7 +167,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 SC_TOO_MANY_REQUESTS,
                 "LIMITE_EXCEDIDO",
                 "Muitas requisições. Tente novamente em instantes. Limite: "
-                        + grupo.limite() + " por minuto.",
+                        + rateLimitService.limite(grupo) + " por minuto.",
                 List.<CampoInvalido>of(),
                 UUID.randomUUID().toString().replace("-", "")
         );

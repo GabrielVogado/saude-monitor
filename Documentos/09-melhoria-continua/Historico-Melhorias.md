@@ -1385,6 +1385,63 @@ Pentest autorizado da homologação (F-01, `Documentos/12-seguranca/Pentest-HML-
 
 ---
 
+## M-021 — F-02/F-03 do pentest: 401 vs 403 e HSTS ausente
+
+**Data:** 23/09/2026 · **PR:** #138
+
+### Como apareceu
+
+Achados F-02 e F-03 do pentest de 23/09/2026
+(`Documentos/12-seguranca/Pentest-HML-2026-09-23.md`), ambos informativos — o F-01
+(`raioKm`, mesma sessão) já tinha sido corrigido no M-020.
+
+### F-02 — 401 em vez de 403 para dono divergente
+
+`NaoAutorizadoException` (401) era usada tanto para "não autenticado" quanto para "está
+autenticado, mas o recurso é de outro usuário" (BOLA em visita e feedback) — os dois
+casos misturados na mesma classe, apesar de terem semântica HTTP diferente: 401 significa
+"sem credencial"; aqui a credencial existe e é válida.
+
+### O que mudou (F-02)
+
+- Nova `AcessoNegadoException` (403, código `ACESSO_NEGADO`) — o mesmo código que
+  `RestAccessDeniedHandler` já usa para BFLA (papel insuficiente via Spring Security);
+  agora BOLA (dono divergente, decidido em serviço) usa o mesmo código.
+- `VisitaServiceImpl.obterAtivaOu409` e `FeedbackServiceImpl.exigirDono` passam a lançar
+  `AcessoNegadoException` em vez de `NaoAutorizadoException`. Os demais usos de
+  `NaoAutorizadoException` (login, refresh, "usuário não autenticado") ficaram como
+  estavam — são 401 de verdade.
+- Frontend conferido: o interceptor de refresh de token só age em `status === 401`; o
+  tratamento de fila offline trata 400–499 igual. A troca não quebra nenhum fluxo do app.
+
+### F-03 — sem HSTS
+
+Sem `Strict-Transport-Security` nas respostas. Causa: o writer padrão do Spring Security
+só emite o cabeçalho quando `request.isSecure()` é verdadeiro — e no Cloud Run o TLS
+termina no front-end do Google, a aplicação recebe a conexão como HTTP simples, então
+`isSecure()` é sempre falso.
+
+### O que mudou (F-03)
+
+- `SecurityConfig` registra um `HstsHeaderWriter` com `AnyRequestMatcher.INSTANCE`, que
+  emite o cabeçalho sempre, sem depender do esquema visto pelo contêiner.
+- **Decisão que ficou registrada:** não usar `server.forward-headers-strategy=framework`
+  para isso (resolveria o `isSecure()` de forma mais "correta", mas o
+  `ForwardedHeaderFilter` do Spring confia cegamente no primeiro endereço de
+  `X-Forwarded-For` — reabriria por outro caminho o contorno de rate limit que o M-018
+  fechou no `RateLimitFilter`).
+
+### Verificação
+
+- Testes novos: `VisitaServiceImplTest` e `FeedbackServiceImplTest` (dono divergente →
+  403), `HospitalListagemValidacaoIntegracaoTest` (cabeçalho HSTS presente numa conexão
+  não seguera simulada pelo MockMvc — o mesmo cenário do Cloud Run real).
+- 3 mutações, 3 mortas (voltar cada troca ao estado anterior derruba o teste
+  correspondente).
+- Suíte do backend: 281 testes, 0 falhas. `code-review`: sem achados.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

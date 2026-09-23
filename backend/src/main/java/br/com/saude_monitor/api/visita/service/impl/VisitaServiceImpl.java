@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.visita.service.impl;
 
+import br.com.saude_monitor.api.config.exception.AcessoNegadoException;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
@@ -376,8 +377,11 @@ public class VisitaServiceImpl implements VisitaService {
         VisitaDocument visita = visitaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Visita não encontrada para o id informado."));
 
+        // 403, não 401 (achado F-02 do pentest de 23/09/2026): quem chama já está
+        // autenticado (tem um JWT válido) — só não é dono desta visita (BOLA). 401
+        // significaria "não autenticado", o que não é o caso.
         if (visita.getUsuarioId() != null && !visita.getUsuarioId().equals(usuarioId)) {
-            throw new NaoAutorizadoException("Visita não pertence ao usuário autenticado.");
+            throw new AcessoNegadoException("Visita não pertence ao usuário autenticado.");
         }
         if (visita.getStatus() != StatusVisita.EM_ATENDIMENTO && visita.getStatus() != StatusVisita.SUSPEITA) {
             throw new ConflitoException("Visita já encerrada (status " + visita.getStatus() + ").");

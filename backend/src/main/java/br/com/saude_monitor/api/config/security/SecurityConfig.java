@@ -11,10 +11,13 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.HstsHeaderWriter;
+import org.springframework.security.web.util.matcher.AnyRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Configuration
 @EnableWebSecurity
@@ -31,11 +34,25 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    /** Um ano, mesmo teto usado pelo HSTS preload list do Chrome/Firefox. */
+    private static final long HSTS_MAX_AGE_SEGUNDOS = TimeUnit.DAYS.toSeconds(365);
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                // HSTS (achado F-03 do pentest de 23/09/2026): o writer padrão do Spring
+                // Security só emite o cabeçalho quando `request.isSecure()` é verdadeiro, e no
+                // Cloud Run o TLS termina no front-end do Google — a aplicação recebe a
+                // conexão como HTTP simples, então `isSecure()` é sempre falso e o cabeçalho
+                // nunca saía. `AnyRequestMatcher` emite sempre, sem depender do esquema visto
+                // pelo contêiner. Não usar `server.forward-headers-strategy=framework` para
+                // isso: o `ForwardedHeaderFilter` do Spring confiaria cegamente no primeiro
+                // endereço de `X-Forwarded-For`, reabrindo o contorno de rate limit do M-018
+                // por um caminho diferente do `RateLimitFilter`.
+                .headers(headers -> headers.addHeaderWriter(
+                        new HstsHeaderWriter(AnyRequestMatcher.INSTANCE, HSTS_MAX_AGE_SEGUNDOS, true)))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(eh -> eh
                         .authenticationEntryPoint(authenticationEntryPoint)

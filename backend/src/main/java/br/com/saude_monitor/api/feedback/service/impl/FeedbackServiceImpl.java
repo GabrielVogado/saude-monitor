@@ -1,8 +1,8 @@
 package br.com.saude_monitor.api.feedback.service.impl;
 
 import br.com.saude_monitor.api.agregado.event.FeedbackSalvoEvent;
+import br.com.saude_monitor.api.config.exception.AcessoNegadoException;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
-import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
 import br.com.saude_monitor.api.config.exception.ValidacaoNegocioException;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
@@ -189,9 +189,11 @@ public class FeedbackServiceImpl implements FeedbackService {
      * feedback tem {@code usuarioId} igual ao do usuário logado.
      */
     private void exigirDono(FeedbackDocument feedback, String usuarioId) {
+        // 403, não 401 (achado F-02 do pentest de 23/09/2026): quem chama já está
+        // autenticado (endpoints 🔒) — só não é dono deste feedback (BOLA).
         if (usuarioId == null || feedback.getUsuarioId() == null
                 || !feedback.getUsuarioId().equals(usuarioId)) {
-            throw new NaoAutorizadoException("Feedback não pertence ao usuário autenticado.");
+            throw new AcessoNegadoException("Feedback não pertence ao usuário autenticado.");
         }
     }
 

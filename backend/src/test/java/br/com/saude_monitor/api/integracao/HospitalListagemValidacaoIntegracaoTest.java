@@ -10,6 +10,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -85,5 +86,18 @@ class HospitalListagemValidacaoIntegracaoTest extends IntegracaoTestBase {
         // raioKm ausente: Bean Validation ignora null, o filtro geoespacial não é aplicado.
         mockMvc.perform(get("/api/v1/hospitais"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void respostaTrazHstsMesmoSemTlsNaConexaoComOContainer() throws Exception {
+        // F-03 do pentest de 23/09/2026: no Cloud Run o TLS termina no front-end do Google
+        // e a aplicação recebe a conexão como HTTP simples (isSecure()==false), então o
+        // writer padrão do Spring Security nunca emitia o cabeçalho. O MockMvc também
+        // simula uma requisição não segura por padrão — se a correção dependesse de
+        // isSecure(), este teste falharia exatamente como falharia contra o Cloud Run real.
+        mockMvc.perform(get("/api/v1/hospitais"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Strict-Transport-Security",
+                        "max-age=31536000 ; includeSubDomains"));
     }
 }

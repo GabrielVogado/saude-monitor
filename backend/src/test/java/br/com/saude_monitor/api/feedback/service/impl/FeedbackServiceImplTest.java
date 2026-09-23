@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.feedback.service.impl;
 
+import br.com.saude_monitor.api.config.exception.AcessoNegadoException;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.feedback.dto.FeedbackRequest;
@@ -49,6 +50,21 @@ class FeedbackServiceImplTest {
     void setup() {
         when(visitaRepository.findByStatusAndSaidaBefore(any(), any())).thenReturn(List.of());
         when(feedbackRepository.findByVisitaIdIn(any())).thenReturn(List.of());
+    }
+
+    @Test
+    void buscarPorVisitaDeOutroUsuarioLancaAcessoNegado() {
+        // Achado F-02 do pentest de 23/09/2026: o chamador está autenticado (endpoint 🔒)
+        // — só não é dono deste feedback. 403 (ACESSO_NEGADO), não 401.
+        FeedbackDocument feedbackDeOutro = FeedbackDocument.builder()
+                .id("f1")
+                .visitaId("v1")
+                .usuarioId("dono-legitimo")
+                .build();
+        when(feedbackRepository.findByVisitaId("v1")).thenReturn(Optional.of(feedbackDeOutro));
+
+        assertThatThrownBy(() -> service.buscarPorVisita("v1", "invasor"))
+                .isInstanceOf(AcessoNegadoException.class);
     }
 
     /**

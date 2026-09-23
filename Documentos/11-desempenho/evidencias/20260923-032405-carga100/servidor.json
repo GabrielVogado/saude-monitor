@@ -1,0 +1,83 @@
+{
+  "janela": {
+    "inicio": "2026-09-23T06:24:06.000Z",
+    "fim": "2026-09-23T06:26:48.000Z",
+    "segundos": 162
+  },
+  "mongoOpsPico": 38.99747940735986,
+  "mongoOpsMedia": 18.44199361231651,
+  "mongoComandos": 4135,
+  "mongoConexoesPico": 2,
+  "backendRequisicoes": 1205,
+  "backend5xx": 0,
+  "cpuPico": -1,
+  "heapPico": 0.27930005006115843,
+  "p95PorRota": [
+    {
+      "rota": "POST /api/v1/auth/login",
+      "p95ms": 263
+    },
+    {
+      "rota": "GET /api/v1/hospitais",
+      "p95ms": 111
+    },
+    {
+      "rota": "GET /api/v1/hospitais/ranking",
+      "p95ms": 81
+    },
+    {
+      "rota": "POST /api/v1/visitas/checkin",
+      "p95ms": 52
+    },
+    {
+      "rota": "POST /api/v1/feedbacks",
+      "p95ms": 48
+    },
+    {
+      "rota": "POST /api/v1/visitas/{id}/heartbeat",
+      "p95ms": 44
+    },
+    {
+      "rota": "POST /api/v1/visitas/{id}/checkout",
+      "p95ms": 42
+    },
+    {
+      "rota": "GET /api/v1/contas/visitas",
+      "p95ms": 42
+    },
+    {
+      "rota": "GET /api/v1/hospitais/{id}/indicadores",
+      "p95ms": 34
+    },
+    {
+      "rota": "GET /api/v1/contas/feedbacks",
+      "p95ms": 32
+    },
+    {
+      "rota": "GET /api/v1/hospitais/{id}",
+      "p95ms": 28
+    }
+  ],
+  "mongoPorComando": [
+    {
+      "comando": "find",
+      "total": 3230
+    },
+    {
+      "comando": "update",
+      "total": 300
+    },
+    {
+      "comando": "getMore",
+      "total": 205
+    },
+    {
+      "comando": "aggregate",
+      "total": 200
+    },
+    {
+      "comando": "insert",
+      "total": 200
+    }
+  ]
+}

@@ -1,0 +1,423 @@
+<title>Desempenho Radar Saúde HML</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #f4f7f6;
+    --surface: #ffffff;
+    --ink: #14201d;
+    --muted: #5a6b66;
+    --rule: #d9e2df;
+    --accent: #0d7a70;
+    --accent-soft: #d6ede9;
+    --ok: #1e7a4a;
+    --ok-soft: #dcefe4;
+    --warn: #a86a12;
+    --fail: #b8431a;
+    --fail-soft: #f7e3da;
+    --grid: #e6ecea;
+    --sans: "Public Sans", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground: #0e1513;
+      --surface: #151f1c;
+      --ink: #e4ece9;
+      --muted: #93a39e;
+      --rule: #26332f;
+      --accent: #3fc0b2;
+      --accent-soft: #173a35;
+      --ok: #5fcf8f;
+      --ok-soft: #173427;
+      --warn: #e0a54a;
+      --fail: #f08a5d;
+      --fail-soft: #3a2119;
+      --grid: #1f2a27;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #0e1513;
+    --surface: #151f1c;
+    --ink: #e4ece9;
+    --muted: #93a39e;
+    --rule: #26332f;
+    --accent: #3fc0b2;
+    --accent-soft: #173a35;
+    --ok: #5fcf8f;
+    --ok-soft: #173427;
+    --warn: #e0a54a;
+    --fail: #f08a5d;
+    --fail-soft: #3a2119;
+    --grid: #1f2a27;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    padding-inline: 20px;
+    padding-block: 40px 72px;
+  }
+  .page { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 48px; }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); font-weight: 800; letter-spacing: -0.02em; }
+  h2 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.01em; }
+  h3 { font-size: 1rem; font-weight: 700; }
+  p { margin: 0; max-width: 68ch; }
+  .eyebrow { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .num, td.num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  section { display: flex; flex-direction: column; gap: 18px; }
+  .lede { color: var(--muted); font-size: 1.05rem; }
+
+  header.cabecalho { display: flex; flex-direction: column; gap: 14px; border-bottom: 1px solid var(--rule); padding-bottom: 28px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--muted); font-size: 0.9rem; }
+  .meta b { color: var(--ink); font-weight: 600; }
+  .veredito { display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px; }
+  .veredito .selo { flex: none; font-family: var(--mono); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; padding: 4px 8px; border-radius: 5px; background: var(--ok-soft); color: var(--ok); }
+
+  .numeros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .numero { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+  .numero .valor { font-family: var(--mono); font-size: 1.75rem; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .numero .rotulo { font-size: 0.85rem; color: var(--muted); }
+  .numero .ref { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+  .numero.falha .valor { color: var(--fail); }
+  @media (max-width: 760px) { .numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  .painel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; }
+  .grafico { width: 100%; height: auto; display: block; }
+  .grafico text { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+  .grafico .rot { fill: var(--ink); font-family: var(--sans); font-size: 12px; }
+  .grafico .grade { stroke: var(--grid); stroke-width: 1; }
+  .grafico .barra { fill: var(--accent); }
+  .grafico .barra.fora { fill: var(--fail); }
+  .grafico .mediana { stroke: var(--surface); stroke-width: 2; }
+  .grafico .meta { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 4 4; }
+  .grafico .teto { stroke: var(--fail); stroke-width: 1.5; }
+  .grafico .aborto { stroke: var(--warn); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .grafico .linha { fill: none; stroke: var(--accent); stroke-width: 2.25; stroke-linejoin: round; }
+  .grafico .area { fill: var(--accent-soft); }
+  .grafico .ponto { fill: var(--accent); }
+  .grafico .fim { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+  .grafico .legenda-meta { fill: var(--ink); font-weight: 600; }
+  .grafico .legenda-teto { fill: var(--fail); font-weight: 600; }
+  .grafico .legenda-aborto { fill: var(--warn); font-weight: 600; }
+  .legenda { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.82rem; color: var(--muted); margin-top: 10px; }
+  .legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  .tabela { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  th { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  td.num, th.num { text-align: right; }
+  .chip { display: inline-block; font-family: var(--mono); font-size: 0.72rem; font-weight: 600; padding: 2px 7px; border-radius: 5px; }
+  .chip.ok { background: var(--ok-soft); color: var(--ok); }
+  .chip.falha { background: var(--fail-soft); color: var(--fail); }
+  tr.destaque td { background: var(--fail-soft); }
+
+  .analise { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .bloco { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .bloco p, .bloco li { font-size: 0.95rem; }
+  .bloco ul, .bloco ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  .bloco.principal { grid-column: 1 / -1; border-left: 4px solid var(--fail); }
+  @media (max-width: 760px) { .analise { grid-template-columns: 1fr; } }
+
+  .notas { color: var(--muted); font-size: 0.88rem; display: flex; flex-direction: column; gap: 6px; padding-left: 20px; margin: 0; }
+  footer { border-top: 1px solid var(--rule); padding-top: 18px; color: var(--muted); font-size: 0.82rem; display: flex; flex-wrap: wrap; gap: 6px 20px; }
+  code { font-family: var(--mono); font-size: 0.85em; background: var(--grid); padding: 1px 5px; border-radius: 4px; }
+</style>
+
+<main class="page">
+  <header class="cabecalho">
+    <span class="eyebrow">Relatório de desempenho · homologação</span>
+    <h1>Radar Saúde aguenta 100 usuários simultâneos — com uma ressalva no login</h1>
+    <div class="meta">
+      <span><b>Data</b> 23/09/2026, 03h24–03h27 (Brasília)</span>
+      <span><b>Versão</b> v1.0.0-rc.3</span>
+      <span><b>Ambiente</b> Cloud Run 1 vCPU · 1 GiB + MongoDB Atlas M0</span>
+      <span><b>Ferramentas</b> k6 · Prometheus · Grafana</span>
+    </div>
+    <div class="veredito">
+      <span class="selo">11 / 12 NA META</span>
+      <p>100 pessoas percorreram a jornada completa do app ao mesmo tempo — login, busca de hospitais, <strong>check-in, checkout e avaliação</strong> — sem nenhum erro. A resposta ficou dentro da meta de 300 ms (RNF-02) em 11 dos 12 fluxos; só o login passou, por 10 ms. Nenhum limite gratuito foi ameaçado.</p>
+    </div>
+  </header>
+
+  <section aria-label="Números principais">
+    <div class="numeros">
+      <div class="numero">
+        <span class="valor">0</span>
+        <span class="rotulo">erros em 1.200 requisições</span>
+        <span class="ref">meta ≤ 1%</span>
+      </div>
+      <div class="numero">
+        <span class="valor">157 ms</span>
+        <span class="rotulo">p95 da jornada, visto pelo usuário</span>
+        <span class="ref">meta ≤ 300 ms</span>
+      </div>
+      <div class="numero falha">
+        <span class="valor">310 ms</span>
+        <span class="rotulo">p95 do login — único fora da meta</span>
+        <span class="ref">servidor: 263 ms</span>
+      </div>
+      <div class="numero">
+        <span class="valor">39 op/s</span>
+        <span class="rotulo">pico no banco (Atlas)</span>
+        <span class="ref">teto gratuito: 100 op/s</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div>
+      <span class="eyebrow">Lado do usuário</span>
+      <h2>Tempo de resposta por fluxo</h2>
+    </div>
+    <p class="lede">Percentil 95 — o tempo que 95% das chamadas não ultrapassam —, medido na máquina que gerou a carga. A linha tracejada é a meta do RNF-02.</p>
+    <div class="painel">
+      <svg id="grafico-fluxos" class="grafico" role="img" aria-label="Gráfico de barras do p95 por fluxo: login 310 ms, acima da meta de 300 ms; todos os demais abaixo de 175 ms."></svg>
+      <div class="legenda">
+        <span><i style="background:var(--accent)"></i>p95 dentro da meta</span>
+        <span><i style="background:var(--fail)"></i>p95 acima da meta</span>
+        <span><i style="background:var(--surface);border:2px solid var(--ink)"></i>marca branca na barra = mediana (p50)</span>
+      </div>
+    </div>
+    <div class="tabela">
+      <table>
+        <thead><tr><th>Fluxo</th><th class="num">p50</th><th class="num">p90</th><th class="num">p95</th><th class="num">p99</th><th class="num">máx</th><th>meta p95</th></tr></thead>
+        <tbody id="tabela-fluxos"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div>
+      <span class="eyebrow">Banco de dados</span>
+      <h2>Operações por segundo no MongoDB durante o teste</h2>
+    </div>
+    <p class="lede">Leituras do vigia a cada 10 s. Os usuários entraram aos poucos ao longo de 2 minutos; o pico coincide com o maior número de jornadas em andamento. O teste seria interrompido automaticamente acima de 90 op/s.</p>
+    <div class="painel">
+      <svg id="grafico-mongo" class="grafico" role="img" aria-label="Gráfico de linha das operações por segundo no Mongo: sobe até 38,8 op/s aos 70 segundos e desce para 20 op/s no fim, bem abaixo do limite de interrupção de 90 e do teto de 100."></svg>
+      <div class="legenda">
+        <span><i style="background:var(--accent)"></i>operações/s (média móvel de 1 min)</span>
+        <span><i style="background:var(--warn)"></i>interrupção automática (90)</span>
+        <span><i style="background:var(--fail)"></i>teto do Atlas M0 (100)</span>
+      </div>
+    </div>
+    <div class="tabela">
+      <table>
+        <thead><tr><th>Comando no banco</th><th class="num">Quantidade</th><th class="num">Parcela</th></tr></thead>
+        <tbody>
+          <tr><td>find (leitura)</td><td class="num">3.230</td><td class="num">78%</td></tr>
+          <tr><td>update</td><td class="num">300</td><td class="num">7%</td></tr>
+          <tr><td>getMore (paginação de cursor)</td><td class="num">205</td><td class="num">5%</td></tr>
+          <tr><td>aggregate</td><td class="num">200</td><td class="num">5%</td></tr>
+          <tr><td>insert</td><td class="num">200</td><td class="num">5%</td></tr>
+          <tr><td><b>Total</b> — ≈ 41 por jornada</td><td class="num"><b>4.135</b></td><td class="num">100%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div>
+      <span class="eyebrow">Análise</span>
+      <h2>O que os números dizem</h2>
+    </div>
+    <div class="analise">
+      <div class="bloco principal">
+        <h3>O login é o gargalo — e é custo de segurança, não defeito</h3>
+        <p>A senha é conferida com <strong>BCrypt</strong>, um algoritmo propositalmente lento para dificultar a descoberta de senhas por tentativa. Numa instância de 1 vCPU, logins que chegam juntos esperam a vez na CPU: no servidor o login leva 263 ms no p95, contra no máximo 111 ms de qualquer outra rota.</p>
+        <p><strong>Decisão pendente do PO:</strong></p>
+        <ol>
+          <li><strong>Aceitar e documentar</strong> (recomendado) — é uma chamada por sessão, não por tela; o acesso dura 15 min e a renovação, 30 dias.</li>
+          <li>Subir para 2 vCPU no horário de pico — resolve, mas passa a custar.</li>
+          <li>Reduzir o custo do BCrypt — <em>não recomendado</em>: enfraquece a proteção das senhas.</li>
+        </ol>
+      </div>
+      <div class="bloco">
+        <h3>O banco é o primeiro limite a estourar</h3>
+        <p>O Atlas gratuito trabalhou a 39% do teto. No mesmo ritmo de uso, cerca de <strong>250 usuários simultâneos</strong> encostariam nas 100 op/s — e o cluster é compartilhado com o ambiente de desenvolvimento.</p>
+      </div>
+      <div class="bloco">
+        <h3>Servidor com folga de memória</h3>
+        <p>Memória (heap) no pico: 28%. O Cloud Run não informa o uso de CPU de dentro do contêiner; a fila no login é inferida pela latência, não medida.</p>
+      </div>
+      <div class="bloco">
+        <h3>Rede</h3>
+        <p>A diferença entre o tempo visto pelo usuário e o do servidor (~50 a 60 ms) é a rede até São Paulo mais a fila de entrada do Cloud Run.</p>
+      </div>
+      <div class="bloco">
+        <h3>Nada de dado de teste ficou para trás</h3>
+        <p>As 100 visitas, as 100 avaliações e as notas calculadas com elas foram removidas depois da execução. Nenhum hospital ficou com nota de teste.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div>
+      <span class="eyebrow">Lado do servidor</span>
+      <h2>Tempo no backend por rota</h2>
+    </div>
+    <div class="tabela">
+      <table>
+        <thead><tr><th>Rota</th><th class="num">p95 no servidor</th></tr></thead>
+        <tbody>
+          <tr class="destaque"><td class="mono">POST /api/v1/auth/login</td><td class="num">263 ms</td></tr>
+          <tr><td class="mono">GET /api/v1/hospitais</td><td class="num">111 ms</td></tr>
+          <tr><td class="mono">GET /api/v1/hospitais/ranking</td><td class="num">81 ms</td></tr>
+          <tr><td class="mono">POST /api/v1/visitas/checkin</td><td class="num">52 ms</td></tr>
+          <tr><td class="mono">POST /api/v1/feedbacks</td><td class="num">48 ms</td></tr>
+          <tr><td class="mono">POST /api/v1/visitas/{id}/heartbeat</td><td class="num">44 ms</td></tr>
+          <tr><td class="mono">POST /api/v1/visitas/{id}/checkout</td><td class="num">42 ms</td></tr>
+          <tr><td class="mono">GET /api/v1/contas/visitas</td><td class="num">42 ms</td></tr>
+          <tr><td class="mono">GET /api/v1/hospitais/{id}/indicadores</td><td class="num">34 ms</td></tr>
+          <tr><td class="mono">GET /api/v1/contas/feedbacks</td><td class="num">32 ms</td></tr>
+          <tr><td class="mono">GET /api/v1/hospitais/{id}</td><td class="num">28 ms</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div>
+      <span class="eyebrow">Custo</span>
+      <h2>Consumo dos limites gratuitos</h2>
+    </div>
+    <div class="tabela">
+      <table>
+        <thead><tr><th>Recurso</th><th class="num">Nesta execução</th><th class="num">Limite gratuito</th><th>Situação</th></tr></thead>
+        <tbody>
+          <tr><td>Requisições ao Cloud Run</td><td class="num">1.205</td><td class="num">2.000.000 / mês</td><td><span class="chip ok">0,06%</span></td></tr>
+          <tr><td>Pico de operações no Atlas M0</td><td class="num">39 op/s</td><td class="num">100 op/s</td><td><span class="chip ok">39%</span></td></tr>
+          <tr><td>Conexões em uso no Atlas</td><td class="num">2</td><td class="num">500</td><td><span class="chip ok">&lt; 1%</span></td></tr>
+          <tr><td>E-mails (Resend)</td><td class="num">0</td><td class="num">100 / dia</td><td><span class="chip ok">fora da carga</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div>
+      <span class="eyebrow">Método</span>
+      <h2>Como o teste foi feito</h2>
+    </div>
+    <ul class="notas">
+      <li><strong>Jornada por usuário (uma vez cada):</strong> login → lista de hospitais → filtro por raio → detalhe e indicadores → check-in → heartbeat → checkout → avaliação → histórico → ranking.</li>
+      <li><strong>Fora da carga:</strong> "esqueci minha senha" e o cadastro — os dois enviam e-mail. Os 100 usuários de teste foram criados direto no banco.</li>
+      <li><strong>Comportamento humano:</strong> entrada espalhada em 120 s e pausas de 1 a 8 s entre ações. Não é um teste de estresse.</li>
+      <li><strong>Hospitais variados</strong> entre os usuários, para não medir um cache artificialmente quente.</li>
+      <li><strong>Paradas automáticas:</strong> acima de 90 op/s no banco por 30 s, erros acima de 5% ou p95 acima de 5 s. Nenhuma foi acionada.</li>
+      <li><strong>Limitações:</strong> um único gerador de carga (por isso os limites de requisição da homologação foram elevados, M-018); a latência do usuário inclui a rede até São Paulo; o Cloud Run não expõe a CPU ao contêiner.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>Dados: execução <code>20260923-032405-carga100</code></span>
+    <span>Fonte versionada: <code>Documentos/11-desempenho/Relatorio-Desempenho-HML-2026-09-23.md</code></span>
+    <span>Reproduzir: <code>bash perf/scripts/executar.sh carga100</code></span>
+  </footer>
+</main>
+
+<script>
+  // Dados reais da execução 20260923-032405-carga100 (summary.json do k6 e leituras do vigia).
+  const fluxos = [
+    { nome: 'login', p50: 148, p90: 258, p95: 310, p99: 368, max: 374 },
+    { nome: 'lista', p50: 128, p90: 164, p95: 175, p99: 190, max: 193 },
+    { nome: 'ranking', p50: 89, p90: 105, p95: 116, p99: 144, max: 186 },
+    { nome: 'checkout', p50: 58, p90: 70, p95: 101, p99: 211, max: 211 },
+    { nome: 'check-in', p50: 62, p90: 78, p95: 100, p99: 233, max: 251 },
+    { nome: 'heartbeat', p50: 58, p90: 80, p95: 92, p99: 144, max: 285 },
+    { nome: 'avaliação', p50: 61, p90: 76, p95: 89, p99: 164, max: 254 },
+    { nome: 'histórico de visitas', p50: 52, p90: 65, p95: 75, p99: 126, max: 197 },
+    { nome: 'indicadores', p50: 44, p90: 57, p95: 70, p99: 84, max: 99 },
+    { nome: 'filtro por raio', p50: 53, p90: 66, p95: 68, p99: 79, max: 204 },
+    { nome: 'histórico de avaliações', p50: 48, p90: 60, p95: 66, p99: 97, max: 295 },
+    { nome: 'detalhe', p50: 45, p90: 56, p95: 64, p99: 146, max: 244 },
+  ];
+  const META = 300;
+  const mongo = [
+    [10, 1.3], [20, 3.7], [30, 7.7], [40, 14.1], [50, 20.6], [60, 28.7], [70, 35.0], [80, 38.8],
+    [90, 36.1], [99, 33.4], [109, 29.5], [119, 28.3], [129, 27.5], [139, 28.2], [149, 25.6], [159, 20.0],
+  ];
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs, pai) => {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    if (pai) pai.appendChild(e);
+    return e;
+  };
+  const texto = (conteudo, attrs, pai) => { const t = el('text', attrs, pai); t.textContent = conteudo; return t; };
+
+  // ---- p95 por fluxo (barras horizontais)
+  (function () {
+    const svg = document.getElementById('grafico-fluxos');
+    const L = 900, rotulo = 168, dir = 58, topo = 26, alt = 22, passo = 30;
+    const H = topo + fluxos.length * passo + 28;
+    svg.setAttribute('viewBox', `0 0 ${L} ${H}`);
+    const maxEixo = 350;
+    const x = (v) => rotulo + (v / maxEixo) * (L - rotulo - dir);
+    for (let v = 0; v <= maxEixo; v += 50) {
+      el('line', { x1: x(v), x2: x(v), y1: topo - 6, y2: H - 22, class: 'grade' }, svg);
+      texto(`${v}`, { x: x(v), y: H - 6, 'text-anchor': 'middle' }, svg);
+    }
+    fluxos.forEach((f, i) => {
+      const y = topo + i * passo;
+      texto(f.nome, { x: rotulo - 10, y: y + alt / 2 + 4, 'text-anchor': 'end', class: 'rot' }, svg);
+      el('rect', { x: x(0), y, width: x(f.p95) - x(0), height: alt, rx: 3, class: 'barra' + (f.p95 > META ? ' fora' : '') }, svg);
+      el('line', { x1: x(f.p50), x2: x(f.p50), y1: y + 3, y2: y + alt - 3, class: 'mediana' }, svg);
+      texto(`${f.p95} ms`, { x: x(f.p95) + 6, y: y + alt / 2 + 4 }, svg);
+    });
+    el('line', { x1: x(META), x2: x(META), y1: topo - 10, y2: H - 22, class: 'meta' }, svg);
+    texto('meta 300 ms', { x: x(META), y: topo - 14, 'text-anchor': 'middle', class: 'legenda-meta' }, svg);
+    texto('ms', { x: L - 6, y: H - 6, 'text-anchor': 'end' }, svg);
+  })();
+
+  // ---- tabela por fluxo
+  (function () {
+    const corpo = document.getElementById('tabela-fluxos');
+    for (const f of fluxos) {
+      const tr = document.createElement('tr');
+      if (f.p95 > META) tr.className = 'destaque';
+      const ok = f.p95 <= META;
+      tr.innerHTML = `<td>${f.nome}</td><td class="num">${f.p50} ms</td><td class="num">${f.p90} ms</td>` +
+        `<td class="num"><b>${f.p95} ms</b></td><td class="num">${f.p99} ms</td><td class="num">${f.max} ms</td>` +
+        `<td><span class="chip ${ok ? 'ok' : 'falha'}">${ok ? 'dentro' : 'acima'}</span></td>`;
+      corpo.appendChild(tr);
+    }
+  })();
+
+  // ---- op/s no Mongo (linha)
+  (function () {
+    const svg = document.getElementById('grafico-mongo');
+    const L = 900, H = 300, esq = 44, dir = 150, topo = 16, base = 36;
+    svg.setAttribute('viewBox', `0 0 ${L} ${H}`);
+    const maxY = 110, maxX = 170;
+    const x = (s) => esq + (s / maxX) * (L - esq - dir);
+    const y = (v) => topo + (1 - v / maxY) * (H - topo - base);
+    for (let v = 0; v <= 100; v += 20) {
+      el('line', { x1: esq, x2: L - dir, y1: y(v), y2: y(v), class: 'grade' }, svg);
+      texto(`${v}`, { x: esq - 8, y: y(v) + 4, 'text-anchor': 'end' }, svg);
+    }
+    for (let s = 0; s <= 160; s += 30) {
+      texto(`${s}s`, { x: x(s), y: H - 12, 'text-anchor': 'middle' }, svg);
+    }
+    const pts = mongo.map(([s, v]) => `${x(s)},${y(v)}`);
+    el('path', { d: `M${x(mongo[0][0])},${y(0)} L${pts.join(' L')} L${x(mongo.at(-1)[0])},${y(0)} Z`, class: 'area' }, svg);
+    el('path', { d: `M${pts.join(' L')}`, class: 'linha' }, svg);
+    el('line', { x1: esq, x2: L - dir, y1: y(100), y2: y(100), class: 'teto' }, svg);
+    el('line', { x1: esq, x2: L - dir, y1: y(90), y2: y(90), class: 'aborto' }, svg);
+    texto('teto Atlas M0 · 100', { x: L - dir + 8, y: y(100) + 4, class: 'legenda-teto' }, svg);
+    texto('interrupção · 90', { x: L - dir + 8, y: y(90) + 12, class: 'legenda-aborto' }, svg);
+    const pico = mongo.reduce((a, b) => (b[1] > a[1] ? b : a));
+    el('circle', { cx: x(pico[0]), cy: y(pico[1]), r: 5, class: 'fim' }, svg);
+    texto(`pico 38,8 op/s`, { x: x(pico[0]), y: y(pico[1]) - 12, 'text-anchor': 'middle', class: 'rot' }, svg);
+    texto('segundos desde o início', { x: L - dir, y: H - 12, 'text-anchor': 'end' }, svg);
+  })();
+</script>

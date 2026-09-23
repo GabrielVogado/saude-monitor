@@ -7,7 +7,7 @@
 
 ## 📌 Revisão 23/09/2026 — Testes de desempenho da homologação
 
-**O que entrou:** estrutura `perf/` (k6 + Prometheus + Grafana, ao vivo) e o primeiro teste com **100 usuários** na homologação (`v1.0.0-rc.3`): 0 erros, p95 157 ms, 11 de 12 fluxos na meta — só o **login** (p95 310 ms) passou dos 300 ms. Relatório em [`11-desempenho/Relatorio-Desempenho-HML-2026-09-23.md`](./11-desempenho/Relatorio-Desempenho-HML-2026-09-23.md). Correção de segurança no rate limit (M-018) e M-019 no Histórico de Melhorias.
+**O que entrou:** estrutura `perf/` (k6 + Prometheus + Grafana, ao vivo) e o primeiro teste com **100 usuários** na homologação (`v1.0.0-rc.3`): 0 erros, p95 157 ms, 11 de 12 fluxos na meta — só o **login** (p95 310 ms) passou dos 300 ms. Relatório em [`11-desempenho/Relatorio-Desempenho-HML-2026-09-23.md`](./11-desempenho/Relatorio-Desempenho-HML-2026-09-23.md) (versão visual em `.html` e evidências brutas em `11-desempenho/evidencias/`). Correção de segurança no rate limit (M-018) e M-019 no Histórico de Melhorias.
 
 ---
 

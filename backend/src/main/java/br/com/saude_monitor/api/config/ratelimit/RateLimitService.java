@@ -13,10 +13,10 @@ import java.util.concurrent.ConcurrentMap;
  * recurso) dentro de uma janela de 1 minuto. Quando o limite é excedido, devolve
  * false para que o filtro responda 429 no envelope padrão da API.</p>
  *
- * <p>Grupos configurados (spec F0-04):</p>
+ * <p>Grupos (spec F0-04), com os limites vindos de {@link RateLimitProperties}:</p>
  * <ul>
- *   <li>{@code AUTH} — login/refresh: 10 req/min/IP</li>
- *   <li>{@code PUBLICO} — demais endpoints públicos: 60 req/min/IP</li>
+ *   <li>{@code AUTH} — login/refresh: padrão 10 req/min/IP</li>
+ *   <li>{@code PUBLICO} — demais endpoints públicos: padrão 60 req/min/IP</li>
  * </ul>
  */
 @Service
@@ -26,22 +26,26 @@ public class RateLimitService {
     static final long JANELA_MS = 60_000L;
 
     public enum Grupo {
-        AUTH(10),
-        PUBLICO(60);
-
-        private final int limite;
-
-        Grupo(int limite) {
-            this.limite = limite;
-        }
-
-        public int limite() {
-            return limite;
-        }
+        AUTH,
+        PUBLICO
     }
+
+    private final RateLimitProperties properties;
 
     /** Chave -> [janelaInicio, contador]. */
     private final ConcurrentMap<String, long[]> contadores = new ConcurrentHashMap<>();
+
+    public RateLimitService(RateLimitProperties properties) {
+        this.properties = properties;
+    }
+
+    /** Limite do grupo por minuto, conforme a configuração do ambiente. */
+    public int limite(Grupo grupo) {
+        return switch (grupo) {
+            case AUTH -> properties.authPorMinuto();
+            case PUBLICO -> properties.publicoPorMinuto();
+        };
+    }
 
     /**
      * Tenta registrar uma requisição para a chave no grupo.
@@ -60,7 +64,7 @@ public class RateLimitService {
             return atual;
         });
 
-        return estado[1] <= grupo.limite();
+        return estado[1] <= limite(grupo);
     }
 
     /** Limpeza periódica de janelas antigas para evitar vazamento de memória. */

@@ -23,13 +23,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class RateLimitFilterTest {
 
+    /** Padroes de producao: os mesmos valores de application.properties. */
+    static final RateLimitProperties PADRAO = new RateLimitProperties(10, 60, 1);
+
     private RateLimitService service;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setup() {
-        service = new RateLimitService();
-        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper());
+        service = new RateLimitService(PADRAO);
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new StubController())
                 .addFilters(filter)
@@ -42,7 +45,7 @@ class RateLimitFilterTest {
 
     @Test
     void deveMapearLoginComoAuth() {
-        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper());
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO);
         assertThat(filter.resolverGrupo("POST", "/api/v1/auth/login"))
                 .isEqualTo(RateLimitService.Grupo.AUTH);
         assertThat(filter.resolverGrupo("POST", "/api/v1/auth/refresh"))
@@ -51,7 +54,7 @@ class RateLimitFilterTest {
 
     @Test
     void deveMapearEndpointsPublicosComoPublico() {
-        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper());
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO);
         assertThat(filter.resolverGrupo("GET", "/api/v1/hospitais"))
                 .isEqualTo(RateLimitService.Grupo.PUBLICO);
         assertThat(filter.resolverGrupo("GET", "/api/v1/hospitais/abc/indicadores"))
@@ -66,7 +69,7 @@ class RateLimitFilterTest {
 
     @Test
     void naoDeveLimitarEndpointsAutenticados() {
-        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper());
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO);
         assertThat(filter.resolverGrupo("GET", "/api/v1/hospitais/sugestoes"))
                 .isNull();
         assertThat(filter.resolverGrupo("POST", "/api/v1/hospitais/sugestoes/1/aprovar"))
@@ -121,6 +124,77 @@ class RateLimitFilterTest {
                 .andExpect(status().isTooManyRequests());
         mockMvc.perform(get("/api/v1/hospitais").with(deIp("10.0.0.5")))
                 .andExpect(status().isOk());
+    }
+
+    // ------------------------------------------------ X-Forwarded-For -----------------
+    // Antes valia o PRIMEIRO endereco do cabecalho, que e o que o proprio cliente escreve.
+
+    @Test
+    void clienteQueForjaOXForwardedForAindaEhLimitado() throws Exception {
+        // Mesmo cliente real (ultimo endereco, o que o proxy acrescentou), primeiro endereco
+        // diferente a cada chamada: antes cada chamada caia numa chave nova.
+        for (int i = 0; i < 60; i++) {
+            mockMvc.perform(get("/api/v1/hospitais").header("X-Forwarded-For", "203.0.113." + i + ", 198.51.100.7"))
+                    .andExpect(status().isOk());
+        }
+        mockMvc.perform(get("/api/v1/hospitais").header("X-Forwarded-For", "203.0.113.200, 198.51.100.7"))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void usaOEnderecoAcrescentadoPeloProxyConfiavel() {
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO);
+        org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
+        req.setRemoteAddr("169.254.1.1");
+        req.addHeader("X-Forwarded-For", "1.1.1.1, 2.2.2.2, 198.51.100.7");
+        assertThat(filter.resolverIp(req)).isEqualTo("198.51.100.7");
+    }
+
+    @Test
+    void comDoisProxiesConfiaveisUsaOPenultimoEndereco() {
+        RateLimitProperties doisProxies = new RateLimitProperties(10, 60, 2);
+        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(doisProxies), jsonMapper(), doisProxies);
+        org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
+        req.addHeader("X-Forwarded-For", "1.1.1.1, 198.51.100.7, 35.191.0.1");
+        assertThat(filter.resolverIp(req)).isEqualTo("198.51.100.7");
+    }
+
+    @Test
+    void semProxyConfiavelIgnoraOCabecalho() {
+        RateLimitProperties semProxy = new RateLimitProperties(10, 60, 0);
+        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(semProxy), jsonMapper(), semProxy);
+        org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
+        req.setRemoteAddr("10.0.0.9");
+        req.addHeader("X-Forwarded-For", "1.1.1.1");
+        assertThat(filter.resolverIp(req)).isEqualTo("10.0.0.9");
+    }
+
+    @Test
+    void cabecalhoMaisCurtoQueOsProxiesCaiNoEnderecoDaConexao() {
+        RateLimitProperties doisProxies = new RateLimitProperties(10, 60, 2);
+        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(doisProxies), jsonMapper(), doisProxies);
+        org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
+        req.setRemoteAddr("10.0.0.9");
+        req.addHeader("X-Forwarded-For", "1.1.1.1");
+        assertThat(filter.resolverIp(req)).isEqualTo("10.0.0.9");
+    }
+
+    // ------------------------------------------------ Limites configuraveis -----------
+
+    @Test
+    void limitesVemDaConfiguracaoDoAmbiente() throws Exception {
+        RateLimitProperties homologacao = new RateLimitProperties(10, 100, 1);
+        RateLimitService hom = new RateLimitService(homologacao);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new StubController())
+                .addFilters(new RateLimitFilter(hom, jsonMapper(), homologacao)).build();
+        for (int i = 0; i < 100; i++) {
+            mvc.perform(get("/api/v1/hospitais").with(deIp("10.0.0.8")))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("X-RateLimit-Limit", "100"));
+        }
+        mvc.perform(get("/api/v1/hospitais").with(deIp("10.0.0.8")))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Limite: 100 por minuto")));
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor deIp(String ip) {

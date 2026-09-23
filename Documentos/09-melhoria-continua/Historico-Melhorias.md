@@ -1353,6 +1353,38 @@ dimensionada em ~50 op/s de pico, com início espalhado em 120 s.
 
 ---
 
+## M-020 — `raioKm` negativo derrubava a listagem com HTTP 500 (achado do pentest)
+
+**Data:** 23/09/2026 · **PR:** _(preencher ao abrir)_
+
+### Como apareceu
+
+Pentest autorizado da homologação (F-01, `Documentos/12-seguranca/Pentest-HML-2026-09-23.md`):
+`GET /api/v1/hospitais?latitude=-15.8&longitude=-47.9&raioKm=-5` respondia **HTTP 500**.
+
+### Causa
+
+`HospitalServiceImpl.buscarProximos` passava o parâmetro direto para
+`maxDistance(raioKm * METROS_POR_KM)`. Com `raioKm` negativo, o MongoDB recusa a
+`maxDistance` negativa e a exceção não tratada virava 500 (erro genérico), em vez de um
+400 de validação. `latitude`/`longitude` fora de faixa iam pelo mesmo caminho.
+
+### O que mudou
+
+- `HospitalController.listar`: `@DecimalMin(value="0", inclusive=false)` + `@DecimalMax("1000")`
+  em `raioKm`; `@DecimalMin/@DecimalMax` de faixa em `latitude` (-90..90) e `longitude`
+  (-180..180). Bean Validation ignora `null`, então o filtro por raio segue opcional.
+- Teste em `HospitalListagemValidacaoIntegracaoTest` (contexto completo — o MockMvc
+  standalone não instala o `MethodValidationPostProcessor`, então validaria com o bug
+  presente). 6 casos; mutação confirmada (sem a constraint, 3 caem com 500/200).
+
+### Verificação
+
+- `raioKm=-5|0|5000` e `latitude=120` → 400 `CAMPOS_INVALIDOS`; `raioKm=5` e sem filtro → 200.
+- Suíte do backend: 278 testes, 0 falhas.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

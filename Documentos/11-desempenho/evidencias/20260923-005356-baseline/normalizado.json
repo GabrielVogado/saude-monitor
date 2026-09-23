@@ -1,0 +1,26 @@
+{
+  "tool": "k6",
+  "runLabel": "unnamed-run",
+  "timestamp": "2026-09-23T03:55:10.347Z",
+  "target": "unknown",
+  "thresholds": {
+    "p95Ms": null,
+    "errorRatePct": null
+  },
+  "metrics": {
+    "requests": null,
+    "throughputRps": null,
+    "latencyMs": {
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "errorRatePct": null
+  },
+  "checks": {},
+  "notes": [
+    "p95 latency metric was not found in the k6 summary",
+    "error-rate metric was not found in the k6 summary"
+  ]
+}

@@ -4,6 +4,12 @@
 > 1 instância, 1 vCPU, 1 GiB + MongoDB Atlas M0) · **Ferramentas:** k6 + Prometheus + Grafana
 > (`perf/`) e a skill `performance-testing-skill` · **Execução:** autorizada pelo PO.
 
+> **Versão visual:** [`Relatorio-Desempenho-HML-2026-09-23.html`](./Relatorio-Desempenho-HML-2026-09-23.html)
+> (gráficos de p95 por fluxo e de operações/s no Mongo; abrir no navegador).
+> **Evidências brutas:** [`evidencias/`](./evidencias/) — `summary.json` (k6), `servidor.json`
+> (Prometheus), `vigia.tsv` (op/s do Mongo e usuários ativos a cada 10 s), relatórios gerados e janela de cada execução:
+> `20260923-005356-baseline` e `20260923-032405-carga100`.
+
 ## 1. Resumo executivo
 
 100 usuários simultâneos percorreram a jornada completa do app **uma vez cada** — login,

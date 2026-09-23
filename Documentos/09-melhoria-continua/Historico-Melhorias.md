@@ -1387,7 +1387,7 @@ Pentest autorizado da homologação (F-01, `Documentos/12-seguranca/Pentest-HML-
 
 ## M-021 — F-02/F-03 do pentest: 401 vs 403 e HSTS ausente
 
-**Data:** 23/09/2026 · **PR:** _(preencher ao abrir)_
+**Data:** 23/09/2026 · **PR:** #138
 
 ### Como apareceu
 

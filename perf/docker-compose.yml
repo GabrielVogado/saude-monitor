@@ -1,0 +1,88 @@
+# Estrutura local de testes de desempenho contra a HOMOLOGACAO (Cloud Run + Atlas M0).
+# Tudo roda no Docker desta maquina, sem custo: so o trafego da jornada e da coleta vai
+# para o Google. Ver perf/README.md para o passo a passo.
+#
+#   docker compose --env-file .env up -d         # Prometheus + Grafana + token de coleta
+#   http://localhost:3000                         # painel ao vivo
+#   docker compose --env-file .env run --rm k6 run ...   # executa um cenario (ver scripts/)
+#   docker compose --env-file .env down           # DESLIGAR ao terminar: a coleta a cada
+#                                                 # 10 s mantem o backend acordado
+name: radar-saude-perf
+
+services:
+  # Faz login como o usuario ADMIN de teste a cada 10 min e grava o JWT num volume. O
+  # /actuator/prometheus exige papel ADMIN e o access token vale 15 min -- o Prometheus
+  # le o arquivo a cada coleta (credentials_file), sem precisar reiniciar.
+  token:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    # root: o volume nasce do root, e a imagem roda como usuario sem privilegio -- a
+    # gravacao do token falhava sem aviso e o Prometheus nunca achava o arquivo.
+    user: "0:0"
+    environment:
+      API_URL: ${API_URL}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_SENHA: ${ADMIN_SENHA}
+    volumes:
+      - token:/token
+      - ./token/renovar.sh:/renovar.sh:ro
+    entrypoint: ["/bin/sh", "/renovar.sh"]
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    restart: unless-stopped
+    depends_on: [token]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      # Recebe as metricas do k6 (lado do usuario) por remote write.
+      - --web.enable-remote-write-receiver
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - token:/token:ro
+      - prometheus:/prometheus
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    restart: unless-stopped
+    depends_on: [prometheus]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_SENHA}
+      # So escuta em 127.0.0.1 (porta abaixo): o acesso anonimo e de leitura e local.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/radar-saude-desempenho.json
+      GF_USERS_DEFAULT_LANGUAGE: pt-BR
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana:/var/lib/grafana
+
+  # Gerador de carga. Nao sobe com `up`: roda sob demanda (profile), um cenario por vez.
+  k6:
+    image: grafana/k6:0.54.0
+    profiles: [carga]
+    depends_on: [prometheus]
+    environment:
+      API_URL: ${API_URL}
+      PERF_SENHA: ${PERF_SENHA}
+      PROMETHEUS_URL: http://prometheus:9090
+      K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
+      K6_PROMETHEUS_RW_PUSH_INTERVAL: 5s
+      K6_PROMETHEUS_RW_TREND_STATS: "p(50),p(90),p(95),p(99),avg,max"
+      # Marca as series como encerradas ao fim da execucao: sem isso o Prometheus mantem o
+      # ultimo valor de k6_vus por 5 min e o painel mostra usuarios que ja nao existem.
+      K6_PROMETHEUS_RW_STALE_MARKERS: "true"
+    volumes:
+      - ./k6:/scripts:ro
+      - ./resultados:/resultados
+
+volumes:
+  token:
+  prometheus:
+  grafana:

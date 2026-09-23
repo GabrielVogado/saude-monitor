@@ -1248,7 +1248,7 @@ desinstalar" só se confirma num aparelho, com duas rcs seguidas.
 
 ## M-019 — Testes de desempenho da homologação: métricas ao vivo, relatório e limites gratuitos
 
-**Data:** 23/09/2026 · **PR:** _(preencher ao abrir)_
+**Data:** 23/09/2026 · **PR:** #133
 
 ### O que o PO pediu
 

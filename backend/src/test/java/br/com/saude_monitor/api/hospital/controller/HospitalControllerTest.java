@@ -71,6 +71,11 @@ class HospitalControllerTest {
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
 
+    // A validação dos parâmetros de query (@DecimalMin/@DecimalMax em latitude/longitude/
+    // raioKm) depende do MethodValidationPostProcessor, que o MockMvc standalone não instala.
+    // Por isso o F-01 (raioKm negativo → 400) é coberto em HospitalListagemValidacaoIntegracaoTest,
+    // com o contexto completo do Spring, onde a validação de método de fato roda.
+
     @Test
     void deveCriarHospitalComSucesso() throws Exception {
         String body = """

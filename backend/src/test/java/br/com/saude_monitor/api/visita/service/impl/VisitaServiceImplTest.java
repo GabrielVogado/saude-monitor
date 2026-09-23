@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.visita.service.impl;
 
+import br.com.saude_monitor.api.config.exception.AcessoNegadoException;
 import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.ValidacaoNegocioException;
@@ -192,6 +193,24 @@ class VisitaServiceImplTest {
 
         assertEquals(saidaReal, resposta.saida());
         assertEquals(45, resposta.duracaoMinutos());
+    }
+
+    @Test
+    void checkoutDeVisitaDeOutroUsuarioLancaAcessoNegado() {
+        // Achado F-02 do pentest de 23/09/2026: o chamador está autenticado (tem um token
+        // válido) — só não é dono desta visita. 403 (ACESSO_NEGADO), não 401.
+        VisitaDocument visitaDeOutro = VisitaDocument.builder()
+                .id("v9")
+                .usuarioId("dono-legitimo")
+                .hospitalId("h1")
+                .entrada(Instant.now())
+                .status(StatusVisita.EM_ATENDIMENTO)
+                .build();
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaDeOutro));
+
+        assertThrows(AcessoNegadoException.class,
+                () -> visitaService.checkout("v9", new CheckoutRequest(null, null, null, null), "invasor"));
+        verify(visitaRepository, never()).save(any(VisitaDocument.class));
     }
 
     @Test

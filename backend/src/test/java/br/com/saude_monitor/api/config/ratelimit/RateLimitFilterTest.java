@@ -151,6 +151,17 @@ class RateLimitFilterTest {
     }
 
     @Test
+    void variasLinhasDeXForwardedForSaoLidasComoUmaListaSo() {
+        // O cliente manda uma linha; o proxy acrescenta OUTRA linha em vez de concatenar.
+        // Ler so a primeira devolveria o endereco que o cliente escolheu.
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO);
+        org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
+        req.addHeader("X-Forwarded-For", "1.1.1.1");
+        req.addHeader("X-Forwarded-For", "198.51.100.7");
+        assertThat(filter.resolverIp(req)).isEqualTo("198.51.100.7");
+    }
+
+    @Test
     void comDoisProxiesConfiaveisUsaOPenultimoEndereco() {
         RateLimitProperties doisProxies = new RateLimitProperties(10, 60, 2);
         RateLimitFilter filter = new RateLimitFilter(new RateLimitService(doisProxies), jsonMapper(), doisProxies);

@@ -20,8 +20,9 @@ import java.util.UUID;
 
 /**
  * Filtro de rate limiting (F0-04): aplica limites por IP conforme o grupo do
- * recurso (auth = 10/min, públicos = 60/min) e responde 429 no envelope padrão
- * da API quando o limite é excedido.
+ * recurso e responde 429 no envelope padrão da API quando o limite é excedido.
+ * Os limites vêm de {@link RateLimitProperties} (padrão: auth 10/min, públicos
+ * 60/min; o deploy de homologação os sobe para os testes de desempenho).
  *
  * <p>Endpoints autenticados (com token JWT) não são limitados aqui — a
  * identificação via token já oferece controle granular e evita bloquear usuários
@@ -50,14 +51,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         String ip = resolverIp(request);
-        boolean permitido = rateLimitService.tentarConsumir(ip, grupo);
+        long feitas = rateLimitService.registrar(ip, grupo);
+        int limite = rateLimitService.limite(grupo);
+        boolean permitido = feitas <= limite;
 
-        response.setHeader(HEADER_LIMITE, String.valueOf(rateLimitService.limite(grupo)));
+        response.setHeader(HEADER_LIMITE, String.valueOf(limite));
 
         if (!permitido) {
-            // Registra QUEM foi limitado: e a unica forma de conferir, em producao, que a
-            // chave e o IP real do cliente (e nao o do proxy, que limitaria todo mundo junto).
-            log.info("[RateLimit] 429 {} para {} em {} {}", grupo, ip, request.getMethod(), request.getRequestURI());
+            // Registra QUEM foi limitado -- e a forma de conferir, em producao, que a chave e
+            // o IP real do cliente (e nao o do proxy, que limitaria todo mundo junto). So a
+            // PRIMEIRA rejeicao de cada chave por janela: sob ataque, uma linha por minuto
+            // por IP, nao uma por requisicao.
+            if (feitas == limite + 1L) {
+                log.info("[RateLimit] 429 {} para {} em {} {}", grupo, ip, request.getMethod(), request.getRequestURI());
+            }
             escrever429(response, grupo);
             return;
         }
@@ -72,12 +79,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
      *         (ex.: endpoints autenticados).
      */
     RateLimitService.Grupo resolverGrupo(String method, String uri) {
-        // Auth: login e refresh — limite mais restrito (10/min).
+        // Auth: login e refresh — limite mais restrito (padrão 10/min).
         if (uri.startsWith("/api/v1/auth/")) {
             return RateLimitService.Grupo.AUTH;
         }
 
-        // Endpoints públicos diversos: 60/min.
+        // Endpoints públicos diversos (padrão 60/min).
         if (isPublico(method, uri)) {
             return RateLimitService.Grupo.PUBLICO;
         }
@@ -132,8 +139,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String semCabecalho = remote != null ? remote : "desconhecido";
 
         int confiaveis = properties.proxiesConfiaveis();
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (confiaveis <= 0 || forwarded == null || forwarded.isBlank()) {
+        // TODAS as linhas do cabecalho, na ordem: um cliente pode mandar mais de uma linha
+        // `X-Forwarded-For`, e ler so a primeira (getHeader) deixaria o endereco do proxy
+        // numa linha que nunca e lida -- reabrindo o contorno que este metodo fecha.
+        String forwarded = String.join(",", java.util.Collections.list(request.getHeaders("X-Forwarded-For")));
+        if (confiaveis <= 0 || forwarded.isBlank()) {
             return semCabecalho;
         }
         String[] enderecos = forwarded.split(",");

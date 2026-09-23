@@ -1,6 +1,9 @@
 package br.com.saude_monitor.api.config.ratelimit;
 
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * Propriedades do rate limiting (F0-04), lidas do prefixo {@code app.ratelimit}.
@@ -11,14 +14,19 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * mediria o limitador, não o sistema. Os padrões em {@code application.properties}
  * são os valores de antes; só o deploy de homologação os sobrescreve.</p>
  *
+ * <p>Validada no startup: um limite {@code 0} (erro de digitacao, ou saida vazia do
+ * workflow) faria TODA rota publica responder 429 — inclusive o {@code /actuator/health}
+ * dos smoke tests. Melhor a aplicacao nao subir.</p>
+ *
  * <p>Registrada automaticamente pelo {@code @ConfigurationPropertiesScan}.</p>
  */
+@Validated
 @ConfigurationProperties(prefix = "app.ratelimit")
 public record RateLimitProperties(
         /** Login/refresh ({@code /api/v1/auth/**}), por IP e por minuto. */
-        int authPorMinuto,
+        @Positive int authPorMinuto,
         /** Demais endpoints públicos, por IP e por minuto. */
-        int publicoPorMinuto,
+        @Positive int publicoPorMinuto,
         /**
          * Quantos proxies confiáveis ficam entre o cliente e a aplicação, cada um
          * acrescentando um endereço ao FIM do {@code X-Forwarded-For}. O IP do cliente é
@@ -30,6 +38,6 @@ public record RateLimitProperties(
          * enviar um {@code X-Forwarded-For} diferente a cada requisição para nunca bater
          * no limite.</p>
          */
-        int proxiesConfiaveis
+        @PositiveOrZero int proxiesConfiaveis
 ) {
 }

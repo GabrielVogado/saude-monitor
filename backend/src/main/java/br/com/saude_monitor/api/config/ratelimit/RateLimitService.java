@@ -53,6 +53,15 @@ public class RateLimitService {
      * @return {@code true} se dentro do limite; {@code false} se deve ser bloqueado (429).
      */
     public boolean tentarConsumir(String chave, Grupo grupo) {
+        return registrar(chave, grupo) <= limite(grupo);
+    }
+
+    /**
+     * Registra a requisição e devolve quantas a chave já fez na janela atual (incluindo
+     * esta). O filtro usa o número para registrar em log só a PRIMEIRA rejeição de cada
+     * chave por janela — logar toda rejeição transformaria um ataque num volume de log.
+     */
+    public long registrar(String chave, Grupo grupo) {
         long agora = System.currentTimeMillis();
         long janelaInicio = agora - (agora % JANELA_MS);
 
@@ -64,7 +73,7 @@ public class RateLimitService {
             return atual;
         });
 
-        return estado[1] <= limite(grupo);
+        return estado[1];
     }
 
     /** Limpeza periódica de janelas antigas para evitar vazamento de memória. */

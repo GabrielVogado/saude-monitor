@@ -60,12 +60,15 @@ jobs:
             echo "service_suffix=-hom" >> "$GITHUB_OUTPUT"
             echo "secret_suffix=_HOM" >> "$GITHUB_OUTPUT"
             echo "github_env=homologacao" >> "$GITHUB_OUTPUT"
-            # Limites de rate limiting altos em HOMOLOGACAO (decisao do PO, 23/09/2026):
+            # Limites de rate limiting mais altos em HOMOLOGACAO (decisao do PO, 23/09/2026):
             # os testes de desempenho saem de uma unica maquina, e com 10/60 req/min por
-            # IP mediriam o limitador (429), nao o sistema. Dev e producao ficam com os
-            # limites da spec F0-04.
-            echo "ratelimit_auth=100000" >> "$GITHUB_OUTPUT"
-            echo "ratelimit_publico=100000" >> "$GITHUB_OUTPUT"
+            # IP mediriam o limitador (429), nao o sistema. Dimensionados para a jornada de
+            # 100 usuarios (100 logins em ~1 min; ~9 chamadas publicas por jornada), NAO
+            # ilimitados: o servico e publico, e login sem limite abriria forca bruta de
+            # senha contra as contas de homologacao (achado do code-review). Dev e producao
+            # ficam com os limites da spec F0-04.
+            echo "ratelimit_auth=300" >> "$GITHUB_OUTPUT"
+            echo "ratelimit_publico=2000" >> "$GITHUB_OUTPUT"
           else
             echo "env=dev" >> "$GITHUB_OUTPUT"
             echo "tag=dev" >> "$GITHUB_OUTPUT"

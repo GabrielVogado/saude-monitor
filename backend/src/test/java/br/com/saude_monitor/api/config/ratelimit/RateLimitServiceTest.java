@@ -40,6 +40,14 @@ class RateLimitServiceTest {
     }
 
     @Test
+    void registrarDevolveQuantasAChaveJaFezNaJanela() {
+        RateLimitService service = new RateLimitService(RateLimitFilterTest.PADRAO);
+        assertThat(service.registrar("ip", RateLimitService.Grupo.AUTH)).isEqualTo(1);
+        assertThat(service.registrar("ip", RateLimitService.Grupo.AUTH)).isEqualTo(2);
+        assertThat(service.registrar("outro", RateLimitService.Grupo.AUTH)).isEqualTo(1);
+    }
+
+    @Test
     void deveLimparJanelasObsoletas() {
         RateLimitService service = new RateLimitService(RateLimitFilterTest.PADRAO);
         service.tentarConsumir("ip-antigo", RateLimitService.Grupo.PUBLICO);

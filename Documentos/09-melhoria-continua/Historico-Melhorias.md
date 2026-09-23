@@ -1248,7 +1248,7 @@ desinstalar" só se confirma num aparelho, com duas rcs seguidas.
 
 ## M-018 — Rate limit contornável por X-Forwarded-For forjado; limites por ambiente
 
-**Data:** 23/09/2026 · **PR:** _(preencher ao abrir)_
+**Data:** 23/09/2026 · **PR:** #131
 
 ### Como apareceu
 

@@ -38,6 +38,8 @@ jobs:
       service_suffix: ${{ steps.resolve.outputs.service_suffix }}
       secret_suffix: ${{ steps.resolve.outputs.secret_suffix }}
       github_env: ${{ steps.resolve.outputs.github_env }}
+      ratelimit_auth: ${{ steps.resolve.outputs.ratelimit_auth }}
+      ratelimit_publico: ${{ steps.resolve.outputs.ratelimit_publico }}
     steps:
       - id: resolve
         run: |
@@ -47,6 +49,8 @@ jobs:
             echo "service_suffix=" >> "$GITHUB_OUTPUT"
             echo "secret_suffix=_PROD" >> "$GITHUB_OUTPUT"
             echo "github_env=producao" >> "$GITHUB_OUTPUT"
+            echo "ratelimit_auth=10" >> "$GITHUB_OUTPUT"
+            echo "ratelimit_publico=60" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
             # Homologacao (decisao do PO, 22/09/2026). Servico, banco e JWT proprios:
             # os secrets `_HOM` apontam para o banco `saude_monitor_hom`. Sem eles o
@@ -56,12 +60,23 @@ jobs:
             echo "service_suffix=-hom" >> "$GITHUB_OUTPUT"
             echo "secret_suffix=_HOM" >> "$GITHUB_OUTPUT"
             echo "github_env=homologacao" >> "$GITHUB_OUTPUT"
+            # Limites de rate limiting mais altos em HOMOLOGACAO (decisao do PO, 23/09/2026):
+            # os testes de desempenho saem de uma unica maquina, e com 10/60 req/min por
+            # IP mediriam o limitador (429), nao o sistema. Dimensionados para a jornada de
+            # 100 usuarios (100 logins em ~1 min; ~9 chamadas publicas por jornada), NAO
+            # ilimitados: o servico e publico, e login sem limite abriria forca bruta de
+            # senha contra as contas de homologacao (achado do code-review). Dev e producao
+            # ficam com os limites da spec F0-04.
+            echo "ratelimit_auth=300" >> "$GITHUB_OUTPUT"
+            echo "ratelimit_publico=2000" >> "$GITHUB_OUTPUT"
           else
             echo "env=dev" >> "$GITHUB_OUTPUT"
             echo "tag=dev" >> "$GITHUB_OUTPUT"
             echo "service_suffix=-dev" >> "$GITHUB_OUTPUT"
             echo "secret_suffix=" >> "$GITHUB_OUTPUT"
             echo "github_env=desenvolvimento" >> "$GITHUB_OUTPUT"
+            echo "ratelimit_auth=10" >> "$GITHUB_OUTPUT"
+            echo "ratelimit_publico=60" >> "$GITHUB_OUTPUT"
           fi
 
   build-and-deploy:
@@ -151,6 +166,8 @@ jobs:
           env_vars: |
             APP_SEEDADMIN_ENABLED=false
             RESEND_FROM_EMAIL=senha@saudemonitor.dev
+            APP_RATELIMIT_AUTH_POR_MINUTO=${{ needs.resolve-env.outputs.ratelimit_auth }}
+            APP_RATELIMIT_PUBLICO_POR_MINUTO=${{ needs.resolve-env.outputs.ratelimit_publico }}
           flags: >-
             --allow-unauthenticated
             --service-account=saude-monitor-run@${{ env.PROJECT_ID }}.iam.gserviceaccount.com

@@ -1246,6 +1246,55 @@ desinstalar" só se confirma num aparelho, com duas rcs seguidas.
 
 ---
 
+## M-018 — Rate limit contornável por X-Forwarded-For forjado; limites por ambiente
+
+**Data:** 23/09/2026 · **PR:** #131
+
+### Como apareceu
+
+Ao planejar os testes de desempenho da homologação (100 usuários saindo de uma única
+máquina), a leitura do `RateLimitFilter` mostrou duas coisas: os limites da F0-04 (10
+logins/min e 60 req/min por IP nas rotas públicas) mediriam o limitador, não o sistema —
+e a chave do limite era o **primeiro** endereço do `X-Forwarded-For`, que é escrito pelo
+próprio cliente.
+
+### Falha de segurança
+
+Trocando o `X-Forwarded-For` a cada requisição, qualquer cliente caía numa chave nova e
+**nunca** era limitado — inclusive no login, anulando a proteção contra força bruta de
+senha. Agora vale o endereço acrescentado pelo proxy confiável (o N-ésimo contando da
+direita; N = `app.ratelimit.proxies-confiaveis`, 1 no Cloud Run), lendo **todas** as
+linhas do cabeçalho (achado do code-review: ler só a primeira reabria o contorno).
+
+### O que mudou
+
+- Limites em `app.ratelimit.*` (padrões iguais aos de antes), validados no startup —
+  um `0` faria toda rota pública, inclusive o health check, responder 429.
+- Homologação: **300** logins/min e **2000** req/min públicas, dimensionados para a
+  jornada de 100 usuários. Não ilimitados: o serviço é público, e login sem limite abriria
+  força bruta contra as contas de homologação (achado do code-review — a primeira versão
+  usava 100000).
+- 429 registrado em log com o IP, **uma vez por IP por janela** (não uma por requisição),
+  para conferir em produção que a chave é o cliente e não o proxy.
+
+### Verificação
+
+- Testes novos: cabeçalho forjado, várias linhas de cabeçalho, 0/1/2 proxies, cabeçalho
+  curto, limites por configuração. **4 mutações, 4 mortas** (voltar a ler o primeiro
+  endereço; ignorar `proxies=0`; limite fixo em 60; ler só a primeira linha).
+- Suíte do backend: 270 testes, 0 falhas (com Testcontainers).
+- `security-review`: sem achados. `code-review`: 6 achados corrigidos; aceitos —
+  reserva no endereço da conexão (no Cloud Run o cabeçalho sempre existe), troca pelo
+  `RemoteIpValve` (outro escopo), contadores por instância/IPv6 (pré-existente; hoje
+  máximo de 1 instância).
+
+### A conferir depois do deploy
+
+Que no Cloud Run o endereço mais à direita é mesmo o do cliente: o log de 429 mostra a
+chave usada; comparar com o IP de quem gerou o 429.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Libera trafego HTTP (cleartext) apenas para os hosts de desenvolvimento local.
+  Necessario porque builds release bloqueiam http:// por padrao (Android 9+/API 28+),
+  o que impedia o APK de release de conectar no backend em http://192.168.100.11:8080.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Backend local (PC na rede LAN) -->
+        <domain includeSubdomains="false">192.168.100.11</domain>
+        <domain includeSubdomains="false">192.168.100.20</domain>
+        <!-- Emulador Android -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- Localhost / loopback -->
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

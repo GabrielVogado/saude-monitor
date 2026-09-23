@@ -1,0 +1,40 @@
+# Blueprint do Render para o backend (Spring Boot).
+# Crie o serviço em: https://dashboard.render.com/select-repo?type=blueprint
+# (ou New + Blueprint) apontando para este repositório.
+#
+# IMPORTANTE: a imagem GHCR é privada. Antes de criar o serviço, configure
+# em Render: Account Settings -> Registry Credentials -> Add Credential
+#   Registry: ghcr.io
+#   Username: <seu usuário GitHub>
+#   Password: <GitHub PAT com scope read:packages>
+#
+# O CD (cd-backend.yml) faz push da imagem e dispara o deploy via API,
+# então o serviço precisa existir com o Service ID anotado nos secrets.
+
+services:
+  - type: web
+    name: saude-monitor-backend-dev
+    runtime: image
+    image:
+      url: ghcr.io/gabrielvogado/saude-monitor-backend:dev
+    plan: free
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: MONGO_HOST
+        sync: false
+      - key: MONGO_PORT
+        value: 27017
+      - key: MONGO_DATABASE
+        value: saude_monitor_dev
+      - key: MONGO_AUTH_DB
+        value: admin
+      - key: MONGO_USER
+        sync: false
+      - key: MONGO_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_SENHA
+        sync: false

@@ -1,0 +1,362 @@
+# Build do APK no proprio GitHub Actions, sem consumir cota do EAS.
+#
+# POR QUE ESTE WORKFLOW EXISTE
+#
+# O cd-mobile-eas.yml disparava a cada push em `frontend/**`. Foram 18 builds em
+# agosto e 20 nos tres primeiros dias de setembro de 2026, contra os 30/mes do free
+# tier do EAS -- a cota foi gasta em builds automaticos que ninguem pediu. A saida
+# nao e so trocar de construtor: e parar de construir sem que alguem peca.
+#
+# O projeto nao precisa do EAS para gerar APK. O diretorio frontend/android/ esta
+# versionado por inteiro (gradlew, build.gradle e o CMakeLists customizado que
+# desativa IPO/LTO por causa do NDK 27), e o repositorio e PUBLICO, entao minutos de
+# Actions sao gratuitos e ilimitados.
+#
+# O EAS continua, so para o AAB de loja e SO POR EXECUCAO MANUAL -- que e onde os
+# creditos rendem, e e raro.
+# VALIDADO em 03/09/2026, antes do merge: run 33818555520, 21 min 13 s, APK de 23 MB
+# publicado como artefato. A validacao usou um gatilho de push temporario, ja removido
+# -- um workflow novo so aceita workflow_dispatch depois de estar na branch padrao.
+name: CD - Mobile (APK via Gradle)
+
+on:
+  # Automatico por decisao do PO em 03/09/2026: toda entrega na `develop` deixa um APK
+  # pronto para baixar, sem ninguem precisar lembrar de pedir (a `master` tambem, via
+  # orquestrador de homologacao -- ver o paragrafo de 22/09/2026 abaixo). O que estourou a cota do EAS nao foi o automatismo em si -- foi
+  # ele custando credito. Aqui nao custa: o repositorio e publico.
+  #
+  # PRECONDICAO para isso ser confortavel: os secrets ANDROID_RELEASE_* (chave de
+  # release, 22/09/2026 -- ver deploy/android/README.md). Sem eles, em dev, cada build
+  # gera uma keystore nova, e instalar um APK por cima do anterior falha com "app nao
+  # instalado" -- o testador precisa desinstalar e perde login, dispositivoId e
+  # feedback pendente. O nome do artefato avisa quando e esse o caso. Em homologacao
+  # e producao a falta da chave derruba o build.
+  # SEM gatilho de pull_request, e a contrapartida fica registrada: o ci.yml valida
+  # so o `expo export --platform web`, entao o build NATIVO (Gradle/NDK) e exercitado
+  # pela primeira vez DEPOIS do merge. Uma mudanca que quebre o nativo deixa a develop
+  # vermelha em vez de ser barrada no PR. Adicionar `pull_request` custaria ~21 min por
+  # PR de frontend -- gratuito em repositorio publico, mas e decisao do PO, nao efeito
+  # colateral de um PR de infraestrutura.
+  #
+  # `master` saiu do gatilho em 22/09/2026: `master` passou a ser HOMOLOGACAO, e o APK
+  # de la tem de nascer depois do backend de homologacao (para apontar para a URL dele)
+  # e virar tag + GitHub Release. Quem o constroi e o orquestrador de homologacao, que
+  # chama este workflow por `workflow_call`. Um push em `master` disparando daqui tambem
+  # produziria um segundo APK, sem versao de release e apontando para dev.
+  push:
+    branches: [develop]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/cd-mobile-apk.yml'
+
+  workflow_dispatch:
+    inputs:
+      variante:
+        description: Variante do build
+        type: choice
+        options: [release, debug]
+        default: release
+
+  # Chamado pelo orquestrador de homologacao/producao, que ja sabe a versao (da tag) e
+  # a URL do backend que acabou de publicar.
+  workflow_call:
+    inputs:
+      ambiente:
+        description: dev | hom | prod
+        type: string
+        required: true
+      api_url:
+        description: URL do backend que o APK vai usar
+        type: string
+        required: true
+      version_name:
+        description: versionName (ex. 1.0.0-rc.1)
+        type: string
+        required: true
+      version_code:
+        description: versionCode (inteiro crescente)
+        type: string
+        required: true
+    outputs:
+      artefato:
+        description: Nome do artefato com o APK
+        value: ${{ jobs.apk.outputs.artefato }}
+      arquivo:
+        description: Nome do arquivo .apk dentro do artefato
+        value: ${{ jobs.apk.outputs.arquivo }}
+    # Declarados para o chamador nao poder esquecer um sem erro: sem `secrets: inherit`
+    # nem repasse explicito, todos chegariam vazios -- a chave falharia alto, mas o token
+    # do Mapbox nao, e o APK sairia para a Release com o mapa em branco.
+    secrets:
+      EXPO_PUBLIC_MAPBOX_TOKEN:
+        required: true
+      ANDROID_RELEASE_KEYSTORE_BASE64:
+        required: true
+      ANDROID_RELEASE_STORE_PASSWORD:
+        required: true
+      ANDROID_RELEASE_KEY_ALIAS:
+        required: true
+      ANDROID_RELEASE_KEY_PASSWORD:
+        required: true
+
+permissions:
+  contents: read
+
+# Uma sequencia de merges enfileiraria varios builds de ~21 min, e so o ultimo
+# interessa. O `event_name` no grupo ja isola push de dispatch -- um push nunca
+# cancelaria um APK que alguem pediu a mao. O `cancel-in-progress` condicional que
+# havia aqui era redundante com isso, e tinha um efeito nao pretendido: SERIALIZAVA
+# dois dispatches na mesma ref, deixando o segundo esperando ~21 min sem indicacao de
+# fila.
+#
+# 22/09/2026: o grupo ganhou ambiente e variante. Chamado por `workflow_call`, `github.ref`
+# e `github.event_name` sao os do CHAMADOR -- sem isso, um dispatch manual de dev na
+# `master` cairia no mesmo grupo do APK de homologacao e o cancelaria no meio. E
+# homologacao/producao nunca cancelam: cada push na `master` e uma rc com tag propria.
+concurrency:
+  group: apk-${{ inputs.ambiente || 'dev' }}-${{ inputs.variante || 'release' }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ (inputs.ambiente || 'dev') == 'dev' }}
+
+jobs:
+  apk:
+    name: APK ${{ inputs.ambiente || 'dev' }} (${{ inputs.variante || 'release' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: frontend
+    outputs:
+      artefato: ${{ steps.apk.outputs.artefato }}
+      arquivo: ${{ steps.apk.outputs.arquivo }}
+    env:
+      # Push/dispatch = dev. So o `workflow_call` (orquestrador) pede hom/prod.
+      AMBIENTE: ${{ inputs.ambiente || 'dev' }}
+      VARIANTE: ${{ inputs.variante || 'release' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache do Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-apk-${{ hashFiles('frontend/android/**/*.gradle*', 'frontend/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-apk-
+
+      - name: Instalar dependências
+        # `npm install`, não `npm ci`: ver nota em `ci.yml` (subárvore de
+        # dependências opcionais wasm32, inconsistente entre npm no Windows
+        # e no Linux do runner).
+        run: npm install --legacy-peer-deps
+
+      # Versao do APK. O Android so instala POR CIMA quando o versionCode e maior que o
+      # instalado -- com `1` fixo no build.gradle, nenhum APK novo era reconhecido como
+      # atualizacao. Hom/prod recebem os numeros do orquestrador (derivados da tag); dev
+      # usa o run_number deste workflow, que so cresce. Os pacotes sao diferentes por
+      # ambiente (`.dev`, `.hom`), entao as duas sequencias nunca competem.
+      - name: Calcular versão
+        id: versao
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          API_URL: ${{ inputs.api_url }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          # `required: true` do workflow_call so exige a CHAVE, nao um valor: um output
+          # vazio do chamador faria o APK de homologacao cair nos valores de dev (URL do
+          # backend de dev, versao -dev.<run> menor que a instalada).
+          if [ "$AMBIENTE" != "dev" ]; then
+            for ENTRADA in VERSION_NAME VERSION_CODE API_URL; do
+              if [ -z "${!ENTRADA:-}" ]; then
+                echo "ERRO: ambiente $AMBIENTE sem $ENTRADA -- o chamador precisa informar."
+                exit 1
+              fi
+            done
+          fi
+          if [ -n "${VERSION_NAME:-}" ]; then
+            NOME="$VERSION_NAME"
+            CODIGO="$VERSION_CODE"
+          else
+            BASE=$(node -p "require('./app.json').expo.version")
+            NOME="${BASE}-dev.${RUN_NUMBER}"
+            CODIGO="$RUN_NUMBER"
+          fi
+          if ! [[ "$CODIGO" =~ ^[1-9][0-9]*$ ]] || [ "$CODIGO" -gt 2100000000 ]; then
+            echo "ERRO: versionCode '$CODIGO' invalido (inteiro de 1 a 2100000000)."
+            exit 1
+          fi
+          echo "nome=$NOME" >> "$GITHUB_OUTPUT"
+          echo "codigo=$CODIGO" >> "$GITHUB_OUTPUT"
+          echo "🏷️ Ambiente \`$AMBIENTE\` · versão \`$NOME\` · versionCode \`$CODIGO\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # Chave de RELEASE (secrets ANDROID_RELEASE_*): assinatura estavel e a outra metade
+      # de "atualizar sem desinstalar" -- o Android recusa APK assinado por chave
+      # diferente da instalada.
+      #
+      # Sem ela: dev cai no caminho antigo (debug.keystore do secret
+      # ANDROID_KEYSTORE_BASE64, ou uma gerada na hora, marcada no nome do artefato);
+      # hom/prod FALHAM. Publicar numa Release um APK que ninguem consegue atualizar
+      # depois seria entregar o problema que este ambiente existe para resolver.
+      - name: Preparar assinatura
+        id: keystore
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          # A chave de release so assina o que esta em `develop` ou `master`. Um dispatch de
+          # outra branch sairia com o mesmo certificado de producao e instalaria por cima
+          # do APK de dev sem ninguem perceber que era codigo nao integrado.
+          REF_INTEGRADA=nao
+          case "$REF" in refs/heads/develop|refs/heads/master) REF_INTEGRADA=sim ;; esac
+
+          if [ -n "${RELEASE_KEYSTORE_BASE64:-}" ] && [ "$VARIANTE" = "release" ] && [ "$REF_INTEGRADA" = "sim" ]; then
+            # Os QUATRO secrets, e a chave aberta de verdade, antes dos ~20 min de Gradle:
+            # senha/alias errados so apareciam no fim, como "Keystore was tampered with,
+            # or password was incorrect" ou "key alias not found".
+            for SEGREDO in RELEASE_STORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
+              if [ -z "${!SEGREDO:-}" ]; then
+                echo "ERRO: secret ANDROID_${SEGREDO} nao definido (ver deploy/android/README.md)."
+                exit 1
+              fi
+            done
+            CAMINHO="$RUNNER_TEMP/release.keystore"
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$CAMINHO"
+            if ! keytool -list -keystore "$CAMINHO" -storepass "$RELEASE_STORE_PASSWORD" -alias "$RELEASE_KEY_ALIAS" >/dev/null 2>&1; then
+              echo "ERRO: a keystore nao abre com ANDROID_RELEASE_STORE_PASSWORD, ou nao tem o alias ANDROID_RELEASE_KEY_ALIAS."
+              exit 1
+            fi
+            echo "caminho=$CAMINHO" >> "$GITHUB_OUTPUT"
+            echo "sufixo=" >> "$GITHUB_OUTPUT"
+            echo "✅ Assinado com a chave de release — atualiza por cima das versões anteriores." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [ "$AMBIENTE" != "dev" ]; then
+            {
+              echo "❌ **Ambiente \`$AMBIENTE\` exige a chave de release.**"
+              echo ""
+              echo "Crie os secrets \`ANDROID_RELEASE_KEYSTORE_BASE64\`, \`ANDROID_RELEASE_STORE_PASSWORD\`,"
+              echo "\`ANDROID_RELEASE_KEY_ALIAS\` e \`ANDROID_RELEASE_KEY_PASSWORD\` (ver \`deploy/android/README.md\`)."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "ERRO: ambiente $AMBIENTE sem chave de release (secret ausente, ou ref $REF fora de develop/master)."
+            exit 1
+          fi
+
+          # Caminho de dev sem chave de release: a variante assina com a debug.keystore
+          # (credenciais publicas fixadas no build.gradle). Se a chave de release existe e
+          # mesmo assim viemos parar aqui (variante debug, ou branch nao integrada), este
+          # APK NAO atualiza o de dev -- o nome avisa.
+          DESTINO=android/app/debug.keystore
+          echo "caminho=" >> "$GITHUB_OUTPUT"
+          if [ -n "${RELEASE_KEYSTORE_BASE64:-}" ]; then
+            AVISO="-NAO-ATUALIZA-O-DEV"
+          else
+            AVISO=""
+          fi
+          if [ -n "${KEYSTORE_BASE64:-}" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$DESTINO"
+            echo "sufixo=$AVISO" >> "$GITHUB_OUTPUT"
+            echo "ℹ️ Assinado com a debug.keystore do secret \`ANDROID_KEYSTORE_BASE64\`." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          keytool -genkeypair -v -keystore "$DESTINO" \
+            -storepass android -alias androiddebugkey -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" >/dev/null
+          # O resumo do job ninguem le ao baixar o artefato -- por isso o nome avisa.
+          echo "sufixo=-ASSINATURA-EFEMERA" >> "$GITHUB_OUTPUT"
+          echo "⚠️ **Keystore gerada nesta execução** — este APK não atualiza por cima de outro; é preciso desinstalar antes. Crie os secrets \`ANDROID_RELEASE_*\` para resolver." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build do APK
+        env:
+          # ESTA linha decide o destino do APK, nao o `frontend/app.json`:
+          # `src/config/api.js` le `EXPO_PUBLIC_API_BASE_URL` PRIMEIRO. Hom/prod recebem a
+          # URL do backend que o orquestrador acabou de publicar; dev usa a variavel de
+          # repositorio ou o Cloud Run de dev.
+          EXPO_PUBLIC_API_BASE_URL: ${{ inputs.api_url || vars.EXPO_PUBLIC_API_BASE_URL || 'https://saude-monitor-backend-dev-uly57kmmia-rj.a.run.app' }}
+          # Token publico do Mapbox (tiles `Street`); sem ele o mapa monta vazio.
+          EXPO_PUBLIC_MAPBOX_TOKEN: ${{ secrets.EXPO_PUBLIC_MAPBOX_TOKEN }}
+          # Lidas pelo `signingConfigs.release` do build.gradle. Vazias no caminho de dev
+          # sem chave -- ai o build.gradle usa a debug.
+          ANDROID_RELEASE_KEYSTORE_PATH: ${{ steps.keystore.outputs.caminho }}
+          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          VERSION_NAME: ${{ steps.versao.outputs.nome }}
+          VERSION_CODE: ${{ steps.versao.outputs.codigo }}
+        working-directory: frontend/android
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          if [ "$VARIANTE" = "debug" ]; then TAREFA=assembleDebug; else TAREFA=assembleRelease; fi
+          ./gradlew --no-daemon "$TAREFA" \
+            -Pambiente="$AMBIENTE" \
+            -PappVersionName="$VERSION_NAME" \
+            -PappVersionCode="$VERSION_CODE"
+
+      - name: Localizar o APK
+        id: apk
+        env:
+          VERSION_NAME: ${{ steps.versao.outputs.nome }}
+          SUFIXO: ${{ steps.keystore.outputs.sufixo }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # `-print -quit` em vez de `| head -1`: com `pipefail`, o head fechava o pipe e o
+          # find morria com SIGPIPE. Escopado a variante e com `-newer`: o
+          # android/.gitignore DES-ignora `app/build/outputs/apk/**`, e um APK versionado
+          # no passado seria restaurado pelo checkout e poderia sair no lugar do novo.
+          CAMINHO=$(find "android/app/build/outputs/apk/$VARIANTE" -name "*.apk" -newer android/gradlew -print -quit 2>/dev/null || true)
+          if [ -z "$CAMINHO" ]; then
+            echo "ERRO: nenhum APK foi produzido pelo Gradle."
+            exit 1
+          fi
+
+          # Nome que o testador ve ao baixar (e o nome do anexo na Release):
+          # radar-saude-hom-1.0.0-rc.1.apk. Lista de PERMITIDOS em vez de trocar so a
+          # barra: o upload-artifact recusa `/ \ : < > | * ? "`, e nome de branch/versao
+          # e dado externo (medido em 05/09/2026, run 33932396994).
+          SUFIXO_VARIANTE=""; [ "$VARIANTE" = "debug" ] && SUFIXO_VARIANTE="-debug"
+          # Dispatch de uma branch qualquer gera o MESMO pacote `.dev`: a branch no nome e o
+          # que mostra ao testador que aquilo nao e o que esta na `develop`.
+          SUFIXO_BRANCH=""
+          case "$REF_NAME" in develop|master) ;; *) SUFIXO_BRANCH="-${REF_NAME}" ;; esac
+          BASE=$(printf '%s' "radar-saude-${AMBIENTE}-${VERSION_NAME}${SUFIXO_BRANCH}${SUFIXO_VARIANTE}${SUFIXO}" | tr -c 'A-Za-z0-9._-' '-')
+          ARQUIVO="${BASE}.apk"
+          mkdir -p "$RUNNER_TEMP/saida"
+          cp "$CAMINHO" "$RUNNER_TEMP/saida/$ARQUIVO"
+
+          echo "caminho=$RUNNER_TEMP/saida/$ARQUIVO" >> "$GITHUB_OUTPUT"
+          echo "arquivo=$ARQUIVO" >> "$GITHUB_OUTPUT"
+          echo "artefato=apk-${BASE}-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "📦 \`$ARQUIVO\` — $(du -h "$CAMINHO" | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar o APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.artefato }}
+          path: ${{ steps.apk.outputs.caminho }}
+          retention-days: 30
+          if-no-files-found: error

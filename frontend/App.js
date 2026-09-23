@@ -1,98 +1,257 @@
-import React from "react";
-import {createStackNavigator} from "@react-navigation/stack";
-import {createDrawerNavigator} from "@react-navigation/drawer";
+import React, { useEffect, useRef } from "react";
+import {createNativeStackNavigator} from "@react-navigation/native-stack";
+import {createBottomTabNavigator} from "@react-navigation/bottom-tabs";
 import {NavigationContainer} from "@react-navigation/native";
-import {SafeAreaProvider} from "react-native-safe-area-context";
-import {Image, Text, TouchableOpacity, View} from "react-native";
+import {SafeAreaProvider, useSafeAreaInsets} from "react-native-safe-area-context";
+import * as Notifications from "expo-notifications";
+import * as Network from "expo-network";
+import {AppState} from "react-native";
+import {Building2, Home as HomeIcon, Map as MapIcon, User as UserIcon} from "lucide-react-native";
 import HomeScreen from "./src/screens/home/view/HomeScreen.js";
 import LoginScreen from "./src/screens/auth/view/LoginScreen.js";
+import EsqueciSenhaScreen from "./src/screens/auth/view/EsqueciSenhaScreen.js";
+import ConfirmarEmailScreen from "./src/screens/auth/view/ConfirmarEmailScreen.js";
 import UserScreen from "./src/screens/user/view/UserScreen.js";
 import GeoLocalizacaoScreen from "./src/screens/geolocalizacao/view/GeoLocalizacaoScreen.js";
+import HospitaisScreen from "./src/screens/hospitais/view/HospitaisScreen.js";
+import HospitalDetalheScreen from "./src/screens/hospitais/view/HospitalDetalheScreen.js";
+import RankingScreen from "./src/screens/hospitais/view/RankingScreen.js";
+import SugerirHospitalScreen from "./src/screens/hospitais/view/SugerirHospitalScreen.js";
+import FeedbackFormScreen from "./src/screens/feedback/view/FeedbackFormScreen.js";
+import PerfilScreen from "./src/screens/perfil/view/PerfilScreen.js";
+import HistoricoScreen from "./src/screens/perfil/view/HistoricoScreen.js";
+import PrivacidadeScreen from "./src/screens/perfil/view/PrivacidadeScreen.js";
+import NotificacoesScreen from "./src/screens/perfil/view/NotificacoesScreen.js";
+import {colors} from "./src/theme";
+import { agendarLembrete, feedbackAvaliavel, pendenciaAtual } from "./src/screens/feedback/service/FeedbackNotificationService";
+import { sincronizar } from "./src/services/SincronizacaoOffline";
 
-const Stack = createStackNavigator();
-const Drawer = createDrawerNavigator();
+const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
 
-// Componente customizado para o título do header
-const HeaderTitle = () => (
-    <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <Image
-            source={require("./assets/img/predio-do-hospital.png")}
-            style={{ width: 24, height: 24, marginRight: 8, resizeMode: "contain" }}
-        />
-        <Text style={{ fontSize: 18, fontWeight: "bold", color: "#333" }}>
-            Hospital App
-        </Text>
-    </View>
-);
-
-// Stack principal (Home + Login)
-function MainStack({ navigation }) {
+// Stack da aba Início (E6-01): a Home é a âncora do geofencing/visita ativa (E2-07).
+// É uma tela de apresentação do app; o check-in manual agora vive na lista Hospitais
+// e o mapa é uma aba própria ("Mapa").
+function HomeStack() {
     return (
-        <Stack.Navigator>
-            <Stack.Screen
-                name="Home"
-                component={HomeScreen}
-                options={{
-                    headerStyle: { backgroundColor: "#fff" },
-                    headerTitle: () => <HeaderTitle />,
-                    headerTintColor: "#333",
-                    // Ícone hambúrguer visível no lado direito
-                    headerRight: () => (
-                        <TouchableOpacity
-                            onPress={() => navigation.openDrawer()}
-                            style={{ marginRight: 15 }}
-                        >
-                            <Image
-                                source={require("./assets/img/menu-de-hamburguer.png")}
-                                style={{ width: 24, height: 24, resizeMode: "contain" }}
-                            />
-                        </TouchableOpacity>
-                    ),
-                }}
-            />
-            <Stack.Screen
-                name="Login"
-                component={LoginScreen}
-                options={{
-                    headerStyle: { backgroundColor: "#fff" },
-                    headerTitle: () => <HeaderTitle />,
-                    headerTintColor: "#333",
-                }}
-            />
-            <Stack.Screen
-                name="Geolocalizacao"
-                component={GeoLocalizacaoScreen}
-                options={{
-                    headerStyle: { backgroundColor: "#fff" },
-                    headerTitle: () => <HeaderTitle />,
-                    headerTintColor: "#333",
-                }}
-            />
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Home" component={HomeScreen} />
         </Stack.Navigator>
     );
 }
 
+// Stack da aba Hospitais (Épico 01 — CRUD/geofence, listagem pública, sugestões).
+function HospitaisStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="HospitaisLista" component={HospitaisScreen} />
+            <Stack.Screen name="HospitalDetalhe" component={HospitalDetalheScreen} />
+            <Stack.Screen name="Ranking" component={RankingScreen} />
+            <Stack.Screen name="SugerirHospital" component={SugerirHospitalScreen} />
+        </Stack.Navigator>
+    );
+}
+
+// Stack da aba Mapa (F-07): pilha própria, no mesmo padrão da aba Hospitais.
+// Sem isso, abrir o detalhe do hospital a partir de um pino do mapa navegava para
+// dentro da pilha da aba Hospitais (`navigation.navigate("Hospitais", { screen:
+// "HospitalDetalhe" })`) — voltar pousava na lista de Hospitais, não no mapa de
+// onde o usuário veio. Relatado pelo PO em uso real (10/09/2026): "não consigo
+// retornar para a aba de mapas", enquanto o mesmo fluxo pela lista já funcionava
+// (HospitalDetalhe já vivia dentro da própria pilha da aba Hospitais).
+function MapaStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="MapaTela" component={GeoLocalizacaoScreen} />
+            <Stack.Screen name="HospitalDetalhe" component={HospitalDetalheScreen} />
+        </Stack.Navigator>
+    );
+}
+
+// Stack da aba Perfil (Épico 05 — conta, consentimento, privacidade; F0-05).
+function PerfilStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Perfil" component={PerfilScreen} />
+            <Stack.Screen name="Historico" component={HistoricoScreen} />
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="EsqueciSenha" component={EsqueciSenhaScreen} />
+            <Stack.Screen name="ConfirmarEmail" component={ConfirmarEmailScreen} />
+            <Stack.Screen name="Cadastro" component={UserScreen} />
+            <Stack.Screen name="Privacidade" component={PrivacidadeScreen} />
+            <Stack.Screen name="Notificacoes" component={NotificacoesScreen} />
+        </Stack.Navigator>
+    );
+}
+
+// Stack do Épico 03 — Feedback Pós-Saída (F-05). Aberta via notificação local
+// pós-saída (E3-01) ou direto do app; sem aba (acesso por fluxo/notificação).
+function FeedbackStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="FeedbackForm" component={FeedbackFormScreen} />
+        </Stack.Navigator>
+    );
+}
+
+// Navegação por Bottom Tabs (E6-01): 4 abas de 1 polegar (Início, Hospitais, Mapa,
+// Perfil) substituindo o antigo Drawer. O mapa entrou como aba própria (navegação
+// revisada), em vez de botão dentro da Home. Transições suaves via burst.
+function Tabs() {
+    // Barra de sistema (Android, botões na tela — não gestos): o `BottomTabBar` da lib
+    // soma `insets.bottom` sozinho à altura E ao paddingBottom padrão, mas SÓ quando a
+    // tela não define os dois no `tabBarStyle` — um `tabBarStyle` com valores fixos entra
+    // DEPOIS no array de estilos e sobrescreve os dois, jogando fora o inset. Sem essa
+    // soma, o conteúdo da barra ficava atrás dos botões do sistema em aparelhos com barra
+    // de navegação clássica (relatado pelo PO, com captura de tela do físico — a barra
+    // de gestos, sem essa barra, não expõe o bug porque o inset é ~0).
+    const insets = useSafeAreaInsets();
+
+    return (
+        <Tab.Navigator
+            screenOptions={{
+                headerShown: false,
+                tabBarActiveTintColor: colors.primary,
+                tabBarInactiveTintColor: colors.onSurfaceVariant,
+                tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
+                tabBarStyle: {
+                    backgroundColor: colors.surfaceContainerLowest,
+                    borderTopColor: colors.outlineVariant,
+                    height: 64 + insets.bottom,
+                    paddingBottom: 8 + insets.bottom,
+                    paddingTop: 8,
+                },
+            }}
+        >
+            <Tab.Screen
+                name="Inicio"
+                component={HomeStack}
+                options={{
+                    tabBarLabel: "Início",
+                    tabBarAccessibilityLabel: "Início — apresentação do app",
+                    tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} />,
+                }}
+            />
+            <Tab.Screen
+                name="Hospitais"
+                component={HospitaisStack}
+                options={{
+                    tabBarLabel: "Hospitais",
+                    tabBarAccessibilityLabel: "Hospitais — lista com indicadores",
+                    tabBarIcon: ({ color, size }) => <Building2 color={color} size={size} />,
+                }}
+                listeners={({ navigation }) => ({
+                    // Item 07 (revisão de UX): ao reabrir a aba Hospitais, volta para a
+                    // lista — nunca para o HospitalDetalhe/Sugestão que estava no topo do
+                    // stack aninhado quando o usuário trocou de aba.
+                    tabPress: () => {
+                        const state = navigation.getState();
+                        const aba = state?.routes?.find((r) => r.name === "Hospitais");
+                        const interna = aba?.state?.routes?.[aba.state.index ?? 0]?.name;
+                        if (interna && interna !== "HospitaisLista") {
+                            navigation.navigate("Hospitais", { screen: "HospitaisLista" });
+                        }
+                    },
+                })}
+            />
+            <Tab.Screen
+                name="Mapa"
+                component={MapaStack}
+                options={{
+                    tabBarLabel: "Mapa",
+                    tabBarAccessibilityLabel: "Mapa — hospitais e geolocalização",
+                    tabBarIcon: ({ color, size }) => <MapIcon color={color} size={size} />,
+                }}
+            />
+            <Tab.Screen
+                name="Perfil"
+                component={PerfilStack}
+                options={{
+                    tabBarLabel: "Perfil",
+                    tabBarAccessibilityLabel: "Perfil — conta e privacidade",
+                    tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+                }}
+            />
+        </Tab.Navigator>
+    );
+}
+
 export default function App() {
+    const navigationRef = useRef(null);
+
+    useEffect(() => {
+        // E3-01/E3-03: abre o formulário de feedback quando o usuário toca na
+        // notificação local de feedback pós-saída.
+        const tratarResposta = async (resposta) => {
+            const data = resposta?.notification?.request?.content?.data;
+            if (!data?.abrirFeedback || !data?.visitaId) {
+                return;
+            }
+            // RN-09: a pendência guardada é sempre a mais recente (uma só por vez —
+            // ver o comentário de concluirFeedback em FeedbackNotificationService.js).
+            // Uma notificação antiga, de uma visita já substituída por outra mais
+            // recente, pode continuar parada na bandeja: feedbackAvaliavel() sozinho
+            // checaria a validade da pendência ATUAL, não da visita tocada, e abriria
+            // o formulário com dados de outra visita/hospital (achado do code-review
+            // no PR desta correção — 08/09/2026). Por isso o match de visitaId e a
+            // checagem de janela de 24h têm que valer para a MESMA pendência.
+            const pendencia = await pendenciaAtual();
+            const disponivel = pendencia?.visitaId === data.visitaId && (await feedbackAvaliavel());
+            if (!disponivel) {
+                return;
+            }
+            // Pedido de feedback visualizado: agenda o lembrete único (RN-09/E3-03)
+            // caso ele não responda de imediato.
+            await agendarLembrete({ visitaId: data.visitaId, hospitalNome: pendencia.hospitalNome });
+            navigationRef.current?.navigate("Feedback", {
+                screen: "FeedbackForm",
+                params: {
+                    visitaId: data.visitaId,
+                    hospitalNome: pendencia.hospitalNome,
+                },
+            });
+        };
+
+        const subscricao = Notifications.addNotificationResponseReceivedListener(tratarResposta);
+        return () => subscricao.remove();
+    }, []);
+
+    useEffect(() => {
+        // OPS-05: check-in e checkout registrados sem internet ficam na fila
+        // offline. Os dois momentos em que vale tentar de novo são a volta ao
+        // primeiro plano e o retorno da conexão — o segundo cobre o aparelho que
+        // ficou aberto na tela enquanto o sinal voltava.
+        const tentar = () => { sincronizar().catch(() => {}); };
+
+        tentar();
+
+        const inscricaoApp = AppState.addEventListener("change", (estado) => {
+            if (estado === "active") {
+                tentar();
+            }
+        });
+
+        // Disponível a partir do expo-network 6; a chamada é opcional para não
+        // quebrar em plataforma sem suporte (web) nem no ambiente de teste.
+        const inscricaoRede = Network.addNetworkStateListener?.((estado) => {
+            if (estado?.isConnected) {
+                tentar();
+            }
+        });
+
+        return () => {
+            inscricaoApp.remove();
+            inscricaoRede?.remove?.();
+        };
+    }, []);
+
     return (
         <SafeAreaProvider>
-            <NavigationContainer>
-                {/* Drawer com opção de Login */}
-                <Drawer.Navigator
-                    screenOptions={{
-                        headerShown: false, // escondemos o header duplicado do Drawer
-                    }}
-                >
-                    <Drawer.Screen name="Home" component={MainStack} />
-                    <Drawer.Screen name="Login" component={LoginScreen} />
-                    <Drawer.Screen name="Cadastro" component={UserScreen} />
-                    <Drawer.Screen
-                        name="Geolocalizacao"
-                        component={GeoLocalizacaoScreen}
-                        options={{
-                            drawerItemStyle: { display: "none" },
-                        }}
-                    />
-                </Drawer.Navigator>
+            <NavigationContainer ref={navigationRef}>
+                <Stack.Navigator screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="Tabs" component={Tabs} />
+                    <Stack.Screen name="Feedback" component={FeedbackStack} />
+                </Stack.Navigator>
             </NavigationContainer>
         </SafeAreaProvider>
     );

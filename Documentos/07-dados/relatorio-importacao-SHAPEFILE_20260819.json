@@ -1,0 +1,76 @@
+{
+  "lote": "SHAPEFILE_20260819",
+  "dry_run": false,
+  "lidos": 340,
+  "validos": 340,
+  "quarentenados": 0,
+  "rejeitados": 0,
+  "duplicados": 0,
+  "novos": 0,
+  "atualizados": 340,
+  "por_camada": {
+    "Centros_de_Atenção_Psicos": {
+      "lidos": 18,
+      "validos": 18,
+      "quarentena": 0,
+      "rejeitados": 0
+    },
+    "Centros_Especializados": {
+      "lidos": 40,
+      "validos": 40,
+      "quarentena": 0,
+      "rejeitados": 0
+    },
+    "Hospitais": {
+      "lidos": 16,
+      "validos": 16,
+      "quarentena": 0,
+      "rejeitados": 0
+    },
+    "Outras_Unidades_de_Saúde": {
+      "lidos": 29,
+      "validos": 29,
+      "quarentena": 0,
+      "rejeitados": 0
+    },
+    "Policlínicas": {
+      "lidos": 18,
+      "validos": 18,
+      "quarentena": 0,
+      "rejeitados": 0
+    },
+    "UBS_-_Consultório_na_rua": {
+      "lidos": 7,
+      "validos": 7,
+      "quarentena": 0,
+      "rejeitados": 0
+    },
+    "UBS_-_Saúde_Indígena": {
+      "lidos": 7,
+      "validos": 7,
+      "quarentena": 0,
+      "rejeitados": 0
+    },
+    "UBS_-_Unidades_Prisionais": {
+      "lidos": 9,
+      "validos": 9,
+      "quarentena": 0,
+      "rejeitados": 0
+    },
+    "Unidade_Básica_de_Saúde": {
+      "lidos": 183,
+      "validos": 183,
+      "quarentena": 0,
+      "rejeitados": 0
+    },
+    "Unidades_de_Pronto_Atendi": {
+      "lidos": 13,
+      "validos": 13,
+      "quarentena": 0,
+      "rejeitados": 0
+    }
+  },
+  "quarentena_detalhes": [],
+  "rejeitados_detalhes": [],
+  "duplicados_detalhes": []
+}

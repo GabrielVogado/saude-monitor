@@ -10,24 +10,24 @@ import {
     View,
 } from 'react-native';
 import {
+    ArrowLeft,
     ArrowRight,
     Eye,
     EyeOff,
-    Globe,
-    HelpCircle,
     Lock,
     Mail,
     Phone,
-    Share2,
     ShieldCheck,
     User,
-    UserPlus
+    UserPlus,
+    Users
 } from 'lucide-react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import UserService from '../service/UserService';
+import {colors} from '../../../theme';
 import styles from './css/UserStyle';
 
-const HospitalRegisterScreen = () => {
+const HospitalRegisterScreen = ({navigation}) => {
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
@@ -50,19 +50,25 @@ const HospitalRegisterScreen = () => {
         try {
             setIsSubmitting(true);
 
-            await UserService.cadastro({
+            await UserService.registro({
                 fullName,
                 email,
                 phone,
                 password,
+                consentimento: { termosUso: true, versaoTermos: "1.0" },
             });
 
-            Alert.alert('Cadastro realizado', 'Seu cadastro foi enviado com sucesso.');
+            // Confirmação obrigatória de e-mail (10/09/2026): sem confirmar, o login é
+            // recusado. Leva direto para a tela de confirmação em vez de só avisar e
+            // deixar o usuário descobrir sozinho no próximo login.
+            const emailCadastrado = email.trim();
             setFullName('');
             setEmail('');
             setPhone('');
             setPassword('');
             setAgreeTerms(false);
+            Alert.alert('Cadastro realizado', 'Enviamos um código de confirmação para o seu e-mail.');
+            navigation?.navigate?.('ConfirmarEmail', { email: emailCadastrado });
         } catch (error) {
             Alert.alert('Falha no cadastro', error.message || 'Nao foi possivel concluir o cadastro.');
         } finally {
@@ -80,8 +86,13 @@ const HospitalRegisterScreen = () => {
 
                     {/* Header with Back Button Placeholder */}
                     <View style={styles.header}>
-                        <TouchableOpacity style={styles.backBtn}>
-                            <ArrowRight size={24} color="#075985" style={styles.headerBackIcon} />
+                        <TouchableOpacity
+                            style={styles.backBtn}
+                            onPress={() => navigation?.goBack?.()}
+                            accessibilityRole="button"
+                            accessibilityLabel="Voltar"
+                        >
+                            <ArrowLeft size={24} color={colors.primary} style={styles.headerBackIcon} />
                         </TouchableOpacity>
                         <View style={styles.headerSpacer} />
                     </View>
@@ -90,13 +101,14 @@ const HospitalRegisterScreen = () => {
                     <View style={styles.card}>
                         <View style={styles.iconCircle}>
                             <View style={styles.innerIcon}>
-                                <UserPlus size={32} color="#0085C7" />
+                                <UserPlus size={32} color={colors.primary} />
                             </View>
                         </View>
 
-                        <Text style={styles.title}>Crie seu cadastro</Text>
+                        <Text style={styles.title}>Crie sua conta</Text>
                         <Text style={styles.subtitle}>
-                            Preencha seus dados para solicitar acesso ao painel.
+                            Guarde seu histórico de visitas e suas avaliações. O cadastro é
+                            opcional — você já pode usar o app sem ele.
                         </Text>
 
                         {/* Form */}
@@ -105,24 +117,24 @@ const HospitalRegisterScreen = () => {
                             {/* Full Name */}
                             <Text style={styles.label}>NOME COMPLETO</Text>
                             <View style={styles.inputContainer}>
-                                <User size={20} color="#94A3B8" style={styles.inputIcon} />
+                                <User size={20} color={colors.outline} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Ex: Dr. Alberto Ferreira"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholder="Seu nome completo"
+                                    placeholderTextColor={colors.outline}
                                     value={fullName}
                                     onChangeText={setFullName}
                                 />
                             </View>
 
                             {/* Email */}
-                            <Text style={styles.label}>E-MAIL INSTITUCIONAL</Text>
+                            <Text style={styles.label}>E-MAIL</Text>
                             <View style={styles.inputContainer}>
-                                <Mail size={20} color="#94A3B8" style={styles.inputIcon} />
+                                <Mail size={20} color={colors.outline} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="nome@hospital.com.br"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholder="seu@email.com"
+                                    placeholderTextColor={colors.outline}
                                     value={email}
                                     onChangeText={setEmail}
                                     keyboardType="email-address"
@@ -131,13 +143,13 @@ const HospitalRegisterScreen = () => {
                             </View>
 
                             {/* Phone */}
-                            <Text style={styles.label}>TELEFONE</Text>
+                            <Text style={styles.label}>TELEFONE (OPCIONAL)</Text>
                             <View style={styles.inputContainer}>
-                                <Phone size={20} color="#94A3B8" style={styles.inputIcon} />
+                                <Phone size={20} color={colors.outline} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="(11) 99999-9999"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholderTextColor={colors.outline}
                                     value={phone}
                                     onChangeText={setPhone}
                                     keyboardType="phone-pad"
@@ -148,20 +160,24 @@ const HospitalRegisterScreen = () => {
                             {/* Password */}
                             <Text style={styles.label}>SENHA</Text>
                             <View style={styles.inputContainer}>
-                                <Lock size={20} color="#94A3B8" style={styles.inputIcon} />
+                                <Lock size={20} color={colors.outline} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="••••••••"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholderTextColor={colors.outline}
                                     secureTextEntry={!showPassword}
                                     value={password}
                                     onChangeText={setPassword}
                                 />
-                                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                                <TouchableOpacity
+                                    onPress={() => setShowPassword(!showPassword)}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                                >
                                     {showPassword ? (
-                                        <EyeOff size={20} color="#94A3B8" />
+                                        <EyeOff size={20} color={colors.outline} />
                                     ) : (
-                                        <Eye size={20} color="#94A3B8" />
+                                        <Eye size={20} color={colors.outline} />
                                     )}
                                 </TouchableOpacity>
                             </View>
@@ -171,9 +187,26 @@ const HospitalRegisterScreen = () => {
                                 <TouchableOpacity
                                     style={[styles.checkbox, agreeTerms && styles.checkboxActive]}
                                     onPress={() => setAgreeTerms(!agreeTerms)}
+                                    accessibilityRole="checkbox"
+                                    accessibilityState={{checked: agreeTerms}}
+                                    accessibilityLabel="Aceito os Termos de Uso e a Política de Privacidade"
                                 />
                                 <Text style={styles.termsText}>
-                                    Concordo com os <Text style={styles.linkText}>Termos de Uso</Text> e <Text style={styles.linkText}>Política de Privacidade</Text> da plataforma Clinical Sanctuary.
+                                    Concordo com os{" "}
+                                    <Text
+                                        style={styles.linkText}
+                                        onPress={() => navigation?.navigate?.("Privacidade")}
+                                    >
+                                        Termos de Uso
+                                    </Text>{" "}
+                                    e{" "}
+                                    <Text
+                                        style={styles.linkText}
+                                        onPress={() => navigation?.navigate?.("Privacidade")}
+                                    >
+                                        Política de Privacidade
+                                    </Text>{" "}
+                                    do Clinical Sanctuary.
                                 </Text>
                             </View>
 
@@ -182,21 +215,25 @@ const HospitalRegisterScreen = () => {
                                 style={[styles.registerButton, isSubmitting && styles.registerButtonDisabled]}
                                 onPress={handleCadastro}
                                 disabled={isSubmitting}
+                                accessibilityRole="button"
+                                accessibilityLabel={isSubmitting ? "Enviando cadastro" : "Criar conta"}
+                                accessibilityState={{disabled: isSubmitting, busy: isSubmitting}}
                             >
                                 <Text style={styles.registerButtonText}>
-                                    {isSubmitting ? 'Enviando...' : 'Cadastrar no sistema'}
+                                    {isSubmitting ? 'Enviando...' : 'Criar conta'}
                                 </Text>
-                                <ArrowRight size={20} color="#FFF" style={styles.registerButtonIcon} />
+                                <ArrowRight size={20} color={colors.onPrimary} style={styles.registerButtonIcon} />
                             </TouchableOpacity>
                         </View>
 
                         {/* Compliance Info */}
                         <View style={styles.complianceBox}>
                             <View style={styles.complianceIcon}>
-                                <ShieldCheck size={18} color="#0085C7" />
+                                <ShieldCheck size={18} color={colors.primary} />
                             </View>
                             <Text style={styles.complianceText}>
-                                Em conformidade com a <Text style={styles.complianceHighlight}>LGPD (Lei Geral de Proteção de Dados)</Text>. Suas informações são tratadas com sigilo absoluto e utilizadas exclusivamente para autenticação institucional.
+                                Suas avaliações são anônimas e agregadas por hospital, seguindo a{" "}
+                                <Text style={styles.complianceHighlight}>LGPD</Text>.
                             </Text>
                         </View>
                     </View>
@@ -204,38 +241,26 @@ const HospitalRegisterScreen = () => {
                     {/* Security Badges */}
                     <View style={styles.securityBadges}>
                         <View style={styles.badgeItem}>
-                            <Lock size={14} color="#64748B" />
-                            <Text style={styles.badgeText}>END-TO-END ENCRYPTED</Text>
+                            <ShieldCheck size={14} color={colors.onSurfaceVariant} />
+                            <Text style={styles.badgeText}>LGPD</Text>
                         </View>
                         <View style={styles.badgeItem}>
-                            <ShieldCheck size={14} color="#64748B" />
-                            <Text style={styles.badgeText}>HIPAA COMPLIANT</Text>
+                            <Lock size={14} color={colors.onSurfaceVariant} />
+                            <Text style={styles.badgeText}>Criptografia ponta a ponta</Text>
+                        </View>
+                        <View style={styles.badgeItem}>
+                            <Users size={14} color={colors.onSurfaceVariant} />
+                            <Text style={styles.badgeText}>Dados anônimos e agregados</Text>
                         </View>
                     </View>
 
-                    {/* Social / Support Icons */}
-                    <View style={styles.socialIcons}>
-                        <View style={styles.iconWrapper}>
-                            <TouchableOpacity style={styles.socialBtn}><Globe size={24} color="#1E293B" /></TouchableOpacity>
-                            <Text style={styles.iconLabel}>GLOBAL</Text>
-                        </View>
-                        <View style={styles.iconWrapper}>
-                            <TouchableOpacity style={styles.socialBtn}><Share2 size={24} color="#1E293B" /></TouchableOpacity>
-                            <Text style={styles.iconLabel}>PARTILHAR</Text>
-                        </View>
-                        <View style={styles.iconWrapper}>
-                            <TouchableOpacity style={styles.socialBtn}><HelpCircle size={24} color="#1E293B" /></TouchableOpacity>
-                            <Text style={styles.iconLabel}>SUPORTE</Text>
-                        </View>
-                    </View>
-
-                    {/* Simple Footer Links */}
+                    {/* Footer */}
                     <View style={styles.simpleFooter}>
                         <Text style={styles.simpleFooterLink}>Termos</Text>
                         <View style={styles.dot} />
-                        <Text style={styles.simpleFooterLink}>Cookies</Text>
-                        <View style={styles.dot} />
-                        <Text style={styles.simpleFooterLink}>Privacidade</Text>
+                        <TouchableOpacity onPress={() => navigation?.navigate?.("Privacidade")} accessibilityRole="link" accessibilityLabel="Política de Privacidade">
+                            <Text style={styles.linkText}>Privacidade</Text>
+                        </TouchableOpacity>
                     </View>
 
                 </ScrollView>

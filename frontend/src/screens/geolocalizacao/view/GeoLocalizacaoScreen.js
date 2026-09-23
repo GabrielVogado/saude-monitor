@@ -1,11 +1,37 @@
-import React, { useEffect, useMemo, useRef } from "react";
+// ADR-002 (Documentos/02-arquitetura-tecnica/Arvore-Tecnologica-v2.0.md): geofencing
+// nativo (expo-task-manager + startGeofencingAsync, ver `GeofencingTaskService.js`) é a
+// fonte de verdade do ciclo de vida das visitas (check-in/checkout automáticos, E2-01/02).
+// Esta tela permanece apenas como ferramenta de depuração/mapa com `watchPositionAsync`
+// em foreground — não dispara check-in/checkout e não deve ser alterada para isso.
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView, { Marker } from "react-native-maps";
+import { Building2, X } from "lucide-react-native";
+import { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from "../../../utils/mapkit";
 import {
   GeolocalizacaoProvider,
   useGeolocalizacao,
 } from "../service/GeoLocalizacaoService";
+import { getInitialViewState, MAPBOX_STYLE } from "../../../utils/mapStyle";
+import {
+  centroDoHospital,
+  geofencesParaFeatureCollection,
+} from "../../../utils/geojson";
+import { formatarDistancia, haversineMetros } from "../../../utils/distancia";
+import HospitalService from "../../hospitais/service/HospitalService";
+import { CSChip, CSHospitalCard, CSIconButton, CSOptionSheet } from "../../../components";
+import { colors, typography, spacing, radii, shadows } from "../../../theme";
+
+// F-07: filtro geo por raio. "Todos" mantém o comportamento anterior (catálogo
+// completo); os demais dependem do GPS e são resolvidos pelo backend
+// (GET /api/v1/hospitais?latitude&longitude&raioKm).
+const RAIOS_KM = [
+  { value: null, label: "Todos" },
+  { value: 1, label: "1 km" },
+  { value: 5, label: "5 km" },
+  { value: 10, label: "10 km" },
+  { value: 25, label: "25 km" },
+];
 
 const BRASIL_REGION = {
   latitude: -14.235,
@@ -14,8 +40,8 @@ const BRASIL_REGION = {
   longitudeDelta: 35,
 };
 
-function GeolocalizacaoContent() {
-  const mapRef = useRef(null);
+function GeolocalizacaoContent({ navigation }) {
+  const cameraRef = useRef(null);
   const {
     coordenadas,
     carregando,
@@ -24,6 +50,89 @@ function GeolocalizacaoContent() {
     iniciarMonitoramento,
     pararMonitoramento,
   } = useGeolocalizacao();
+  const [hospitais, setHospitais] = useState([]);
+  const [erroHospitais, setErroHospitais] = useState(null);
+  const [raioKm, setRaioKm] = useState(null);
+
+  // Item 05 (revisão de UX) + F-07: o mapa exibe todos os hospitais ativos e, quando
+  // há um raio selecionado com GPS disponível, delega o recorte geográfico ao backend
+  // (`raioKm`) em vez de baixar o catálogo inteiro — mitigação do risco de performance
+  // com muitos polígonos (§21.6 do Plano de Sprints).
+  const posicaoRef = useRef(null);
+  posicaoRef.current = coordenadas;
+  const temGps = coordenadas !== null;
+
+  // Identifica a carga em andamento: ao trocar o raio (ou o GPS aparecer/desaparecer)
+  // no meio da paginação incremental abaixo, a chamada antiga precisa parar de
+  // escrever no estado em vez de sobrescrever a lista da carga nova.
+  const cargaEmAndamentoRef = useRef(0);
+
+  const carregarHospitais = useCallback(async () => {
+    const posicao = posicaoRef.current;
+    const idCarga = ++cargaEmAndamentoRef.current;
+
+    setErroHospitais(null);
+
+    // Filtro por raio exige posição: sem GPS, mantém o catálogo completo (bloco abaixo).
+    if (raioKm !== null && posicao) {
+      // O recorte geográfico já restringe o resultado a poucos hospitais — cabe
+      // numa única página.
+      try {
+        const data = await HospitalService.listar({
+          latitude: posicao.latitude,
+          longitude: posicao.longitude,
+          raioKm,
+          size: 100,
+        });
+        if (cargaEmAndamentoRef.current === idCarga) {
+          setHospitais(data?.content || data || []);
+        }
+      } catch (e) {
+        if (cargaEmAndamentoRef.current === idCarga) {
+          setErroHospitais(e.message || "Não foi possível carregar os hospitais.");
+        }
+      }
+      return;
+    }
+
+    // "Todos": o catálogo (~340 hospitais) excede o `size` máximo aceito pelo
+    // backend (100, ver HospitalController). Busca todas as páginas em sequência
+    // e vai atualizando o mapa lote a lote — mostrar todas as unidades (item 05)
+    // sem voltar a montar centenas de marcadores numa única leva, que era o risco
+    // de ANR já mitigado (Plano-Sprints-v2.1 §21.6 / BUG-04 no topo deste arquivo).
+    let pagina = 0;
+    let acumulado = [];
+    try {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const data = await HospitalService.listar({ page: pagina, size: 100 });
+        if (cargaEmAndamentoRef.current !== idCarga) {
+          return;
+        }
+
+        const lote = data?.content || [];
+        acumulado = pagina === 0 ? lote : acumulado.concat(lote);
+        setHospitais(acumulado);
+
+        const total = data?.totalElements ?? acumulado.length;
+        if (lote.length === 0 || acumulado.length >= total) {
+          break;
+        }
+        pagina += 1;
+      }
+    } catch (e) {
+      if (cargaEmAndamentoRef.current === idCarga) {
+        setErroHospitais(e.message || "Não foi possível carregar os hospitais.");
+      }
+    }
+  }, [raioKm]);
+
+  // Refaz a busca ao trocar o raio e quando o GPS passa a ter (ou perde) posição.
+  // Não depende de `coordenadas` diretamente: a posição muda a cada leitura do
+  // watchPosition e dispararia uma requisição por atualização.
+  useEffect(() => {
+    carregarHospitais();
+  }, [carregarHospitais, temGps]);
 
   const regionAtual = useMemo(() => {
     if (!coordenadas) {
@@ -38,6 +147,247 @@ function GeolocalizacaoContent() {
     };
   }, [coordenadas]);
 
+  // F-07: polígonos das geofences renderizados como uma única fonte GeoJSON —
+  // muito mais leve que um componente por hospital.
+  const geofencesFeatureCollection = useMemo(
+    () => geofencesParaFeatureCollection(hospitais),
+    [hospitais]
+  );
+
+  /**
+   * BUG-04 — o mapa precisa ser DESTRUÍDO, não apenas escondido, antes de sair da tela.
+   *
+   * Navegar direto daqui congelava o app (ANR de 30 a 40 s, 8 ocorrências registradas
+   * entre 02/09 e 04/09/2026, sob o MapLibre). A corrida, medida no logcat do S24 Ultra:
+   *
+   *   14:40:04.115  dedo sobe
+   *   14:40:04.140  navigation.navigate      → React Navigation esconde a aba Mapa
+   *   14:40:04.166  surfaceDestroyed         → a thread de renderização GL é encerrada
+   *   14:40:04.330  handleMessage TAP        → o Android entrega o toque CONFIRMADO,
+   *                                            164 ms depois do teardown
+   *
+   * Esse toque atrasado (o Android segura ~215 ms para distinguir de duplo-toque)
+   * caía no mapa sem renderizador vivo e travava a thread principal sem timeout, até
+   * o usuário matar o app. A ordem abaixo elimina a corrida em vez de adivinhar o
+   * atraso: desmonta o `<MapView>` primeiro, e só no efeito seguinte — depois de o
+   * desmonte estar comprometido na árvore — é que navega.
+   *
+   * Mantido na migração Mapbox (`feature/mapbox-migration`): o mecanismo da trava foi
+   * verificado no bytecode do MapLibre, não no Mapbox — mas desmontar-antes-de-navegar
+   * continua sendo a ordem segura também aqui (view destruída não recebe toque
+   * atrasado), e os testes de regressão abaixo seguem protegendo a ORDEM.
+   */
+  const [mapaMontado, setMapaMontado] = useState(true);
+  const hospitalPendente = useRef(null);
+  // BUG-11: opções de unidades sobrepostas aguardando escolha do usuário (null =
+  // seletor fechado). Ver `aoTocarGeofence` abaixo.
+  const [opcoesGeofence, setOpcoesGeofence] = useState(null);
+
+  // Hospital selecionado no mapa: o card com as informações básicas aparece sobre o
+  // mapa e é ele — não o marcador — que leva ao detalhe. Guarda só o `id` e deriva o
+  // hospital da lista: se o hospital sair do resultado, o card some em vez de exibir um
+  // dado que já não está no mapa. Trocar o raio fecha o card de propósito (ver o chip):
+  // só derivar deixava o `id` guardado, e o card voltava sozinho ao restaurar o raio.
+  const [hospitalSelecionadoId, setHospitalSelecionadoId] = useState(null);
+  const hospitalSelecionado = useMemo(
+    () => hospitais.find((h) => h.id === hospitalSelecionadoId) || null,
+    [hospitais, hospitalSelecionadoId]
+  );
+
+  // Distância do GPS até o hospital do card (F-07, critério 3). Sem GPS, `null` — o
+  // card omite a linha em vez de mostrar um valor inventado.
+  const distanciaDoCard = useMemo(
+    () =>
+      hospitalSelecionado
+        ? formatarDistancia(haversineMetros(coordenadas, centroDoHospital(hospitalSelecionado)))
+        : null,
+    [hospitalSelecionado, coordenadas]
+  );
+
+  const abrirHospital = useCallback(
+    (hospitalId) => {
+      if (!hospitalId) {
+        return;
+      }
+
+      // Só desmonta se houver para onde ir. Desmontar primeiro e descobrir depois que a
+      // navegação não acontece deixaria a tela SEM MAPA e sem saída: quem remonta é o
+      // evento `focus`, que exige a tela ter perdido o foco antes — e ela não perde se a
+      // navegação não ocorreu. O usuário ficaria olhando um buraco entre o cabeçalho e a
+      // caixa de informações até trocar de aba.
+      if (typeof navigation?.navigate !== "function") {
+        return;
+      }
+
+      hospitalPendente.current = hospitalId;
+      setMapaMontado(false);
+    },
+    [navigation]
+  );
+
+  useEffect(() => {
+    if (mapaMontado || !hospitalPendente.current) {
+      return;
+    }
+
+    const id = hospitalPendente.current;
+    hospitalPendente.current = null;
+    // Achado de 10/09/2026: navegar para a pilha da aba Hospitais (em vez da
+    // própria pilha da aba Mapa, "MapaStack" em App.js) trocava de aba por baixo
+    // dos panos — voltar do detalhe pousava na lista de Hospitais, não no mapa.
+    navigation?.navigate?.("HospitalDetalhe", { id });
+  }, [mapaMontado, navigation]);
+
+  // Remonta o mapa ao voltar para a aba. Usa o listener do `navigation` em vez de
+  // `useFocusEffect` de propósito: o hook exige um NavigationContainer em volta, e esta
+  // tela é renderizada isolada nos testes.
+  useEffect(() => {
+    const remover = navigation?.addListener?.("focus", () => setMapaMontado(true));
+    return () => remover?.();
+  }, [navigation]);
+
+  const selecionarHospital = useCallback(
+    (hospitalId) => {
+      if (!hospitalId) {
+        return;
+      }
+      setHospitalSelecionadoId(hospitalId);
+
+      // Centraliza o marcador no mapa: o card ocupa a parte de baixo e cobriria um
+      // marcador tocado perto da borda inferior. Só a posição — o zoom é do usuário.
+      const hospital = hospitais.find((h) => h.id === hospitalId);
+      const centro = hospital ? centroDoHospital(hospital) : null;
+      if (centro) {
+        cameraRef.current?.setCamera({
+          centerCoordinate: [centro.longitude, centro.latitude],
+          animationDuration: 300,
+        });
+      }
+    },
+    [hospitais]
+  );
+
+  const fecharCard = useCallback(() => {
+    setHospitalSelecionadoId(null);
+  }, []);
+
+  // O card devolve o próprio hospital (contrato do `CSHospitalCard`, ARQ-05). É aqui,
+  // e só aqui, que o mapa é desmontado para navegar — ver `abrirHospital` (BUG-04).
+  const aoTocarCard = useCallback(
+    (hospital) => {
+      abrirHospital(hospital?.id);
+    },
+    [abrirHospital]
+  );
+
+  const aoTocarGeofence = useCallback(
+    (evento) => {
+      // BUG-11 — unidades empilhadas eram inalcançáveis: com 2+ geofences sobrepostos
+      // (duplicatas de seed — ver `07-dados/relatorio-auditoria-duplicatas-20260912.md`
+      // — ou unidades vizinhas reais como UPA + UBS + Casa de Parto), o toque abria
+      // sempre `features[0]` e as demais nunca eram acessíveis. Com mais de uma
+      // unidade no ponto, oferece a lista para escolha em vez de adivinhar — via
+      // `CSOptionSheet` (não `Alert.alert`: no Android, `Alert.alert` só exibe os 3
+      // primeiros botões, e o próprio cenário que motivou o BUG-11 tem 5 unidades
+      // no mesmo ponto — metade delas continuaria inalcançável).
+      const features = (evento?.features || []).filter(
+        (f, i, arr) =>
+          (f?.properties?.id || f?.id) &&
+          arr.findIndex((g) => (g?.properties?.id || g?.id) === (f?.properties?.id || f?.id)) === i
+      );
+      if (features.length === 0) {
+        return;
+      }
+      if (features.length === 1) {
+        const unico = features[0];
+        selecionarHospital(unico?.properties?.id || unico?.id);
+        return;
+      }
+      // Nomes repetidos (ex.: "Ubs São Sebastião" ×5 no complexo da Papuda) não
+      // distinguem as opções — sufixa a distância do GPS quando houver colisão.
+      // Sem GPS, volta ao nome puro: opção duplicada ainda abre a unidade certa
+      // pelo `id`, só a escolha é menos confortável.
+      const nomes = features.map((f) => f?.properties?.nome || "Unidade");
+      const rotulo = (id, nome) => {
+        if (nomes.filter((n) => n === nome).length < 2) {
+          return nome;
+        }
+        const hospital = hospitais.find((h) => h.id === id);
+        const metros = haversineMetros(posicaoRef.current, hospital ? centroDoHospital(hospital) : null);
+        const texto = formatarDistancia(metros);
+        return texto ? `${nome} · ${texto}` : nome;
+      };
+      setOpcoesGeofence(
+        features.map((f) => {
+          const id = f?.properties?.id || f?.id;
+          return { id, label: rotulo(id, f?.properties?.nome || "Unidade") };
+        })
+      );
+    },
+    [hospitais, selecionarHospital]
+  );
+
+  const escolherHospitalDoSheet = useCallback(
+    (hospitalId) => {
+      // A escolha no seletor seleciona a unidade — mesmo caminho do toque num
+      // marcador: card sobre o mapa, e o detalhe só depois do toque no card.
+      setOpcoesGeofence(null);
+      selecionarHospital(hospitalId);
+    },
+    [selecionarHospital]
+  );
+
+  const aoCancelarSheet = useCallback(() => {
+    setOpcoesGeofence(null);
+  }, []);
+
+  const centralizar = useCallback(() => {
+    const alvo = getInitialViewState(regionAtual);
+    cameraRef.current?.setCamera({
+      centerCoordinate: alvo.centerCoordinate,
+      zoomLevel: alvo.zoomLevel,
+      animationDuration: 500,
+    });
+  }, [regionAtual]);
+
+  // Posição inicial da câmera, calculada uma vez por montagem: a `Camera` do Mapbox
+  // acompanha mudanças de props, então recalcular a cada render moveria o mapa
+  // sozinho sempre que o GPS atualizasse. O enquadramento nos hospitais continua
+  // por conta do efeito `enquadrarHospitais` (fitBounds) abaixo.
+  const cameraInicial = useMemo(() => getInitialViewState(BRASIL_REGION), []);
+
+  // Enquadra a câmera para cobrir todos os hospitais cadastrados (item 05) sempre
+  // que a lista carregar — assim o "todos os hospitais" é visível de imediato.
+  const enquadrarHospitais = useCallback(() => {
+    const pontos = hospitais
+      .map((h) => centroDoHospital(h))
+      .filter(Boolean);
+    if (pontos.length === 0) {
+      return;
+    }
+
+    const lats = pontos.map((p) => p.latitude);
+    const lngs = pontos.map((p) => p.longitude);
+    cameraRef.current?.fitBounds(
+      [Math.max(...lngs), Math.max(...lats)],
+      [Math.min(...lngs), Math.min(...lats)],
+      48,
+      600
+    );
+  }, [hospitais]);
+
+  // `mapaMontado` entra nas dependências porque o remonte cria uma `<Camera>` NOVA, com
+  // a posição inicial de volta em BRASIL_REGION (zoom 3, o país inteiro). Sem re-rodar
+  // o enquadramento aqui, quem aproximasse o próprio bairro, tocasse num hospital e
+  // voltasse encontraria o mapa zerado. As outras dependências não bastam: a
+  // identidade de `hospitais` não muda no desmonte/remonte, então o efeito não
+  // dispararia sozinho.
+  useEffect(() => {
+    if (mapaMontado && hospitais.length > 0) {
+      enquadrarHospitais();
+    }
+  }, [mapaMontado, hospitais, enquadrarHospitais]);
+
   useEffect(() => {
     iniciarMonitoramento();
     return () => {
@@ -45,57 +395,190 @@ function GeolocalizacaoContent() {
     };
   }, [iniciarMonitoramento, pararMonitoramento]);
 
+  // Centraliza no GPS apenas quando não há hospitais enquadrados (ex.: base sem
+  // cadastro); com hospitais, o usuário usa o botão "Centralizar no meu GPS".
+  // Mesmo motivo do efeito acima: sem `mapaMontado` na lista, a base sem hospitais
+  // cadastrados voltaria do detalhe enquadrando o Brasil em vez da posição do usuário.
   useEffect(() => {
-    if (coordenadas) {
-      mapRef.current?.animateToRegion(regionAtual, 500);
+    if (mapaMontado && coordenadas && hospitais.length === 0) {
+      centralizar();
     }
-  }, [coordenadas, regionAtual]);
+  }, [mapaMontado, coordenadas, regionAtual, hospitais.length]);
+
+  // BUG-10 — o marcador do hospital ficava FORA do círculo do geofence: o filho era
+  // uma linha `[ponto + rótulo]` e a âncora padrão (`{x: 0.5, y: 0.5}`) centralizava a
+  // LINHA inteira na coordenada, empurrando o ponto ~metade da largura da linha para
+  // o lado (px de tela, constante) — com pouco zoom o círculo tem poucos px e não o
+  // continha. Agora o marcador é um ícone SIMÉTRICO: a âncora padrão (centro) põe o
+  // centro do ícone exatamente na coordenada, a mesma de `centroDoHospital` que
+  // desenha o polígono. Por isso NÃO se passa `anchor` aqui — reintroduzir um
+  // filho assimétrico (rótulo ao lado) reabriria o BUG-10.
+  const renderizarMarcador = (hospital, selecionado) => {
+    const centroide = centroDoHospital(hospital);
+    if (!centroide) {
+      return null;
+    }
+    return (
+      <MarkerView
+        key={selecionado ? `selecionado-${hospital.id}` : hospital.id}
+        testID={`marcador-hospital-${hospital.id}`}
+        coordinate={[centroide.longitude, centroide.latitude]}
+      >
+        <View
+          style={[styles.hospitalMarker, selecionado && styles.hospitalMarkerSelecionado]}
+          accessibilityRole="button"
+          accessibilityLabel={`Ver informações de ${hospital.nome}`}
+          accessibilityState={{ selected: selecionado }}
+          onStartShouldSetResponder={() => true}
+          onResponderRelease={() => selecionarHospital(hospital.id)}
+        >
+          <Building2
+            size={selecionado ? 22 : 20}
+            color={selecionado ? colors.onPrimary : colors.primary}
+          />
+        </View>
+      </MarkerView>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.screenHeader}>
-        <Text style={styles.screenHeaderTitle}>Mapa de Geolocalizacao</Text>
+        <Text style={styles.screenHeaderTitle}>Mapa de Geolocalização</Text>
+
+        {/* F-07: filtro geográfico por raio a partir da posição atual. */}
+        <View style={styles.filtroRaio}>
+          {RAIOS_KM.map((r) => (
+            <CSChip
+              key={r.label}
+              label={r.label}
+              selected={raioKm === r.value}
+              onPress={() => {
+                setRaioKm(r.value);
+                fecharCard();
+              }}
+            />
+          ))}
+        </View>
+
+        {raioKm !== null && !coordenadas && (
+          <Text style={styles.infoSubText} accessibilityLiveRegion="polite">
+            Aguardando o GPS para filtrar hospitais num raio de {raioKm} km.
+          </Text>
+        )}
       </View>
 
-      <MapView ref={mapRef} style={styles.map} initialRegion={BRASIL_REGION}>
-        {!coordenadas && (
-          <Marker
-            coordinate={{
-              latitude: BRASIL_REGION.latitude,
-              longitude: BRASIL_REGION.longitude,
-            }}
-            title="Brasil"
-            description="Aguardando sua localizacao atual"
-          />
-        )}
+      {/*
+       * BUG-05 — o recorte do mapa é NOSSO, porque a biblioteca desliga o dela.
+       *
+       * Ao arrastar o mapa, os nomes dos hospitais apareciam por cima do cabeçalho e
+       * da caixa de informações — cobrindo justamente os chips de raio, que ficavam
+       * ilegíveis e sem alvo visível. Cada marcador (`MarkerView`) é uma View comum,
+       * posicionada por coordenada absoluta de projeção: fora da viewport a posição
+       * fica negativa (ou maior que a altura) e o desenho escapa para o resto da tela.
+       *
+       * Basta um ancestral recortando para conter tudo: `overflow: "hidden"` neste
+       * container faz o RN limitar o canvas à área do mapa. Mantido na migração
+       * Mapbox — o `MarkerView` tem o mesmo modelo de posicionamento.
+       *
+       * O container também substitui o placeholder que existia aqui: ele tem `flex: 1`
+       * e permanece montado quando o `<MapView>` sai (ver `abrirHospital`), então a
+       * caixa de informações não salta para junto do cabeçalho no quadro da transição.
+       */}
+      <View style={styles.mapContainer} testID="mapa-container">
+        {/* Desmontado de propósito antes de navegar — ver o comentário do `abrirHospital`. */}
+        {mapaMontado ? (
+          <MapView
+            style={styles.map}
+            styleURL={MAPBOX_STYLE}
+            onDidFinishLoadingMap={enquadrarHospitais}
+          >
+            <Camera
+              ref={cameraRef}
+              centerCoordinate={cameraInicial.centerCoordinate}
+              zoomLevel={cameraInicial.zoomLevel}
+            />
 
-        {coordenadas && (
-          <Marker
-            coordinate={{
-              latitude: coordenadas.latitude,
-              longitude: coordenadas.longitude,
-            }}
-            title="Sua posicao"
-            description="Posicao atual em tempo real"
-          />
-        )}
-      </MapView>
+            {!coordenadas && !hospitais.length && (
+              <MarkerView coordinate={[BRASIL_REGION.longitude, BRASIL_REGION.latitude]}>
+                <View style={styles.markerDot} />
+              </MarkerView>
+            )}
+
+            {geofencesFeatureCollection.features.length > 0 && (
+              <ShapeSource
+                id="geofences-hospitais"
+                testID="geofences-hospitais"
+                shape={geofencesFeatureCollection}
+                onPress={aoTocarGeofence}
+              >
+                <FillLayer
+                  id="geofences-preenchimento"
+                  style={{ fillColor: colors.primary, fillOpacity: 0.18 }}
+                />
+                <LineLayer
+                  id="geofences-contorno"
+                  style={{ lineColor: colors.primary, lineWidth: 2 }}
+                />
+              </ShapeSource>
+            )}
+
+            {/* O selecionado sai da lista e é desenhado logo abaixo, por último: marcador
+                filho posterior fica por cima do anterior (nativo e Web), e com ~340
+                ícones sobrepostos o destacado não pode ficar escondido atrás de outro. */}
+            {hospitais.map((hospital) =>
+              hospital.id === hospitalSelecionadoId ? null : renderizarMarcador(hospital, false)
+            )}
+            {hospitalSelecionado ? renderizarMarcador(hospitalSelecionado, true) : null}
+
+            {coordenadas && (
+              <MarkerView coordinate={[coordenadas.longitude, coordenadas.latitude]}>
+                <View style={styles.userDot} />
+              </MarkerView>
+            )}
+          </MapView>
+        ) : null}
+
+        {/* Card do hospital selecionado, sobre o mapa. Fica FORA do `MapView`: continua
+            visível durante o desmonte-antes-de-navegar e ao voltar do detalhe. O botão
+            de fechar vem depois do card no JSX para ficar por cima dele. */}
+        {hospitalSelecionado ? (
+          <View style={styles.cardSobreMapa} pointerEvents="box-none" testID="card-hospital-mapa">
+            <CSHospitalCard
+              hospital={hospitalSelecionado}
+              onPress={aoTocarCard}
+              distancia={distanciaDoCard}
+            />
+            <CSIconButton
+              icon={X}
+              size={20}
+              accessibilityLabel="Fechar informações do hospital"
+              onPress={fecharCard}
+              style={styles.cardFechar}
+            />
+          </View>
+        ) : null}
+      </View>
 
       <View style={styles.infoBox}>
         {carregando && (
           <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color="#0C4A6E" />
+            <ActivityIndicator
+              size="small"
+              color={colors.primary}
+              accessibilityLabel="Carregando localização"
+            />
             <Text style={styles.infoText}>Monitorando GPS em tempo real...</Text>
           </View>
         )}
 
         {!carregando && coordenadas && (
           <>
-            <Text style={styles.title}>Localizacao atual</Text>
+            <Text style={styles.title}>Localização atual</Text>
             <Text style={styles.infoText}>Latitude: {coordenadas.latitude.toFixed(6)}</Text>
             <Text style={styles.infoText}>Longitude: {coordenadas.longitude.toFixed(6)}</Text>
             <Text style={styles.infoSubText}>
-              Precisao: {coordenadas.accuracy ? `${Math.round(coordenadas.accuracy)}m` : "N/D"}
+              Precisão: {coordenadas.accuracy ? `${Math.round(coordenadas.accuracy)}m` : "N/D"}
             </Text>
           </>
         )}
@@ -104,10 +587,25 @@ function GeolocalizacaoContent() {
           <Text style={styles.infoText}>Aguardando primeira leitura do GPS...</Text>
         )}
 
-        {erro && <Text style={styles.errorText}>{erro}</Text>}
+        {erro && (
+          <Text style={styles.errorText} accessibilityLiveRegion="polite">
+            {erro}
+          </Text>
+        )}
+
+        {erroHospitais && (
+          <Text style={styles.errorText} accessibilityLiveRegion="polite">
+            {erroHospitais}
+          </Text>
+        )}
 
         {!!erro && (
-          <TouchableOpacity style={styles.retryButton} onPress={iniciarMonitoramento}>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={iniciarMonitoramento}
+            accessibilityRole="button"
+            accessibilityLabel="Tentar novamente"
+          >
             <Text style={styles.retryText}>Tentar novamente</Text>
           </TouchableOpacity>
         )}
@@ -115,40 +613,145 @@ function GeolocalizacaoContent() {
         {!!coordenadas && (
           <TouchableOpacity
             style={styles.centerButton}
-            onPress={() => {
-              mapRef.current?.animateToRegion(regionAtual, 500);
-            }}
+            onPress={centralizar}
+            accessibilityRole="button"
+            accessibilityLabel="Centralizar no meu GPS"
           >
             <Text style={styles.centerText}>Centralizar no meu GPS</Text>
           </TouchableOpacity>
         )}
       </View>
+
+      <CSOptionSheet
+        visible={!!opcoesGeofence}
+        title="Várias unidades neste local"
+        options={(opcoesGeofence || []).map((opcao) => ({
+          key: opcao.id,
+          label: opcao.label,
+          onPress: () => escolherHospitalDoSheet(opcao.id),
+        }))}
+        onClose={aoCancelarSheet}
+      />
     </SafeAreaView>
   );
 }
 
-export default function GeoLocalizacaoScreen() {
+export default function GeoLocalizacaoScreen({ navigation }) {
   return (
     <GeolocalizacaoProvider>
-      <GeolocalizacaoContent />
+      <GeolocalizacaoContent navigation={navigation} />
     </GeolocalizacaoProvider>
   );
 }
 
+// E6-02: cores migradas para os tokens do Design System v2.0.
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
-  screenHeader: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8, backgroundColor: "#FFFFFF" },
-  screenHeaderTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
-  map: { flex: 1 },
-  infoBox: { backgroundColor: "#F8FAFC", borderTopWidth: 1, borderColor: "#E2E8F0", paddingHorizontal: 16, paddingVertical: 12 },
-  title: { fontSize: 16, fontWeight: "700", color: "#0F172A", marginBottom: 6 },
-  loadingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  infoText: { color: "#334155", fontSize: 14 },
-  infoSubText: { color: "#64748B", fontSize: 13, marginTop: 2 },
-  errorText: { color: "#B91C1C", marginTop: 10, fontSize: 13 },
-  retryButton: { marginTop: 10, alignSelf: "flex-start", backgroundColor: "#0EA5E9", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-  retryText: { color: "#FFFFFF", fontWeight: "600" },
-  centerButton: { marginTop: 10, alignSelf: "flex-start", backgroundColor: "#0C4A6E", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-  centerText: { color: "#FFFFFF", fontWeight: "600" },
+  container: { flex: 1, backgroundColor: colors.surfaceContainerLowest },
+  screenHeader: {
+    paddingHorizontal: spacing.s4,
+    paddingTop: spacing.s3,
+    paddingBottom: spacing.s2,
+    backgroundColor: colors.surfaceContainerLowest,
+  },
+  screenHeaderTitle: { ...typography.titleMd, color: colors.onSurface },
+  filtroRaio: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.s2,
+    marginTop: spacing.s2,
+  },
+  // `overflow: "hidden"` não é enfeite: é o único recorte da subárvore do mapa.
+  // Ver o comentário do JSX (BUG-05) — o `MarkerView` posiciona marcadores fora da
+  // viewport, e sem este container os rótulos dos hospitais vazam por cima do
+  // cabeçalho e da caixa de informações.
+  mapContainer: { flex: 1, overflow: "hidden" },
+  // BUG-06: cor de fundo enquanto os tiles do estilo remoto carregam, ou se a
+  // rede/token falhar — sem isso o fundo é o preto-azulado do renderizador nativo.
+  map: { flex: 1, backgroundColor: colors.surfaceContainerLow },
+  infoBox: {
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderColor: colors.outlineVariant,
+    paddingHorizontal: spacing.s4,
+    paddingVertical: spacing.s3,
+  },
+  title: { ...typography.titleMd, color: colors.onSurface, marginBottom: spacing.s2 },
+  loadingRow: { flexDirection: "row", alignItems: "center", gap: spacing.s2 },
+  infoText: { color: colors.onSurfaceVariant, ...typography.bodyMd },
+  infoSubText: { color: colors.onSurfaceVariant, fontSize: 13, marginTop: 2 },
+  errorText: { color: colors.error, marginTop: spacing.s3, fontSize: 13 },
+  retryButton: {
+    marginTop: spacing.s3,
+    alignSelf: "flex-start",
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.s3,
+    paddingVertical: spacing.s2,
+    borderRadius: radii.sm,
+    minHeight: 48,
+    justifyContent: "center",
+  },
+  retryText: { color: colors.onPrimary, fontWeight: "600" },
+  centerButton: {
+    marginTop: spacing.s3,
+    alignSelf: "flex-start",
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.s3,
+    paddingVertical: spacing.s2,
+    borderRadius: radii.sm,
+    minHeight: 48,
+    justifyContent: "center",
+  },
+  centerText: { color: colors.onPrimary, fontWeight: "600" },
+  markerDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.outline,
+    borderWidth: 2,
+    borderColor: colors.surfaceContainerLowest,
+  },
+  userDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.primary,
+    borderWidth: 3,
+    borderColor: colors.surfaceContainerLowest,
+  },
+  // Marcador de hospital: ícone em caixa branca (referência: mapa de resultados de
+  // hospedagem do Decolar). Simétrico de propósito — ver `renderizarMarcador` (BUG-10).
+  hospitalMarker: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    alignItems: "center",
+    justifyContent: "center",
+    ...shadows.cloud1,
+  },
+  hospitalMarkerSelecionado: {
+    width: 46,
+    height: 46,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  cardSobreMapa: {
+    position: "absolute",
+    left: spacing.s3,
+    right: spacing.s3,
+    bottom: spacing.s3,
+  },
+  // Metade para fora do canto do card, como o "X" do card de referência — assim não
+  // cobre o nome do hospital nem os selos.
+  cardFechar: {
+    position: "absolute",
+    top: -20,
+    right: spacing.s2,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    ...shadows.cloud1,
+  },
 });
-

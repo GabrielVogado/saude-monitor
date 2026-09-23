@@ -45,10 +45,7 @@ frontend/.env*.local
 frontend/*.tsbuildinfo
 
 # generated native folders
-/ios
-/android
-frontend/ios
-frontend/android
+
 
 # IDE/editor local config
 .idea/
@@ -56,9 +53,7 @@ frontend/android
 *.iml
 
 # Android/Gradle local files
-frontend/android/.gradle/
-frontend/android/local.properties
-frontend/android/**/build/
+
 
 # React Native temporary and cache files
 .bundle/
@@ -67,3 +62,58 @@ frontend/android/**/build/
 *.keystore
 google-services.json
 GoogleService-Info.plist
+
+# Epico 01 - scripts de ETL ja executados (nao versionar)
+etl/
+# Os dados geoespaciais de origem (multiplas_camadas_saude_14/ e _csv/) voltaram ao
+# versionamento em 03/09/2026 ("deve subir por enquanto") e foram REMOVIDOS em
+# 05/09/2026 por decisao do PO -- a delecao e permanente. Sem regra de ignore de
+# proposito: se as pastas reaparecerem, e melhor que o `git status` mostre do que
+# some-las em silencio.
+__pycache__/
+*.pyc
+
+# Backup local (mongodump) - nao versionar
+backup-hospitais/
+
+# Segredos de deploy (VM Oracle Cloud) — nunca versionar
+deploy/oracle/.env
+
+# Relatorios de cobertura (gerados por Jest e JaCoCo)
+coverage/
+frontend/coverage/
+backend/build/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Limpeza de 03/09/2026 — o que nao e relevante para o desenvolvimento do sistema
+# nao sobe para o repositorio (decisao do PO)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Configuracao de agentes de IA (por maquina, nao afeta build/imagem/bundle)
+.claude/
+CLAUDE.md
+.opencode/
+.spec/
+
+# Ciclo de observacao do agente (skill-observations/ + skill-updates/): processo
+# do agente, nao produto. Ja estavam versionados por descuido -- destrackeados em
+# 16/09/2026 (retirados do git, mantidos em disco).
+skill-observations/
+skill-updates/
+
+# Nota pessoal de ambiente (uma maquina especifica) -- mesmo motivo acima
+FRONTEND-ANDROID-SUBIDA-EMULADOR-SEM-GARGALO.md
+
+# Cache e saida de build
+.gradle/
+frontend/android/.gradle/
+frontend/android/app/build/
+
+# Logs e artefatos avulsos de sessao
+logs/
+run_logs.txt
+screenshot_emulator.png
+pr_body_retrofit.txt
+
+# Travas temporarias do LibreOffice sobre os .dbf geoespaciais
+.~lock.*#

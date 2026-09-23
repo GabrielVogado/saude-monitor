@@ -1,0 +1,177 @@
+/**
+ * Cliente de Hospitais (Épico 01) — listagem pública, sugestão, auth e retry 401.
+ * Contrato §3.2: GET /api/v1/hospitais (público F-03), POST /api/v1/hospitais/sugestoes (E1-05 P2).
+ */
+import HospitalService from "../../../screens/hospitais/service/HospitalService";
+import TokenStorage from "../../../services/TokenStorage";
+import LoginService from "../../../screens/auth/service/LoginService";
+import { reiniciarControleDeRenovacao } from "../../../config/sessao";
+import { ErroServidorIndisponivel } from "../../../config/http";
+
+process.env.EXPO_PUBLIC_API_BASE_URL = "https://api.test";
+
+jest.mock("../../../screens/auth/service/LoginService");
+
+function jsonResponse(body, status = 200) {
+  return { ok: status < 400, status, text: async () => JSON.stringify(body), json: async () => body };
+}
+
+describe("HospitalService (Épico 01)", () => {
+  const capturada = { pathname: "", search: "" };
+  beforeEach(async () => {
+    require("@react-native-async-storage/async-storage").default.__reset();
+    jest.clearAllMocks();
+    reiniciarControleDeRenovacao();
+    capturada.pathname = "";
+    capturada.search = "";
+    global.fetch = jest.fn().mockImplementation(async (url, config) => {
+      const u = new URL(url);
+      capturada.pathname = u.pathname;
+      capturada.search = u.search;
+      return jsonResponse({ content: [] });
+    });
+  });
+
+  test("listar monta a URL pública correta com query", async () => {
+    await HospitalService.listar({ latitude: -15.79, longitude: -47.88, raioKm: 5, size: 50 });
+    expect(capturada.pathname).toBe("/api/v1/hospitais");
+    expect(capturada.search).toContain("latitude=-15.79");
+    expect(capturada.search).toContain("raioKm=5");
+    expect(capturada.search).toContain("size=50");
+  });
+
+  test("listar omite parâmetros vazios/undefined", async () => {
+    await HospitalService.listar({ size: 20 });
+    expect(capturada.search).toContain("size=20");
+    expect(capturada.search).not.toContain("latitude");
+  });
+
+  test("public apps não enviam Authorization sem sessão", async () => {
+    await HospitalService.listar({ size: 10 });
+    const [, config] = global.fetch.mock.calls[0];
+    expect(config.headers.Authorization).toBeUndefined();
+  });
+
+  test("anexa Authorization Bearer quando há token", async () => {
+    await TokenStorage.salvarTokens({ accessToken: "TOK", refreshToken: "R" });
+    await HospitalService.listar({ size: 10 });
+    const [, config] = global.fetch.mock.calls[0];
+    expect(config.headers.Authorization).toBe("Bearer TOK");
+  });
+
+  test("sugestão é POST público no caminho /api/v1/hospitais/sugestoes (E1-05)", async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ id: "s1" }, 201));
+    const resp = await HospitalService.sugerir({ nome: "Policlínica", cnpj: "12.345.678/0001-95" });
+    expect(global.fetch.mock.calls[0][0]).toContain("/api/v1/hospitais/sugestoes");
+    expect(global.fetch.mock.calls[0][1].method).toBe("POST");
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body).nome).toBe("Policlínica");
+    expect(resp.id).toBe("s1");
+  });
+
+  test("erro não-ok lança a mensagem do envelope (com HTTP sem mensagem)", async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "Hospital não encontrado." }, 404));
+    await expect(HospitalService.buscarPorId("nao-existe")).rejects.toThrow("Hospital não encontrado.");
+  });
+
+  test("401 renova o token via refresh e tenta novamente uma vez", async () => {
+    await TokenStorage.salvarTokens({ accessToken: "OLD", refreshToken: "R" });
+    LoginService.refresh.mockResolvedValue({ accessToken: "NEW", refreshToken: "R2" });
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ message: "expirado" }, 401))
+      .mockResolvedValueOnce(jsonResponse({ content: [] }));
+
+    await HospitalService.listar({ size: 10 });
+    expect(LoginService.refresh).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  test("dois 401 simultâneos renovam a sessão uma única vez (ARQ-01)", async () => {
+    await TokenStorage.salvarTokens({ accessToken: "OLD", refreshToken: "R" });
+    LoginService.refresh.mockImplementation(async () => {
+      // Segura a renovação para que a segunda requisição chegue com ela em voo,
+      // que é exatamente a janela em que o token era rotacionado duas vezes.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return { accessToken: "NEW", refreshToken: "R2" };
+    });
+
+    let chamadas = 0;
+    global.fetch = jest.fn().mockImplementation(async () => {
+      chamadas += 1;
+      return chamadas <= 2
+        ? jsonResponse({ message: "expirado" }, 401)
+        : jsonResponse({ content: [] });
+    });
+
+    await Promise.all([
+      HospitalService.listar({ size: 10 }),
+      HospitalService.listar({ size: 20 }),
+    ]);
+
+    expect(LoginService.refresh).toHaveBeenCalledTimes(1);
+    expect(LoginService.logout).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalledTimes(4);
+  });
+
+  test("refresh falha por servidor indisponível (cold start) — não desloga, preserva a sessão", async () => {
+    // Achado de 10/09/2026: antes, QUALQUER falha do refresh (inclusive esta, sem
+    // relação com o refresh token válido por 30 dias) disparava logout permanente.
+    await TokenStorage.salvarTokens({ accessToken: "OLD", refreshToken: "R" });
+    LoginService.refresh.mockRejectedValue(
+      new ErroServidorIndisponivel("https://api.test/api/v1/auth/refresh")
+    );
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "expirado" }, 401));
+
+    await expect(HospitalService.listar({ size: 10 })).rejects.toThrow(/indisponível/i);
+
+    expect(LoginService.logout).not.toHaveBeenCalled();
+    expect(await TokenStorage.getRefreshToken()).toBe("R");
+  });
+
+  test("401 sem refresh token NÃO tenta renovar e lança o envelope de erro", async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "Token inválido ou expirado." }, 401));
+    await expect(HospitalService.listar({ size: 10 })).rejects.toThrow("Token inválido ou expirado.");
+    // apenas 1 chamada (sem retry)
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("buscarIndicadores chama GET /api/v1/hospitais/{id}/indicadores (E4-01..E4-04, §3.5)", async () => {
+    const payload = {
+      hospitalId: "h1",
+      indicadoresDisponiveis: true,
+      notaMedia: 4.2,
+      nAvaliacoes: 12,
+      tempoMedianoMinutos: 95,
+      nVisitas: 34,
+      periodo: { inicio: "2026-05-10T00:00:00Z", fim: "2026-08-07T23:59:59Z" },
+      atualizadoEm: "2026-08-07T16:55:05Z",
+    };
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse(payload));
+
+    const resp = await HospitalService.buscarIndicadores("h1");
+    const [url, config] = global.fetch.mock.calls[0];
+    expect(url).toContain("/api/v1/hospitais/h1/indicadores");
+    expect(config.method).toBe("GET");
+    expect(resp.indicadoresDisponiveis).toBe(true);
+    expect(resp.notaMedia).toBe(4.2);
+    expect(resp.nVisitas).toBe(34);
+    expect(resp.periodo.inicio).toBe("2026-05-10T00:00:00Z");
+  });
+
+  test("buscarIndicadores devolve indisponível quando N < 5 (RN-15)", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      jsonResponse({ hospitalId: "h1", indicadoresDisponiveis: false, notaMedia: null, nAvaliacoes: 3 })
+    );
+    const resp = await HospitalService.buscarIndicadores("h1");
+    expect(resp.indicadoresDisponiveis).toBe(false);
+    expect(resp.notaMedia).toBeNull();
+  });
+
+  test("buscarIndicadores lança 404 quando hospital não existe", async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "Hospital não encontrado." }, 404));
+    await expect(HospitalService.buscarIndicadores("nao-existe")).rejects.toThrow(
+      "Hospital não encontrado."
+    );
+  });
+});

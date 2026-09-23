@@ -1,51 +1,255 @@
-import {buildApiUrl} from "../../../config/api";
+import { buildApiUrl } from "../../../config/api";
+import { classificarErroDeRede, fetchComRetry, fetchComTimeout } from "../../../config/http";
+import TokenStorage from "../../../services/TokenStorage";
+// Import circular consciente: GeofencingTaskService importa HospitalService e
+// VisitaService, que por sua vez importam este módulo (LoginService) para o
+// interceptor 401. Seguro porque nenhum dos quatro módulos lê o binding importado
+// no topo do arquivo — só dentro de corpos de função, chamados depois que o grafo
+// inteiro já carregou. Tentativa de quebrar o ciclo com `import()` dinâmico foi
+// descartada: introduzia uma dependência real e frágil da interop do Jest com
+// `jest.mock` em import dinâmico (sem `__esModule: true` no mock, o binding vinha
+// undefined) — trocava um risco teórico por um problema demonstrado.
+import { pararGeofencing } from "../../visitas/service/GeofencingTaskService";
+
+const BASE_PATH = "/api/v1/auth";
+
+/**
+ * Cliente de autenticação alinhado ao contrato v2.0 (§3.1):
+ * - `POST /api/v1/auth/login` → `{ accessToken, refreshToken, expiraEm, usuario }`
+ * - `POST /api/v1/auth/refresh` → rotaciona o par de tokens
+ * - `POST /api/v1/auth/logout` → revoga o refresh token no servidor (blacklist)
+ */
+async function post(path, body, { idempotente = false } = {}) {
+  const url = buildApiUrl(path);
+
+  let response;
+  try {
+    response = await fetchComRetry(
+      url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+      { idempotente }
+    );
+  } catch (error) {
+    throw await classificarErroDeRede(error, url);
+  }
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    const message =
+      data?.message ||
+      data?.error ||
+      `Falha na autenticação (HTTP ${response.status}).`;
+    const erro = new Error(message);
+    // Sem isto, nada consegue diferenciar "o servidor rejeitou o token" (401/403) de
+    // "o servidor está indisponível agora" (503 de cold start) — as duas viravam o
+    // mesmo Error genérico e derrubavam a sessão por igual (achado de 10/09/2026).
+    erro.status = response.status;
+    erro.data = data;
+    throw erro;
+  }
+
+  return data;
+}
+
+/** Encerra o geofencing nativo sem nunca bloquear logout/exclusão por falha aqui. */
+async function pararGeofencingBestEffort() {
+  try {
+    await pararGeofencing();
+  } catch {
+    // best-effort: falha ao parar o monitoramento nativo não pode impedir a
+    // limpeza local da sessão (nem, na exclusão, a conta já excluída no servidor).
+  }
+}
 
 class LoginService {
-    static async login({email, password, rememberDevice}) {
-        const loginData = {
-            email: email?.trim() || "",
-            password: password || "",
-            rememberDevice: Boolean(rememberDevice),
-        };
-        const loginUrl = buildApiUrl("/api/auth/login");
+  /**
+   * Autentica credenciais e persiste os tokens + usuário no dispositivo.
+   *
+   * @param {{ email: string, password: string, rememberDevice?: boolean }} credenciais
+   * @returns {Promise<{ accessToken: string, refreshToken: string, expiraEm: number, usuario: object }>}
+   */
+  static async login({ email, password, rememberDevice }) {
+    const payload = {
+      email: email?.trim() || "",
+      password: password || "",
+      rememberDevice: Boolean(rememberDevice),
+    };
 
-        let response;
+    // O login é a primeira requisição do app e por isso a que mais encontra o
+    // servidor hibernado (PERF-04). Repetir é seguro: autenticar duas vezes
+    // apenas emite um novo par de tokens. O `refresh` fica de fora de propósito
+    // — ele **rotaciona** o refresh token, e uma repetição depois de o servidor
+    // já ter rotacionado enviaria um token morto e derrubaria a sessão.
+    const response = await post(`${BASE_PATH}/login`, payload, { idempotente: true });
 
-        try {
-            response = await fetch(loginUrl, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(loginData),
-            });
-        } catch (error) {
-            if (error.message === "Network request failed") {
-                throw new Error(`Nao foi possivel conectar ao backend em ${loginUrl}. Verifique API, URL e rede.`);
-            }
-
-            throw error;
-        }
-
-        let responseData = {};
-
-        try {
-            responseData = await response.json();
-        } catch (parseError) {
-            responseData = {};
-        }
-
-        if (!response.ok || responseData?.success === false) {
-            const message = responseData?.message || "Falha ao realizar login";
-            const fieldErrors = responseData?.errors
-                ? `\n${Object.values(responseData.errors).join("\n")}`
-                : "";
-            throw new Error(`${message}${fieldErrors}`);
-        }
-
-        return responseData;
+    if (response.usuario?.papel === "ADMIN") {
+      throw new Error(
+        "Acesso administrativo disponível apenas pelo Painel Administrativo Web. Utilize um usuário do aplicativo."
+      );
     }
+
+    await TokenStorage.salvarTokens({
+      accessToken: response.accessToken,
+      refreshToken: response.refreshToken,
+      usuario: response.usuario,
+    });
+
+    return response;
+  }
+
+  /**
+   * Renova o access token a partir do refresh token persistido (rotação).
+   * Reutilizado pelo interceptor 401 do HospitalService.
+   */
+  static async refresh() {
+    const refreshToken = await TokenStorage.getRefreshToken();
+
+    if (!refreshToken) {
+      throw new Error("Sessão expirada. Faça login novamente.");
+    }
+
+    const response = await post(`${BASE_PATH}/refresh`, { refreshToken });
+
+    await TokenStorage.salvarTokens({
+      accessToken: response.accessToken,
+      refreshToken: response.refreshToken,
+      usuario: response.usuario ?? (await TokenStorage.getUsuario()),
+    });
+
+    return response;
+  }
+
+  /**
+   * Encerra a sessão (§3.1): revoga o refresh token no servidor (best-effort) e limpa
+   * os tokens persistidos no dispositivo.
+   *
+   * A revogação server-side é best-effort de propósito — o logout local nunca fica
+   * bloqueado por falha de rede/backend (o interceptor 401 também chama este método).
+   */
+  static async logout() {
+    const refreshToken = await TokenStorage.getRefreshToken();
+
+    if (refreshToken) {
+      try {
+        await post(`${BASE_PATH}/logout`, { refreshToken });
+      } catch {
+        // ignora: sem conexão o refresh expira sozinho; o logout local segue.
+      }
+    }
+
+    await pararGeofencingBestEffort();
+    await TokenStorage.limparTokens();
+  }
+
+  /**
+   * Solicita o código de redefinição de senha ("esqueci minha senha", E8-05/BUG-03).
+   *
+   * O backend sempre devolve a mesma resposta genérica, exista ou não o e-mail — esta
+   * tela nunca deve tentar diferenciar os dois casos a partir do retorno.
+   *
+   * `idempotente: true`: reenviar é seguro — o backend faz upsert por e-mail, então
+   * repetir só troca o código, nunca deixa dois códigos ativos.
+   */
+  static async esqueciSenha(email) {
+    return post(`${BASE_PATH}/esqueci-senha`, { email: email?.trim() || "" }, { idempotente: true });
+  }
+
+  /**
+   * Confirma o código enviado por e-mail e define a nova senha.
+   *
+   * Sem `idempotente`: uma repetição depois que o código já foi consumido devolveria um
+   * erro confuso ("código inválido"); melhor deixar o usuário tentar de novo manualmente.
+   */
+  static async redefinirSenha({ email, codigo, novaSenha }) {
+    return post(`${BASE_PATH}/redefinir-senha`, {
+      email: email?.trim() || "",
+      codigo: codigo?.trim() || "",
+      novaSenha: novaSenha || "",
+    });
+  }
+
+  /**
+   * Confirma o e-mail do cadastro com o código de 6 dígitos enviado por `registro`
+   * (confirmação obrigatória, 10/09/2026). Sem confirmar, `login` é recusado (403
+   * EMAIL_NAO_CONFIRMADO).
+   *
+   * Sem `idempotente`: mesma razão de `redefinirSenha` — repetir depois que o código já
+   * foi consumido devolveria um erro confuso.
+   */
+  static async confirmarEmail({ email, codigo }) {
+    return post(`${BASE_PATH}/confirmar-email`, {
+      email: email?.trim() || "",
+      codigo: codigo?.trim() || "",
+    });
+  }
+
+  /**
+   * Reenvia o código de confirmação de e-mail. Resposta sempre genérica — não revela se
+   * o e-mail existe nem se já está confirmado.
+   *
+   * `idempotente: true`: mesma razão de `esqueciSenha` — o backend faz upsert por
+   * (e-mail, propósito), reenviar só troca o código.
+   */
+  static async reenviarConfirmacaoEmail(email) {
+    return post(`${BASE_PATH}/reenviar-confirmacao`, { email: email?.trim() || "" }, { idempotente: true });
+  }
+
+  /**
+   * Exclui a conta do usuário autenticado (F0-05/LGPD).
+   *
+   * Envia `DELETE /api/v1/contas/exclusao` com o access token e, em caso de
+   * sucesso, remove a sessão local (logout) já que a conta deixou de existir.
+   */
+  static async excluirConta() {
+    const accessToken = await TokenStorage.getAccessToken();
+
+    if (!accessToken) {
+      throw new Error("Sessão expirada. Faça login novamente.");
+    }
+
+    const url = buildApiUrl("/api/v1/contas/exclusao");
+
+    let response;
+    try {
+      response = await fetchComTimeout(url, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+    } catch (error) {
+      throw await classificarErroDeRede(error, url);
+    }
+
+    let data = null;
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+
+    if (!response.ok) {
+      const message =
+        data?.message ||
+        `Falha ao excluir a conta (HTTP ${response.status}).`;
+      throw new Error(message);
+    }
+
+    await pararGeofencingBestEffort();
+    await TokenStorage.limparTokens();
+    return data;
+  }
 }
 
 export default LoginService;
-

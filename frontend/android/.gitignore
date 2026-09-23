@@ -1,0 +1,23 @@
+# OSX
+#
+.DS_Store
+
+# Android/IntelliJ
+#
+build/
+# Exceção: APKs gerados (debug/release) são versionados propositalmente (Épico 02).
+!app/build/outputs/apk/
+!app/build/outputs/apk/**
+.idea
+.gradle
+local.properties
+*.iml
+*.hprof
+.cxx/
+
+# Bundle artifacts
+*.jsbundle
+
+# Artefatos transitórios de build do Android (APKs versionadas são a exceção acima)
+app/build/outputs/apk/**/output-metadata.json
+app/build/outputs/apk/**/baselineProfiles/

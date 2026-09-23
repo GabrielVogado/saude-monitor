@@ -1,0 +1,449 @@
+<title>Guia saude-monitor</title>
+<style>
+  :root {
+    --bg: #f4f8fa;
+    --surface: #ffffff;
+    --surface-2: #eaf2f6;
+    --ink: #15252f;
+    --ink-soft: #55697599;
+    --ink-soft-solid: #55697a;
+    --accent: #0a6c8f;
+    --accent-ink: #ffffff;
+    --accent-soft: #dcedf4;
+    --border: #d8e4ea;
+    --shadow: rgba(21, 37, 47, 0.10);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1a20;
+      --surface: #16252c;
+      --surface-2: #1c2e36;
+      --ink: #e8eff2;
+      --ink-soft: #aebdc6aa;
+      --ink-soft-solid: #aebdc6;
+      --accent: #5cc2e6;
+      --accent-ink: #072830;
+      --accent-soft: #1e3a45;
+      --border: #2a3e47;
+      --shadow: rgba(0, 0, 0, 0.35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1a20;
+    --surface: #16252c;
+    --surface-2: #1c2e36;
+    --ink: #e8eff2;
+    --ink-soft: #aebdc6aa;
+    --ink-soft-solid: #aebdc6;
+    --accent: #5cc2e6;
+    --accent-ink: #072830;
+    --accent-soft: #1e3a45;
+    --border: #2a3e47;
+    --shadow: rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
+  }
+
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    padding-inline: 20px;
+    padding-block: 48px 72px;
+  }
+
+  .page {
+    max-width: 700px;
+    margin-inline: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 56px;
+  }
+
+  h1, h2, h3 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    text-wrap: balance;
+    color: var(--ink);
+    margin: 0;
+  }
+
+  /* ---------- Hero ---------- */
+  header.hero {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .eyebrow {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1.title {
+    font-size: clamp(2rem, 5vw, 2.6rem);
+    line-height: 1.15;
+  }
+  .lede {
+    font-size: 1.08rem;
+    color: var(--ink-soft-solid);
+    max-width: 60ch;
+  }
+  .lede strong { color: var(--ink); }
+
+  .toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+    list-style: none;
+    padding: 0;
+  }
+  .toc li a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--ink-soft-solid);
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 500;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .toc li a:hover {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .toc .num {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  /* ---------- Sections ---------- */
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  section.intro, section.closing {
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  section.step {
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+  }
+
+  .step-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .step-num {
+    font-family: "Fraunces", serif;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--accent-ink);
+    background: var(--accent);
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-variant-numeric: tabular-nums;
+  }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.12rem; margin-top: 4px; }
+
+  p { margin: 0; color: var(--ink); }
+  p.muted { color: var(--ink-soft-solid); }
+
+  ul.plain, ol.plain {
+    margin: 0;
+    padding-left: 1.2em;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  ul.plain li, ol.plain li { color: var(--ink); }
+  ul.plain li strong { color: var(--ink); }
+
+  .callout {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 0.96rem;
+    color: var(--ink-soft-solid);
+  }
+  .callout strong { color: var(--ink); }
+
+  /* ---------- Screenshots ---------- */
+  figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .frame {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 10px;
+    box-shadow: 0 8px 24px var(--shadow);
+    max-width: 340px;
+  }
+  .frame img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 9px;
+  }
+  figcaption {
+    font-size: 0.86rem;
+    color: var(--ink-soft-solid);
+    max-width: 340px;
+  }
+
+  .shots-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: flex-start;
+  }
+  .shots-row.wide .frame { max-width: 420px; }
+
+  footer.closing-note {
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  footer.closing-note .lede { max-width: none; }
+
+  @media (max-width: 480px) {
+    body { font-size: 16px; }
+    h1.title { font-size: 1.8rem; }
+    .frame, figcaption { max-width: 100%; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="hero">
+    <span class="eyebrow">Guia do usuário · saude-monitor</span>
+    <h1 class="title">Primeiros passos no saude-monitor</h1>
+    <p class="lede">
+      Um guia curto para quem está abrindo o app pela primeira vez: como criar
+      conta (se quiser), encontrar um hospital perto de você e deixar o app
+      <strong>detectar sua visita sozinho</strong> — sem precisar apertar nada.
+    </p>
+    <ul class="toc">
+      <li><a href="#conta"><span class="num">1</span> Sua conta</a></li>
+      <li><a href="#hospitais"><span class="num">2</span> Encontrar um hospital</a></li>
+      <li><a href="#mapa"><span class="num">3</span> Detecção automática</a></li>
+      <li><a href="#perfil"><span class="num">4</span> Seu perfil</a></li>
+    </ul>
+  </header>
+
+  <section class="intro">
+    <h2>O que o app faz</h2>
+    <p>
+      O <strong>saude-monitor</strong> ajuda você a encontrar hospitais e unidades
+      de saúde perto de você e mostra, de forma pública e transparente, a nota e o
+      tempo médio de espera de cada um — calculados a partir de avaliações reais de
+      outras pessoas.
+    </p>
+    <p>
+      Quando você chega a um hospital, o app percebe sozinho pela localização do
+      seu celular e começa a contar o tempo da visita. Na saída, pede sua opinião
+      em menos de um minuto. Você pode usar tudo isso <strong>sem nunca criar uma
+      conta</strong>.
+    </p>
+    <figure>
+      <div class="frame">
+        <img src="imagens/01-inicio.png" alt="Tela inicial do app, explicando detecção automática, feedback rápido e avaliação pública" loading="lazy">
+      </div>
+      <figcaption>A tela de apresentação do app, a primeira coisa que você vê ao abrir.</figcaption>
+    </figure>
+  </section>
+
+  <section class="step" id="conta">
+    <div class="step-head">
+      <span class="step-num">1</span>
+      <h2>Criando sua conta <span style="font-weight:400; color:var(--ink-soft-solid); font-family:'IBM Plex Sans',sans-serif; font-size:0.62em;">(é opcional)</span></h2>
+    </div>
+    <p>
+      Você não precisa se cadastrar para usar o app: pode buscar hospitais, ver
+      notas, consultar o mapa e fazer check-in manual sem nenhuma conta. Criar
+      uma conta só vale a pena se você quiser guardar seu histórico de visitas e
+      suas avaliações.
+    </p>
+    <p>Para criar uma conta, abra a aba <strong>Perfil</strong> e toque em <strong>Criar conta</strong>.</p>
+
+    <div class="shots-row">
+      <figure>
+        <div class="frame">
+          <img src="imagens/11-perfil.png" alt="Tela de Perfil com os botões Entrar e Criar conta" loading="lazy">
+        </div>
+        <figcaption>Perfil sem login: a conta é sempre opcional.</figcaption>
+      </figure>
+      <figure>
+        <div class="frame">
+          <img src="imagens/05-cadastro.png" alt="Formulário de cadastro com nome, e-mail, telefone e senha" loading="lazy">
+        </div>
+        <figcaption>Nome, e-mail e senha — o telefone é opcional.</figcaption>
+      </figure>
+    </div>
+
+    <p class="muted">
+      Depois de criar a conta, o app envia um código de confirmação para o seu
+      e-mail. Você precisa confirmar antes de conseguir entrar — isso garante que,
+      se um dia precisar redefinir sua senha, o código chegue no endereço certo.
+    </p>
+
+    <h3>Entrando com uma conta existente</h3>
+    <p>Se você já tem conta, abra <strong>Perfil</strong> → <strong>Entrar</strong> e informe seu e-mail e senha.</p>
+    <div class="shots-row">
+      <figure>
+        <div class="frame">
+          <img src="imagens/06-login.png" alt="Tela de login com e-mail, senha e opção Lembrar este dispositivo" loading="lazy">
+        </div>
+        <figcaption>Login com e-mail e senha.</figcaption>
+      </figure>
+      <figure>
+        <div class="frame">
+          <img src="imagens/07-esqueci-senha.png" alt="Tela de recuperação de senha por e-mail" loading="lazy">
+        </div>
+        <figcaption>Esqueceu a senha? Um código de 6 dígitos chega por e-mail.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="step" id="hospitais">
+    <div class="step-head">
+      <span class="step-num">2</span>
+      <h2>Encontrando um hospital</h2>
+    </div>
+    <p>
+      Abra a aba <strong>Hospitais</strong> para ver a lista completa, com o tipo
+      de cada unidade (hospital, UBS, UPA, centro especializado etc.) e sua
+      categoria (público, privado ou filantrópico).
+    </p>
+    <div class="shots-row wide">
+      <figure>
+        <div class="frame">
+          <img src="imagens/02-hospitais-lista.png" alt="Lista de hospitais com filtros por tipo" loading="lazy">
+        </div>
+        <figcaption>Lista completa, com busca e filtros no topo.</figcaption>
+      </figure>
+      <figure>
+        <div class="frame">
+          <img src="imagens/03-hospitais-busca.png" alt='Busca por "hran" filtrando para o Hospital Regional da Asa Norte' loading="lazy">
+        </div>
+        <figcaption>Buscando pelo nome — ou até por uma sigla conhecida.</figcaption>
+      </figure>
+    </div>
+    <p>
+      Toque em um hospital da lista para ver o <strong>detalhe</strong>: endereço,
+      contato, horário de funcionamento, avaliação pública e a localização no mapa.
+    </p>
+    <figure>
+      <div class="frame">
+        <img src="imagens/04-hospital-detalhe.png" alt="Detalhe do Hospital de Base do Distrito Federal, com mapa e endereço" loading="lazy">
+      </div>
+      <figcaption>Detalhe de um hospital, com mapa real e geofence de detecção.</figcaption>
+    </figure>
+
+    <h3>Ranking de hospitais</h3>
+    <p>
+      No topo da lista, toque no ícone de troféu para ver o <strong>ranking</strong> —
+      ordenado pela melhor nota ou pelo menor tempo médio de espera, com filtro por tipo.
+    </p>
+    <figure>
+      <div class="frame">
+        <img src="imagens/09-ranking.png" alt="Ranking de hospitais ordenado pela melhor nota" loading="lazy">
+      </div>
+      <figcaption>Ranking ordenado pela melhor nota média das avaliações.</figcaption>
+    </figure>
+  </section>
+
+  <section class="step" id="mapa">
+    <div class="step-head">
+      <span class="step-num">3</span>
+      <h2>Deixando o app detectar sua visita</h2>
+    </div>
+    <p>
+      Abra a aba <strong>Mapa</strong> para ver todos os hospitais próximos num só
+      lugar. Se você permitir o acesso à localização, o app consegue:
+    </p>
+    <ul class="plain">
+      <li>Mostrar sua posição no mapa junto com os hospitais ao redor;</li>
+      <li>Filtrar por um raio de distância (1, 5, 10 ou 25 km);</li>
+      <li><strong>Detectar automaticamente</strong> quando você entra na área de um hospital e começar a contar sua visita sozinho.</li>
+    </ul>
+    <figure>
+      <div class="frame">
+        <img src="imagens/08-mapa.png" alt="Mapa com dezenas de hospitais de Brasília marcados" loading="lazy">
+      </div>
+      <figcaption>Cada marcador é um hospital — toque para abrir o detalhe.</figcaption>
+    </figure>
+    <div class="callout">
+      <strong>Duas unidades muito próximas?</strong> Se os círculos de detecção se
+      sobrepõem, tocar naquele ponto do mapa abre uma lista para você escolher qual
+      unidade quer ver — em vez de sempre abrir a mesma.
+    </div>
+  </section>
+
+  <section class="step" id="perfil">
+    <div class="step-head">
+      <span class="step-num">4</span>
+      <h2>Acompanhando seu perfil</h2>
+    </div>
+    <p>Na aba <strong>Perfil</strong>, além de entrar ou criar conta, você pode:</p>
+    <ul class="plain">
+      <li><strong>Permitir ou revogar a localização</strong> a qualquer momento — negar não bloqueia o restante do app, só desliga a detecção automática de visita;</li>
+      <li><strong>Ativar notificações</strong> para receber um convite para avaliar sua visita e, se você não responder, um lembrete único depois (é opcional);</li>
+      <li>Ler a <strong>Política de Privacidade e Termos de Uso</strong>.</li>
+    </ul>
+    <figure>
+      <div class="frame">
+        <img src="imagens/10-notificacoes.png" alt="Tela de gerenciamento de notificações" loading="lazy">
+      </div>
+      <figcaption>Notificações são opcionais — dá para avaliar pelo app de qualquer forma.</figcaption>
+    </figure>
+    <p class="muted">Suas avaliações são sempre anônimas e agregadas por hospital, seguindo a LGPD.</p>
+  </section>
+
+  <footer class="closing-note">
+    <h2>Próximos passos</h2>
+    <ul class="plain">
+      <li>Sem conta, você já pode buscar hospitais, consultar o ranking e usar o mapa.</li>
+      <li>Com conta, você passa a ter histórico das suas visitas e avaliações guardado.</li>
+      <li>Deixe a localização ativada para que o app detecte suas visitas sozinho, sem esforço nenhum da sua parte.</li>
+    </ul>
+    <p class="lede">
+      Dúvidas sobre como seus dados são usados? A Política de Privacidade está
+      sempre acessível em <strong>Perfil → Ler Política de Privacidade e Termos de Uso</strong>.
+    </p>
+  </footer>
+
+</div>

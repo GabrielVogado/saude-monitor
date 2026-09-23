@@ -1,0 +1,41 @@
+{
+  "target": "https://saude-monitor-backend-hom-767615581088.southamerica-east1.run.app",
+  "systemType": "database-backed",
+  "executionMode": "authorized-environment-run",
+  "environment": "staging",
+  "tool": "k6",
+  "auth": "bearer",
+  "observability": "prometheus+grafana (backend /actuator/prometheus + k6 remote write)",
+  "criticalFlows": ["login", "lista", "raio", "detalhe", "indicadores", "checkin", "heartbeat", "checkout", "feedback", "historico_visitas", "historico_feedbacks", "ranking"],
+  "excludedFlows": ["esqueci-senha", "registro (envia e-mail; usuarios criados direto no banco)"],
+  "thresholds": {
+    "p95Ms": 300,
+    "errorRatePct": 1
+  },
+  "stopConditions": {
+    "mongoOpsPerSecond": 90,
+    "errorRatePct": 5,
+    "p95Ms": 5000,
+    "evaluationWindowSeconds": 30
+  },
+  "constraints": {
+    "atlasM0OpsPerSecond": 100,
+    "cloudRunFreeRequestsPerMonth": 2000000,
+    "resendEmailsPerDay": 100,
+    "sharedDatabaseClusterWithDev": true
+  },
+  "scenarios": [
+    {
+      "name": "baseline",
+      "goal": "Validar conexao, autenticacao e coleta de metricas; medir operacoes de Mongo por jornada",
+      "durationSeconds": 120,
+      "stages": [{ "durationSeconds": 5, "target": 2 }]
+    },
+    {
+      "name": "carga100",
+      "goal": "100 usuarios simultaneos percorrendo a jornada completa uma vez, com inicio espalhado em 120 s e pausas de pessoa real",
+      "durationSeconds": 300,
+      "stages": [{ "durationSeconds": 120, "target": 100 }, { "durationSeconds": 210, "target": 100 }]
+    }
+  ]
+}

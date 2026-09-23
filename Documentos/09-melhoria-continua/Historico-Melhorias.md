@@ -1246,6 +1246,67 @@ desinstalar" só se confirma num aparelho, com duas rcs seguidas.
 
 ---
 
+## M-019 — Testes de desempenho da homologação: métricas ao vivo, relatório e limites gratuitos
+
+**Data:** 23/09/2026 · **PR:** _(preencher ao abrir)_
+
+### O que o PO pediu
+
+Testes de desempenho "partindo do sistema como um usuário final" — com check-ins,
+checkouts e feedbacks, fora o "esqueci minha senha" —, um sistema de análise de métricas
+com relatório, acompanhamento **ao vivo** das requisições, e sem estourar os limites
+gratuitos do Cloud Run e do Atlas. Ferramenta indicada pelo PO: a skill
+`jovd83/performance-testing-skill` (instalada após auditoria: sem `postinstall`, scripts só
+leem JSON do k6; varredura do instalador "Safe/0 alertas"). O primeiro nome indicado,
+`qaskills`, não existe no npm — nomes parecidos pertencem a outros autores.
+
+### O que mudou
+
+`perf/` (roda no Docker local, custo zero): Prometheus coletando o `/actuator/prometheus`
+da homologação (com um ADMIN de coleta e renovação do token de 15 min), k6 enviando as
+métricas do lado do usuário por *remote write*, Grafana com painel ao vivo (atualiza a cada
+5 s), jornada k6 com 12 fluxos medidos um a um, **vigia** que aborta o teste acima de 90
+op/s no Mongo, scripts de preparo/limpeza dos dados de teste e relatório de análise
+(cliente + servidor + Mongo por comando + consumo dos limites gratuitos).
+
+### Limites que decidem o desenho (medidos nas páginas oficiais em 23/09/2026)
+
+O gargalo não é o Cloud Run (2 milhões de requisições/mês), é o **Atlas M0: 100
+operações/s** — acima disso o Atlas estrangula o cluster, que é o **mesmo do dev**. A carga
+foi dimensionada a partir do custo medido de uma jornada, não de um palpite.
+
+### Achados durante a construção
+
+- **Jackson 3 recusa primitivo ausente:** o `LoginRequest` tem `boolean rememberDevice`
+  primitivo; um corpo sem ele volta 400 "corpo malformado". O app sempre o envia; os
+  scripts passaram a enviar. Vale para qualquer cliente novo da API.
+- **Contagem por `increase()` subestimava:** série que nasce no meio da janela perde o
+  primeiro valor — o baseline mostrava 15 requisições onde houve 28. O relatório passou a
+  usar a diferença dos contadores entre início e fim.
+- O Cloud Run não expõe CPU ao contêiner (`process_cpu_usage = -1`); o relatório diz
+  "indisponível" em vez de um número falso.
+- O renovador do token gravava num volume sem permissão e falhava **sem aviso**; agora
+  roda como root e registra a falha.
+
+### Achados do `code-review`, corrigidos antes do PR
+
+- **Vigia cego sob carga:** sem dado no Prometheus (coleta lenta, token expirado, cold
+  start) ele lia "0 op/s" e parava de proteger o limite. Agora "sem dado" conta como alerta
+  e aborta após 30 s.
+- **Limpeza apagava nota real:** apagar o agregado de todo hospital tocado sumiria com a
+  nota de quem tem avaliações reais. Agora só apaga onde não sobrou dado real; nos demais
+  marca a visita real mais recente para o job do backend recalcular.
+- Um usuário de carga inexistente podia ser sorteado (o vigia ocupa um id de VU); o vigia
+  somava VUs de execuções anteriores; senhas e URI apareciam como argumento de processo.
+
+### Baseline (23/09/2026, 2 usuários)
+
+24/24 verificações, **0 erros**, **p95 da jornada 165 ms** (meta 300 ms); fluxo mais lento
+login (p95 230 ms). **≈ 61 operações de Mongo por jornada** → carga de 100 usuários
+dimensionada em ~50 op/s de pico, com início espalhado em 120 s.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

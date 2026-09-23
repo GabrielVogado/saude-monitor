@@ -1355,7 +1355,7 @@ dimensionada em ~50 op/s de pico, com início espalhado em 120 s.
 
 ## M-020 — `raioKm` negativo derrubava a listagem com HTTP 500 (achado do pentest)
 
-**Data:** 23/09/2026 · **PR:** _(preencher ao abrir)_
+**Data:** 23/09/2026 · **PR:** #136
 
 ### Como apareceu
 

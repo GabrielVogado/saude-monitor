@@ -1220,6 +1220,24 @@ ele; produção ainda não existe).
   em 6 contra um remoto local (primeira rc, sequência, re-execução no mesmo commit, troca
   de base, versão menor recusada, `1.10.0` sem confundir com `1.1.0`).
 
+### Primeira rc (23/09/2026) — três falhas, três lições
+
+1. **`bad auth` no Atlas:** a senha dentro de `MONGO_URI_HOM` não era a atual do usuário
+   `saude_monitor_hom`. O pipeline se protegeu como desenhado — APK pronto, backend
+   recusado, **nenhuma tag criada**. Corrigido com nova versão do secret.
+2. **Seed parado por CPU:** com o banco vazio, o `SeedRunner` (ApplicationRunner) roda
+   **depois** de o Tomcat abrir a porta; o Cloud Run já considera a instância pronta e
+   estrangula a CPU entre requisições. O seed só avançava durante as requisições do smoke
+   test (114 → 135 → 154 hospitais, medido pela API) e o `/actuator/health` ficava
+   `OUT_OF_SERVICE` (readiness só vira `UP` depois dos runners). **Risco:** instância
+   desligada no meio deixaria o banco parcial para sempre (`skip-if-not-empty`).
+   Destravado alimentando requisições até `Concluído — novos: 339`. **Causa estrutural
+   aberta:** vale para qualquer banco vazio no Cloud Run (produção incluída) — o seed
+   precisa rodar antes de a porta abrir, ou com CPU sempre alocada.
+3. **Reexecução só dos jobs que falharam** não preserva outputs de workflow reutilizável:
+   o nome do artefato chegou vazio e o `download-artifact` tentou baixar tudo. O job
+   `release` passou a achar o APK pelo commit e tirar a versão do nome do arquivo.
+
 ### O que ainda não foi validado
 
 A cadeia inteira (`cd-homologacao.yml`) só roda de verdade no primeiro push na

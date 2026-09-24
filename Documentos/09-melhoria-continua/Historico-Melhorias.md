@@ -1444,7 +1444,7 @@ termina no front-end do Google, a aplicação recebe a conexão como HTTP simple
 
 ## M-022 — Re-medição do Épico 8 (E8-01, E8-02, E8-08): documento alinhado ao número real
 
-**Data:** 24/09/2026 · **PR:** #___
+**Data:** 24/09/2026 · **PR:** #141
 
 ### Como apareceu
 

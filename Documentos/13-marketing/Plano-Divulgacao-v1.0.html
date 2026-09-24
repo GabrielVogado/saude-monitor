@@ -1,0 +1,563 @@
+<title>Divulgação do Radar Saúde</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#F3F7F9; --surface:#FFFFFF; --surface-2:#E8F0F4; --ink:#0E2230; --muted:#4F6675; --line:#D3DFE6;
+  --brand:#006193; --brand-soft:#D6EAF4; --on-brand:#FFFFFF;
+  --ok:#1C7F5E; --ok-soft:#DDF1E8; --warn:#9A5F00; --warn-soft:#FBEBD0; --bad:#B23A2E; --bad-soft:#F8E0DC;
+  --dot-idle:#A9BCC8;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0A1620; --surface:#11212E; --surface-2:#16293A; --ink:#E2ECF2; --muted:#9AB0BF; --line:#23394A;
+    --brand:#5BB8E8; --brand-soft:#123A52; --on-brand:#06202F;
+    --ok:#5CCB9F; --ok-soft:#113A2C; --warn:#E8B04E; --warn-soft:#3A2B0E; --bad:#F08A7E; --bad-soft:#3E1C18;
+    --dot-idle:#3D5566;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0A1620; --surface:#11212E; --surface-2:#16293A; --ink:#E2ECF2; --muted:#9AB0BF; --line:#23394A;
+  --brand:#5BB8E8; --brand-soft:#123A52; --on-brand:#06202F;
+  --ok:#5CCB9F; --ok-soft:#113A2C; --warn:#E8B04E; --warn-soft:#3A2B0E; --bad:#F08A7E; --bad-soft:#3E1C18;
+  --dot-idle:#3D5566;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.6;padding-inline:20px;padding-block:0 64px}
+.wrap{max-width:1040px;margin-inline:auto}
+h1,h2,h3{font-family:var(--f-display);line-height:1.15;text-wrap:balance;margin:0}
+h2{font-size:clamp(1.5rem,3.2vw,2rem);font-weight:700}
+h3{font-size:1.15rem;font-weight:700}
+p{margin:0}
+.prose{max-width:66ch}
+.eyebrow{font-family:var(--f-mono);font-size:.74rem;letter-spacing:.09em;text-transform:uppercase;color:var(--brand);font-weight:600}
+.muted{color:var(--muted)}
+code,.mono{font-family:var(--f-mono);font-size:.88em}
+a{color:var(--brand)}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px;border-radius:4px}
+
+/* top bar */
+.top{display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:space-between;align-items:center;padding-block:18px;border-bottom:1px solid var(--line)}
+.brandmark{display:flex;gap:10px;align-items:center;font-family:var(--f-display);font-weight:700;font-size:1.05rem}
+.brandmark svg{flex:none}
+.meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--f-mono);font-size:.76rem;color:var(--muted)}
+
+/* hero */
+.hero{display:grid;grid-template-columns:1.15fr 1fr;gap:40px;align-items:center;padding-block:48px 40px}
+.hero h1{font-size:clamp(2rem,5.2vw,3.35rem);font-weight:800;letter-spacing:-.015em}
+.hero h1 em{font-style:normal;color:var(--brand)}
+.hero .lede{margin-top:18px;font-size:1.12rem;color:var(--muted);max-width:52ch}
+.rule-box{margin-top:24px;display:inline-flex;gap:12px;align-items:baseline;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px}
+.rule-box .mono{font-size:1.05rem;font-weight:600;color:var(--brand)}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+.panel svg{display:block;width:100%;height:auto}
+.panel .cap{margin-top:8px;font-size:.88rem;line-height:1.4}
+.panel .cap b{display:block;font-family:var(--f-display)}
+.tag{display:inline-block;font-family:var(--f-mono);font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:99px}
+.tag.bad{background:var(--bad-soft);color:var(--bad)}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.brand{background:var(--brand-soft);color:var(--brand)}
+
+/* nav */
+nav.toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-block:1px solid var(--line);overflow-x:auto;margin-inline:-20px;padding-inline:20px}
+nav.toc ul{list-style:none;display:flex;gap:4px;margin:0;padding-block:8px;white-space:nowrap}
+nav.toc a{display:block;text-decoration:none;color:var(--muted);font-size:.9rem;padding:6px 10px;border-radius:6px}
+nav.toc a:hover{background:var(--surface-2);color:var(--ink)}
+
+section.block{padding-block:56px 8px;scroll-margin-top:56px}
+section.block > header{display:grid;gap:8px;margin-bottom:24px}
+
+/* blockers */
+.blockers{display:grid;gap:10px}
+.blocker{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.blocker .id{grid-row:span 3;font-family:var(--f-mono);font-weight:600;color:var(--bad);font-size:.9rem;padding-top:2px}
+.blocker .why{color:var(--muted);font-size:.96rem}
+.blocker .done{font-size:.9rem}
+.blocker .done::before{content:"Pronto quando: ";font-weight:700;color:var(--ok)}
+.blocker.key{border-color:var(--bad)}
+
+/* personas */
+.personas{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.persona{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:10px;align-content:start}
+.persona .q{font-family:var(--f-display);font-size:1.05rem;font-weight:500;line-height:1.35}
+.persona .where{font-size:.9rem;color:var(--muted)}
+.persona.later{opacity:.72}
+.message{margin-top:18px;background:var(--brand);color:var(--on-brand);border-radius:12px;padding:22px 24px}
+.message .eyebrow{color:inherit;opacity:.8}
+.message p{font-family:var(--f-display);font-weight:700;font-size:clamp(1.15rem,2.6vw,1.5rem);line-height:1.3;margin-top:6px}
+.support{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.support p{background:var(--surface-2);border-radius:8px;padding:12px 14px;font-size:.95rem}
+
+/* timeline */
+.phases{display:grid;gap:0;position:relative}
+.phase{display:grid;grid-template-columns:120px 1fr;gap:24px;padding-block:22px;border-top:1px solid var(--line)}
+.phase:last-child{border-bottom:1px solid var(--line)}
+.phase .when{font-family:var(--f-mono);font-size:.8rem;color:var(--muted)}
+.phase .when b{display:block;font-family:var(--f-display);font-size:2.2rem;line-height:1;color:var(--brand);margin-bottom:6px}
+.phase .body{display:grid;gap:12px}
+.phase .goal{color:var(--muted)}
+.gate{background:var(--warn-soft);color:var(--ink);border-left:3px solid var(--warn);padding:10px 14px;border-radius:0 8px 8px 0;font-size:.95rem}
+.gate b{color:var(--warn)}
+ul.checks{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+ul.checks li label{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;cursor:pointer;font-size:.98rem}
+ul.checks input{width:18px;height:18px;margin:3px 0 0;accent-color:var(--ok)}
+ul.checks input:checked + span{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dot-idle)}
+.progress{display:flex;align-items:center;gap:10px;font-family:var(--f-mono);font-size:.78rem;color:var(--muted)}
+.bar{flex:1;max-width:220px;height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--ok);transition:width .25s}
+.skillref{font-family:var(--f-mono);font-size:.78rem;color:var(--brand)}
+
+/* dont */
+.donts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;counter-reset:d}
+.dont{display:grid;grid-template-columns:auto 1fr;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:.96rem}
+.dont::before{content:"✕";font-weight:700;color:var(--bad)}
+.dont b{display:block}
+
+/* tables */
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--surface-2)}
+td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.star td{background:var(--brand-soft)}
+tr.star td:first-child{font-weight:700}
+td .skill{font-family:var(--f-mono);font-size:.84rem;font-weight:600;white-space:nowrap}
+td .ask{font-style:italic;color:var(--muted)}
+.note{margin-top:14px;font-size:.93rem;color:var(--muted);max-width:70ch}
+
+/* ethics */
+.ethics{display:grid;grid-template-columns:1fr 1fr;gap:10px 28px}
+.ethics ul.checks li label{font-size:.96rem}
+.sos{margin-top:16px;display:inline-flex;gap:10px;align-items:center;font-weight:600}
+.sos .mono{background:var(--bad);color:#fff;padding:2px 10px;border-radius:6px;font-size:1rem}
+
+/* glossary */
+dl.gloss{display:grid;grid-template-columns:repeat(2,1fr);gap:0 28px;margin:0}
+dl.gloss div{padding-block:12px;border-top:1px solid var(--line)}
+dl.gloss dt{font-weight:700}
+dl.gloss dd{margin:2px 0 0;color:var(--muted);font-size:.95rem}
+
+/* templates */
+.templates{display:grid;gap:14px}
+.tpl{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.tpl header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.tpl header h3{font-size:1rem}
+.tpl pre{margin:0;padding:16px;white-space:pre-wrap;font-family:var(--f-mono);font-size:.84rem;line-height:1.55;overflow-x:auto}
+button.copy{font:600 .82rem var(--f-body);background:var(--brand);color:var(--on-brand);border:0;border-radius:6px;padding:6px 12px;cursor:pointer}
+button.copy:hover{filter:brightness(1.08)}
+
+/* summary */
+.summary{background:var(--ink);color:var(--bg);border-radius:14px;padding:28px}
+.summary h2{color:inherit}
+.summary ol{margin:18px 0 0;padding:0;list-style:none;display:grid;gap:12px;counter-reset:s}
+.summary li{display:grid;grid-template-columns:130px 1fr;gap:16px;padding-top:12px;border-top:1px solid color-mix(in srgb,var(--bg) 22%,transparent)}
+.summary li .w{font-family:var(--f-mono);font-size:.8rem;opacity:.75;padding-top:3px}
+.summary .star{color:var(--brand-soft)}
+footer.foot{margin-top:40px;font-size:.85rem;color:var(--muted)}
+
+@media (max-width:820px){
+  .hero{grid-template-columns:1fr;gap:28px;padding-block:32px}
+  .personas,.support{grid-template-columns:1fr}
+  .ethics,dl.gloss{grid-template-columns:1fr}
+  .phase{grid-template-columns:1fr;gap:10px}
+  .phase .when b{display:inline;font-size:1.6rem;margin-right:8px}
+  .summary li{grid-template-columns:1fr;gap:2px}
+}
+@media (max-width:440px){
+  body{padding-inline:16px;font-size:16px}
+  nav.toc{margin-inline:-16px;padding-inline:16px}
+  .compare{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<div class="top">
+  <div class="brandmark">
+    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="12.5" fill="none" stroke="var(--brand)" stroke-width="1.5"/><circle cx="14" cy="14" r="7.5" fill="none" stroke="var(--brand)" stroke-width="1.5" opacity=".55"/><path d="M14 14 L14 1.5 A12.5 12.5 0 0 1 24.8 7.7 Z" fill="var(--brand)" opacity=".35"/><circle cx="19" cy="8.5" r="2" fill="var(--brand)"/></svg>
+    Radar Saúde
+  </div>
+  <div class="meta"><span>Plano de Divulgação v1.0</span><span>23/09/2026</span><span>App em homologação · v1.0.0-rc.4</span></div>
+</div>
+
+<section class="hero">
+  <div>
+    <div class="eyebrow">A regra que guia o plano inteiro</div>
+    <h1>Poucos hospitais com nota valem mais que <em>o Brasil inteiro</em> vazio.</h1>
+    <p class="lede">Um plano de 12 semanas para levar o Radar Saúde aos moradores do Distrito Federal, escrito para quem nunca fez marketing. O orçamento previsto vai de R$ 0 a R$ 500; o que o plano mais pede é tempo.</p>
+    <div class="rule-box"><span class="mono">N ≥ 5</span><span>O app só mostra a nota de um hospital depois de 5 avaliações.</span></div>
+  </div>
+  <div class="compare" aria-label="Comparação entre usuários espalhados e concentrados">
+    <div class="panel">
+      <svg viewBox="0 0 200 150" role="img" aria-label="Usuários espalhados: nenhum hospital chega a 5 avaliações">
+        <rect x="1" y="1" width="198" height="148" rx="8" fill="var(--surface-2)"/>
+        <g fill="var(--dot-idle)">
+          <circle cx="18" cy="22" r="3"/><circle cx="60" cy="14" r="3"/><circle cx="104" cy="30" r="3"/><circle cx="150" cy="18" r="3"/><circle cx="182" cy="40" r="3"/>
+          <circle cx="30" cy="70" r="3"/><circle cx="84" cy="88" r="3"/><circle cx="170" cy="92" r="3"/><circle cx="20" cy="126" r="3"/><circle cx="72" cy="134" r="3"/><circle cx="128" cy="124" r="3"/><circle cx="186" cy="132" r="3"/>
+        </g>
+        <g font-family="JetBrains Mono, monospace" font-size="10" font-weight="600">
+          <rect x="38" y="36" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--line)"/><text x="46" y="48" text-anchor="middle" fill="var(--muted)">1</text>
+          <rect x="122" y="56" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--line)"/><text x="130" y="68" text-anchor="middle" fill="var(--muted)">0</text>
+          <rect x="44" y="96" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--line)"/><text x="52" y="108" text-anchor="middle" fill="var(--muted)">1</text>
+          <rect x="148" y="104" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--line)"/><text x="156" y="116" text-anchor="middle" fill="var(--muted)">0</text>
+        </g>
+      </svg>
+      <div class="cap"><b>Espalhado</b><span class="tag bad">0 hospitais com nota</span></div>
+    </div>
+    <div class="panel">
+      <svg viewBox="0 0 200 150" role="img" aria-label="Usuários concentrados: dois hospitais passam de 5 avaliações">
+        <rect x="1" y="1" width="198" height="148" rx="8" fill="var(--surface-2)"/>
+        <circle cx="62" cy="62" r="38" fill="var(--brand)" opacity=".1"/>
+        <circle cx="146" cy="100" r="30" fill="var(--brand)" opacity=".1"/>
+        <g fill="var(--brand)">
+          <circle cx="40" cy="46" r="3"/><circle cx="52" cy="36" r="3"/><circle cx="78" cy="40" r="3"/><circle cx="86" cy="62" r="3"/><circle cx="36" cy="72" r="3"/><circle cx="50" cy="86" r="3"/><circle cx="74" cy="86" r="3"/>
+          <circle cx="126" cy="88" r="3"/><circle cx="164" cy="84" r="3"/><circle cx="170" cy="108" r="3"/><circle cx="132" cy="120" r="3"/><circle cx="156" cy="124" r="3"/>
+        </g>
+        <g font-family="JetBrains Mono, monospace" font-size="10" font-weight="600">
+          <rect x="54" y="54" width="18" height="16" rx="3" fill="var(--ok)"/><text x="63" y="66" text-anchor="middle" fill="var(--surface)">7</text>
+          <rect x="137" y="92" width="18" height="16" rx="3" fill="var(--ok)"/><text x="146" y="104" text-anchor="middle" fill="var(--surface)">5</text>
+          <rect x="160" y="22" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--line)"/><text x="168" y="34" text-anchor="middle" fill="var(--muted)">0</text>
+        </g>
+      </svg>
+      <div class="cap"><b>Concentrado</b><span class="tag ok">2 hospitais com nota</span></div>
+    </div>
+  </div>
+</section>
+
+<nav class="toc" aria-label="Seções">
+  <ul>
+    <li><a href="#bloqueios">Antes de divulgar</a></li>
+    <li><a href="#publico">Público e mensagem</a></li>
+    <li><a href="#fases">As 4 fases</a></li>
+    <li><a href="#evitar">O que evitar</a></li>
+    <li><a href="#medir">Como medir</a></li>
+    <li><a href="#saude">Cuidados de saúde</a></li>
+    <li><a href="#skills">Skills</a></li>
+    <li><a href="#modelos">Textos prontos</a></li>
+    <li><a href="#glossario">Glossário</a></li>
+    <li><a href="#resumo">Resumo</a></li>
+  </ul>
+</nav>
+
+<section class="block" id="bloqueios">
+  <header>
+    <div class="eyebrow">Antes de divulgar</div>
+    <h2>5 bloqueios a resolver primeiro</h2>
+    <p class="prose muted">Quem tem uma experiência ruim com o app não volta, e ainda comenta com os outros. Por isso, nada de divulgar antes de resolver estes cinco pontos.</p>
+  </header>
+  <div class="blockers">
+    <div class="blocker"><span class="id">B-1</span><h3>App rápido e estável</h3><p class="why">O teste com 100 usuários de 23/09 já deu p95 de 157 ms. Ainda faltam os testes de campo em hospitais reais (V-01, V-02…).</p><p class="done">validações do S11 aprovadas.</p></div>
+    <div class="blocker key"><span class="id">B-2</span><h3>Play Store: localização em segundo plano</h3><p class="why">O Google exige uma declaração justificando <code>ACCESS_BACKGROUND_LOCATION</code>, com um vídeo curto mostrando o recurso em uso. Apps de saúde também preenchem uma declaração própria. Sem isso, o app é recusado.</p><p class="done">app aprovado ao menos no teste fechado da Play Console.</p></div>
+    <div class="blocker"><span class="id">B-3</span><h3>LGPD: dado sensível</h3><p class="why">Saber que alguém esteve num hospital e o que achou do atendimento revela informação de saúde. A LGPD trata esse tipo de informação como dado sensível. Uma política de privacidade clara também ajuda a convencer as pessoas a instalar.</p><p class="done">política publicada num link público e revisada com a skill <code>lgpd-compliance-check</code>.</p></div>
+    <div class="blocker"><span class="id">B-4</span><h3>Risco com os hospitais</h3><p class="why">Um ranking público pode incomodar as instituições. A proteção é mostrar como o cálculo é feito (mínimo de 5 avaliações, data da medição). Nunca escreva "o pior hospital do DF".</p><p class="done">página "Como calculamos" publicada e textos revisados.</p></div>
+    <div class="blocker"><span class="id">B-5</span><h3>Um lugar para mandar as pessoas</h3><p class="why">Todo post precisa de um link. Enquanto não houver site, use a página da Play Store.</p><p class="done">existe um link curto único para instalar.</p></div>
+  </div>
+</section>
+
+<section class="block" id="publico">
+  <header>
+    <div class="eyebrow">Público e mensagem</div>
+    <h2>Quem queremos alcançar e o que dizer</h2>
+  </header>
+  <div class="personas">
+    <div class="persona"><span class="tag brand">Marina, 34 · paciente</span><p class="q">"Saiba antes de ir quanto tempo vai esperar."</p><p class="where">Instagram, grupos de WhatsApp do bairro e do condomínio, grupos de mães.</p></div>
+    <div class="persona"><span class="tag brand">Carlos, 28 · acompanhante do pai</span><p class="q">"Você não aperta nada: o app percebe sozinho que você está no hospital."</p><p class="where">WhatsApp da família, Facebook, grupos de cuidadores.</p></div>
+    <div class="persona later"><span class="tag warn">Dra. Renata, 41 · gestora · depois</span><p class="q">"Um termômetro gratuito do que o paciente sente."</p><p class="where">LinkedIn e associações de hospitais. Fica para depois do MVP.</p></div>
+  </div>
+  <div class="message">
+    <div class="eyebrow">Mensagem principal · use em tudo</div>
+    <p>Radar Saúde: veja quanto tempo se espera e como é o atendimento em cada hospital do DF, medido por quem esteve lá.</p>
+  </div>
+  <div class="support">
+    <p>"Você não aperta nada: o app percebe quando você entra e sai do hospital."</p>
+    <p>"Na saída, 4 perguntas em 45 segundos. Dá para pular."</p>
+    <p>"Sua avaliação é anônima e ajuda a próxima pessoa a decidir."</p>
+  </div>
+</section>
+
+<section class="block" id="fases">
+  <header>
+    <div class="eyebrow">O plano · 12 semanas</div>
+    <h2>As 4 fases</h2>
+    <p class="prose muted">As caixas de seleção ficam salvas neste navegador. Use-as para acompanhar o que já foi feito.</p>
+  </header>
+  <div class="phases">
+
+    <div class="phase" data-phase="0">
+      <div class="when"><b>0</b>semanas 1–2</div>
+      <div class="body">
+        <h3>Preparar a casa</h3>
+        <p class="goal">Ter o mínimo necessário para não desperdiçar ninguém que chegar.</p>
+        <ul class="checks">
+          <li><label><input type="checkbox" id="f0-1"><span>Resolver os bloqueios B-2 a B-5.</span></label></li>
+          <li><label><input type="checkbox" id="f0-2"><span>Criar um perfil no Instagram (ex.: @radarsaude.df) e uma comunidade no WhatsApp "Radar Saúde — Beta". <span class="skillref">whatsapp-community</span></span></label></li>
+          <li><label><input type="checkbox" id="f0-3"><span>Escrever a página da Play Store: título com a busca das pessoas ("tempo de espera hospital"), descrição e 4–5 capturas de tela (mapa, detalhe do hospital, formulário de 45 s). <span class="skillref">aso-app-store</span></span></label></li>
+          <li><label><input type="checkbox" id="f0-4"><span>Escolher 3 regiões do DF para concentrar o esforço.</span></label></li>
+          <li><label><input type="checkbox" id="f0-5"><span>Montar a planilha semanal de métricas.</span></label></li>
+        </ul>
+        <div class="progress"><span class="bar"><i></i></span><span class="count">0/5</span></div>
+      </div>
+    </div>
+
+    <div class="phase" data-phase="1">
+      <div class="when"><b>1</b>semanas 3–6</div>
+      <div class="body">
+        <h3>Beta fechado com conhecidos</h3>
+        <p class="goal">30 a 50 pessoas usando de verdade, para descobrir o que quebra e o que confunde. Corresponde à sprint S12.</p>
+        <ul class="checks">
+          <li><label><input type="checkbox" id="f1-1"><span>Convidar uma a uma família, amigos, colegas e vizinhos, começando por quem vai a hospital com frequência. <span class="skillref">beta-launch-plan</span></span></label></li>
+          <li><label><input type="checkbox" id="f1-2"><span>Mandar uma mensagem pessoal para cada um, nunca um texto genérico (modelo em Textos prontos).</span></label></li>
+          <li><label><input type="checkbox" id="f1-3"><span>Explicar a missão no grupo: instalar, permitir a localização "o tempo todo" e responder o formulário na próxima ida a um hospital.</span></label></li>
+          <li><label><input type="checkbox" id="f1-4"><span>Toda semana, contar no grupo o que foi corrigido graças a eles.</span></label></li>
+          <li><label><input type="checkbox" id="f1-5"><span>Na semana 5, fazer 5 conversas de 15 minutos: o que você achou que o app fazia? Onde ficou confuso? Para quem indicaria?</span></label></li>
+        </ul>
+        <div class="gate"><b>Só passe de fase com:</b> 60% dos testadores com a localização ativa <b>e</b> 3 hospitais com N ≥ 5. Se não atingir, fique mais tempo aqui.</div>
+        <div class="progress"><span class="bar"><i></i></span><span class="count">0/5</span></div>
+      </div>
+    </div>
+
+    <div class="phase" data-phase="2">
+      <div class="when"><b>2</b>semanas 7–8</div>
+      <div class="body">
+        <h3>Lançamento público no DF</h3>
+        <p class="goal">Chegar a 300–500 usuários nas 3 regiões escolhidas.</p>
+        <ul class="checks">
+          <li><label><input type="checkbox" id="f2-1"><span>Imprensa local: mandar a sugestão de matéria a 5–10 jornalistas de cidade e saúde, com os números reais do beta. <span class="skillref">press-outreach</span></span></label></li>
+          <li><label><input type="checkbox" id="f2-2"><span>Pedir aos testadores que compartilhem nos grupos de WhatsApp e Facebook de que já participam, com texto e imagem prontos.</span></label></li>
+          <li><label><input type="checkbox" id="f2-3"><span>Instagram 3 vezes por semana: como funciona em 3 passos, tempo de espera da semana (só com N ≥ 5), por que é anônimo.</span></label></li>
+          <li><label><input type="checkbox" id="f2-4"><span>Um post honesto no <code>r/brasilia</code>: "fiz um app e queria a opinião de vocês".</span></label></li>
+        </ul>
+        <div class="progress"><span class="bar"><i></i></span><span class="count">0/4</span></div>
+      </div>
+    </div>
+
+    <div class="phase" data-phase="3">
+      <div class="when"><b>3</b>semanas 9–12</div>
+      <div class="body">
+        <h3>Crescer com o que funcionou</h3>
+        <p class="goal">Fazer o app crescer por indicação, sem depender só do seu esforço.</p>
+        <ul class="checks">
+          <li><label><input type="checkbox" id="f3-1"><span>Botão de indicação depois do formulário: "Sua avaliação ajudou o Hospital X a ter nota. Chame alguém para ajudar também." <span class="skillref">viral-loop-design</span></span></label></li>
+          <li><label><input type="checkbox" id="f3-2"><span>Parcerias com associações de moradores e de pacientes, centros acadêmicos de saúde e conselhos locais, oferecendo em troca um relatório mensal da região. <span class="skillref">partnership-growth</span></span></label></li>
+          <li><label><input type="checkbox" id="f3-3"><span>Reforçar o canal que trouxe mais usuários ativos e cortar o que não trouxe ninguém.</span></label></li>
+          <li><label><input type="checkbox" id="f3-4"><span>Só então, se quiser, testar R$ 100–300 em anúncio no Instagram, segmentado para as regiões escolhidas.</span></label></li>
+        </ul>
+        <div class="progress"><span class="bar"><i></i></span><span class="count">0/4</span></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="block" id="evitar">
+  <header>
+    <div class="eyebrow">Erros comuns de iniciante</div>
+    <h2>O que não fazer</h2>
+  </header>
+  <div class="donts">
+    <div class="dont"><div><b>Anunciar antes do app funcionar bem</b>Quem tem uma experiência ruim não volta, e ainda comenta.</div></div>
+    <div class="dont"><div><b>Pagar anúncio no começo</b>Sem saber qual mensagem funciona, é dinheiro perdido.</div></div>
+    <div class="dont"><div><b>Espalhar por vários estados</b>Quebra a regra do N ≥ 5.</div></div>
+    <div class="dont"><div><b>Estar em todas as redes</b>Instagram e WhatsApp bastam por enquanto.</div></div>
+    <div class="dont"><div><b>Falar mal de hospitais nomeados</b>Mostre os dados e deixe o julgamento para quem lê.</div></div>
+    <div class="dont"><div><b>Esconder o pedido de localização</b>Explique antes por que o app precisa dela "o tempo todo". É o passo em que mais gente desiste.</div></div>
+    <div class="dont"><div><b>Sumir do grupo do beta</b>Duas semanas de silêncio matam o grupo.</div></div>
+  </div>
+</section>
+
+<section class="block" id="medir">
+  <header>
+    <div class="eyebrow">Planilha semanal · toda sexta</div>
+    <h2>Como medir</h2>
+  </header>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Métrica</th><th>Onde ver</th><th>Meta sem. 6</th><th>Meta sem. 12</th></tr></thead>
+      <tbody>
+        <tr class="star"><td>★ Hospitais com N ≥ 5</td><td>backend</td><td class="num">3</td><td class="num">10</td></tr>
+        <tr><td>Instalações totais</td><td>Play Console</td><td class="num">50</td><td class="num">500</td></tr>
+        <tr><td>% com localização "o tempo todo"</td><td>backend (consentimentos)</td><td class="num">60%</td><td class="num">50%</td></tr>
+        <tr><td>Visitas detectadas na semana</td><td>backend</td><td class="num">20</td><td class="num">150</td></tr>
+        <tr><td>Avaliações respondidas na semana</td><td>backend</td><td class="num">15</td><td class="num">100</td></tr>
+        <tr><td>Nota na Play Store</td><td>Play Console</td><td class="num">—</td><td class="num">≥ 4,3</td></tr>
+        <tr><td>De onde a pessoa veio</td><td>perguntar no grupo</td><td class="num">—</td><td class="num">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note"><b>Hospitais com N ≥ 5 é a métrica que manda.</b> Se ela sobe, o app está ficando útil. As metas são estimativas iniciais; ajuste depois de ver os números reais do beta.</p>
+</section>
+
+<section class="block" id="saude">
+  <header>
+    <div class="eyebrow">Revise antes de publicar qualquer texto</div>
+    <h2>Cuidados específicos de saúde</h2>
+  </header>
+  <ul class="checks ethics">
+    <li><label><input type="checkbox" id="e-1"><span>O texto informa e não promete ("veja o tempo médio relatado", nunca "evite esperas").</span></label></li>
+    <li><label><input type="checkbox" id="e-2"><span>Nenhum hospital é chamado de "pior", "melhor" ou "evite".</span></label></li>
+    <li><label><input type="checkbox" id="e-3"><span>Todo número tem fonte e data ("média de 12 visitas entre 01 e 15/10").</span></label></li>
+    <li><label><input type="checkbox" id="e-4"><span>Nenhum depoimento ou foto de paciente sem autorização por escrito.</span></label></li>
+    <li><label><input type="checkbox" id="e-5"><span>Fica claro que o app não é serviço de emergência.</span></label></li>
+    <li><label><input type="checkbox" id="e-6"><span>Toda página de cadastro tem link para a política de privacidade.</span></label></li>
+  </ul>
+  <p class="sos">Em emergência, ligue <span class="mono">192</span></p>
+</section>
+
+<section class="block" id="skills">
+  <header>
+    <div class="eyebrow">kursku/skills · 10 de ~1.850</div>
+    <h2>As skills escolhidas e quando usar cada uma</h2>
+    <p class="prose muted">Estão copiadas em <code>.claude/skills/</code> no repositório, e o Claude Code as carrega sozinho. Para usar no claude.ai, envie o <code>SKILL.md</code> em Personalizar → Habilidades.</p>
+  </header>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Fase</th><th>Skill</th><th>Para que serve</th><th>Exemplo de pedido</th></tr></thead>
+      <tbody>
+        <tr><td>Base</td><td><span class="skill">launch-strategy</span></td><td>Fases e checklist de lançamento; é a base deste plano.</td><td class="ask">"Revise o plano e diga o que falta para a Fase 2."</td></tr>
+        <tr><td>Base</td><td><span class="skill">healthcare-marketing</span></td><td>Ética e regras de divulgação em saúde.</td><td class="ask">"Revise este post do Instagram contra as regras de marketing de saúde."</td></tr>
+        <tr><td>0</td><td><span class="skill">lgpd-compliance-check</span></td><td>Política de privacidade e consentimentos.</td><td class="ask">"Revise a política de privacidade considerando localização e dado de saúde."</td></tr>
+        <tr><td>0</td><td><span class="skill">aso-app-store</span></td><td>Título, descrição e capturas da Play Store.</td><td class="ask">"Escreva o título e as descrições do Radar Saúde para a Play Store."</td></tr>
+        <tr><td>0–1</td><td><span class="skill">whatsapp-community</span></td><td>Montar e moderar a comunidade do beta.</td><td class="ask">"Monte a comunidade do beta e a mensagem de boas-vindas."</td></tr>
+        <tr><td>1</td><td><span class="skill">beta-launch-plan</span></td><td>Recrutar, receber e ouvir os testadores.</td><td class="ask">"Crie o roteiro das entrevistas de 15 minutos."</td></tr>
+        <tr><td>2</td><td><span class="skill">press-outreach</span></td><td>Sugestão de matéria para jornalistas e acompanhamento.</td><td class="ask">"Escreva a sugestão de matéria para a imprensa do DF com estes números: …"</td></tr>
+        <tr><td>3</td><td><span class="skill">viral-loop-design</span></td><td>Indicação dentro do app, depois do formulário.</td><td class="ask">"Proponha o fluxo de compartilhamento e o texto do convite."</td></tr>
+        <tr><td>3</td><td><span class="skill">partnership-growth</span></td><td>Parcerias com associações e universidades.</td><td class="ask">"Liste 15 associações do DF e escreva o convite de parceria."</td></tr>
+        <tr><td>Qualquer</td><td><span class="skill">marketing-ideas</span></td><td>140 ideias com nota de viabilidade por fase.</td><td class="ask">"Sugira 5 ideias para um app pré-lançamento com R$ 0."</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Ficaram de fora as skills de anúncios pagos, funis de venda, e-mail marketing, precificação e Product Hunt. Elas servem para produtos pagos ou público de tecnologia, e voltam a fazer sentido se o painel para hospitais sair do papel.</p>
+</section>
+
+<section class="block" id="modelos">
+  <header>
+    <div class="eyebrow">Copie, ajuste e envie</div>
+    <h2>Textos prontos</h2>
+  </header>
+  <div class="templates">
+    <div class="tpl">
+      <header><h3>Convite pessoal para o beta · WhatsApp</h3><button class="copy" type="button" data-target="t1">Copiar</button></header>
+      <pre id="t1">Oi, [nome]! Tudo bem?
+
+Estou terminando um app chamado Radar Saúde: ele mostra quanto tempo
+se espera e como é o atendimento nos hospitais do DF, com base em
+quem esteve lá.
+
+Estou chamando umas 40 pessoas de confiança para testar antes de
+lançar. Você vai a hospital de vez em quando (com você ou com alguém
+da família)? Se topar, te mando o link e te coloco no grupo do teste.
+
+Leva 2 minutos para instalar, e na saída do hospital são 4 perguntas.
+Sua opinião vai mudar o app de verdade.</pre>
+    </div>
+    <div class="tpl">
+      <header><h3>Para os testadores repassarem nos grupos</h3><button class="copy" type="button" data-target="t2">Copiar</button></header>
+      <pre id="t2">Gente, estou testando um app do DF que mostra o tempo de espera e a
+nota de atendimento dos hospitais, a partir de quem esteve lá.
+Não precisa fazer nada: ele percebe quando você entra e sai, e na
+saída pergunta 4 coisas rapidinho (dá para pular). É anônimo.
+
+Quanto mais gente usa, mais hospitais ganham nota. Link: [link]</pre>
+    </div>
+    <div class="tpl">
+      <header><h3>Sugestão de matéria para jornalista · e-mail</h3><button class="copy" type="button" data-target="t3">Copiar</button></header>
+      <pre id="t3">Assunto: App criado no DF mede tempo real de espera em hospitais
+
+Olá, [nome]. Vi sua matéria sobre [tema recente de saúde no DF].
+
+O Radar Saúde é um aplicativo gratuito, criado aqui no DF, que usa
+a localização do celular para medir quanto tempo as pessoas realmente
+ficam em cada hospital, e pede uma avaliação de 45 segundos na saída.
+As médias só aparecem com pelo menos 5 avaliações, e a metodologia
+é pública.
+
+Em [N] semanas de teste, [X] pessoas registraram [Y] visitas em
+[Z] hospitais. Posso mostrar os números e explicar como funciona.
+
+[Seu nome] · [telefone] · [link]</pre>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="glossario">
+  <header>
+    <div class="eyebrow">Só o que você vai ouvir</div>
+    <h2>Glossário mínimo</h2>
+  </header>
+  <dl class="gloss">
+    <div><dt>Público-alvo</dt><dd>Quem você quer que baixe o app: moradores do DF que usam pronto-socorro.</dd></div>
+    <div><dt>Proposta de valor</dt><dd>O motivo, em uma frase, para alguém baixar o app.</dd></div>
+    <div><dt>Canal</dt><dd>Onde a mensagem chega à pessoa: WhatsApp, Instagram, jornal, boca a boca.</dd></div>
+    <div><dt>Beta fechado</dt><dd>Versão de teste para um grupo pequeno e escolhido, antes de abrir para todos.</dd></div>
+    <div><dt>Early adopter</dt><dd>Primeiros usuários, que aceitam defeitos em troca de estar por dentro.</dd></div>
+    <div><dt>ASO</dt><dd>Fazer a página do app na Play Store aparecer na busca e convencer quem a visita.</dd></div>
+    <div><dt>Ativação</dt><dd>A pessoa instalou, permitiu a localização e teve uma visita detectada.</dd></div>
+    <div><dt>Retenção</dt><dd>A pessoa continua com o app instalado semanas depois.</dd></div>
+    <div><dt>Pauta</dt><dd>Uma sugestão de notícia enviada a um jornalista.</dd></div>
+    <div><dt>Funil</dt><dd>Viu → instalou → ativou → avaliou → indicou. Em cada etapa, parte das pessoas desiste.</dd></div>
+  </dl>
+</section>
+
+<section class="block" id="resumo">
+  <div class="summary">
+    <div class="eyebrow" style="color:inherit;opacity:.7">Para colar na geladeira</div>
+    <h2>O plano em uma página</h2>
+    <ol>
+      <li><span class="w">semanas 1–2</span><span>Play Store aprovada, política de privacidade publicada, Instagram e grupo de WhatsApp criados, 3 regiões do DF escolhidas.</span></li>
+      <li><span class="w">semanas 3–6</span><span>30–50 conhecidos testando e conversa com eles toda semana. Só avance com 3 hospitais com N ≥ 5.</span></li>
+      <li><span class="w">semanas 7–8</span><span>Jornal local, testadores compartilhando nos grupos deles e Instagram 3 vezes por semana.</span></li>
+      <li><span class="w">semanas 9–12</span><span>Botão de indicação no app, parcerias com associações e mais esforço no canal que funcionou.</span></li>
+      <li><span class="w">toda sexta</span><span>Preencher a planilha. <b class="star">A métrica que manda é hospitais com N ≥ 5.</b></span></li>
+    </ol>
+  </div>
+  <footer class="foot">Fonte: <code>Documentos/13-marketing/Plano-Divulgacao-v1.0.md</code> no repositório saude-monitor · Responsável: Gabriel Vogado (PO)</footer>
+</section>
+
+</div>
+
+<script>
+(function(){
+  var KEY='radar-divulgacao-checks';
+  var state={};
+  try{state=JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){state={};}
+  var boxes=document.querySelectorAll('ul.checks input[type=checkbox]');
+  function refresh(){
+    document.querySelectorAll('.phase').forEach(function(ph){
+      var all=ph.querySelectorAll('input[type=checkbox]');
+      var done=ph.querySelectorAll('input[type=checkbox]:checked').length;
+      var bar=ph.querySelector('.bar i'), c=ph.querySelector('.count');
+      if(bar) bar.style.width=(all.length?done/all.length*100:0)+'%';
+      if(c) c.textContent=done+'/'+all.length;
+    });
+  }
+  boxes.forEach(function(b){
+    if(state[b.id]) b.checked=true;
+    b.addEventListener('change',function(){
+      state[b.id]=b.checked;
+      try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}
+      refresh();
+    });
+  });
+  refresh();
+  document.querySelectorAll('button.copy').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var el=document.getElementById(btn.dataset.target);
+      var text=el.textContent;
+      function selectIt(){var r=document.createRange();r.selectNodeContents(el);var s=getSelection();s.removeAllRanges();s.addRange(r);btn.textContent='Selecionado: Ctrl+C';}
+      try{
+        navigator.clipboard.writeText(text).then(function(){btn.textContent='Copiado';setTimeout(function(){btn.textContent='Copiar';},1800);},selectIt);
+      }catch(e){selectIt();}
+    });
+  });
+})();
+</script>

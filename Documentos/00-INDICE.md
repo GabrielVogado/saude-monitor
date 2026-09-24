@@ -7,7 +7,7 @@
 
 ## 📌 Revisão 23/09/2026 — Plano de divulgação
 
-**O que entrou:** nova pasta `13-marketing/` com o [`Plano-Divulgacao-v1.0.md`](./13-marketing/Plano-Divulgacao-v1.0.md), um plano de 12 semanas para lançar o Radar Saúde no DF (preparação → beta fechado → lançamento local → crescimento), escrito para quem não tem experiência em marketing. Dez skills de marketing do repositório `kursku/skills` foram copiadas para `.claude/skills/` (o §9 do plano explica como usar cada uma).
+**O que entrou:** nova pasta `13-marketing/` com o [`Plano-Divulgacao-v1.0.md`](./13-marketing/Plano-Divulgacao-v1.0.md), um plano de 12 semanas para lançar o Radar Saúde no DF (preparação → beta fechado → lançamento local → crescimento), escrito para quem não tem experiência em marketing. Dez skills de marketing do repositório `kursku/skills` foram copiadas para `.claude/skills/` (o §9 do plano explica como usar cada uma). Versão visual em [`Plano-Divulgacao-v1.0.html`](./13-marketing/Plano-Divulgacao-v1.0.html).
 
 ---
 

@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 23/09/2026 — Plano de divulgação
+
+**O que entrou:** nova pasta `13-marketing/` com o [`Plano-Divulgacao-v1.0.md`](./13-marketing/Plano-Divulgacao-v1.0.md), um plano de 12 semanas para lançar o Radar Saúde no DF (preparação → beta fechado → lançamento local → crescimento), escrito para quem não tem experiência em marketing. Versão visual em [`Plano-Divulgacao-v1.0.html`](./13-marketing/Plano-Divulgacao-v1.0.html). O critério de saída do beta segue a V-09 do `Plano-Sprints-v2.1` §22.4.
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre divulgação) e `Historico-Melhorias.md` (não é correção nem mudança de processo).
+
+---
+
 ## 📌 Revisão 23/09/2026 — Pentest da homologação
 
 **O que entrou:** relatório do teste de segurança autorizado da homologação (`v1.0.0-rc.4`), só na camada de aplicação, em [`12-seguranca/Pentest-HML-2026-09-23.md`](./12-seguranca/Pentest-HML-2026-09-23.md). Sem achado alto/crítico; autenticação, autorização (BOLA/BFLA) e injeção (SQLi/NoSQLi/XSS/SSTI) sólidas. Três achados baixos/informativos — o F-01 (`raioKm` negativo → 500) corrigido no M-020.

@@ -6,14 +6,14 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 >
 > **Última verificação: 02/09/2026, contra `develop@f26666e`.** A versão anterior deste arquivo (30/08/2026, preservada em `_historico/De-Para-Backlog-Features-v2.md`) precedia a **Sprint S8** e marcava como "Parcial" seis estórias que hoje estão entregues: **E3-02**, **E3-03**, **E4-05**, **E5-03**, **E5-05** e **E6-05**.
 >
-> **Escopo:** todas as estórias do backlog. O **Épico 7 / Painel Administrativo Web (F-11)** foi **adiado por decisão do Product Owner em 02/09/2026** (D-01, `Backlog-MVP-v2.1.md` §2.1) — continua listado, agora como P2 fora do caminho crítico.
+> **Escopo:** todas as estórias do backlog. O **Épico 7 / Painel Administrativo Web (F-11)** foi adiado pelo PO em 02/09/2026 (D-01) e **retomado em 24/09/2026** — agora **🚧 em andamento**, como SPA Angular 21 em `admin/` ([ADR-012](08-analise%20tecnica/adrs.md)).
 
 ## Placar
 
 | Escopo | Entregue | Total | % |
 |---|---|---|---|
 | Aplicativo (Fase 0 + Épicos 1–6) | 42 | 43 | **98%** |
-| Painel Administrativo Web (Épico 7) | 0 | 9 | 0% (adiado) |
+| Painel Administrativo Web (Épico 7) | 0 | 9 | 0% (🚧 em andamento, retomado 24/09) |
 | **Total do backlog** | **42** | **52** | **81%** |
 | Épico 8 — Estabilização e Desempenho (novo, v2.1) | 8 | 15 | 53% |
 
@@ -90,9 +90,11 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **E6-04** | Loading/Empty/Error states | **F-08** | 🟢 Implementado (S6: estados com retry na Home, Perfil e Check-in; tab bar testada em smoke test de UI) |
 | **E6-05** | Notificações opt-in | **F-08** | ✅ Existente — tela dedicada de opt-in no Perfil (`NotificacoesScreen`, S8), desacoplada do fluxo de feedback (E3-01) |
 
-## Épico 7 — Painel Administrativo Web · ⏸️ ADIADO (P2)
+## Épico 7 — Painel Administrativo Web · 🚧 EM ANDAMENTO (retomado 24/09/2026)
 
-> **Decisão D-01 (02/09/2026):** *"O Painel ADMIN ainda não é prioritário, será desenvolvido depois que o app estiver todo desenvolvido sem pendências, nem débitos técnicos."* Entra somente após o Épico 8 e as validações V-01..V-09.
+> **Decisão D-01 (02/09/2026):** *"O Painel ADMIN ainda não é prioritário, será desenvolvido depois que o app estiver todo desenvolvido sem pendências, nem débitos técnicos."*
+>
+> **Retomada (24/09/2026):** por decisão do PO, o F-11 foi **reaberto** antes do fecho total do Épico 8 (que ainda tem 🔴 E8-05/E8-07/E8-11/E8-15). Stack escolhido: **Angular 21 (SPA)** em `admin/`, consumindo a API atual — ver **[ADR-012](08-analise%20tecnica/adrs.md)**. As estórias abaixo seguem 🔴 até haver entrega efetiva (proibido marcar item fictício); o scaffolding do projeto **não** conclui nenhuma delas.
 
 | ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |
 |---|---|---|---|

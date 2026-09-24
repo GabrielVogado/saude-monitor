@@ -1442,6 +1442,75 @@ termina no front-end do Google, a aplicação recebe a conexão como HTTP simple
 
 ---
 
+## M-022 — Re-medição do Épico 8 (E8-01, E8-02, E8-08): documento alinhado ao número real
+
+**Data:** 24/09/2026 · **PR:** #___
+
+### Como apareceu
+
+Pedido do PO para confirmar o estado real de itens do Épico 8 em vez de repetir o
+`De-Para-Backlog-Features.md`, cuja última verificação era de **02/09/2026** — antes da
+migração para o Cloud Run e das ondas de teste. Régua da casa: **proibido afirmar um
+estado sem medi-lo**. Nada abaixo veio do documento; cada número saiu de uma execução de
+24/09/2026.
+
+### E8-01 — cold start: continua **não resolvido** (confirmado pela via autoritativa)
+
+- `gcloud run services describe saude-monitor-backend-hom --region=southamerica-east1`:
+  annotation `autoscaling.knative.dev/minScale` **ausente** (⇒ `--min-instances=0`, default
+  do Cloud Run) e `maxScale='1'`. O piso que eliminaria o cold start nunca foi aplicado.
+- A primeira requisição da sessão veio 200 em 0,23 s — **medida de instância quente**, por
+  tráfego recente dentro da janela de ociosidade, **não** por instância mínima; não avalia
+  esta estória, exatamente como o próprio E8-01 já registrava.
+- Achado lateral: `maxScale=1` é um teto de **uma** instância — irrelevante para o cold
+  start, registrado no E8-01 por ser um limite de escala real.
+
+### E8-02 — latência quente: **cumpre o orçamento**, contra os "1,9–4,9 s" do documento
+
+12 amostras por endpoint, ponta-a-ponta da máquina local até o Cloud Run (São Paulo),
+serviço quente (meta RNF-02: p95 ≤ 300 ms):
+
+| Endpoint | p50 | p95 | max |
+|---|---|---|---|
+| `GET /actuator/health` | 182 ms | 209 ms | 209 ms |
+| `GET /api/v1/hospitais?page=0&size=1` (find) | 226 ms | 242 ms | 263 ms |
+| `GET /api/v1/hospitais?...&raioKm=5` (geo, F-07) | 175 ms | **196 ms** | 210 ms |
+
+Bate com o k6 do `perf/` (p95 157 ms com 100 usuários, M-019). Os "1,9–4,9 s" do De-Para
+eram estado frio/Render antigo, nunca re-medido sobre o Cloud Run quente. **Ressalvas
+registradas no E8-02:** (a) **login** não foi medido (precisa de auth) — foi o único acima
+da meta no k6 (310 ms); (b) 12 amostras de um cliente **não** são teste de carga; (c) o
+`maxScale=1` limita sob concorrência acima de uma instância; (d) o cold start (E8-01)
+continua sendo o pior caso da latência percebida.
+
+### E8-08 — cobertura: subiu nas duas pontas; frontend ainda **abaixo** dos 90% do PO
+
+Suítes completas rodadas em 24/09/2026, 0 falhas.
+
+- **Frontend** (`jest --coverage`, 411 testes / 42 suítes), lido do `text-summary` da run
+  (o `coverage-summary.json` do repositório estava desatualizado, de uma run anterior):
+  **84,32%** statements · **73,49%** branches · **80,14%** functions · **85,29%** lines.
+  Régua do PO é 90% nas quatro — **nenhuma atinge**; *branches* é a mais distante (−16,5pp).
+  Ainda assim, subiu em tudo sobre o último snapshot do De-Para (79,71/67,72/77,67/80,22).
+- **Backend** (`gradlew test jacocoTestReport`), lido do `jacocoTestReport.xml`:
+  **80,15%** instruções · **65,92%** branches · **79,24%** linhas (piso próprio 65%/50%,
+  cumprido). Muito acima do documento (67,49% / 51,78%).
+
+### O que mudou
+
+- `De-Para-Backlog-Features.md`: nota de verificação do cabeçalho, correção do parêntese
+  "1–5 s por requisição com o serviço quente" no aviso do Placar (contradito pela medição),
+  e apêndice de 24/09/2026 nas linhas **E8-01**, **E8-02** (🔴 → 🟡, com a evidência) e
+  **E8-08**. Nenhuma estória muda de "entregue" — o placar (7/15) segue igual.
+- Nenhuma mudança de código: esta entrada é só medição e alinhamento documental.
+
+### Verificação
+
+- Reprodutível: `gcloud run services describe`, `curl -w "%{time_total}"` em laço,
+  `jest --coverage`, `gradlew jacocoTestReport`. Números acima são a saída dessas execuções.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

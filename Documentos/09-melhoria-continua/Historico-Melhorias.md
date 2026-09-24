@@ -1510,13 +1510,27 @@ Suítes completas rodadas em 24/09/2026, 0 falhas.
   **80,15%** instruções · **65,92%** branches · **79,24%** linhas (piso próprio 65%/50%,
   cumprido). Muito acima do documento (67,49% / 51,78%).
 
+### Decisão do PO (24/09/2026)
+
+Diante dos números acima, o PO decidiu:
+
+- **E8-02 — fechar com exceção documentada.** Os caminhos **GET** cumprem o orçamento do
+  RNF-02 sob carga (k6 M-019: 100 usuários, p95 157 ms) e no spot check quente de hoje. O
+  **login** é aceito como **exceção justificada**: o BCrypt é lento por segurança, por
+  desenho, e trazê-lo abaixo de 300 ms significaria enfraquecer o custo do hash. Estória
+  marcada ✅ **com exceção**; placar do Épico 8 vai a 8/15. Se a exceção precisar ser revista,
+  o ponto de ataque é o `maxScale=1` (cauda sob concorrência), não o BCrypt em si.
+- **E8-01 — só medir, não decidir agora.** A troca para `--min-instances=1` (que eliminaria
+  o cold start ao custo de uma instância ociosa cobrada 24/7) **não** foi feita nesta sessão;
+  fica para decisão do time. Os números e a config ficam registrados. Estória segue 🟡.
+
 ### O que mudou
 
 - `De-Para-Backlog-Features.md`: nota de verificação do cabeçalho, correção do parêntese
   "1–5 s por requisição com o serviço quente" no aviso do Placar (contradito pela medição),
   e apêndice de 24/09/2026 nas linhas **E8-01** (config + sonda de ociosidade + logs),
-  **E8-02** (🔴 → 🟡, GET + login) e **E8-08**. Nenhuma estória muda de "entregue" — o
-  placar (7/15) segue igual.
+  **E8-02** (🔴 → ✅ com exceção, GET + login) e **E8-08**. **Placar do Épico 8: 7 → 8 de 15
+  (47% → 53%)**, pela decisão do PO abaixo.
 - **Armadilha de medição corrigida (PR #142, `fix(testes)`):** o `jest.config.js` ganhou o
   reporter `json-summary`, para o `coverage-summary.json` regenerar a cada run e não mais
   enganar como enganou aqui (mostrava a "Onda 1" sobre uma run de 411 testes). Verificado:

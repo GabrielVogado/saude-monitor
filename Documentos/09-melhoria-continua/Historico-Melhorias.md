@@ -1464,8 +1464,18 @@ estado sem medi-lo**. Nada abaixo veio do documento; cada número saiu de uma ex
   esta estória, exatamente como o próprio E8-01 já registrava.
 - Achado lateral: `maxScale=1` é um teto de **uma** instância — irrelevante para o cold
   start, registrado no E8-01 por ser um limite de escala real.
+- **Tentativa de reproduzir o cold start:** após **16 min sem tráfego** (da minha parte), a
+  primeira requisição voltou 200 em **0,656 s** (a segunda, 0,188 s) — **sem 503 e sem os
+  ~14 s do JVM**. A instância ainda estava viva: a janela até escalar a zero é maior que 16
+  min, ou tráfego real da homologação resetou o relógio. Resultado empírico **inconclusivo**.
+- **Logs do Cloud Run (48 h), fonte autoritativa:** 503 reais em `/actuator/health` existem
+  (23/09 12:32, 06:22, 02:43 UTC), mas os do período **coincidem com `DEPLOYMENT_ROLLOUT`**
+  nos mesmos instantes — arranque por deploy, não por ociosidade; latência baixa
+  (0,007–0,587 s), o 503 falha rápido por falta de capacidade. **Nenhum 503 em 24/09.** O
+  cold start segue possível (`min=0`), mas o exemplar limpo por ociosidade continua sendo o
+  de 05/09 (14,778 s) — não reproduzido hoje.
 
-### E8-02 — latência quente: **cumpre o orçamento**, contra os "1,9–4,9 s" do documento
+### E8-02 — latência quente: os GET **cumprem** o orçamento; o **login não**
 
 12 amostras por endpoint, ponta-a-ponta da máquina local até o Cloud Run (São Paulo),
 serviço quente (meta RNF-02: p95 ≤ 300 ms):
@@ -1475,13 +1485,17 @@ serviço quente (meta RNF-02: p95 ≤ 300 ms):
 | `GET /actuator/health` | 182 ms | 209 ms | 209 ms |
 | `GET /api/v1/hospitais?page=0&size=1` (find) | 226 ms | 242 ms | 263 ms |
 | `GET /api/v1/hospitais?...&raioKm=5` (geo, F-07) | 175 ms | **196 ms** | 210 ms |
+| `POST /api/v1/auth/login` (conta ADMIN de carga) | 318 ms | **1074 ms** | 4263 ms |
 
-Bate com o k6 do `perf/` (p95 157 ms com 100 usuários, M-019). Os "1,9–4,9 s" do De-Para
-eram estado frio/Render antigo, nunca re-medido sobre o Cloud Run quente. **Ressalvas
-registradas no E8-02:** (a) **login** não foi medido (precisa de auth) — foi o único acima
-da meta no k6 (310 ms); (b) 12 amostras de um cliente **não** são teste de carga; (c) o
-`maxScale=1` limita sob concorrência acima de uma instância; (d) o cold start (E8-01)
-continua sendo o pior caso da latência percebida.
+Os GET batem com o k6 do `perf/` (p95 157 ms com 100 usuários, M-019). Os "1,9–4,9 s" do
+De-Para eram estado frio/Render antigo, nunca re-medido sobre o Cloud Run quente. **O
+login estoura o orçamento** (p50 já em 318 ms, p95 1074 ms), pior que os 310 ms do k6: é o
+caminho do **BCrypt**, CPU-bound por desenho, e o `maxScale=1` (uma vCPU) explica a cauda
+longa (max 4263 ms). Os usuários de carga `perf-N` foram limpos (login 401); usei a conta
+ADMIN coletora, que passa pelo mesmo caminho de autenticação. **Ressalvas:** (a) fechar o
+E8-02 exige trazer o login ao orçamento **ou** aceitá-lo como exceção justificada do
+BCrypt; (b) 12 amostras de um cliente **não** são teste de carga; (c) o `maxScale=1` limita
+sob concorrência acima de uma instância; (d) o cold start (E8-01) segue como o pior caso.
 
 ### E8-08 — cobertura: subiu nas duas pontas; frontend ainda **abaixo** dos 90% do PO
 
@@ -1500,14 +1514,22 @@ Suítes completas rodadas em 24/09/2026, 0 falhas.
 
 - `De-Para-Backlog-Features.md`: nota de verificação do cabeçalho, correção do parêntese
   "1–5 s por requisição com o serviço quente" no aviso do Placar (contradito pela medição),
-  e apêndice de 24/09/2026 nas linhas **E8-01**, **E8-02** (🔴 → 🟡, com a evidência) e
-  **E8-08**. Nenhuma estória muda de "entregue" — o placar (7/15) segue igual.
-- Nenhuma mudança de código: esta entrada é só medição e alinhamento documental.
+  e apêndice de 24/09/2026 nas linhas **E8-01** (config + sonda de ociosidade + logs),
+  **E8-02** (🔴 → 🟡, GET + login) e **E8-08**. Nenhuma estória muda de "entregue" — o
+  placar (7/15) segue igual.
+- **Armadilha de medição corrigida (PR #142, `fix(testes)`):** o `jest.config.js` ganhou o
+  reporter `json-summary`, para o `coverage-summary.json` regenerar a cada run e não mais
+  enganar como enganou aqui (mostrava a "Onda 1" sobre uma run de 411 testes). Verificado:
+  mtime regenerado e `total` idêntico ao `text-summary`.
+- Fora essa correção de test-infra, nenhuma mudança de código: esta entrada é medição e
+  alinhamento documental.
 
 ### Verificação
 
-- Reprodutível: `gcloud run services describe`, `curl -w "%{time_total}"` em laço,
-  `jest --coverage`, `gradlew jacocoTestReport`. Números acima são a saída dessas execuções.
+- Reprodutível: `gcloud run services describe`, `gcloud logging read` (503/`Starting new
+  instance`), `curl -w "%{time_total}"` em laço (GET e `POST /auth/login`), sonda de cold
+  start com 16 min de ociosidade, `jest --coverage`, `gradlew jacocoTestReport`. Números
+  acima são a saída dessas execuções.
 
 ---
 

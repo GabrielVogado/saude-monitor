@@ -35,7 +35,12 @@ module.exports = {
     "!src/**/css/**",
     "!src/theme/**",
   ],
-  coverageReporters: ["text-summary", "lcov"],
+  // `json-summary` gera o `coverage/coverage-summary.json` a cada run de cobertura.
+  // Sem ele, o Jest só imprimia o `text-summary` (stdout) e o `lcov`, e um
+  // `coverage-summary.json` deixado por uma run antiga sobrevivia intacto — foi lido
+  // como se fosse atual e mostrou números defasados (M-022, 24/09/2026). Com o reporter,
+  // o arquivo passa a ser fonte confiável, alinhada ao que o `text-summary` imprime.
+  coverageReporters: ["text-summary", "json-summary", "lcov"],
 
   /**
    * Piso de cobertura no patamar medido hoje, arredondado para baixo: a porta

@@ -1146,11 +1146,19 @@ O que **precisa ser reescrito em Angular** (não vem de graça do app): sessão/
 - **Upgrade de Node para 22** fica como decisão futura: destravaria Angular 22 + Signal
   Forms, mas precisa ser validado contra o toolchain do Expo antes.
 - **Split futuro em repositórios separados (decisão do PO, 24/09/2026):** o plano é que
-  `mobile`/`frontend`, `backend` e `admin` virem repositórios próprios. `admin/` já nasce
-  **autocontido** (seu `package.json`, `angular.json`, `.gitignore` e testes), então a
-  extração é um `git subtree`/mover-pasta sem desacoplar nada — o único vínculo com o
-  monorepo é o **contrato de API**, que continua sendo do backend. Enquanto o monorepo
-  durar, mantê-lo autocontido é o que preserva essa saída barata.
+  cada pasta vire um repositório próprio, com estes **nomes-alvo**:
+
+  | Pasta atual (monorepo) | Repositório futuro |
+  |---|---|
+  | `frontend/` (app Expo/RN) | **`radar-saude-mobile`** |
+  | `admin/` (Angular 21) | **`painel-admin-frontend`** |
+  | `backend/` (Spring Boot) | **`radar-saude-backend`** |
+
+  As pastas **não** são renomeadas agora — seguem `frontend/`/`admin/`/`backend/` até o
+  split. `admin/` já nasce **autocontido** (seu `package.json`, `angular.json`, `.gitignore`
+  e testes), então a extração é um `git subtree`/mover-pasta sem desacoplar nada — o único
+  vínculo com o monorepo é o **contrato de API**, que continua sendo do backend. Enquanto o
+  monorepo durar, manter cada pasta autocontida é o que preserva essa saída barata.
 
 ---
 

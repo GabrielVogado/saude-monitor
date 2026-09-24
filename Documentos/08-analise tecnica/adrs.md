@@ -1075,6 +1075,85 @@ enquanto não há capacidade, com `--max-instances=1` e nenhuma instância viva.
 
 ---
 
+## ADR-012: Painel Administrativo Web como SPA Angular separada (`admin/`)
+
+**Data:** 2026-09-24
+**Status:** Aceito — decisão do PO em 24/09/2026; scaffolding iniciado (Angular 21 em `admin/`)
+**Área:** Frontend do Painel Administrativo (F-11 / Épico 7)
+
+> Segundo ADR `Aceito` da lista e o primeiro do **frontend** fora de `Proposto`. Trata do
+> Painel Admin (F-11), que estava **adiado** por decisão do PO (D-01, 02/09/2026) e foi
+> **retomado** em 24/09/2026.
+
+---
+
+### Contexto e Problema
+
+O fluxo de moderação de sugestões (E1-06) e a gestão de hospitais (E7-*) dependem de um
+Painel Admin Web que **nunca foi construído** — as telas mobile de aprovação chegaram a
+existir e foram removidas em 08/09/2026 por serem inacessíveis (código morto). O app de
+campo é Expo/React Native com `react-native-web` (já serve web), mas o painel é outro
+produto: **desktop, denso em dados, CRUD, tabelas, fila de moderação e mapa** — ergonomia
+que o RN/RNW não entrega bem.
+
+A decisão do PO (24/09/2026) foi **retomar o F-11 agora** e construí-lo com **Angular**.
+
+---
+
+### Opções Avaliadas
+
+**Opção 1 — `react-native-web`, reusando o stack do app**
+- Descartada: o RNW é otimizado para paridade com o mobile; grids de dados, formulários
+  densos e atalhos de teclado de um admin ficam desconfortáveis. Reuso de componente seria
+  baixo (os `CS*` são mobile) e ainda exigiria build/deploy próprios — pouco ganho real.
+
+**Opção 2 — React web (Vite/Next + React)**
+- Viável e com alguma economia de modelo mental vindo do RN, mas **sem reuso de componente**
+  mesmo assim. Não escolhida — o PO preferiu Angular pela estrutura opinativa (DI, forms,
+  roteamento) que serve a um CRUD administrativo.
+
+**Opção 3 — Angular 21 (SPA) ← Decisão**
+- Forte para admin denso: DI, Reactive Forms, roteamento com guards, tabelas.
+- Suporte de skill oficial (`angular-developer`, de `angular/angular`).
+- **Restrição de ambiente medida (24/09/2026):** o Angular **22** exige Node ≥ 22.22; a
+  máquina roda **Node 20.19.3**. O Angular **21** roda em `^20.19.0`. Subir o Node global
+  arriscaria o toolchain do Expo (o app depende do Node 20 — ver `App.test.js`), então
+  fixou-se o **Angular 21**. Consequência: **Reactive Forms** (Signal Forms só são estáveis
+  no v22+).
+
+---
+
+### Decisão
+
+Painel Admin implementado como **SPA Angular 21** em `admin/`, dentro deste monorepo, ao
+lado de `frontend/` (app) e `backend/` (API). Consome a **mesma API Spring Boot**; o que se
+reusa é o **contrato**, não o código RN. Autenticação pelos endpoints JWT já existentes.
+CI/deploy próprios do painel ficam para etapa seguinte.
+
+O que **precisa ser reescrito em Angular** (não vem de graça do app): sessão/expiração
+(o 403 encerra sessão — `sessao.js`), cliente HTTP com timeout/retry/fila
+(`config/http.js`) e os design tokens. Registrado como dívida de partida do painel.
+
+---
+
+### Consequências
+
+- **Segundo stack de frontend** no repositório, com toolchain, testes (Vitest no Angular 21)
+  e CI próprios — custo de manutenção assumido conscientemente.
+- Nova linha na matriz de roteamento de skills (`.claude/skills-roteamento.md`): área
+  `admin/` → `angular-developer`; `security-review` no portão de auth/endpoint público.
+- **Épico 7 reaberto** no `De-Para-Backlog-Features.md` (de ⏸️ ADIADO para 🚧 em andamento).
+- **Upgrade de Node para 22** fica como decisão futura: destravaria Angular 22 + Signal
+  Forms, mas precisa ser validado contra o toolchain do Expo antes.
+- **Split futuro em repositórios separados (decisão do PO, 24/09/2026):** o plano é que
+  `mobile`/`frontend`, `backend` e `admin` virem repositórios próprios. `admin/` já nasce
+  **autocontido** (seu `package.json`, `angular.json`, `.gitignore` e testes), então a
+  extração é um `git subtree`/mover-pasta sem desacoplar nada — o único vínculo com o
+  monorepo é o **contrato de API**, que continua sendo do backend. Enquanto o monorepo
+  durar, mantê-lo autocontido é o que preserva essa saída barata.
+
+---
+
 ## Resumo de Status
 
 | ADR | Título | Prioridade | Esforço | Impacto |
@@ -1090,7 +1169,9 @@ enquanto não há capacidade, com `--max-instances=1` e nenhuma instância viva.
 | ADR-009 | `HeartbeatService` com `AppState` | Média | Baixo (1–2h) | Médio |
 | ADR-010 | Migração Incremental para TypeScript | Alta | Alto (incremental) | Alto |
 | ADR-011 | Hospedagem do backend no Google Cloud Run | Crítica | Concluído em 04/09/2026 | Alto |
+| ADR-012 | Painel Admin em Angular 21 (SPA separada) | Média | Em andamento (24/09/2026) | Alto |
 
-> Os ADR-001 a ADR-010 continuam `Proposto`. O **ADR-011 é o único `Aceito`** — e é
-> o único de infraestrutura. Isso reflete a ordem de execução registrada na nota da
-> revisão 3.1: o gargalo medido estava no backend, não no frontend.
+> Os ADR-001 a ADR-010 continuam `Proposto`. **`Aceito`: ADR-011** (infraestrutura,
+> backend) **e ADR-012** (frontend do painel admin) — este último o primeiro ADR de
+> frontend a sair de `Proposto`, quando o gargalo do backend (ADR-011) já estava
+> resolvido e o PO retomou o F-11.

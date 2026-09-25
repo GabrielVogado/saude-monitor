@@ -30,6 +30,16 @@
         <option value="PUBLICO">Público</option>
         <option value="PRIVADO">Privado</option>
       </select>
+      <select
+        aria-label="Filtrar por região administrativa"
+        (change)="filtrarRegiao($any($event.target).value)"
+        class="rounded-lg border border-outline-soft bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+      >
+        <option value="">Todas as regiões</option>
+        @for (regiao of regioesDisponiveis(); track regiao) {
+          <option [value]="regiao">{{ regiao }}</option>
+        }
+      </select>
       <input
         #q
         type="search"
@@ -66,6 +76,7 @@
             <th class="px-4 py-3 font-semibold">Nome</th>
             <th class="px-4 py-3 font-semibold">Tipo</th>
             <th class="px-4 py-3 font-semibold">Cidade/UF</th>
+            <th class="px-4 py-3 font-semibold">Região</th>
             <th class="px-4 py-3 font-semibold">Status</th>
             <th class="px-4 py-3 text-right font-semibold">Ações</th>
           </tr>
@@ -83,6 +94,7 @@
               <td class="px-4 py-3 text-ink-soft">
                 {{ h.endereco?.cidade || '—' }}@if (h.endereco?.uf) { / {{ h.endereco?.uf }} }
               </td>
+              <td class="px-4 py-3 text-ink-soft">{{ h.regiaoAdministrativa || '—' }}</td>
               <td class="px-4 py-3">
                 <span
                   class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold"

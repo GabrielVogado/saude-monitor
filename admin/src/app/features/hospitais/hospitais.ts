@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { Camada } from '../../core/camadas/camada';
 import { HospitalApi } from '../../core/hospitais/hospital';
 import { Hospital, StatusHospital, TipoEstabelecimento } from '../../core/hospitais/hospital.models';
 
@@ -10,6 +11,7 @@ import { Hospital, StatusHospital, TipoEstabelecimento } from '../../core/hospit
 })
 export class Hospitais implements OnInit {
   private readonly api = inject(HospitalApi);
+  private readonly camadaApi = inject(Camada);
   private readonly size = 20;
 
   protected readonly carregando = signal(false);
@@ -21,6 +23,9 @@ export class Hospitais implements OnInit {
   protected termoBusca = '';
   protected readonly tipoFiltro = signal<TipoEstabelecimento | ''>('');
   protected readonly statusFiltro = signal<StatusHospital>('TODOS');
+  protected readonly regiaoFiltro = signal('');
+  /** Nomes de Região Administrativa para o seletor (E7-03) — vem da camada pública. */
+  protected readonly regioesDisponiveis = signal<string[]>([]);
   /** Id do hospital cujo status está sendo alterado (desabilita o botão da linha). */
   protected readonly alterandoId = signal<string | null>(null);
   /** Erro de ação (toggle) — mostrado como aviso, sem esconder a tabela. */
@@ -28,6 +33,12 @@ export class Hospitais implements OnInit {
 
   ngOnInit(): void {
     this.carregar();
+    // Falha ao carregar os nomes de região não deve impedir a listagem em si — o
+    // seletor fica vazio ("Todas as regiões") e o resto da tela segue funcionando.
+    this.camadaApi.nomesRegiaoAdministrativa().subscribe({
+      next: (nomes) => this.regioesDisponiveis.set(nomes),
+      error: () => this.regioesDisponiveis.set([]),
+    });
   }
 
   /** Ativa/desativa o hospital (E7-07), com confirmação, e recarrega a listagem. */
@@ -68,6 +79,12 @@ export class Hospitais implements OnInit {
     this.carregar();
   }
 
+  protected filtrarRegiao(valor: string): void {
+    this.regiaoFiltro.set(valor);
+    this.page.set(0);
+    this.carregar();
+  }
+
   protected irPara(destino: number): void {
     if (destino < 0 || destino >= this.totalPages()) {
       return;
@@ -84,6 +101,7 @@ export class Hospitais implements OnInit {
         busca: this.termoBusca,
         tipo: this.tipoFiltro() || undefined,
         status: this.statusFiltro(),
+        regiaoAdministrativa: this.regiaoFiltro() || undefined,
         page: this.page(),
         size: this.size,
       })

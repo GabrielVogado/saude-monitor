@@ -28,6 +28,9 @@ export class HospitalApi {
     if (params.tipo) {
       httpParams = httpParams.set('tipo', params.tipo);
     }
+    if (params.regiaoAdministrativa?.trim()) {
+      httpParams = httpParams.set('regiaoAdministrativa', params.regiaoAdministrativa.trim());
+    }
     return this.http.get<PageResponse<Hospital>>(`${this.apiBaseUrl}/api/v1/admin/hospitais`, {
       params: httpParams,
     });

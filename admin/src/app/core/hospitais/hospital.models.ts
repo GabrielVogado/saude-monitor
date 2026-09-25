@@ -23,6 +23,8 @@ export interface Hospital {
   endereco?: Endereco;
   raioMetros?: number;
   ativo: boolean;
+  /** Região Administrativa (E7-03) — derivada das coordenadas; pode ser `null`. */
+  regiaoAdministrativa?: string | null;
 }
 
 /** Envelope paginado do backend (`PageResponse<T>`). */
@@ -38,6 +40,8 @@ export interface ListarHospitaisParams {
   busca?: string;
   tipo?: TipoEstabelecimento;
   status?: StatusHospital;
+  /** Nome exato da Região Administrativa (E7-03) — vem de `Camada.nomesRegiaoAdministrativa()`. */
+  regiaoAdministrativa?: string;
   page?: number;
   size?: number;
 }

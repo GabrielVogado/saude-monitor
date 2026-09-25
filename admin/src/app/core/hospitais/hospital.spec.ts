@@ -55,6 +55,18 @@ describe('HospitalApi', () => {
     req.flush(pagina);
   });
 
+  it('envia regiaoAdministrativa quando informada e omite quando vazia', () => {
+    api.listar({ regiaoAdministrativa: 'Plano Piloto' }).subscribe();
+    const req = http.expectOne((r) => r.url === `${BASE}/api/v1/admin/hospitais`);
+    expect(req.request.params.get('regiaoAdministrativa')).toBe('Plano Piloto');
+    req.flush(pagina);
+
+    api.listar({ regiaoAdministrativa: '  ' }).subscribe();
+    const req2 = http.expectOne((r) => r.url === `${BASE}/api/v1/admin/hospitais`);
+    expect(req2.request.params.has('regiaoAdministrativa')).toBe(false);
+    req2.flush(pagina);
+  });
+
   it('altera status via PATCH /{id}/status com corpo { ativo }', () => {
     api.alterarStatus('h1', false).subscribe();
     const req = http.expectOne(`${BASE}/api/v1/hospitais/h1/status`);

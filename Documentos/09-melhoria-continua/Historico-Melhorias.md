@@ -1547,6 +1547,51 @@ Diante dos números acima, o PO decidiu:
 
 ---
 
+## M-023 — Painel Administrativo Web (F-11/Épico 7) retomado: fundação + primeiras estórias
+
+**Data:** 24–25/09/2026 · **PRs:** #143, #144, #145, #147, #148, #150, #151 · **ADRs:** ADR-012, ADR-013
+
+> Registro consolidado da frente do painel (backfill de conformidade — o `CLAUDE.md`
+> pede registrar melhorias reais no Historico, e esta frente vinha só em ADRs + De-Para).
+
+### O que apareceu
+
+O Épico 7 (Painel Admin Web), adiado desde 02/09 (D-01), foi **retomado por decisão do PO
+em 24/09/2026**. O fluxo de moderação (E1-06) e a gestão de hospitais dependem dele.
+
+### O que mudou
+
+- **Stack e fundação (ADR-012, #143):** SPA **Angular 21** em `admin/` (Node 20.19 não roda
+  o v22), autocontida para o split futuro em repos (`radar-saude-mobile`/`painel-admin-frontend`/
+  `radar-saude-backend`).
+- **CORS (#144):** o backend não liberava a origem do painel (browser); `SecurityConfig` +
+  `CorsProperties` passaram a permitir as origens do painel por ambiente. Sem isso, nenhuma
+  chamada do painel funcionava (achado na verificação E2E do login).
+- **Layout da marca (#145):** Tailwind v4 com tokens da paleta "Clinical Sanctuary" em
+  `@theme`, logo do sistema, fontes Manrope/Inter; login e shell interativos.
+- **E7-01 login (#145):** enforce **ADMIN-only** (o painel só aceita `papel === ADMIN`,
+  inverso do app), guard de rota, interceptor JWT, `TokenStorage`. Verificado E2E pelo PO.
+- **E7-09 (parcial) shell (#147):** topbar + navegação lateral com rotas filhas sob o guard.
+- **E7-02 listar (#147 + #150 + #151):** página com tabela, busca, paginação; passou a
+  consumir o endpoint admin `GET /api/v1/admin/hospitais` (namespace ADMIN, #150) que lista
+  inativos. Verificado E2E (TODOS 340 · INATIVOS 0 · sem token 401).
+- **E7-03 (parcial) filtros (#148 + #151):** nome, tipo e status; falta região.
+
+### Segurança de sessão (ADR-013)
+
+O PO levantou (25/09) a visibilidade de senha/token no DevTools. Registrado que **não é
+vazamento** (DevTools da própria máquina; TLS+HSTS na rede; nada logado — verificado), e
+decidida a direção de endurecimento: **refresh token em cookie HttpOnly** + access token só
+em memória, sequenciada e a detalhar deploy (mesmo domínio ou BFF/proxy).
+
+### Verificação
+
+- Frontend: **23 testes (Vitest) verdes**, `ng build` limpo, telas conferidas no preview.
+- Backend (outras sessões): CORS e listagem admin cobertos por testes MockMvc/integração.
+- Revisão do diff antes do merge, com os achados baixos tratados.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

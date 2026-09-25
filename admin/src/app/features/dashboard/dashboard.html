@@ -1,0 +1,15 @@
+<main class="dashboard">
+  <header class="topo">
+    <h1>Painel Administrativo</h1>
+    <button type="button" (click)="sair()">Sair</button>
+  </header>
+
+  @if (usuario(); as u) {
+    <p>Bem-vindo(a), <strong>{{ u.nome }}</strong> ({{ u.email }}).</p>
+  }
+
+  <p class="nota">
+    Estrutura inicial do painel. As telas de hospitais, mapa e moderação de sugestões
+    entram nas próximas estórias (E7-02 em diante).
+  </p>
+</main>

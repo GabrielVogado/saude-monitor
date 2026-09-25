@@ -92,6 +92,8 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 
 > **Decisão D-01 (02/09/2026):** *"O Painel ADMIN ainda não é prioritário, será desenvolvido depois que o app estiver todo desenvolvido sem pendências, nem débitos técnicos."* Entra somente após o Épico 8 e as validações V-01..V-09.
 
+> **Nota CORS-01 (25/09/2026):** o painel Angular em `http://localhost:4200` não chamava a API porque o backend não emitia `Access-Control-Allow-Origin` para a origem do painel. Medição do dia: `fetch` normal → "Failed to fetch"; o mesmo `fetch` em `mode: 'no-cors'` → resposta *opaque* (servidor alcançável) — faltavam só os cabeçalhos CORS. O app mobile é React Native **nativo** e nunca sofreu CORS; o painel web sofre, e isso bloqueava toda estória E7 que chama a API (a começar pelo login, E7-01). **Corrigido no backend** (`SecurityConfig` + novo `CorsProperties`): origens configuráveis por ambiente via `app.cors.allowed-origins` / env `APP_CORS_ALLOWED_ORIGINS` (dev cobre localhost incluindo `:4200`; produção sobrescreve com a origem real do painel, nunca `*`); métodos GET/POST/PUT/PATCH/DELETE/OPTIONS (PATCH mantido porque a API o expõe na edição de hospital pelo ADMIN); cabeçalhos restritos a `Authorization`/`Content-Type`; credenciais **desligadas** (autenticação é Bearer/JWT no header, não cookie). Coberto por `CorsConfigTest` (4 testes MockMvc sobre preflight OPTIONS e requisição real: origem autorizada recebe os cabeçalhos, origem não autorizada é recusada sem `ACAO`, cabeçalho fora do contrato é rejeitado).
+
 | ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |
 |---|---|---|---|
 | **E7-01** | Login web administrativo | **F-11** | 🔴 Inexistente |

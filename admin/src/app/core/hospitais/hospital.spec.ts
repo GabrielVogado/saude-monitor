@@ -1,0 +1,55 @@
+import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+
+import { HospitalApi } from './hospital';
+import { API_BASE_URL } from '../config/api.config';
+
+const BASE = 'https://api.test';
+const pagina = {
+  content: [{ id: '1', nome: 'Hosp A', tipo: 'PUBLICO', ativo: true }],
+  page: 0,
+  size: 20,
+  totalElements: 1,
+  totalPages: 1,
+};
+
+describe('HospitalApi', () => {
+  let api: HospitalApi;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: API_BASE_URL, useValue: BASE },
+      ],
+    });
+    api = TestBed.inject(HospitalApi);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  it('lista com page/size e busca', () => {
+    let resp: unknown;
+    api.listar({ busca: 'ana', page: 2, size: 10 }).subscribe((r) => (resp = r));
+
+    const req = http.expectOne((r) => r.url === `${BASE}/api/v1/hospitais`);
+    expect(req.request.params.get('page')).toBe('2');
+    expect(req.request.params.get('size')).toBe('10');
+    expect(req.request.params.get('busca')).toBe('ana');
+    req.flush(pagina);
+
+    expect(resp).toEqual(pagina);
+  });
+
+  it('omite a busca quando vazia e usa page 0 por padrão', () => {
+    api.listar({}).subscribe();
+    const req = http.expectOne((r) => r.url === `${BASE}/api/v1/hospitais`);
+    expect(req.request.params.has('busca')).toBe(false);
+    expect(req.request.params.get('page')).toBe('0');
+    req.flush(pagina);
+  });
+});

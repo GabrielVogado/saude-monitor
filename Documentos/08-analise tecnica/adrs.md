@@ -1162,6 +1162,82 @@ O que **precisa ser reescrito em Angular** (não vem de graça do app): sessão/
 
 ---
 
+## ADR-013: Refresh token em cookie HttpOnly no Painel Admin Web
+
+**Data:** 2026-09-25
+**Status:** Aceito (direção, decisão do PO em 25/09/2026) — implementação **pendente** e sequenciada
+**Área:** Segurança / Autenticação do Painel Admin (frontend web + backend)
+
+---
+
+### Contexto e Problema
+
+O PO observou (25/09/2026) que, no DevTools do navegador, a requisição de login exibe
+`email`/`password` e a resposta exibe `accessToken`/`refreshToken`, e levantou isso como
+risco no painel e no app.
+
+**Esclarecimento técnico registrado (o que NÃO é vulnerabilidade):**
+- A visibilidade no DevTools é da **própria máquina que fez o login** — para quem já
+  digitou a senha. Não expõe a terceiros.
+- **Na rede o tráfego é cifrado por TLS** (backend em `https://…run.app`, com HSTS —
+  M-021/F-03); o DevTools mostra em claro só porque é o ponto final.
+- A senha no corpo e os tokens na resposta são **inerentes** ao login por HTTP. Hashear a
+  senha no cliente é antipadrão (o hash vira a senha efetiva e quebra a verificação BCrypt)
+  e nada esconde uma requisição do DevTools local. Verificado: **nenhum `console.*` loga
+  credenciais/token** no `admin/` nem no `frontend/`.
+
+**O risco real por trás da preocupação** é *onde o token fica guardado após o login*: hoje
+o painel usa `sessionStorage` (ADR-012), legível por XSS. O app mobile **já** usa
+`expo-secure-store` (ADR-005), o mecanismo adequado nativo — então esta decisão é do
+**web**.
+
+---
+
+### Decisão
+
+No Painel Admin Web, o **refresh token** passa a trafegar em **cookie
+`HttpOnly; Secure; SameSite`** emitido pelo backend; o JavaScript (e portanto DevTools/XSS)
+não consegue lê-lo. O **access token** de curta duração fica **apenas em memória** no SPA
+(não em `sessionStorage`/`localStorage`), renovado por chamada a `/auth/refresh` que envia
+o cookie automaticamente.
+
+- `POST /auth/login` e `/auth/refresh`: `Set-Cookie: refreshToken=…; HttpOnly; Secure; SameSite=…; Path=/api/v1/auth`.
+- `/auth/refresh`: lê o refresh do **cookie**, não do corpo. `/auth/logout`: expira o cookie.
+- Access token continua no corpo JSON (guardado só em memória pelo cliente).
+
+---
+
+### Restrição de arquitetura (decisiva para a implementação)
+
+Cookie de sessão entre **origens diferentes** (painel `…:4200`/`painel-admin-frontend` × API
+`…run.app`/`radar-saude-backend`) é **cross-site**: exige `SameSite=None; Secure` e esbarra
+no bloqueio de cookies de terceiros (Safari ITP, fim dos 3rd-party cookies no Chrome). Para
+o cookie HttpOnly funcionar de forma robusta, uma destas condições:
+1. **Mesmo site registrável** em produção (ex. `admin.radarsaude.app` + `api.radarsaude.app`)
+   → `SameSite=Lax/Strict`, sem problema de terceiros; **caminho recomendado**;
+2. ou um **BFF/proxy same-origin** (o SPA chama `/api` na própria origem, que repassa ao
+   backend);
+3. em **dev** (`localhost:4200` → `run.app`, cross-site), usar proxy do `ng serve`
+   (`proxy.conf`) para o SPA falar com origem própria.
+
+Implicações: **CORS com `allowCredentials=true`** e origens explícitas (nunca `*`); front
+envia `withCredentials`; **CSRF** — `SameSite` mitiga, e se algum dia precisar `SameSite=None`,
+adicionar defesa CSRF (double-submit token ou header custom exigido).
+
+---
+
+### Consequências / Sequenciamento
+
+- Muda **backend** (auth: emitir/ler/expirar cookie; CORS credentials) **e admin**
+  (access token em memória, `withCredentials`, refresh silencioso no carregamento).
+- **Mobile não muda** — `expo-secure-store` (ADR-005) já é a proteção at-rest adequada.
+- **Sequenciar depois** do PR de backend em curso (listagem admin de inativos) para **não
+  conflitar no `SecurityConfig`** — duas frentes editando auth ao mesmo tempo colidem.
+- Depende de definição de deploy (mesmo domínio registrável **ou** BFF/proxy) antes de valer
+  em produção; sem isso, cai no bloqueio de cookie cross-site.
+
+---
+
 ## Resumo de Status
 
 | ADR | Título | Prioridade | Esforço | Impacto |
@@ -1178,8 +1254,8 @@ O que **precisa ser reescrito em Angular** (não vem de graça do app): sessão/
 | ADR-010 | Migração Incremental para TypeScript | Alta | Alto (incremental) | Alto |
 | ADR-011 | Hospedagem do backend no Google Cloud Run | Crítica | Concluído em 04/09/2026 | Alto |
 | ADR-012 | Painel Admin em Angular 21 (SPA separada) | Média | Em andamento (24/09/2026) | Alto |
+| ADR-013 | Refresh token em cookie HttpOnly (Painel Web) | Alta | Pendente (dir. aceita 25/09/2026) | Alto |
 
 > Os ADR-001 a ADR-010 continuam `Proposto`. **`Aceito`: ADR-011** (infraestrutura,
-> backend) **e ADR-012** (frontend do painel admin) — este último o primeiro ADR de
-> frontend a sair de `Proposto`, quando o gargalo do backend (ADR-011) já estava
-> resolvido e o PO retomou o F-11.
+> backend), **ADR-012** (frontend do painel admin) e **ADR-013** (segurança de sessão do
+> painel web — direção aceita, implementação sequenciada após o backend de inativos).

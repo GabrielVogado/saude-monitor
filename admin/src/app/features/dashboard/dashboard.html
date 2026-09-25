@@ -3,12 +3,19 @@
     <h1 class="text-2xl font-bold tracking-tight text-ink">Bem-vindo(a), {{ u.nome }}</h1>
   }
   <p class="mt-1 text-sm text-ink-soft">
-    Estrutura inicial do painel. As telas de hospitais, mapa e moderação de sugestões entram nas próximas
-    estórias (E7-02 em diante).
+    Visão geral do painel. Novos indicadores entram conforme as próximas estórias.
   </p>
 
   <section class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-    @for (card of cards; track card.titulo) {
+    <article class="rounded-xl border border-outline-soft/50 bg-surface-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <p class="text-sm font-medium text-ink-soft">Hospitais cadastrados</p>
+      <p class="mt-2 text-3xl font-bold text-brand-500">
+        {{ carregandoTotal() ? '…' : (totalHospitais() ?? '—') }}
+      </p>
+      <p class="mt-1 text-xs text-ink-soft/70">ativos + inativos</p>
+    </article>
+
+    @for (card of cardsPendentes; track card.titulo) {
       <article class="rounded-xl border border-outline-soft/50 bg-surface-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
         <p class="text-sm font-medium text-ink-soft">{{ card.titulo }}</p>
         <p class="mt-2 text-3xl font-bold text-brand-500">—</p>

@@ -30,8 +30,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 10/09/2026) acrescentou 2 (`/auth/esqueci-senha`, `/auth/redefinir-senha`), somando 33;
  * a confirmação obrigatória de e-mail no cadastro (mesmo dia) acrescentou mais 2
  * (`/auth/confirmar-email`, `/auth/reenviar-confirmacao`), somando 35; as camadas
- * geográficas (F-11, §5 — `GET /api/v1/camadas/{tipo}`) somam **36**. Este teste mede
- * o total de operações que o springdoc realmente gera, não presume que bateu.</p>
+ * geográficas (F-11, §5 — `GET /api/v1/camadas/{tipo}`) somam 36; a listagem
+ * administrativa (E7-02/E7-07 — `GET /api/v1/admin/hospitais`, restrita a ADMIN) soma
+ * **37**. Este teste mede o total de operações que o springdoc realmente gera, não
+ * presume que bateu.</p>
  */
 @Testcontainers
 @SpringBootTest
@@ -78,7 +80,7 @@ class OpenApiContratoTest {
             }
         }
 
-        assertThat(operacoes).isEqualTo(36);
+        assertThat(operacoes).isEqualTo(37);
     }
 
     /**

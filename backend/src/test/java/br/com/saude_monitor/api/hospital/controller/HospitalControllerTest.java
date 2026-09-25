@@ -178,7 +178,7 @@ class HospitalControllerTest {
             return new HospitalResponse("1", request.nome(), request.cnpj(), request.tipo(),
                     request.categoria(), null, null, null, null, null,
                     request.endereco(), request.contato(), request.geofence(),
-                    true, IndicadoresResponse.indisponivel(), Instant.now(), Instant.now());
+                    true, null, IndicadoresResponse.indisponivel(), Instant.now(), Instant.now());
         }
 
         @Override

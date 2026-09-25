@@ -1,6 +1,9 @@
 /** Tipo de estabelecimento (espelha o enum do backend). */
 export type TipoEstabelecimento = 'PUBLICO' | 'PRIVADO';
 
+/** Filtro de status na listagem admin (espelha `StatusHospital` do backend). */
+export type StatusHospital = 'ATIVOS' | 'INATIVOS' | 'TODOS';
+
 export interface Endereco {
   logradouro?: string;
   numero?: string;
@@ -34,6 +37,7 @@ export interface PageResponse<T> {
 export interface ListarHospitaisParams {
   busca?: string;
   tipo?: TipoEstabelecimento;
+  status?: StatusHospital;
   page?: number;
   size?: number;
 }

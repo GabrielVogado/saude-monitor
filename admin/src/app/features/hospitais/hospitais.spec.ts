@@ -20,6 +20,10 @@ describe('Hospitais', () => {
   let el: HTMLElement;
   const api = { listar: vi.fn() };
 
+  function selects() {
+    return Array.from(el.querySelectorAll('select')) as HTMLSelectElement[];
+  }
+
   beforeEach(async () => {
     api.listar.mockReset();
     api.listar.mockReturnValue(of(pagina()));
@@ -34,8 +38,10 @@ describe('Hospitais', () => {
     fixture.detectChanges();
   });
 
-  it('carrega e renderiza os hospitais no init', () => {
-    expect(api.listar).toHaveBeenCalledWith(expect.objectContaining({ busca: '', page: 0, size: 20 }));
+  it('carrega no init com status TODOS por padrão', () => {
+    expect(api.listar).toHaveBeenCalledWith(
+      expect.objectContaining({ busca: '', status: 'TODOS', page: 0, size: 20 }),
+    );
     expect(el.textContent).toContain('Hosp A');
     expect(el.textContent).toContain('Público');
     expect(el.textContent).toContain('Brasília');
@@ -46,13 +52,21 @@ describe('Hospitais', () => {
     input.value = 'ana';
     (el.querySelector('button') as HTMLButtonElement).click();
     fixture.detectChanges();
-    expect(api.listar).toHaveBeenLastCalledWith(expect.objectContaining({ busca: 'ana', page: 0, size: 20 }));
+    expect(api.listar).toHaveBeenLastCalledWith(expect.objectContaining({ busca: 'ana', page: 0 }));
   });
 
-  it('filtrar por tipo reenvia com o tipo e reseta a página', () => {
-    const select = el.querySelector('select') as HTMLSelectElement;
-    select.value = 'PRIVADO';
-    select.dispatchEvent(new Event('change'));
+  it('filtrar por status INATIVOS reenvia com o status', () => {
+    const statusSelect = selects()[0];
+    statusSelect.value = 'INATIVOS';
+    statusSelect.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(api.listar).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'INATIVOS', page: 0 }));
+  });
+
+  it('filtrar por tipo reenvia com o tipo', () => {
+    const tipoSelect = selects()[1];
+    tipoSelect.value = 'PRIVADO';
+    tipoSelect.dispatchEvent(new Event('change'));
     fixture.detectChanges();
     expect(api.listar).toHaveBeenLastCalledWith(expect.objectContaining({ tipo: 'PRIVADO', page: 0 }));
   });

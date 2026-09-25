@@ -20,6 +20,15 @@ export const routes: Routes = [
         path: 'hospitais',
         loadComponent: () => import('./features/hospitais/hospitais').then((m) => m.Hospitais),
       },
+      {
+        path: 'hospitais/:id',
+        loadComponent: () =>
+          import('./features/hospital-detalhe/hospital-detalhe').then((m) => m.HospitalDetalhe),
+      },
+      {
+        path: 'mapa',
+        loadComponent: () => import('./features/mapa/mapa').then((m) => m.Mapa),
+      },
     ],
   },
   { path: '**', redirectTo: 'login' },

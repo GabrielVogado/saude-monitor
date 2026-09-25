@@ -14,6 +14,24 @@ export interface Endereco {
   cep?: string;
 }
 
+export interface Contato {
+  telefone?: string;
+  email?: string;
+}
+
+/** Ponto geográfico do centroide do hospital (espelha `LocalizacaoDto`). */
+export interface Localizacao {
+  latitude: number;
+  longitude: number;
+}
+
+export interface Indicadores {
+  indicadoresDisponiveis: boolean;
+  notaMedia?: number;
+  nAvaliacoes?: number;
+  tempoMedianoMinutos?: number;
+}
+
 /** Hospital resumido devolvido pela listagem (espelha `HospitalResumoResponse`). */
 export interface Hospital {
   id: string;
@@ -21,10 +39,30 @@ export interface Hospital {
   tipo: TipoEstabelecimento;
   tipoUnidade?: string;
   endereco?: Endereco;
+  localizacao?: Localizacao;
   raioMetros?: number;
   ativo: boolean;
   /** Região Administrativa (E7-03) — derivada das coordenadas; pode ser `null`. */
   regiaoAdministrativa?: string | null;
+}
+
+/** Detalhe completo do hospital (E7-05) — espelha `HospitalResponse`. */
+export interface HospitalDetalheResponse {
+  id: string;
+  nome: string;
+  cnpj?: string;
+  tipo: TipoEstabelecimento;
+  categoria?: string;
+  horarioFuncionamento?: string;
+  salaVacina?: boolean;
+  farmacia?: boolean;
+  coletaMaterial?: boolean;
+  tipoUnidade?: string;
+  endereco?: Endereco;
+  contato?: Contato;
+  ativo: boolean;
+  regiaoAdministrativa?: string | null;
+  indicadores?: Indicadores;
 }
 
 /** Envelope paginado do backend (`PageResponse<T>`). */

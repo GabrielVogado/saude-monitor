@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '../config/api.config';
-import { Hospital, ListarHospitaisParams, PageResponse } from './hospital.models';
+import { Hospital, HospitalDetalheResponse, ListarHospitaisParams, PageResponse } from './hospital.models';
 
 /**
  * Cliente da API de hospitais para o painel admin.
@@ -42,5 +42,13 @@ export class HospitalApi {
    */
   alterarStatus(id: string, ativo: boolean): Observable<Hospital> {
     return this.http.patch<Hospital>(`${this.apiBaseUrl}/api/v1/hospitais/${id}/status`, { ativo });
+  }
+
+  /**
+   * Detalhe completo do hospital (E7-05) — `GET /api/v1/hospitais/{id}` (público, mas
+   * navegado só a partir do painel autenticado).
+   */
+  buscarPorId(id: string): Observable<HospitalDetalheResponse> {
+    return this.http.get<HospitalDetalheResponse>(`${this.apiBaseUrl}/api/v1/hospitais/${id}`);
   }
 }

@@ -1,0 +1,75 @@
+<div class="animate-[fadeInUp_0.4s_ease-out]">
+  <a routerLink="/hospitais" class="text-sm font-semibold text-brand-500 hover:underline">← Voltar para Hospitais</a>
+
+  @if (carregando()) {
+    <div class="mt-4 rounded-xl border border-outline-soft/50 bg-surface-card p-8 text-center text-sm text-ink-soft">
+      Carregando…
+    </div>
+  } @else if (erro(); as mensagem) {
+    <div class="mt-4 rounded-xl border border-outline-soft/50 bg-surface-card p-8 text-center text-sm text-danger-700" role="alert">
+      {{ mensagem }}
+    </div>
+  } @else if (hospital(); as h) {
+    <div class="mt-4 rounded-xl border border-outline-soft/50 bg-surface-card p-6 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight text-ink">{{ h.nome }}</h1>
+          <p class="mt-1 text-sm text-ink-soft">{{ h.tipoUnidade || h.categoria || '—' }}</p>
+        </div>
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+          [class]="h.ativo ? 'bg-teal-100 text-teal-500' : 'bg-surface-muted text-ink-soft'"
+        >
+          <span class="h-1.5 w-1.5 rounded-full" [class]="h.ativo ? 'bg-teal-500' : 'bg-outline'"></span>
+          {{ h.ativo ? 'Ativo' : 'Inativo' }}
+        </span>
+      </div>
+
+      <dl class="mt-6 grid gap-x-6 gap-y-4 sm:grid-cols-2">
+        <div>
+          <dt class="text-xs font-semibold uppercase tracking-wide text-ink-soft">Tipo</dt>
+          <dd class="mt-0.5 text-sm text-ink">{{ h.tipo === 'PUBLICO' ? 'Público' : 'Privado' }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold uppercase tracking-wide text-ink-soft">Região administrativa</dt>
+          <dd class="mt-0.5 text-sm text-ink">{{ h.regiaoAdministrativa || '—' }}</dd>
+        </div>
+        <div class="sm:col-span-2">
+          <dt class="text-xs font-semibold uppercase tracking-wide text-ink-soft">Endereço</dt>
+          <dd class="mt-0.5 text-sm text-ink">
+            @if (h.endereco; as e) {
+              {{ e.logradouro }}@if (e.numero) {, {{ e.numero }}}@if (e.complemento) { — {{ e.complemento }}}
+              <br />
+              {{ e.bairro }}@if (e.bairro && e.cidade) {, } {{ e.cidade }}@if (e.uf) { / {{ e.uf }}}
+              @if (e.cep) { — CEP {{ e.cep }} }
+            } @else {
+              —
+            }
+          </dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold uppercase tracking-wide text-ink-soft">Telefone</dt>
+          <dd class="mt-0.5 text-sm text-ink">{{ h.contato?.telefone || '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold uppercase tracking-wide text-ink-soft">E-mail</dt>
+          <dd class="mt-0.5 text-sm text-ink">{{ h.contato?.email || '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold uppercase tracking-wide text-ink-soft">Horário de funcionamento</dt>
+          <dd class="mt-0.5 text-sm text-ink">{{ h.horarioFuncionamento || '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold uppercase tracking-wide text-ink-soft">Indicadores</dt>
+          <dd class="mt-0.5 text-sm text-ink">
+            @if (h.indicadores?.indicadoresDisponiveis) {
+              Nota {{ h.indicadores?.notaMedia }} · {{ h.indicadores?.nAvaliacoes }} avaliação(ões)
+            } @else {
+              Ainda sem indicadores suficientes
+            }
+          </dd>
+        </div>
+      </dl>
+    </div>
+  }
+</div>

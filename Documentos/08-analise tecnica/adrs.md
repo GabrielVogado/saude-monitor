@@ -1238,6 +1238,50 @@ adicionar defesa CSRF (double-submit token ou header custom exigido).
 
 ---
 
+## ADR-014: Leaflet para o mapa multi-camada do Painel Admin
+
+**Data:** 2026-09-25
+**Status:** Aceito
+**Área:** Frontend do Painel Administrativo (E7-04/E7-05, Épico 7)
+
+---
+
+### Contexto e Problema
+
+A E7-04 pede um mapa com as 4 camadas geográficas já servidas em
+`GET /api/v1/camadas/{tipo}` (Região Administrativa, RIDE, Região de Saúde,
+Macrorregião de Saúde) e os marcadores de hospital; a E7-05, navegar do marcador ao
+detalhe. O painel (Angular 21) precisa de uma lib de mapa web — nenhuma estava
+instalada em `admin/`.
+
+### Opções Avaliadas
+
+**Mapbox GL JS** — o app mobile já usa Mapbox (`@rnmapbox/maps`, token
+`EXPO_PUBLIC_MAPBOX_TOKEN`), mas esse token é escopado ao app mobile; usar Mapbox no
+painel exigiria um **token novo, escopado à web** e abre risco de custo por uso.
+
+**Leaflet (`leaflet` + `@types/leaflet`) ← Decisão** — biblioteca madura, sem token,
+tiles raster OSM (`tile.openstreetmap.org`) — mesma fonte de tiles que o app mobile já
+usa (`OSM_RASTER_STYLE`). Zero custo, zero credencial nova para gerenciar.
+
+### Decisão
+
+**Leaflet**, com `maxZoom: 19` explícito na tile layer — replica de propósito a lição
+do **BUG-06** (mobile, 05/09/2026): pedir zoom além do que o `tile.openstreetmap.org`
+publica gera 404 em massa contra um servidor gratuito. As 4 camadas são carregadas
+**sob demanda** (só ao marcar o toggle, uma vez, com cache em memória) — mitigação do
+risco T-W1 já previsto no `Plano-Tecnico-Painel-Administrativo-Web-v1.0.md` (§9) para
+o peso combinado dos 4 GeoJSON.
+
+### Consequências
+
+- Nova dependência de runtime (`leaflet`, sem custo/licença restritiva — BSD-2-Clause).
+- Sem overlap com o Mapbox do mobile: nenhum token/config compartilhado entre os dois
+  frontends.
+- Estilo de tile raster simples (sem 3D/vetorial); suficiente para polígonos + marcadores.
+
+---
+
 ## Resumo de Status
 
 | ADR | Título | Prioridade | Esforço | Impacto |
@@ -1255,7 +1299,9 @@ adicionar defesa CSRF (double-submit token ou header custom exigido).
 | ADR-011 | Hospedagem do backend no Google Cloud Run | Crítica | Concluído em 04/09/2026 | Alto |
 | ADR-012 | Painel Admin em Angular 21 (SPA separada) | Média | Em andamento (24/09/2026) | Alto |
 | ADR-013 | Refresh token em cookie HttpOnly (Painel Web) | Alta | Pendente (dir. aceita 25/09/2026) | Alto |
+| ADR-014 | Leaflet para o mapa do Painel Admin | Média | Em andamento (25/09/2026) | Médio |
 
 > Os ADR-001 a ADR-010 continuam `Proposto`. **`Aceito`: ADR-011** (infraestrutura,
-> backend), **ADR-012** (frontend do painel admin) e **ADR-013** (segurança de sessão do
-> painel web — direção aceita, implementação sequenciada após o backend de inativos).
+> backend), **ADR-012** (frontend do painel admin), **ADR-013** (segurança de sessão do
+> painel web — direção aceita, implementação sequenciada após o backend de inativos) e
+> **ADR-014** (biblioteca de mapa do painel).

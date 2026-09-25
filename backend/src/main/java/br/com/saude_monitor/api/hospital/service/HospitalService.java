@@ -7,6 +7,7 @@ import br.com.saude_monitor.api.hospital.dto.HospitalResumoResponse;
 import br.com.saude_monitor.api.hospital.dto.HospitalResponse;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
 import br.com.saude_monitor.api.hospital.dto.OrdemRanking;
+import br.com.saude_monitor.api.hospital.dto.StatusHospital;
 import br.com.saude_monitor.api.hospital.document.StatusSugestao;
 import br.com.saude_monitor.api.hospital.dto.AprovarSugestaoRequest;
 import br.com.saude_monitor.api.hospital.dto.RejeitarSugestaoRequest;
@@ -29,6 +30,16 @@ public interface HospitalService {
 
     PageResponse<HospitalResumoResponse> listar(Double latitude, Double longitude, Double raioKm,
                                                 TipoEstabelecimento tipo, String busca, int page, int size);
+
+    /**
+     * Listagem administrativa de hospitais (E7-02 / E7-07), sem filtro geoespacial e
+     * com filtro por {@link StatusHospital} — incluindo inativos, o que o contrato
+     * público jamais expõe. A autorização a ADMIN é responsabilidade do
+     * {@code SecurityConfig} (papel {@code ADMIN}); este método assume o requisitante
+     * já autorizado.
+     */
+    PageResponse<HospitalResumoResponse> listarAdmin(StatusHospital status, TipoEstabelecimento tipo,
+                                                     String busca, int page, int size);
 
     /**
      * Ranking público de hospitais ordenável por nota média ou por tempo médio de

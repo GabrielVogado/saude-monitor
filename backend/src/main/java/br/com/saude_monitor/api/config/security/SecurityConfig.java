@@ -75,6 +75,13 @@ public class SecurityConfig {
                         // Moderação de sugestões (E1-06): endpoints admin específicos.
                         .requestMatchers(HttpMethod.GET, "/api/v1/hospitais/sugestoes", "/api/v1/hospitais/sugestoes/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/hospitais/sugestoes/**").hasRole("ADMIN")
+                        // Listagem administrativa (E7-02/E7-07): namespace dedicado /api/v1/admin/**,
+                        // fora do contrato público /api/v1/hospitais (só-ativos). Único caminho que
+                        // pode devolver hospitais inativos — restrito a ADMIN. Precede a regra genérica
+                        // GET permitAll abaixo por clareza (paths distintos não se sobrepõem, mas o
+                        // grupo admin fica junto). Sem esta linha, cairia em anyRequest().authenticated()
+                        // e qualquer USER autenticado enxergaria os inativos.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/hospitais").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/hospitais/**").permitAll()
                         // Camadas geográficas (F-11, §5): divisão administrativa/de saúde é
                         // dado público — mesmo regime dos GET de hospitais.

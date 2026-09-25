@@ -11,6 +11,7 @@ import br.com.saude_monitor.api.hospital.dto.HospitalResponse;
 import br.com.saude_monitor.api.hospital.dto.IndicadoresResponse;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
 import br.com.saude_monitor.api.hospital.dto.OrdemRanking;
+import br.com.saude_monitor.api.hospital.dto.StatusHospital;
 import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
 import br.com.saude_monitor.api.hospital.dto.AprovarSugestaoRequest;
 import br.com.saude_monitor.api.hospital.dto.RejeitarSugestaoRequest;
@@ -203,6 +204,12 @@ class HospitalControllerTest {
 
         @Override
         public PageResponse<HospitalResumoResponse> ranking(OrdemRanking ordem, TipoEstabelecimento tipo, int page, int size) {
+            return PageResponse.of(List.of(), page, size, 0);
+        }
+
+        @Override
+        public PageResponse<HospitalResumoResponse> listarAdmin(StatusHospital status, TipoEstabelecimento tipo,
+                                                                String busca, int page, int size) {
             return PageResponse.of(List.of(), page, size, 0);
         }
 

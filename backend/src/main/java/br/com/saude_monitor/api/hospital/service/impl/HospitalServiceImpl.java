@@ -21,6 +21,7 @@ import br.com.saude_monitor.api.hospital.dto.IndicadoresResponse;
 import br.com.saude_monitor.api.hospital.dto.LocalizacaoDto;
 import br.com.saude_monitor.api.hospital.dto.OrdemRanking;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
+import br.com.saude_monitor.api.hospital.dto.StatusHospital;
 import br.com.saude_monitor.api.hospital.dto.RejeitarSugestaoRequest;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalDetalheResponse;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalRequest;
@@ -143,10 +144,29 @@ public class HospitalServiceImpl implements HospitalService {
             total = documentos.size();
             documentos = paginarEmMemoria(documentos, page, size);
         } else {
-            Page<HospitalDocument> resultado = buscarPaginado(tipo, busca, page, size);
+            // Contrato público: sempre e somente ativos.
+            Page<HospitalDocument> resultado = buscarPaginado(StatusHospital.ATIVOS, tipo, busca, page, size);
             documentos = resultado.getContent();
             total = resultado.getTotalElements();
         }
+
+        Map<String, IndicadoresResponse> porId = mapaIndicadores(documentos);
+        List<HospitalResumoResponse> content = documentos.stream()
+                .map(d -> toResumo(d, porId.get(d.getId())))
+                .toList();
+        return PageResponse.of(content, page, size, total);
+    }
+
+    @Override
+    public PageResponse<HospitalResumoResponse> listarAdmin(StatusHospital status, TipoEstabelecimento tipo,
+                                                            String busca, int page, int size) {
+        // Mesma listagem paginada não geoespacial do caminho público, mas honrando o
+        // filtro de status — inclusive INATIVOS/TODOS, que o contrato público nunca expõe.
+        // A restrição a ADMIN é feita no SecurityConfig; aqui o requisitante já vem autorizado.
+        StatusHospital efetivo = status == null ? StatusHospital.TODOS : status;
+        Page<HospitalDocument> resultado = buscarPaginado(efetivo, tipo, busca, page, size);
+        List<HospitalDocument> documentos = resultado.getContent();
+        long total = resultado.getTotalElements();
 
         Map<String, IndicadoresResponse> porId = mapaIndicadores(documentos);
         List<HospitalResumoResponse> content = documentos.stream()
@@ -325,9 +345,26 @@ public class HospitalServiceImpl implements HospitalService {
         return mongoTemplate.find(filtro, HospitalDocument.class);
     }
 
-    /** Busca paginada sem filtro geoespacial, com critérios opcionais de tipo e nome. */
-    private Page<HospitalDocument> buscarPaginado(TipoEstabelecimento tipo, String busca, int page, int size) {
-        Query query = new Query(Criteria.where("ativo").is(true));
+    /**
+     * Constrói o critério de {@code ativo} conforme o status pedido. {@link StatusHospital#TODOS}
+     * não adiciona critério (nenhum filtro por {@code ativo}). Existe um único ponto de decisão
+     * para que o caminho público jamais deixe de passar {@link StatusHospital#ATIVOS}.
+     */
+    private static Criteria criterioStatus(StatusHospital status) {
+        return switch (status) {
+            case ATIVOS -> Criteria.where("ativo").is(true);
+            case INATIVOS -> Criteria.where("ativo").is(false);
+            case TODOS -> null;
+        };
+    }
+
+    /** Busca paginada sem filtro geoespacial, com critério de status e critérios opcionais de tipo e nome. */
+    private Page<HospitalDocument> buscarPaginado(StatusHospital status, TipoEstabelecimento tipo, String busca, int page, int size) {
+        Query query = new Query();
+        Criteria statusCriteria = criterioStatus(status);
+        if (statusCriteria != null) {
+            query.addCriteria(statusCriteria);
+        }
         if (tipo != null) {
             query.addCriteria(Criteria.where("tipo").is(tipo));
         }

@@ -56,10 +56,13 @@ class ListagemPorRaioTest {
     private final GeofenceFactory geofenceFactory = mock(GeofenceFactory.class);
     private final AutenticacaoHelper autenticacaoHelper = mock(AutenticacaoHelper.class);
     private final AgregadoService agregadoService = mock(AgregadoService.class);
+    private final br.com.saude_monitor.api.regiao.service.RegiaoAdministrativaResolver regiaoAdministrativaResolver =
+            mock(br.com.saude_monitor.api.regiao.service.RegiaoAdministrativaResolver.class);
 
     private final HospitalService service =
             new HospitalServiceImpl(hospitalRepository, sugestaoRepository, mongoTemplate,
-                    geofenceValidator, geofenceFactory, autenticacaoHelper, agregadoService);
+                    geofenceValidator, geofenceFactory, autenticacaoHelper, agregadoService,
+                    regiaoAdministrativaResolver);
 
     /** Coordenada do relato do PO (Recanto das Emas, DF). */
     private static final double LAT = -15.924781;

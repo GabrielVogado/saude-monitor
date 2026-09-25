@@ -32,14 +32,15 @@ public interface HospitalService {
                                                 TipoEstabelecimento tipo, String busca, int page, int size);
 
     /**
-     * Listagem administrativa de hospitais (E7-02 / E7-07), sem filtro geoespacial e
-     * com filtro por {@link StatusHospital} — incluindo inativos, o que o contrato
-     * público jamais expõe. A autorização a ADMIN é responsabilidade do
-     * {@code SecurityConfig} (papel {@code ADMIN}); este método assume o requisitante
-     * já autorizado.
+     * Listagem administrativa de hospitais (E7-02 / E7-03 / E7-07), sem filtro geoespacial
+     * por raio e com filtro por {@link StatusHospital} — incluindo inativos, o que o
+     * contrato público jamais expõe — e por {@code regiaoAdministrativa} (igualdade exata
+     * do nome resolvido por point-in-polygon, E7-03). A autorização a ADMIN é
+     * responsabilidade do {@code SecurityConfig} (papel {@code ADMIN}); este método assume
+     * o requisitante já autorizado.
      */
     PageResponse<HospitalResumoResponse> listarAdmin(StatusHospital status, TipoEstabelecimento tipo,
-                                                     String busca, int page, int size);
+                                                     String regiaoAdministrativa, String busca, int page, int size);
 
     /**
      * Ranking público de hospitais ordenável por nota média ou por tempo médio de

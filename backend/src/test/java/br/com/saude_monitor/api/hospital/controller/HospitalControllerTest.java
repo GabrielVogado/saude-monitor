@@ -209,7 +209,8 @@ class HospitalControllerTest {
 
         @Override
         public PageResponse<HospitalResumoResponse> listarAdmin(StatusHospital status, TipoEstabelecimento tipo,
-                                                                String busca, int page, int size) {
+                                                                String regiaoAdministrativa, String busca,
+                                                                int page, int size) {
             return PageResponse.of(List.of(), page, size, 0);
         }
 

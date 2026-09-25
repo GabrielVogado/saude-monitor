@@ -93,10 +93,12 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 > **Decisão D-01 (02/09/2026):** *"O Painel ADMIN ainda não é prioritário, será desenvolvido depois que o app estiver todo desenvolvido sem pendências, nem débitos técnicos."*
 >
 > **Retomada (24/09/2026):** por decisão do PO, o F-11 foi **reaberto** antes do fecho total do Épico 8 (que ainda tem 🔴 E8-05/E8-07/E8-11/E8-15). Stack escolhido: **Angular 21 (SPA)** em `admin/`, consumindo a API atual — ver **[ADR-012](08-analise%20tecnica/adrs.md)**. As estórias abaixo seguem 🔴 até haver entrega efetiva (proibido marcar item fictício); o scaffolding do projeto **não** conclui nenhuma delas.
+>
+> **CORS-01 (dependência de backend, achada em 25/09/2026):** o backend **não envia `Access-Control-Allow-Origin`** para a origem do painel no browser. Medido do painel em `localhost:4200`: `fetch` normal → `Failed to fetch`; `fetch` `mode:"no-cors"` → resposta *opaque* (servidor alcançável). O app mobile é nativo e nunca sofreu CORS; o painel, sendo web, sofre. **Toda estória E7 que chame a API depende disso** — o backend precisa liberar as origens do painel (dev `http://localhost:4200` e a futura de produção). É mudança de backend, fora do frontend do E7.
 
 | ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |
 |---|---|---|---|
-| **E7-01** | Login web administrativo | **F-11** | 🔴 Inexistente |
+| **E7-01** | Login web administrativo | **F-11** | 🟡 Em andamento (25/09/2026) — tela de login em `admin/` (Angular, Reactive Forms), com **enforce ADMIN-only** (o painel só aceita `papel === "ADMIN"`, inverso do app), guard de rota e interceptor JWT. **15 testes (Vitest) verdes**; UI validada no preview (render, redirect do guard, validação de formulário). **Não fecha:** o login E2E está bloqueado por **CORS-01** (backend não libera a origem do painel) — falta login real ADMIN passar ponta a ponta |
 | **E7-02** | Listar todos os hospitais (Admin) | **F-11** | 🔴 Inexistente |
 | **E7-03** | Filtrar hospitais (nome/tipo/status/região) | **F-11** | 🔴 Inexistente |
 | **E7-04** | Mapa com camadas georreferenciadas | **F-11** | 🔴 Inexistente |

@@ -1,13 +1,18 @@
 <div class="min-h-screen bg-surface">
   <!-- Topbar -->
   <header class="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-outline-soft/60 bg-surface-card/90 px-4 py-3 backdrop-blur">
-    <div class="flex items-center gap-3">
+    <a
+      routerLink="/dashboard"
+      title="Ir para a Visão geral"
+      aria-label="Ir para a Visão geral"
+      class="flex items-center gap-3 rounded-lg px-1 transition hover:opacity-80"
+    >
       <img src="logo-radar-saude.png" alt="Radar Saúde" class="h-9 w-9 rounded-lg" />
       <div class="leading-tight">
         <p class="text-sm font-bold text-ink">Radar Saúde</p>
         <p class="text-xs text-ink-soft">Painel Administrativo</p>
       </div>
-    </div>
+    </a>
 
     <div class="flex items-center gap-3">
       @if (usuario(); as u) {

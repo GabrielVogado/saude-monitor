@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { Hospitais } from './hospitais';
 import { HospitalApi } from '../../core/hospitais/hospital';
@@ -18,7 +18,7 @@ function pagina(over: Record<string, unknown> = {}) {
 describe('Hospitais', () => {
   let fixture: ComponentFixture<Hospitais>;
   let el: HTMLElement;
-  const api = { listar: vi.fn() };
+  const api = { listar: vi.fn(), alterarStatus: vi.fn() };
 
   function selects() {
     return Array.from(el.querySelectorAll('select')) as HTMLSelectElement[];
@@ -26,7 +26,9 @@ describe('Hospitais', () => {
 
   beforeEach(async () => {
     api.listar.mockReset();
+    api.alterarStatus.mockReset();
     api.listar.mockReturnValue(of(pagina()));
+    api.alterarStatus.mockReturnValue(of({}));
     await TestBed.configureTestingModule({
       imports: [Hospitais],
       providers: [{ provide: HospitalApi, useValue: api }],
@@ -76,5 +78,35 @@ describe('Hospitais', () => {
     (el.querySelector('button') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(el.textContent).toContain('Nenhum hospital encontrado');
+  });
+
+  it('desativar chama alterarStatus(id, false) após confirmação e recarrega', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const botao = Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Desativar')!;
+    botao.click();
+    fixture.detectChanges();
+    expect(api.alterarStatus).toHaveBeenCalledWith('1', false);
+    expect(api.listar).toHaveBeenCalledTimes(2); // init + reload
+    confirmSpy.mockRestore();
+  });
+
+  it('não altera status se a confirmação for cancelada', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const botao = Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Desativar')!;
+    botao.click();
+    fixture.detectChanges();
+    expect(api.alterarStatus).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('erro ao alterar status mantém a lista e mostra aviso (não apaga a tabela)', () => {
+    api.alterarStatus.mockReturnValue(throwError(() => new Error('falha')));
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const botao = Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Desativar')!;
+    botao.click();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Hosp A'); // a lista permanece visível
+    expect(el.textContent).toContain('Não foi possível desativar');
+    confirmSpy.mockRestore();
   });
 });

@@ -13,7 +13,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | Escopo | Entregue | Total | % |
 |---|---|---|---|
 | Aplicativo (Fase 0 + Épicos 1–6) | 42 | 43 | **98%** |
-| Painel Administrativo Web (Épico 7) | 2 | 9 | 22% (🚧 em andamento — E7-01, E7-02 entregues) |
+| Painel Administrativo Web (Épico 7) | 3 | 9 | 33% (🚧 em andamento — E7-01, E7-02, E7-07 entregues) |
 | **Total do backlog** | **42** | **52** | **81%** |
 | Épico 8 — Estabilização e Desempenho (novo, v2.1) | 8 | 15 | 53% |
 
@@ -106,7 +106,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **E7-04** | Mapa com camadas georreferenciadas | **F-11** | 🔴 Inexistente |
 | **E7-05** | Ir ao detalhe do hospital via mapa | **F-11** | 🔴 Inexistente |
 | **E7-06** | Editar dados do hospital (Admin) | **F-11** | 🔴 Inexistente |
-| **E7-07** | Desativar hospital (ícone cinza) | **F-11** | 🔴 Inexistente (frontend). **Pré-requisito de backend pronto (25/09/2026):** a listagem admin já devolve inativos (`GET /api/v1/admin/hospitais?status=TODOS`) para o painel renderizar o ícone cinza; a desativação em si usa o `PATCH /api/v1/hospitais/{id}/status` já existente (ADMIN) |
+| **E7-07** | Desativar hospital (ícone cinza) | **F-11** | ✅ Entregue (25/09/2026) — coluna **Ações** na listagem com botão **Desativar/Ativar** por linha, com **confirmação** e recarga; o status inativo aparece com badge cinza (o `status=INATIVOS` filtra). Usa `PATCH /api/v1/hospitais/{id}/status` (ADMIN). Erro de ação não apaga a lista (aviso separado). **Verificado E2E:** desativei um hospital → apareceu em "Inativos" como Inativo → reativei → dev limpo. 27 testes (Vitest) verdes |
 | **E7-08** | Bloqueio de escrita sobre feedback | **F-11** | 🔴 Inexistente |
 | **E7-09** | Menu Hospitais/Mapa/Sugestões | **F-11** | 🟡 Parcial (25/09/2026) — shell do painel (`admin/features/shell`) com topbar (logo + usuário + Sair) e navegação lateral: **Visão geral** e **Hospitais** navegáveis (roteamento + destaque do ativo); **Mapa** e **Sugestões** marcados "em breve" até suas telas existirem. Fecha quando o menu apontar para telas reais |
 

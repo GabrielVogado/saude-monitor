@@ -40,6 +40,11 @@ dependencies {
 	// JSON (ObjectMapper + JavaTimeModule p/ Instant): auto-config Jackson + serialização de respostas
 	implementation 'org.springframework.boot:spring-boot-starter-json'
 	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+	// Geometria (Polygon/MultiPolygon + point-in-polygon) para resolver a Região
+	// Administrativa de um hospital a partir das camadas GeoJSON (E7-03). As camadas
+	// ficam no classpath (RegiaoService) — o parse GeoJSON→JTS é feito à mão via Jackson
+	// (RegiaoAdministrativaResolver), sem depender do módulo jts-io.
+	implementation 'org.locationtech.jts:jts-core:1.19.0'
 	implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-csv'
 	// Relatorio PDF de exportacao de dados do titular (E5-03 / LGPD art. 18).
 	// OpenPDF (MPL-2.0 / LGPL-2.1) usado como biblioteca nao modificada.

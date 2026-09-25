@@ -31,6 +31,7 @@ import br.com.saude_monitor.api.hospital.repository.SugestaoHospitalRepository;
 import br.com.saude_monitor.api.hospital.service.GeofenceFactory;
 import br.com.saude_monitor.api.hospital.service.GeofenceValidator;
 import br.com.saude_monitor.api.hospital.service.HospitalService;
+import br.com.saude_monitor.api.regiao.service.RegiaoAdministrativaResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.domain.Page;
@@ -72,6 +73,7 @@ public class HospitalServiceImpl implements HospitalService {
     private final GeofenceFactory geofenceFactory;
     private final AutenticacaoHelper autenticacaoHelper;
     private final AgregadoService agregadoService;
+    private final RegiaoAdministrativaResolver regiaoAdministrativaResolver;
 
     @Override
     public HospitalResponse criar(HospitalRequest request) {
@@ -80,6 +82,7 @@ public class HospitalServiceImpl implements HospitalService {
 
         Instant agora = Instant.now();
         GeoJsonPolygon geofence = geofenceFactory.toPolygon(request.geofence());
+        GeoJsonPoint centroide = geofenceFactory.calcularCentroide(geofence);
 
         HospitalDocument document = HospitalDocument.builder()
                 .nome(normalizarNome(request.nome()))
@@ -89,7 +92,8 @@ public class HospitalServiceImpl implements HospitalService {
                 .endereco(toEndereco(request.endereco()))
                 .contato(toContato(request.contato()))
                 .geofence(geofence)
-                .localizacao(geofenceFactory.calcularCentroide(geofence))
+                .localizacao(centroide)
+                .regiaoAdministrativa(resolverRegiaoAdministrativa(centroide))
                 .ativo(true)
                 .fonte("CADASTRO")
                 .criadoEm(agora)
@@ -106,6 +110,7 @@ public class HospitalServiceImpl implements HospitalService {
         validarUnicidade(request.nome(), request.cnpj(), id);
 
         GeoJsonPolygon geofence = geofenceFactory.toPolygon(request.geofence());
+        GeoJsonPoint centroide = geofenceFactory.calcularCentroide(geofence);
         existente.setNome(normalizarNome(request.nome()));
         existente.setCnpj(normalizarCnpj(request.cnpj()));
         existente.setTipo(request.tipo());
@@ -113,7 +118,8 @@ public class HospitalServiceImpl implements HospitalService {
         existente.setEndereco(toEndereco(request.endereco()));
         existente.setContato(toContato(request.contato()));
         existente.setGeofence(geofence);
-        existente.setLocalizacao(geofenceFactory.calcularCentroide(geofence));
+        existente.setLocalizacao(centroide);
+        existente.setRegiaoAdministrativa(resolverRegiaoAdministrativa(centroide));
         existente.setAtualizadoEm(Instant.now());
 
         return toResponse(hospitalRepository.save(existente), indicadoresDe(existente));
@@ -144,8 +150,8 @@ public class HospitalServiceImpl implements HospitalService {
             total = documentos.size();
             documentos = paginarEmMemoria(documentos, page, size);
         } else {
-            // Contrato público: sempre e somente ativos.
-            Page<HospitalDocument> resultado = buscarPaginado(StatusHospital.ATIVOS, tipo, busca, page, size);
+            // Contrato público: sempre e somente ativos; sem filtro de região (exclusivo do admin, E7-03).
+            Page<HospitalDocument> resultado = buscarPaginado(StatusHospital.ATIVOS, tipo, null, busca, page, size);
             documentos = resultado.getContent();
             total = resultado.getTotalElements();
         }
@@ -159,12 +165,15 @@ public class HospitalServiceImpl implements HospitalService {
 
     @Override
     public PageResponse<HospitalResumoResponse> listarAdmin(StatusHospital status, TipoEstabelecimento tipo,
-                                                            String busca, int page, int size) {
+                                                            String regiaoAdministrativa, String busca,
+                                                            int page, int size) {
         // Mesma listagem paginada não geoespacial do caminho público, mas honrando o
-        // filtro de status — inclusive INATIVOS/TODOS, que o contrato público nunca expõe.
+        // filtro de status — inclusive INATIVOS/TODOS, que o contrato público nunca expõe —
+        // e o filtro por regiaoAdministrativa (E7-03), exclusivo do caminho admin.
         // A restrição a ADMIN é feita no SecurityConfig; aqui o requisitante já vem autorizado.
         StatusHospital efetivo = status == null ? StatusHospital.TODOS : status;
-        Page<HospitalDocument> resultado = buscarPaginado(efetivo, tipo, busca, page, size);
+        Page<HospitalDocument> resultado =
+                buscarPaginado(efetivo, tipo, regiaoAdministrativa, busca, page, size);
         List<HospitalDocument> documentos = resultado.getContent();
         long total = resultado.getTotalElements();
 
@@ -358,8 +367,12 @@ public class HospitalServiceImpl implements HospitalService {
         };
     }
 
-    /** Busca paginada sem filtro geoespacial, com critério de status e critérios opcionais de tipo e nome. */
-    private Page<HospitalDocument> buscarPaginado(StatusHospital status, TipoEstabelecimento tipo, String busca, int page, int size) {
+    /**
+     * Busca paginada sem filtro geoespacial por raio, com critério de status e critérios
+     * opcionais de tipo, região administrativa (igualdade exata, E7-03 — indexado) e nome.
+     */
+    private Page<HospitalDocument> buscarPaginado(StatusHospital status, TipoEstabelecimento tipo,
+                                                   String regiaoAdministrativa, String busca, int page, int size) {
         Query query = new Query();
         Criteria statusCriteria = criterioStatus(status);
         if (statusCriteria != null) {
@@ -367,6 +380,9 @@ public class HospitalServiceImpl implements HospitalService {
         }
         if (tipo != null) {
             query.addCriteria(Criteria.where("tipo").is(tipo));
+        }
+        if (regiaoAdministrativa != null && !regiaoAdministrativa.isBlank()) {
+            query.addCriteria(Criteria.where("regiaoAdministrativa").is(regiaoAdministrativa));
         }
         // Ordenação estável obrigatória: a paginação abaixo é feita em memória (subList),
         // e sem um `Sort` explícito a ordem "natural" do MongoDB não é garantida entre
@@ -504,6 +520,14 @@ public class HospitalServiceImpl implements HospitalService {
         );
     }
 
+    /** Resolve a RA do centroide (E7-03); {@code null} se o ponto cair fora de todas. */
+    private String resolverRegiaoAdministrativa(GeoJsonPoint centroide) {
+        if (centroide == null) {
+            return null;
+        }
+        return regiaoAdministrativaResolver.resolver(centroide.getX(), centroide.getY()).orElse(null);
+    }
+
     private HospitalResumoResponse toResumo(HospitalDocument d, IndicadoresResponse indicadores) {
         return new HospitalResumoResponse(
                 d.getId(),
@@ -515,6 +539,7 @@ public class HospitalServiceImpl implements HospitalService {
                 toLocalizacaoDto(d),
                 geofenceFactory.raioAproximadoMetros(d.getGeofence(), centroideDe(d)),
                 d.isAtivo(),
+                d.getRegiaoAdministrativa(),
                 indicadores
         );
     }

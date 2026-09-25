@@ -72,6 +72,10 @@ class AdminHospitalListagemIntegracaoTest extends IntegracaoTestBase {
     }
 
     private void salvarHospital(String nome, boolean ativo) {
+        salvarHospital(nome, ativo, null);
+    }
+
+    private void salvarHospital(String nome, boolean ativo, String regiaoAdministrativa) {
         GeofenceFactory factory = new GeofenceFactory();
         hospitalRepository.save(HospitalDocument.builder()
                 .nome(nome)
@@ -79,6 +83,7 @@ class AdminHospitalListagemIntegracaoTest extends IntegracaoTestBase {
                 .categoria(CategoriaEstabelecimento.HOSPITAL)
                 .localizacao(new GeoJsonPoint(LON, LAT))
                 .geofence(factory.criarCirculo(LAT, LON, 150.0, GeofenceFactory.LADOS_CIRCULO))
+                .regiaoAdministrativa(regiaoAdministrativa)
                 .ativo(ativo)
                 .build());
     }
@@ -165,5 +170,38 @@ class AdminHospitalListagemIntegracaoTest extends IntegracaoTestBase {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].nome").value(NOME_ATIVO))
                 .andExpect(jsonPath("$.content[0].ativo").value(true));
+    }
+
+    // ---------------------------------------------------------------
+    // Filtro por região administrativa (E7-03)
+    // ---------------------------------------------------------------
+
+    @Test
+    void adminComRegiaoFiltraApenasHospitaisDaquelaRegiao() throws Exception {
+        hospitalRepository.deleteAll();
+        salvarHospital("Hospital do Plano Piloto", true, "Plano Piloto");
+        salvarHospital("Hospital do Recanto das Emas", true, "Recanto das Emas");
+        String tokenAdmin = token(Papel.ADMIN, "admin-regiao-hosp@saude-teste.com");
+
+        mockMvc.perform(get("/api/v1/admin/hospitais")
+                        .param("regiaoAdministrativa", "Plano Piloto")
+                        .header("Authorization", "Bearer " + tokenAdmin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].nome").value("Hospital do Plano Piloto"))
+                .andExpect(jsonPath("$.content[0].regiaoAdministrativa").value("Plano Piloto"));
+    }
+
+    @Test
+    void adminSemRegiaoVeTodasIndependenteDaRegiao() throws Exception {
+        hospitalRepository.deleteAll();
+        salvarHospital("Hospital do Plano Piloto", true, "Plano Piloto");
+        salvarHospital("Hospital do Recanto das Emas", true, "Recanto das Emas");
+        String tokenAdmin = token(Papel.ADMIN, "admin-sem-regiao-hosp@saude-teste.com");
+
+        mockMvc.perform(get("/api/v1/admin/hospitais")
+                        .header("Authorization", "Bearer " + tokenAdmin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2));
     }
 }

@@ -35,16 +35,20 @@ public class AdminHospitalController {
 
     /**
      * 🛡️ Lista hospitais para administração (E7-02), incluindo inativos (E7-07), com
-     * filtro por status, tipo, busca textual e paginação. Sem status, retorna
-     * {@link StatusHospital#TODOS}.
+     * filtro por status, tipo, região administrativa (E7-03 — igualdade exata do nome
+     * resolvido por point-in-polygon; nomes disponíveis em
+     * {@code GET /api/v1/camadas/regiao-administrativa}, propriedade {@code nome}), busca
+     * textual e paginação. Sem status, retorna {@link StatusHospital#TODOS}.
      */
     @GetMapping
     public ResponseEntity<PageResponse<HospitalResumoResponse>> listar(
             @RequestParam(required = false) StatusHospital status,
             @RequestParam(required = false) TipoEstabelecimento tipo,
+            @RequestParam(required = false) String regiaoAdministrativa,
             @RequestParam(required = false) String busca,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ResponseEntity.ok(hospitalService.listarAdmin(status, tipo, busca, page, size));
+        return ResponseEntity.ok(
+                hospitalService.listarAdmin(status, tipo, regiaoAdministrativa, busca, page, size));
     }
 }

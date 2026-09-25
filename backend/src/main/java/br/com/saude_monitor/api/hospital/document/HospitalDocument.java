@@ -104,6 +104,16 @@ public class HospitalDocument {
     @GeoSpatialIndexed(name = "localizacao_2dsphere", type = GeoSpatialIndexType.GEO_2DSPHERE)
     private GeoJsonPoint localizacao;
 
+    /**
+     * Região Administrativa (RA) que contém {@link #localizacao} (E7-03, Painel Admin).
+     * Calculada por point-in-polygon contra a camada {@code regiao-administrativa}
+     * (ver {@code RegiaoAdministrativaResolver}) — não é um campo do cadastro, é derivado
+     * das coordenadas. {@code null} até a primeira reconciliação, ou se o ponto cair fora
+     * de todas as RAs mapeadas. Indexado para o filtro do painel admin (E7-03).
+     */
+    @Indexed
+    private String regiaoAdministrativa;
+
     /** Soft delete — {@code false} remove o estabelecimento da listagem pública imediatamente. */
     private boolean ativo;
 

@@ -18,7 +18,10 @@ describe('Shell', () => {
     auth.logout.mockReset();
     await TestBed.configureTestingModule({
       imports: [Shell],
-      providers: [provideRouter([]), { provide: Auth, useValue: auth }],
+      providers: [
+        provideRouter([{ path: 'hospitais', children: [] }]),
+        { provide: Auth, useValue: auth },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Shell);
@@ -40,5 +43,42 @@ describe('Shell', () => {
     botaoSair.click();
     expect(auth.logout).toHaveBeenCalled();
     expect(navSpy).toHaveBeenCalledWith(['/login']);
+  });
+
+  function botaoMenu(): HTMLButtonElement {
+    return el.querySelector('button[aria-label="Abrir menu de navegação"]') as HTMLButtonElement;
+  }
+
+  it('menu mobile começa fechado (aside sem translate-x-0, sem overlay)', () => {
+    expect(botaoMenu().getAttribute('aria-expanded')).toBe('false');
+    expect(el.querySelector('aside')?.classList.contains('translate-x-0')).toBe(false);
+    expect(el.querySelector('[aria-hidden="true"].fixed')).toBeNull();
+  });
+
+  it('clicar no hamburger abre o menu (overlay + aside deslocado)', () => {
+    botaoMenu().click();
+    fixture.detectChanges();
+    expect(botaoMenu().getAttribute('aria-expanded')).toBe('true');
+    expect(el.querySelector('aside')?.classList.contains('translate-x-0')).toBe(true);
+    expect(el.querySelector('[aria-hidden="true"].fixed')).not.toBeNull();
+  });
+
+  it('clicar no overlay fecha o menu', () => {
+    botaoMenu().click();
+    fixture.detectChanges();
+    (el.querySelector('[aria-hidden="true"].fixed') as HTMLElement).click();
+    fixture.detectChanges();
+    expect(botaoMenu().getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('navegar fecha o menu automaticamente', async () => {
+    const router = TestBed.inject(Router);
+    botaoMenu().click();
+    fixture.detectChanges();
+    expect(botaoMenu().getAttribute('aria-expanded')).toBe('true');
+
+    await router.navigateByUrl('/hospitais');
+    fixture.detectChanges();
+    expect(botaoMenu().getAttribute('aria-expanded')).toBe('false');
   });
 });

@@ -1,18 +1,32 @@
 <div class="min-h-screen bg-surface">
   <!-- Topbar -->
-  <header class="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-outline-soft/60 bg-surface-card/90 px-4 py-3 backdrop-blur">
-    <a
-      routerLink="/dashboard"
-      title="Ir para a Visão geral"
-      aria-label="Ir para a Visão geral"
-      class="flex items-center gap-3 rounded-lg px-1 transition hover:opacity-80"
-    >
-      <img src="logo-radar-saude.png" alt="Radar Saúde" class="h-9 w-9 rounded-lg" />
-      <div class="leading-tight">
-        <p class="text-sm font-bold text-ink">Radar Saúde</p>
-        <p class="text-xs text-ink-soft">Painel Administrativo</p>
-      </div>
-    </a>
+  <header class="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-outline-soft/60 bg-surface-card/90 px-4 py-3 backdrop-blur">
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        (click)="alternarMenu()"
+        aria-label="Abrir menu de navegação"
+        [attr.aria-expanded]="menuAberto()"
+        class="grid h-9 w-9 place-items-center rounded-lg text-ink-soft transition hover:bg-surface-muted md:hidden"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      <a
+        routerLink="/dashboard"
+        title="Ir para a Visão geral"
+        aria-label="Ir para a Visão geral"
+        class="flex items-center gap-3 rounded-lg px-1 transition hover:opacity-80"
+      >
+        <img src="logo-radar-saude.png" alt="Radar Saúde" class="h-9 w-9 rounded-lg" />
+        <div class="leading-tight">
+          <p class="text-sm font-bold text-ink">Radar Saúde</p>
+          <p class="text-xs text-ink-soft">Painel Administrativo</p>
+        </div>
+      </a>
+    </div>
 
     <div class="flex items-center gap-3">
       @if (usuario(); as u) {
@@ -32,9 +46,21 @@
     </div>
   </header>
 
+  <!-- Overlay do menu mobile (fecha ao tocar fora) -->
+  @if (menuAberto()) {
+    <div
+      class="fixed inset-0 z-10 bg-ink/40 md:hidden"
+      (click)="fecharMenu()"
+      aria-hidden="true"
+    ></div>
+  }
+
   <div class="mx-auto flex max-w-6xl gap-6 px-4 py-6">
-    <!-- Navegação lateral -->
-    <aside class="hidden w-56 shrink-0 md:block">
+    <!-- Navegação lateral: fixa em md+; drawer deslizante abaixo disso -->
+    <aside
+      class="fixed inset-y-0 left-0 z-10 w-64 -translate-x-full overflow-y-auto bg-surface-card p-4 pt-20 shadow-xl transition-transform duration-200 md:sticky md:top-20 md:z-auto md:w-56 md:shrink-0 md:translate-x-0 md:bg-transparent md:p-0 md:pt-0 md:shadow-none"
+      [class.translate-x-0]="menuAberto()"
+    >
       <nav class="space-y-1">
         <a
           routerLink="/dashboard"

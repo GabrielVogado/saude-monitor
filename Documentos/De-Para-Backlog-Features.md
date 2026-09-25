@@ -13,7 +13,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | Escopo | Entregue | Total | % |
 |---|---|---|---|
 | Aplicativo (Fase 0 + Épicos 1–6) | 42 | 43 | **98%** |
-| Painel Administrativo Web (Épico 7) | 0 | 9 | 0% (🚧 em andamento, retomado 24/09) |
+| Painel Administrativo Web (Épico 7) | 1 | 9 | 11% (🚧 em andamento — E7-01 entregue) |
 | **Total do backlog** | **42** | **52** | **81%** |
 | Épico 8 — Estabilização e Desempenho (novo, v2.1) | 8 | 15 | 53% |
 
@@ -100,7 +100,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 
 | ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |
 |---|---|---|---|
-| **E7-01** | Login web administrativo | **F-11** | 🔴 Inexistente |
+| **E7-01** | Login web administrativo | **F-11** | ✅ Entregue (25/09/2026) — login em `admin/` (Angular, Reactive Forms) com **enforce ADMIN-only** (só `papel === "ADMIN"`, inverso do app), guard de rota e interceptor JWT que anexa Bearer só à API. **Verificado E2E:** com o CORS-01 resolvido, login real `admin@saude.com` pela UI do painel (`localhost:4200`) → HTTP 200, papel ADMIN, token, e navegação ao dashboard **confirmada pelo PO**. 15 testes (Vitest) verdes; `ng build` limpo |
 | **E7-02** | Listar todos os hospitais (Admin) | **F-11** | 🔴 Inexistente |
 | **E7-03** | Filtrar hospitais (nome/tipo/status/região) | **F-11** | 🔴 Inexistente |
 | **E7-04** | Mapa com camadas georreferenciadas | **F-11** | 🔴 Inexistente |

@@ -28,6 +28,7 @@ public class SecurityConfig {
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
     private final RateLimitFilter rateLimitFilter;
+    private final CorsProperties corsProperties;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -99,13 +100,18 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "http://localhost:8081",
-                "http://localhost:3000",
-                "http://localhost:19006"
-        ));
+        // Origens configuráveis por ambiente (CORS-01, Épico 7): dev cobre localhost
+        // (inclui o Painel Admin em :4200); produção sobrescreve por APP_CORS_ALLOWED_ORIGINS.
+        // Origens exatas, nunca "*": credenciais à parte, um curinga abriria a API a qualquer site.
+        config.setAllowedOrigins(corsProperties.allowedOrigins());
+        // PATCH permanece porque a API o expõe de fato (edição de hospital pelo ADMIN,
+        // /api/v1/hospitais/** acima); sem ele o navegador barraria essa chamada no preflight.
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
+        // Só os cabeçalhos que o navegador realmente envia: Bearer/JWT vai em Authorization e o
+        // corpo JSON em Content-Type. Sem "*" — não há cabeçalho customizado no contrato.
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        // Autenticação é por Bearer/JWT no header Authorization, não por cookie/sessão: não há
+        // credencial de navegador a compartilhar entre origens, então credenciais ficam desligadas.
         config.setAllowCredentials(false);
         config.setMaxAge(3600L);
 

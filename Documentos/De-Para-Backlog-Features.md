@@ -101,14 +101,14 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |
 |---|---|---|---|
 | **E7-01** | Login web administrativo | **F-11** | ✅ Entregue (25/09/2026) — login em `admin/` (Angular, Reactive Forms) com **enforce ADMIN-only** (só `papel === "ADMIN"`, inverso do app), guard de rota e interceptor JWT que anexa Bearer só à API. **Verificado E2E:** com o CORS-01 resolvido, login real `admin@saude.com` pela UI do painel (`localhost:4200`) → HTTP 200, papel ADMIN, token, e navegação ao dashboard **confirmada pelo PO**. 15 testes (Vitest) verdes; `ng build` limpo |
-| **E7-02** | Listar todos os hospitais (Admin) | **F-11** | 🔴 Inexistente |
+| **E7-02** | Listar todos os hospitais (Admin) | **F-11** | 🟡 Em andamento (25/09/2026) — página `admin/features/hospitais` (Angular + Tailwind): tabela (nome, tipo, cidade/UF, status), **busca por nome** e **paginação**, com estados de carregando/erro/vazio. Verificado E2E contra o backend dev (340 hospitais reais). **Não fecha:** o endpoint público só retorna **ativos** — "listar **todos** (inclui inativos)" depende de ajuste no backend (dependência do Épico 7, chip criado). O `HospitalApi` já isola essa chamada para trocar pelo caminho admin quando existir |
 | **E7-03** | Filtrar hospitais (nome/tipo/status/região) | **F-11** | 🔴 Inexistente |
 | **E7-04** | Mapa com camadas georreferenciadas | **F-11** | 🔴 Inexistente |
 | **E7-05** | Ir ao detalhe do hospital via mapa | **F-11** | 🔴 Inexistente |
 | **E7-06** | Editar dados do hospital (Admin) | **F-11** | 🔴 Inexistente |
 | **E7-07** | Desativar hospital (ícone cinza) | **F-11** | 🔴 Inexistente |
 | **E7-08** | Bloqueio de escrita sobre feedback | **F-11** | 🔴 Inexistente |
-| **E7-09** | Menu Hospitais/Mapa/Sugestões | **F-11** | 🔴 Inexistente |
+| **E7-09** | Menu Hospitais/Mapa/Sugestões | **F-11** | 🟡 Parcial (25/09/2026) — shell do painel (`admin/features/shell`) com topbar (logo + usuário + Sair) e navegação lateral: **Visão geral** e **Hospitais** navegáveis (roteamento + destaque do ativo); **Mapa** e **Sugestões** marcados "em breve" até suas telas existirem. Fecha quando o menu apontar para telas reais |
 
 ---
 

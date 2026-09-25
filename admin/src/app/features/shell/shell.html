@@ -1,0 +1,58 @@
+<div class="min-h-screen bg-surface">
+  <!-- Topbar -->
+  <header class="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-outline-soft/60 bg-surface-card/90 px-4 py-3 backdrop-blur">
+    <div class="flex items-center gap-3">
+      <img src="logo-radar-saude.png" alt="Radar Saúde" class="h-9 w-9 rounded-lg" />
+      <div class="leading-tight">
+        <p class="text-sm font-bold text-ink">Radar Saúde</p>
+        <p class="text-xs text-ink-soft">Painel Administrativo</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      @if (usuario(); as u) {
+        <div class="hidden text-right sm:block">
+          <p class="text-sm font-semibold text-ink">{{ u.nome }}</p>
+          <p class="text-xs text-ink-soft">{{ u.email }}</p>
+        </div>
+        <span class="grid h-9 w-9 place-items-center rounded-full bg-brand-500 text-sm font-bold text-white" aria-hidden="true">{{ inicial() }}</span>
+      }
+      <button
+        type="button"
+        (click)="sair()"
+        class="rounded-lg border border-outline-soft px-3 py-1.5 text-sm font-semibold text-ink-soft transition hover:border-brand-500 hover:text-brand-500"
+      >
+        Sair
+      </button>
+    </div>
+  </header>
+
+  <div class="mx-auto flex max-w-6xl gap-6 px-4 py-6">
+    <!-- Navegação lateral -->
+    <aside class="hidden w-56 shrink-0 md:block">
+      <nav class="space-y-1">
+        <a
+          routerLink="/dashboard"
+          routerLinkActive="bg-brand-50 text-brand-700"
+          class="block rounded-lg px-3 py-2 text-sm font-semibold text-ink-soft transition hover:bg-surface-muted"
+        >Visão geral</a>
+        <a
+          routerLink="/hospitais"
+          routerLinkActive="bg-brand-50 text-brand-700"
+          class="block rounded-lg px-3 py-2 text-sm font-semibold text-ink-soft transition hover:bg-surface-muted"
+        >Hospitais</a>
+        @for (item of ['Mapa', 'Sugestões']; track item) {
+          <span class="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2 text-sm text-ink-soft/70">
+            {{ item }}
+            <span class="rounded-full bg-surface-muted px-2 py-0.5 text-[0.6875rem] font-semibold">em breve</span>
+          </span>
+        }
+      </nav>
+    </aside>
+
+    <!-- Conteúdo -->
+    <main class="min-w-0 flex-1">
+      <router-outlet />
+    </main>
+  </div>
+</div>

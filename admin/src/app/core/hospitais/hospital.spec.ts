@@ -54,4 +54,12 @@ describe('HospitalApi', () => {
     expect(req.request.params.get('page')).toBe('0');
     req.flush(pagina);
   });
+
+  it('altera status via PATCH /{id}/status com corpo { ativo }', () => {
+    api.alterarStatus('h1', false).subscribe();
+    const req = http.expectOne(`${BASE}/api/v1/hospitais/h1/status`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ ativo: false });
+    req.flush({});
+  });
 });

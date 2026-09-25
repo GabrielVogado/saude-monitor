@@ -48,6 +48,10 @@
     </div>
   </div>
 
+  @if (erroAcao(); as msg) {
+    <p class="mt-3 rounded-lg border border-danger-100 bg-danger-100/40 px-3 py-2 text-sm font-medium text-danger-700" role="alert">{{ msg }}</p>
+  }
+
   <section class="mt-4 overflow-hidden rounded-xl border border-outline-soft/50 bg-surface-card shadow-sm">
     @if (carregando()) {
       <div class="p-8 text-center text-sm text-ink-soft">Carregando…</div>
@@ -63,6 +67,7 @@
             <th class="px-4 py-3 font-semibold">Tipo</th>
             <th class="px-4 py-3 font-semibold">Cidade/UF</th>
             <th class="px-4 py-3 font-semibold">Status</th>
+            <th class="px-4 py-3 text-right font-semibold">Ações</th>
           </tr>
         </thead>
         <tbody>
@@ -86,6 +91,19 @@
                   <span class="h-1.5 w-1.5 rounded-full" [class]="h.ativo ? 'bg-teal-500' : 'bg-outline'"></span>
                   {{ h.ativo ? 'Ativo' : 'Inativo' }}
                 </span>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <button
+                  type="button"
+                  (click)="alternarStatus(h)"
+                  [disabled]="alterandoId() === h.id"
+                  [class]="h.ativo
+                    ? 'border-danger-100 text-danger-700 hover:bg-danger-100/40'
+                    : 'border-teal-100 text-teal-500 hover:bg-teal-100/40'"
+                  class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:cursor-progress disabled:opacity-40"
+                >
+                  {{ alterandoId() === h.id ? '…' : (h.ativo ? 'Desativar' : 'Ativar') }}
+                </button>
               </td>
             </tr>
           }

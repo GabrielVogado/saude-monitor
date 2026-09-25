@@ -32,4 +32,12 @@ export class HospitalApi {
       params: httpParams,
     });
   }
+
+  /**
+   * Ativa/desativa um hospital (E7-07) — `PATCH /api/v1/hospitais/{id}/status`
+   * (restrito a ADMIN no backend). O corpo é `{ ativo }`.
+   */
+  alterarStatus(id: string, ativo: boolean): Observable<Hospital> {
+    return this.http.patch<Hospital>(`${this.apiBaseUrl}/api/v1/hospitais/${id}/status`, { ativo });
+  }
 }

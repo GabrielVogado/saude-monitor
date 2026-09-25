@@ -21,9 +21,33 @@ export class Hospitais implements OnInit {
   protected termoBusca = '';
   protected readonly tipoFiltro = signal<TipoEstabelecimento | ''>('');
   protected readonly statusFiltro = signal<StatusHospital>('TODOS');
+  /** Id do hospital cujo status está sendo alterado (desabilita o botão da linha). */
+  protected readonly alterandoId = signal<string | null>(null);
+  /** Erro de ação (toggle) — mostrado como aviso, sem esconder a tabela. */
+  protected readonly erroAcao = signal<string | null>(null);
 
   ngOnInit(): void {
     this.carregar();
+  }
+
+  /** Ativa/desativa o hospital (E7-07), com confirmação, e recarrega a listagem. */
+  protected alternarStatus(h: Hospital): void {
+    const acao = h.ativo ? 'desativar' : 'ativar';
+    if (!confirm(`Deseja ${acao} o hospital "${h.nome}"?`)) {
+      return;
+    }
+    this.alterandoId.set(h.id);
+    this.erroAcao.set(null);
+    this.api.alterarStatus(h.id, !h.ativo).subscribe({
+      next: () => {
+        this.alterandoId.set(null);
+        this.carregar();
+      },
+      error: () => {
+        this.alterandoId.set(null);
+        this.erroAcao.set(`Não foi possível ${acao} o hospital. Tente novamente.`);
+      },
+    });
   }
 
   protected buscar(termo: string): void {

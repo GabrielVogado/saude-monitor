@@ -4,7 +4,7 @@
       <h1 class="text-2xl font-bold tracking-tight text-ink">Hospitais</h1>
       <p class="mt-1 text-sm text-ink-soft">
         @if (!carregando() && !erro()) {
-          {{ totalElements() }} estabelecimento(s) ativo(s)
+          {{ totalElements() }} estabelecimento(s)
         } @else {
           Gestão de estabelecimentos
         }
@@ -12,6 +12,15 @@
     </div>
 
     <div class="flex items-center gap-2">
+      <select
+        aria-label="Filtrar por status"
+        (change)="filtrarStatus($any($event.target).value)"
+        class="rounded-lg border border-outline-soft bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+      >
+        <option value="TODOS">Todos os status</option>
+        <option value="ATIVOS">Ativos</option>
+        <option value="INATIVOS">Inativos</option>
+      </select>
       <select
         aria-label="Filtrar por tipo"
         (change)="filtrarTipo($any($event.target).value)"
@@ -38,11 +47,6 @@
       </button>
     </div>
   </div>
-
-  <!-- aviso: só ativos até o backend expor os inativos -->
-  <p class="mt-3 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-xs text-brand-700">
-    Exibindo apenas hospitais <strong>ativos</strong>. A listagem incluindo inativos depende de ajuste no backend (dependência do Épico 7).
-  </p>
 
   <section class="mt-4 overflow-hidden rounded-xl border border-outline-soft/50 bg-surface-card shadow-sm">
     @if (carregando()) {

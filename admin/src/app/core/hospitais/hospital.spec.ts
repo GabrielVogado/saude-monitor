@@ -32,11 +32,12 @@ describe('HospitalApi', () => {
 
   afterEach(() => http.verify());
 
-  it('lista com page/size e busca', () => {
+  it('usa o endpoint admin com status TODOS por padrão', () => {
     let resp: unknown;
     api.listar({ busca: 'ana', page: 2, size: 10 }).subscribe((r) => (resp = r));
 
-    const req = http.expectOne((r) => r.url === `${BASE}/api/v1/hospitais`);
+    const req = http.expectOne((r) => r.url === `${BASE}/api/v1/admin/hospitais`);
+    expect(req.request.params.get('status')).toBe('TODOS');
     expect(req.request.params.get('page')).toBe('2');
     expect(req.request.params.get('size')).toBe('10');
     expect(req.request.params.get('busca')).toBe('ana');
@@ -45,9 +46,10 @@ describe('HospitalApi', () => {
     expect(resp).toEqual(pagina);
   });
 
-  it('omite a busca quando vazia e usa page 0 por padrão', () => {
-    api.listar({}).subscribe();
-    const req = http.expectOne((r) => r.url === `${BASE}/api/v1/hospitais`);
+  it('envia o status escolhido e omite a busca vazia', () => {
+    api.listar({ status: 'INATIVOS' }).subscribe();
+    const req = http.expectOne((r) => r.url === `${BASE}/api/v1/admin/hospitais`);
+    expect(req.request.params.get('status')).toBe('INATIVOS');
     expect(req.request.params.has('busca')).toBe(false);
     expect(req.request.params.get('page')).toBe('0');
     req.flush(pagina);

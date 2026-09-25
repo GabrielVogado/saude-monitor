@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { HospitalApi } from '../../core/hospitais/hospital';
-import { Hospital, TipoEstabelecimento } from '../../core/hospitais/hospital.models';
+import { Hospital, StatusHospital, TipoEstabelecimento } from '../../core/hospitais/hospital.models';
 
 @Component({
   selector: 'app-hospitais',
@@ -20,6 +20,7 @@ export class Hospitais implements OnInit {
   protected readonly totalElements = signal(0);
   protected termoBusca = '';
   protected readonly tipoFiltro = signal<TipoEstabelecimento | ''>('');
+  protected readonly statusFiltro = signal<StatusHospital>('TODOS');
 
   ngOnInit(): void {
     this.carregar();
@@ -33,6 +34,12 @@ export class Hospitais implements OnInit {
 
   protected filtrarTipo(valor: string): void {
     this.tipoFiltro.set(valor === 'PUBLICO' || valor === 'PRIVADO' ? valor : '');
+    this.page.set(0);
+    this.carregar();
+  }
+
+  protected filtrarStatus(valor: string): void {
+    this.statusFiltro.set(valor === 'ATIVOS' || valor === 'INATIVOS' ? valor : 'TODOS');
     this.page.set(0);
     this.carregar();
   }
@@ -52,6 +59,7 @@ export class Hospitais implements OnInit {
       .listar({
         busca: this.termoBusca,
         tipo: this.tipoFiltro() || undefined,
+        status: this.statusFiltro(),
         page: this.page(),
         size: this.size,
       })

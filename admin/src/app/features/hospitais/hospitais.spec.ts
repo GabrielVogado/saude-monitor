@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 
 import { Hospitais } from './hospitais';
+import { Camada } from '../../core/camadas/camada';
 import { HospitalApi } from '../../core/hospitais/hospital';
 
 function pagina(over: Record<string, unknown> = {}) {
@@ -19,6 +20,7 @@ describe('Hospitais', () => {
   let fixture: ComponentFixture<Hospitais>;
   let el: HTMLElement;
   const api = { listar: vi.fn(), alterarStatus: vi.fn() };
+  const camadaApi = { nomesRegiaoAdministrativa: vi.fn() };
 
   function selects() {
     return Array.from(el.querySelectorAll('select')) as HTMLSelectElement[];
@@ -27,11 +29,16 @@ describe('Hospitais', () => {
   beforeEach(async () => {
     api.listar.mockReset();
     api.alterarStatus.mockReset();
+    camadaApi.nomesRegiaoAdministrativa.mockReset();
     api.listar.mockReturnValue(of(pagina()));
     api.alterarStatus.mockReturnValue(of({}));
+    camadaApi.nomesRegiaoAdministrativa.mockReturnValue(of(['Plano Piloto', 'Recanto das Emas']));
     await TestBed.configureTestingModule({
       imports: [Hospitais],
-      providers: [{ provide: HospitalApi, useValue: api }],
+      providers: [
+        { provide: HospitalApi, useValue: api },
+        { provide: Camada, useValue: camadaApi },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Hospitais);
@@ -71,6 +78,31 @@ describe('Hospitais', () => {
     tipoSelect.dispatchEvent(new Event('change'));
     fixture.detectChanges();
     expect(api.listar).toHaveBeenLastCalledWith(expect.objectContaining({ tipo: 'PRIVADO', page: 0 }));
+  });
+
+  it('popula o seletor de região com os nomes da camada e filtra ao escolher', () => {
+    expect(camadaApi.nomesRegiaoAdministrativa).toHaveBeenCalled();
+    const regiaoSelect = selects()[2];
+    const opcoes = Array.from(regiaoSelect.options).map((o) => o.textContent?.trim());
+    expect(opcoes).toEqual(['Todas as regiões', 'Plano Piloto', 'Recanto das Emas']);
+
+    regiaoSelect.value = 'Plano Piloto';
+    regiaoSelect.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(api.listar).toHaveBeenLastCalledWith(
+      expect.objectContaining({ regiaoAdministrativa: 'Plano Piloto', page: 0 }),
+    );
+  });
+
+  it('segue funcionando se a camada de regiões falhar ao carregar', () => {
+    camadaApi.nomesRegiaoAdministrativa.mockReturnValue(throwError(() => new Error('falha')));
+    fixture = TestBed.createComponent(Hospitais);
+    el = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+
+    const regiaoSelect = selects()[2];
+    expect(regiaoSelect.options).toHaveLength(1); // só "Todas as regiões"
+    expect(el.textContent).toContain('Hosp A'); // listagem principal não é afetada
   });
 
   it('mostra estado vazio quando não há resultados', () => {

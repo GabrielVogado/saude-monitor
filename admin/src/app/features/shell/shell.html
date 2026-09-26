@@ -72,12 +72,15 @@
           routerLinkActive="bg-brand-50 text-brand-700"
           class="block rounded-lg px-3 py-2 text-sm font-semibold text-ink-soft transition hover:bg-surface-muted"
         >Hospitais</a>
-        @for (item of ['Mapa', 'Sugestões']; track item) {
-          <span class="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2 text-sm text-ink-soft/70">
-            {{ item }}
-            <span class="rounded-full bg-surface-muted px-2 py-0.5 text-[0.6875rem] font-semibold">em breve</span>
-          </span>
-        }
+        <a
+          routerLink="/mapa"
+          routerLinkActive="bg-brand-50 text-brand-700"
+          class="block rounded-lg px-3 py-2 text-sm font-semibold text-ink-soft transition hover:bg-surface-muted"
+        >Mapa</a>
+        <span class="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2 text-sm text-ink-soft/70">
+          Sugestões
+          <span class="rounded-full bg-surface-muted px-2 py-0.5 text-[0.6875rem] font-semibold">em breve</span>
+        </span>
       </nav>
     </aside>
 

@@ -1,0 +1,39 @@
+<div class="animate-[fadeInUp_0.4s_ease-out]">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight text-ink">Mapa</h1>
+      <p class="mt-1 text-sm text-ink-soft">
+        {{ totalHospitais() }} hospital(is) no mapa · toque num marcador para ver detalhes
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 rounded-lg border border-outline-soft/50 bg-surface-card px-3 py-2">
+      @for (opcao of opcoesCamada; track opcao.tipo) {
+        <label class="flex items-center gap-1.5 text-sm text-ink">
+          <input
+            type="checkbox"
+            [checked]="camadasAtivas().has(opcao.tipo)"
+            [attr.aria-label]="opcao.rotulo"
+            (change)="alternarCamada(opcao.tipo, $any($event.target).checked)"
+          />
+          <span class="h-2.5 w-2.5 rounded-full" [style.background]="opcao.cor"></span>
+          {{ opcao.rotulo }}
+          @if (carregandoCamada() === opcao.tipo) {
+            <span class="text-ink-soft">(carregando…)</span>
+          }
+        </label>
+      }
+    </div>
+  </div>
+
+  @if (erro(); as msg) {
+    <p class="mt-3 rounded-lg border border-danger-100 bg-danger-100/40 px-3 py-2 text-sm font-medium text-danger-700" role="alert">
+      {{ msg }}
+    </p>
+  }
+
+  <div
+    #mapaEl
+    class="mt-4 h-[32rem] w-full overflow-hidden rounded-xl border border-outline-soft/50 shadow-sm"
+  ></div>
+</div>

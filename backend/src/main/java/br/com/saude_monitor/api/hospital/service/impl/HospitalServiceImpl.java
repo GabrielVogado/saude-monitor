@@ -514,6 +514,7 @@ public class HospitalServiceImpl implements HospitalService {
                 d.getContato() == null ? null : toContatoDto(d.getContato()),
                 d.getGeofence() == null ? null : geofenceFactory.toDto(d.getGeofence()),
                 d.isAtivo(),
+                d.getRegiaoAdministrativa(),
                 indicadores,
                 d.getCriadoEm(),
                 d.getAtualizadoEm()

@@ -53,6 +53,14 @@ export class Mapa implements AfterViewInit, OnDestroy {
   private mapa: L.Map | null = null;
   /** Cache das camadas já buscadas — evita rebuscar ao alternar o toggle (mitigação T-W1). */
   private readonly camadasCarregadas = new Map<TipoCamada, L.GeoJSON>();
+  /**
+   * O Leaflet mede o container no momento do `L.map()`. Como o `<div #mapaEl>` está
+   * dentro de um bloco com animação (`fadeInUp`) e layout flex, o tamanho final só se
+   * estabiliza depois do primeiro paint — sem recalcular, o grid de tiles fica cortado
+   * (buracos/blocos faltando). O ResizeObserver cobre isso e qualquer mudança futura
+   * (ex.: sidebar recolhendo).
+   */
+  private resizeObserver: ResizeObserver | null = null;
 
   protected readonly opcoesCamada = CAMADAS;
   protected readonly camadasAtivas = signal<ReadonlySet<TipoCamada>>(new Set());
@@ -67,9 +75,16 @@ export class Mapa implements AfterViewInit, OnDestroy {
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(this.mapa);
     this.carregarHospitais();
+
+    // jsdom (ambiente de teste) não implementa ResizeObserver — degrada sem quebrar.
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => this.mapa?.invalidateSize());
+      this.resizeObserver.observe(this.mapaEl.nativeElement);
+    }
   }
 
   ngOnDestroy(): void {
+    this.resizeObserver?.disconnect();
     this.mapa?.remove();
   }
 

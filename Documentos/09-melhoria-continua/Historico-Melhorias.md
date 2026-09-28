@@ -1644,6 +1644,53 @@ Relato do PO com quatro comportamentos do fluxo de feedback após check-in/check
 
 ---
 
+## M-025 — Edição de geofence no painel (E7-06) e o reconciliador que a desfaria
+
+**Data:** 28/09/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Ao desenhar a edição do raio do geofence na E7-06, a primeira ideia foi gerar o círculo
+novo exatamente como o backend gera (32 lados). Lendo o `ReconciliacaoRaioGeofenceRunner`
+(BUG-08), ficou claro que isso não sobreviveria: ele roda **a cada startup**
+(`app.geofence.reconciliacao.enabled=true` em todos os ambientes) e regrava todo círculo
+regular de 32 lados cujo raio difere do raio da categoria. No Cloud Run, startup = cold
+start, então o raio escolhido pelo administrador voltaria sozinho ao padrão pouco depois
+de salvo, sem erro nem log visível para quem editou.
+
+### O que mudou
+
+- O painel gera o círculo com **48 lados** (`LADOS_CIRCULO_ADMIN`): o reconciliador o trata
+  como polígono próprio e o preserva, que é exatamente a regra já documentada nele
+  ("contorno do administrador vale mais que o círculo da categoria").
+- Sem mudar o raio, o polígono atual é reenviado intacto; um contorno desenhado à mão não é
+  trocado por círculo só porque o nome foi editado.
+- Quando o admin troca só a categoria de um hospital com o círculo padrão, a tela avisa que
+  o raio passa a seguir o padrão da nova categoria no próximo startup (comportamento do
+  reconciliador, agora explícito para quem edita).
+
+### Achados do code-review aplicados no mesmo PR
+
+- Raio medido fora da faixa 30–1000 m (contorno à mão) travava o formulário inteiro; a faixa
+  passou a valer só para um raio **novo**. Causa extra: `[min]`/`[max]` no `<input
+  type="number">` ativam os validadores de diretiva do Angular por conta própria.
+- CNPJ gravado só com dígitos (importação CNES) reprovava a máscara e impedia salvar; agora
+  é aceito e enviado mascarado.
+- Resposta do PUT que chegasse após sair da tela (cold start de ~15 s) arrastava o usuário
+  de volta ao detalhe; a assinatura passou a morrer com o componente.
+- A prévia do mapa não se reenquadrava e cortava tiles dentro da animação de entrada; o
+  setup do Leaflet (tiles OSM, z19, `ResizeObserver`) virou `criarMapaBase`, compartilhado
+  com a página do mapa.
+
+### Verificação
+
+- 72 testes (Vitest) verdes e `ng build` limpo. Mutações conferidas: voltar para 32 lados,
+  retirar o `takeUntilDestroyed` do PUT e reaplicar a faixa ao raio original fazem os
+  testes correspondentes falharem.
+- Pendente: verificação E2E com login ADMIN real contra o backend de dev.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

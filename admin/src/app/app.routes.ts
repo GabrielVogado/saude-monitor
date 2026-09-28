@@ -26,6 +26,11 @@ export const routes: Routes = [
           import('./features/hospital-detalhe/hospital-detalhe').then((m) => m.HospitalDetalhe),
       },
       {
+        path: 'hospitais/:id/editar',
+        loadComponent: () =>
+          import('./features/hospital-editar/hospital-editar').then((m) => m.HospitalEditar),
+      },
+      {
         path: 'mapa',
         loadComponent: () => import('./features/mapa/mapa').then((m) => m.Mapa),
       },

@@ -16,13 +16,21 @@
           <h1 class="text-2xl font-bold tracking-tight text-ink">{{ h.nome }}</h1>
           <p class="mt-1 text-sm text-ink-soft">{{ h.tipoUnidade || h.categoria || '—' }}</p>
         </div>
-        <span
-          class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
-          [class]="h.ativo ? 'bg-teal-100 text-teal-500' : 'bg-surface-muted text-ink-soft'"
-        >
-          <span class="h-1.5 w-1.5 rounded-full" [class]="h.ativo ? 'bg-teal-500' : 'bg-outline'"></span>
-          {{ h.ativo ? 'Ativo' : 'Inativo' }}
-        </span>
+        <div class="flex items-center gap-3">
+          <span
+            class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+            [class]="h.ativo ? 'bg-teal-100 text-teal-500' : 'bg-surface-muted text-ink-soft'"
+          >
+            <span class="h-1.5 w-1.5 rounded-full" [class]="h.ativo ? 'bg-teal-500' : 'bg-outline'"></span>
+            {{ h.ativo ? 'Ativo' : 'Inativo' }}
+          </span>
+          <a
+            [routerLink]="['/hospitais', h.id, 'editar']"
+            class="rounded-lg bg-gradient-to-r from-brand-500 to-brand-400 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
+          >
+            Editar
+          </a>
+        </div>
       </div>
 
       <dl class="mt-6 grid gap-x-6 gap-y-4 sm:grid-cols-2">

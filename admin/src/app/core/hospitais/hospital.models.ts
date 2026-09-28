@@ -46,23 +46,55 @@ export interface Hospital {
   regiaoAdministrativa?: string | null;
 }
 
+/** Categoria do estabelecimento (espelha `CategoriaEstabelecimento` do backend). */
+export type CategoriaEstabelecimento =
+  | 'HOSPITAL'
+  | 'UPA'
+  | 'UBS'
+  | 'POLICLINICA'
+  | 'CAPS'
+  | 'CENTRO_ESPECIALIZADO'
+  | 'OUTRO';
+
+/** Polígono GeoJSON do geofence (espelha `GeoJsonPolygonDto`): anéis de posições `[lng, lat]`. */
+export interface GeoJsonPolygon {
+  type: 'Polygon';
+  coordinates: number[][][];
+}
+
 /** Detalhe completo do hospital (E7-05) — espelha `HospitalResponse`. */
 export interface HospitalDetalheResponse {
   id: string;
   nome: string;
-  cnpj?: string;
+  cnpj?: string | null;
   tipo: TipoEstabelecimento;
-  categoria?: string;
+  categoria?: CategoriaEstabelecimento | null;
   horarioFuncionamento?: string;
   salaVacina?: boolean;
   farmacia?: boolean;
   coletaMaterial?: boolean;
   tipoUnidade?: string;
   endereco?: Endereco;
-  contato?: Contato;
+  contato?: Contato | null;
+  geofence?: GeoJsonPolygon | null;
   ativo: boolean;
   regiaoAdministrativa?: string | null;
   indicadores?: Indicadores;
+}
+
+/**
+ * Corpo do `PUT /api/v1/hospitais/{id}` (E7-06) — espelha `HospitalRequest`. É
+ * substituição dos campos cadastrais: horário, serviços e status não fazem parte do
+ * contrato e o backend os preserva. Não há campo de feedback aqui (E7-08).
+ */
+export interface HospitalRequest {
+  nome: string;
+  cnpj: string | null;
+  tipo: TipoEstabelecimento;
+  categoria: CategoriaEstabelecimento | null;
+  endereco: Endereco;
+  contato: Contato | null;
+  geofence: GeoJsonPolygon;
 }
 
 /** Envelope paginado do backend (`PageResponse<T>`). */

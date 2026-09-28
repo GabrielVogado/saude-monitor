@@ -1592,6 +1592,58 @@ em memória, sequenciada e a detalhar deploy (mesmo domínio ou BFF/proxy).
 
 ---
 
+## M-024 — Feedback pós-saída: piso de 2 min, pedido em 1 min e deep-link da notificação
+
+**Data:** 28/09/2026 · **PR:** #163
+
+### Como apareceu
+
+Relato do PO com quatro comportamentos do fluxo de feedback após check-in/checkout
+(manual e por geolocalização, em estados anônimo e logado):
+
+1. A pesquisa era enviada mesmo para quem ficou **menos de 2 min** na unidade.
+2. A notificação demorava **~5 min** (percebido como 5–10 min), não os 1–5 previstos.
+3. Após "Fechar tudo", tocar a notificação abria a **tela inicial** em vez do feedback.
+4. Com o app aberto numa tela qualquer, tocar a notificação **não redirecionava**.
+
+### Causa
+
+1. `agendarFeedback` não olhava a duração da visita — RN-01/RN-07 (visita < 2 min não
+   convida, mesmo corte da agregação do backend) não era aplicado no cliente.
+2. O atraso usava `visitaId.length % 5`; como o ObjectId do Mongo tem sempre 24
+   caracteres, `24 % 5` dava 4 para toda visita e travava o atraso no teto de 5 min.
+3. `addNotificationResponseReceivedListener` não recebe a resposta que **inicia** o app
+   do zero — ela chega por `getLastNotificationResponseAsync`, que não era lido.
+4. O handler fazia `await agendarLembrete(...)` **antes** do `navigate`: uma falha no
+   agendamento impedia a navegação.
+
+### O que mudou
+
+- **Piso de 2 min:** `agendarFeedback` recebe a duração e não agenda abaixo do piso;
+  online vem da resposta do checkout (`duracaoMinutos`), offline é calculada da entrada
+  (util `duracaoMinutosDesde`, arredondado para casar com o inteiro do backend). Vale
+  para `HospitalDetalheScreen` (manual) e `GeofencingTaskService` (geofence).
+- **Pedido em 1 min:** por decisão do PO (28/09/2026), o convite passou de 1–5 min para
+  **1 min fixo** após a saída; o espalhamento por id foi removido (sem propósito com valor
+  fixo, e a idempotência do reagendamento se mantém).
+- **Cold start:** `App.js` trata `getLastNotificationResponseAsync` no mount e despacha a
+  navegação no `onReady` do `NavigationContainer`.
+- **Foreground:** a navegação passa a vir **antes** do lembrete, que vira efeito colateral
+  tolerante a falha.
+- Reidratação: `HomeScreen` passa a `entrada` ao `sincronizarVisitaAtiva`, para o checkout
+  offline por geofence ter a duração após reinício do app.
+
+### Verificação
+
+- **420 testes (Jest) verdes**, com casos novos para cada correção; lint no teto (16
+  warnings pré-existentes, 0 erros).
+- Revisão do diff antes do PR, com os achados tratados (util compartilhado, wire da
+  entrada, arredondamento) ou justificados.
+- Ressalva: a confirmação do fix 4 em aparelho físico (toque com o app aberto) depende de
+  dispositivo/emulador; os demais são cobertos por teste.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

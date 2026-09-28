@@ -104,6 +104,9 @@ jest.mock("expo-notifications", () => {
     cancelScheduledNotificationAsync: jest.fn(),
     getAllScheduledNotificationsAsync: jest.fn(async () => []),
     addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+    // Cold start: por padrão não há resposta que tenha aberto o app (retorna null);
+    // testes que exercitam o caminho de "Fechar tudo" sobrescrevem este mock.
+    getLastNotificationResponseAsync: jest.fn(async () => null),
   };
 });
 

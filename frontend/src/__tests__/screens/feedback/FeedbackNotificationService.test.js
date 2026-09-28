@@ -87,6 +87,58 @@ describe("FeedbackNotificationService (Épico 03)", () => {
     expect(args.content.data.abrirFeedback).toBe(true);
   });
 
+  test("não agenda nem grava pendência quando a visita durou menos de 2 min (RN-01/RN-07)", async () => {
+    // Bug relatado: check-in seguido de checkout imediato convidava para feedback.
+    const resultado = await agendarFeedback({
+      visitaId: "v-curta",
+      hospitalId: "h1",
+      hospitalNome: "UPA",
+      duracaoMinutos: 1,
+    });
+
+    expect(resultado).toBeNull();
+    expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+    expect(await pendenciaAtual()).toBeNull();
+  });
+
+  test("agenda normalmente quando a visita atingiu o piso de 2 min (RN-01/RN-07)", async () => {
+    await agendarFeedback({
+      visitaId: "v-ok",
+      hospitalId: "h1",
+      hospitalNome: "UPA",
+      duracaoMinutos: 2,
+    });
+
+    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+    expect(await pendenciaAtual()).not.toBeNull();
+  });
+
+  test("o atraso do pedido varia por visita e não fica preso no teto de 5 min (bug do ObjectId)", async () => {
+    // ObjectId do Mongo tem sempre 24 caracteres; o cálculo antigo usava `id.length % 5`,
+    // que dava 4 para TODO id de 24 chars e travava o atraso em exatamente 5 min. O novo
+    // usa a soma dos códigos dos caracteres, então ids diferentes caem em baldes diferentes.
+    const agora = Date.now();
+    jest.setSystemTime(agora);
+
+    const idA = "a".repeat(24); // soma 2328 → balde 3 → 4 min
+    const idB = "b".repeat(24); // soma 2352 → balde 2 → 3 min
+
+    await agendarFeedback({ visitaId: idA, hospitalNome: "UPA", saidaEm: new Date(agora).toISOString() });
+    const deltaA = new Date(Notifications.scheduleNotificationAsync.mock.calls[0][0].trigger.date).getTime() - agora;
+
+    Notifications.scheduleNotificationAsync.mockClear();
+    AsyncStorage.__reset();
+
+    await agendarFeedback({ visitaId: idB, hospitalNome: "UPA", saidaEm: new Date(agora).toISOString() });
+    const deltaB = new Date(Notifications.scheduleNotificationAsync.mock.calls[0][0].trigger.date).getTime() - agora;
+
+    expect(deltaA).toBe(4 * 60 * 1000);
+    expect(deltaB).toBe(3 * 60 * 1000);
+    // ambos abaixo do teto — o bug antigo prenderia os dois em 5 min
+    expect(deltaA).not.toBe(5 * 60 * 1000);
+    expect(deltaB).not.toBe(5 * 60 * 1000);
+  });
+
   test("agendarLembrete dispara apenas 1 lembrete (E3-03)", async () => {
     const agora = Date.now();
     jest.setSystemTime(agora);

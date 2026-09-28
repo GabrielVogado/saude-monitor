@@ -48,7 +48,11 @@ describe("HomeScreen — sincronização da visita ativa sobrevive a uma oscila�
   });
 
   test("um refoco sem internet não para o heartbeat de uma visita geofence real", async () => {
-    VisitaService.buscarAtiva.mockResolvedValue({ visita: { id: "v1" } });
+    // Reidrata id + entrada: a entrada alimenta o cálculo de duração no checkout offline
+    // do geofence (RN-01/RN-07), então é repassada ao sincronizarVisitaAtiva.
+    VisitaService.buscarAtiva.mockResolvedValue({
+      visita: { id: "v1", entrada: "2026-09-28T10:00:00.000Z" },
+    });
 
     render(<HomeScreen />);
     await waitFor(() => expect(iniciarHeartbeat).toHaveBeenCalledWith("v1"));
@@ -58,11 +62,13 @@ describe("HomeScreen — sincronização da visita ativa sobrevive a uma oscila�
     await refocarTela();
 
     expect(pararHeartbeat).not.toHaveBeenCalled();
-    expect(sincronizarVisitaAtiva).toHaveBeenLastCalledWith("v1");
+    expect(sincronizarVisitaAtiva).toHaveBeenLastCalledWith("v1", "2026-09-28T10:00:00.000Z");
   });
 
   test("um refoco com erro real ainda limpa a visita e para o heartbeat", async () => {
-    VisitaService.buscarAtiva.mockResolvedValue({ visita: { id: "v1" } });
+    VisitaService.buscarAtiva.mockResolvedValue({
+      visita: { id: "v1", entrada: "2026-09-28T10:00:00.000Z" },
+    });
 
     render(<HomeScreen />);
     await waitFor(() => expect(iniciarHeartbeat).toHaveBeenCalledWith("v1"));
@@ -71,6 +77,7 @@ describe("HomeScreen — sincronização da visita ativa sobrevive a uma oscila�
     await refocarTela();
 
     await waitFor(() => expect(pararHeartbeat).toHaveBeenCalled());
-    expect(sincronizarVisitaAtiva).toHaveBeenLastCalledWith(null);
+    // visita limpa → id null; a entrada guardada acompanha (não há visita ativa).
+    expect(sincronizarVisitaAtiva).toHaveBeenLastCalledWith(null, "2026-09-28T10:00:00.000Z");
   });
 });

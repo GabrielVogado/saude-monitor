@@ -250,4 +250,49 @@ describe("App — abrir formulário a partir da notificação de feedback (RN-09
     // curto-circuito: nem chega a checar a janela de 24h da pendência errada
     expect(feedbackAvaliavelSpy).not.toHaveBeenCalled();
   });
+
+  test("abre o formulário mesmo se o agendamento do lembrete falhar (bug de foreground)", async () => {
+    // Bug relatado: com o app aberto numa tela qualquer, tocar a notificação não
+    // redirecionava. A causa era `await agendarLembrete(...)` ANTES do navigate — se o
+    // agendamento falhasse, o navigate nunca rodava. Agora a navegação vem primeiro e o
+    // lembrete é efeito colateral tolerante a falha.
+    jest.spyOn(FeedbackNotificationService, "feedbackAvaliavel").mockResolvedValue(true);
+    jest.spyOn(FeedbackNotificationService, "pendenciaAtual").mockResolvedValue({
+      visitaId: "v1",
+      hospitalNome: "Hospital Central",
+    });
+    jest
+      .spyOn(FeedbackNotificationService, "agendarLembrete")
+      .mockRejectedValue(new Error("falha ao agendar lembrete"));
+
+    render(<App />);
+    const tratarResposta = callbackDeResposta();
+
+    await act(async () => {
+      await tratarResposta(respostaDeNotificacao({ abrirFeedback: true, visitaId: "v1" }));
+    });
+
+    expect(await screen.findByText("Você passou pela triagem?")).toBeOnTheScreen();
+  });
+
+  test("cold start: a notificação que abriu o app do zero leva ao feedback (bug 'Fechar tudo')", async () => {
+    // Bug relatado: após "Fechar tudo", tocar a notificação abria a tela inicial. O
+    // listener ao vivo não recebe a resposta que INICIA o app — ela vem por
+    // getLastNotificationResponseAsync, tratada no mount.
+    jest.spyOn(FeedbackNotificationService, "feedbackAvaliavel").mockResolvedValue(true);
+    jest.spyOn(FeedbackNotificationService, "pendenciaAtual").mockResolvedValue({
+      visitaId: "v1",
+      hospitalNome: "Hospital Central",
+    });
+    jest.spyOn(FeedbackNotificationService, "agendarLembrete").mockResolvedValue(undefined);
+    Notifications.getLastNotificationResponseAsync.mockResolvedValueOnce(
+      respostaDeNotificacao({ abrirFeedback: true, visitaId: "v1" })
+    );
+
+    render(<App />);
+
+    // O caminho de cold start é assíncrono (getLastNotificationResponseAsync no mount);
+    // findByText aguarda a navegação despachar o formulário.
+    expect(await screen.findByText("Você passou pela triagem?")).toBeOnTheScreen();
+  });
 });

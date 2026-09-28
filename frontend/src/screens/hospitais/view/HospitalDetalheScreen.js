@@ -26,6 +26,7 @@ import {
 } from "../../../utils/geojson";
 import { getInitialViewState, MAPBOX_STYLE } from "../../../utils/mapStyle";
 import {
+  duracaoMinutosDesde,
   formatarData,
   formatarDuracao,
   formatarNota,
@@ -138,20 +139,23 @@ export default function HospitalDetalheScreen({ navigation, route }) {
 
     // Épico 03 — E3-01: agenda o pedido de feedback ~1–5 min após a saída. Chamado
     // tanto no sucesso quanto no checkout enfileirado (abaixo) — nos dois casos a
-    // saída está registrada do ponto de vista do usuário.
-    const encerrarLocalmente = () => {
+    // saída está registrada do ponto de vista do usuário. `duracaoMinutos` decide se a
+    // visita foi longa o bastante para convidar (RN-01/RN-07): online vem da resposta do
+    // checkout; offline é calculada localmente a partir da entrada.
+    const encerrarLocalmente = (duracaoMinutos) => {
       agendarFeedback({
         visitaId: visitaManual.id,
         hospitalId: visitaManual.hospitalId,
         hospitalNome: hospital?.nome,
         saidaEm: new Date().toISOString(),
+        duracaoMinutos,
       });
       setVisitaManual(null);
     };
 
     try {
-      await VisitaService.checkout(visitaManual.id, { encerramentoManual: true });
-      encerrarLocalmente();
+      const resposta = await VisitaService.checkout(visitaManual.id, { encerramentoManual: true });
+      encerrarLocalmente(resposta?.duracaoMinutos);
     } catch (e) {
       if (e.enfileirado) {
         // Sem conexão, o checkout foi guardado para sincronizar depois (OPS-05).
@@ -159,7 +163,7 @@ export default function HospitalDetalheScreen({ navigation, route }) {
         // já encerrou — sem isto, ele ficaria contando o tempo indefinidamente.
         // Janela residual e decisão de aceitá-la documentadas em
         // `preservarSeSemConexao` (utils/alertas.js).
-        encerrarLocalmente();
+        encerrarLocalmente(duracaoMinutosDesde(visitaManual.entrada));
         avisarSemConexao(e.message);
         return;
       }

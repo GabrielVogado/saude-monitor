@@ -9,7 +9,7 @@
 | **Base** | `DESIGN.md` v1.2 (Clinical Sanctuary — painel institucional) + protótipo `code.html` + frontend Expo 55 existente |
 | **Escopo** | App mobile (React Native + Expo 55) — Android e iOS, responsivo para web |
 | **Público do documento** | Designers, desenvolvedores frontend, PO, QA e stakeholders |
-| **v2.1 (28/09/2026)** | Notificação de feedback pós-saída: de "1–5 min" para **1 min** após a saída (decisão do PO, RN-08). Ver [M-024](../09-melhoria-continua/Historico-Melhorias.md). |
+| **v2.1 (28/09/2026)** | Notificação de feedback pós-saída: de "1–5 min" para **1 min** após a saída (decisão do PO, RN-08). Correção de aderência: o lembrete único passa de "2h" para **~6h** após o pedido inicial, alinhando ao código (`agendarLembrete`) e ao que Features/De-Para já registravam (E3-03). Ver [M-024](../09-melhoria-continua/Historico-Melhorias.md). |
 
 > **Como ler este documento:** ele é autocontido. Toda decisão de design está expressa em tokens, números e nomes de componentes. Se um valor não está aqui, ele não existe no padrão — crie a partir das escalas definidas nas seções 5.2 a 5.5.
 
@@ -172,7 +172,7 @@ flowchart TD
 | Múltiplos hospitais no raio | Escolhe o mais próximo (< 100m de diferença = confirmação manual) | Card com 2 opções "Você está em X ou Y?" |
 | Hospital não mapeado | Convida a "Sugerir hospital" (envia geolocalização + nome) | Link no empty state do mapa |
 | Bateria baixa | Reduz frequência de amostragem de GPS | Sem UI; degrade transparente |
-| Notificação não aberta em 2h | 1 lembrete; expira em 24h | Notificação local + card na home |
+| Notificação não aberta em ~6h | 1 lembrete; expira em 24h | Notificação local + card na home |
 | Sem amostra suficiente no hospital | Não exibe média inventada | Texto simples "Ainda sem avaliações suficientes" |
 
 ---
@@ -917,7 +917,7 @@ flowchart LR
 ```
 
 **Regras de comportamento:**
-- Notificação chega 1 min após a saída (janela 24h; 1 lembrete em 2h; expira silenciosamente).
+- Notificação chega 1 min após a saída (janela 24h; 1 lembrete ~6h após o pedido; expira silenciosamente).
 - Se o usuário fechar (X): volta para a home; card do feedback fica na home até a janela expirar.
 - "Pular" a qualquer momento: registra permanência sem nota; sem perguntas repetidas.
 - Falha de rede: respostas salvas localmente; reenvio automático; toast informa.

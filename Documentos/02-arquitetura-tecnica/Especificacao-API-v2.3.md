@@ -451,8 +451,8 @@ Registra feedback pós-saída. **Autenticação opcional** (se logado, vincula `
 #### `GET /api/v1/visitas/{id}/feedback` 🔒
 Retorna feedback da visita (se houver) — usado para edição de comentário (opcional).
 
-#### `PUT /api/v1/feedbacks/{id}` 🔒 (dono)
-Permite editar comentário/nota dentro da janela de 24h (RN-09). **200**.
+#### `PUT /api/v1/feedbacks/{id}` 🔒 (dono, papel USER)
+Permite editar comentário/nota dentro da janela de 24h (RN-09). **200**. O papel `ADMIN` recebe **403** mesmo sobre feedback da própria conta (E7-08): o painel administrativo não altera avaliação.
 
 #### `GET /api/v1/contas/feedbacks` 🔒
 Histórico de feedbacks do usuário (paginado, RN-22 — E5-03). Mesma paginação de `contas/visitas`; cada item traz o feedback e a visita/hospital de referência. **200** `PageResponse`.

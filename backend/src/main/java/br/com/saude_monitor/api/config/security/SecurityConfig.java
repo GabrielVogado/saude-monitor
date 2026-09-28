@@ -72,6 +72,10 @@ public class SecurityConfig {
                         // Feedback pós-saída (Épico 03 / F-05): criação é pública (anônimo, RN-20).
                         // GET/PUT exigem autenticação do dono (🔒) — cobertos por anyRequest().
                         .requestMatchers(HttpMethod.POST, "/api/v1/feedbacks").permitAll()
+                        // E7-08: edição de feedback é só do papel USER. O dono já é exigido no
+                        // serviço (RN-09), mas uma conta ADMIN pode ter visita e feedback próprios;
+                        // sem esta linha o papel ADMIN ainda alcançaria uma escrita de feedback.
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/feedbacks/**").hasRole("USER")
                         // Moderação de sugestões (E1-06): endpoints admin específicos.
                         .requestMatchers(HttpMethod.GET, "/api/v1/hospitais/sugestoes", "/api/v1/hospitais/sugestoes/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/hospitais/sugestoes/**").hasRole("ADMIN")

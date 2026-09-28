@@ -1,16 +1,17 @@
-# 🎯 Features do MVP — Clinical Sanctuary v2.1
+# 🎯 Features do MVP — Clinical Sanctuary v2.3
 
 > **Decomposição funcional executável do MVP — sistema de monitoramento hospitalar por geolocalização com feedback pós-atendimento**
 >
 > | Campo | Valor |
 > |---|---|
-> | **Versão** | 2.1 |
-> | **Status** | Vigente — revalidada contra `develop@f26666e` em **02/09/2026** (ver `Relatorio-Aderencia-Codigo-vs-Features.md` v3.5) |
-> | **Data** | 07/08/2026 · **Revisão v2.1:** 02/09/2026 |
+> | **Versão** | 2.3 |
+> | **Status** | Vigente — revisto em **12/09/2026** contra a branch `feature/mapbox-migration` (ver `Relatorio-Aderencia-Codigo-vs-Features.md` v3.7) |
+> | **Data** | 07/08/2026 · **Revisão v2.2:** 12/09/2026 · **Revisão v2.3:** 28/09/2026 |
 > | **Autor** | Gabriel Vogado (Product Owner) |
-> | **Referências** | Documento Negocial v2.0 · Backlog MVP v2.0 · Padrão UI/UX v2.0 · Árvore Tecnológica v2.0 |
-> | **Arquivo-irmão** | `Backlog-MVP-v2.1.md` — estórias detalhadas com critérios de aceite atômicos |
-> | **O que mudou na v2.1** | Os status de código estavam **congelados em 08/08/2026** e descreviam como "Inexistente" features hoje entregues (F-01, F-03, F-04, F-05, F-06) e como "Não conforme" a segurança já corrigida na Fase 0 (F-09). A v2.1 realinha os 11 status ao código, registra a decisão de **adiar o Painel Admin (F-11)** e acrescenta o **§2.1 — Estado operacional**, que separa "implementado" de "utilizável em campo". |
+> | **Referências** | Documento Negocial v2.1 · Backlog MVP v2.2 · Padrão UI/UX v2.1 · Árvore Tecnológica v2.1 |
+> | **Arquivo-irmão** | `Backlog-MVP-v2.2.md` — estórias detalhadas com critérios de aceite atômicos |
+> | **O que mudou na v2.3** | **F-05:** notificação de feedback pós-saída passa de "1–5 min" para **1 min** após a saída (decisão do PO, RN-08), e o piso de 2 min para convidar passa a ser aplicado no cliente (RN-01/RN-07). Ver [M-024](../09-melhoria-continua/Historico-Melhorias.md). Nenhum status de estória muda. |
+> | **O que mudou na v2.2** | **F-07:** biblioteca de mapa migra de `@maplibre/maplibre-react-native` para `@rnmapbox/maps` v10 (token `EXPO_PUBLIC_MAPBOX_TOKEN`; correção BUG-10 — âncora do marcador). **F-11:** backend passa a servir as 4 camadas geográficas (`GET /api/v1/camadas/{tipo}`); UI do painel segue inexistente (adiada D-01). Nenhum status de estória muda — ver `De-Para-Backlog-Features.md`. Versão anterior (2.1) preservada em `_historico/Features-MVP-v2.1.md`. |
 > | **Relatório de aderência** | `Relatorio-Aderencia-Codigo-vs-Features.md` — mapeamento completo do código existente × features |
 
 ---
@@ -37,7 +38,7 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 | **F-08** | Polimento e acessibilidade | Épico 6 | P1 | 🟡 Funcional, não auditado | E6-02, E6-03, E6-04, E6-05 | — | M (20) |
 | **F-09** | Segurança e privacidade | Fase 0 + Épico 5 | P0 | ✅ Conforme | F0-03, F0-04, E5-01, E5-02, E5-05 | RN-21, RNF-05, RNF-06 | M (18) |
 | **F-10** | Moderação de sugestões de hospitais | Épico 1 | P1 | ✅ Backend funcional · telas mobile removidas (08/09/2026) | E1-06 | — | S (5) |
-| **F-11** | Painel Administrativo Web (hospitais + georreferenciamento) | Épico 7 | **P2 — adiada** | 🔴 Inexistente | E7-01..E7-09 | — | L (25) |
+| **F-11** | Painel Administrativo Web (hospitais + georreferenciamento) | Épico 7 | **P2 — adiada** | 🔴 UI inexistente · backend parcial (`GET /api/v1/camadas/{tipo}`, 12/09/2026) | E7-01..E7-09 | — | L (25) |
 
 > **Legenda de status:** ✅ Funcional (implementado e coberto por teste automatizado) · 🟡 Funcional com ressalva (implementado, mas sem a auditoria/validação exigida pelo DoD) · 🔴 Inexistente (construir do zero). Verificação arquivo a arquivo: `Relatorio-Aderencia-Codigo-vs-Features.md` (v3.5).
 
@@ -218,7 +219,7 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 - **Status de implementação:** ✅ **Funcional** — coleção `feedbacks` com índice único por `visitaId` (RN-12), fluxo anônimo (`usuarioId` nulo), notificação local pós-saída (`expo-notifications`) e o **formulário ramificado de 4 telas** conforme E3-02: triagem → especialidade (select searchable, pulada quando triagem ≠ Sim) → tratamento pela equipe com a opção **"Não interagi"** → nota geral e comentário. Lembrete único agendado em **~6h** (E3-03, RN-09) e job `SEM_FEEDBACK` após 24h. Os três desvios de RN apontados na v2.0 foram corrigidos. (Ver `Relatorio-Aderencia-Codigo-vs-Features.md` §F-05)
 - **Descrição:** Esta feature implementa o **formulário de feedback pós-saída** completo: notificação local, formulário ramificado de até 4 telas respondível em < 45 segundos, envio ao backend, bloqueio de duplicatas, e tela de agradecimento. É o momento de verdade onde o app pede a opinião do usuário — e a regra de ouro é: **não ser cansativo**.
 
-  O fluxo começa quando a visita é encerrada (F-03): o app aguarda de 1 a 5 minutos (configurável) e dispara uma notificação local. Essa espera é deliberada — evita pedir feedback com o usuário ainda no estacionamento ou dentro do transporte. O formulário tem **fluxo ramificado invisível** com até 4 telas (máx.) e barra de progresso visível + botão "Pular" sempre presente. O envio é possível com apenas a nota geral respondida (Tela 4).
+  O fluxo começa quando a visita é encerrada (F-03): o app aguarda de 1 minuto (configurável) e dispara uma notificação local. Essa espera é deliberada — evita pedir feedback com o usuário ainda no estacionamento ou dentro do transporte. O formulário tem **fluxo ramificado invisível** com até 4 telas (máx.) e barra de progresso visível + botão "Pular" sempre presente. O envio é possível com apenas a nota geral respondida (Tela 4).
 
   **Estrutura do fluxo (RN-10) — 4 telas ramificadas, < 45s:**
   - **Tela 1 — Triagem:** "Você passou pela triagem ao chegar na unidade?"
@@ -293,9 +294,9 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
   14. Em caso de erro de rede no envio: toast "Sem conexão — salvaremos e enviaremos depois"; respostas mantidas localmente; reenvio automático ao reconectar
 - **Regras de negócio aplicáveis:** RN-08, RN-09, RN-10, RN-11, RN-12, RN-13
 - **Dependências:** **F-03 (Detecção de saída)** — o feedback é consequência da visita encerrada. **F-01 (Hospitais)** — o feedback referencia `hospital_id`. Pode ser desenvolvida em paralelo com F-04 (ambas consomem F-03).
-- **Esforço estimado:** **M** (1-2 sprints). Justificativa: UI de formulário multi-step ramificado com animações e acessibilidade é trabalho médio de frontend; backend é essencialmente 1 endpoint `POST /feedback` + validação de dedupe. A complexidade está na UX do formulário (tempo < 45s, pulável, ramificação invisível, micro-interações) e na lógica de notificação (delay 1-5min + lembrete 6h + expiração 24h). Estórias: 6.
+- **Esforço estimado:** **M** (1-2 sprints). Justificativa: UI de formulário multi-step ramificado com animações e acessibilidade é trabalho médio de frontend; backend é essencialmente 1 endpoint `POST /feedback` + validação de dedupe. A complexidade está na UX do formulário (tempo < 45s, pulável, ramificação invisível, micro-interações) e na lógica de notificação (delay 1min + lembrete 6h + expiração 24h). Estórias: 6.
 - **Riscos:**
-  - **Baixa taxa de resposta:** se o formulário for percebido como cansativo, a taxa de resposta cai abaixo de 25%. Mitigação: 4 telas é o limite; botão "Pular" sempre visível reduz ansiedade; notificação no momento certo (1-5 min pós-saída); feedback anônimo remove barreira de login.
+  - **Baixa taxa de resposta:** se o formulário for percebido como cansativo, a taxa de resposta cai abaixo de 25%. Mitigação: 4 telas é o limite; botão "Pular" sempre visível reduz ansiedade; notificação no momento certo (1 min pós-saída); feedback anônimo remove barreira de login.
   - **Usuário ignora a notificação:** notificações locais têm baixa taxa de abertura em alguns perfis de usuário. Mitigação: além da notificação, um card na home do app ("Você visitou o Hospital X — quer avaliar?") serve como segundo canal; 1 lembrete máximo.
   - **Feedback malicioso:** usuários podem avaliar mal um hospital repetidamente. Mitigação: 1 feedback por visita (dedupe por `visita_id` único); visitas < 2 min não geram convite de feedback; para o MVP, moderação humana de outliers é suficiente (fase 2 implementa detecção automatizada).
   - **Select CNES/DATASUS lento:** lista de especialidades pode ser grande. Mitigação: cache local da lista CNES/DATASUS; debounce no searchable select; carregamento preguiçoso.
@@ -355,7 +356,7 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 - **ID:** F-07
 - **Épico:** Épico 1 (Listagem) + Épico 6 (Navegação)
 - **Prioridade:** P0 — é a porta de entrada para consulta pública; sem mapa, o cidadão não descobre hospitais próximos
-- **Status de implementação:** ✅ **Funcional** — o mapa exibe hospitais ativos como pins e **os polígonos das geofences**, com filtro por raio, busca por nome e ordenação na lista, e o empty state com CTA "Sugerir hospital" (E1-05). A navegação migrou de Drawer para **Bottom Tabs de 4 abas** (Início, Hospitais, Mapa, Perfil). ⚠️ **Correção de contrato:** a biblioteca de mapa **não é `react-native-maps`** como este documento e o Plano de Sprints descreviam — é **`@maplibre/maplibre-react-native`**, adotada por ser open source e não exigir chave de API do Google. Todas as menções a `react-native-maps` neste documento devem ser lidas como históricas. (Ver `Relatorio-Aderencia-Codigo-vs-Features.md` §F-07)
+- **Status de implementação:** ✅ **Funcional** — o mapa exibe hospitais ativos como pins e **os polígonos das geofences**, com filtro por raio, busca por nome e ordenação na lista, e o empty state com CTA "Sugerir hospital" (E1-05). A navegação migrou de Drawer para **Bottom Tabs de 4 abas** (Início, Hospitais, Mapa, Perfil). ⚠️ **Correção de contrato (v2.2, 12/09/2026):** a biblioteca de mapa **não é mais `@maplibre/maplibre-react-native`** — é **`@rnmapbox/maps` v10** (branch `feature/mapbox-migration`), com estilo vetorial `Street`, geofences em `ShapeSource` + `FillLayer`/`LineLayer` e marcadores em `MarkerView`. Exige token público Mapbox em `EXPO_PUBLIC_MAPBOX_TOKEN` (`.env.local` nunca commitado + secret `EXPO_PUBLIC_MAPBOX_TOKEN` no CI/EAS; sem token o mapa monta vazio) e **não roda no Expo Go** (módulo nativo — APK via `cd-mobile-apk.yml`, que declara o repo Maven da Mapbox em `frontend/android/build.gradle`). 🐞 **BUG-10 (12/09/2026):** o ponto do hospital aparecia fora do círculo com pouco zoom — a âncora padrão do `MarkerView` centralizava a linha `[ponto + rótulo]`; corrigido com `anchor={{x: 0, y: 0.5}}` + teste de regressão. 🗺️ **Exibição ≠ detecção (12/09/2026):** o mapa da lista desenha um **halo fixo de 25 m** (`RAIO_EXIBICAO_METROS`, `utils/geojson.js`) ao redor do ponto — desenhar o raio de detecção (75–100 m) cobria quarteirões e empilhava círculos em complexos densos. A detecção (geofencing nativo) e o polígono verdadeiro da tela de detalhe não mudam; toque em pilha abre o seletor (BUG-11). O detalhe usa o mesmo halo (câmera fechada ~zoom 17 no prédio); o polígono verdadeiro segue só no servidor, para a detecção. ⬛ **Quadrados, não (12/09/2026):** o halo circular marca *proximidade*, não área ocupada — só temos pontos (centros), nunca a planta dos prédios; um quadrado sugeria arestas que não conhecemos (falsa precisão). Se um dia houver footprints, o halo vira polígono real. Linhagem: `react-native-maps` (documentos antigos) → MapLibre (código até 11/09/2026) → Mapbox. Todas as menções anteriores devem ser lidas como históricas. (Ver `Relatorio-Aderencia-Codigo-vs-Features.md` §F-07)
 - **Descrição:** Esta feature implementa as telas de descoberta de hospitais: o **mapa** interativo com pins de hospitais e posição do usuário, a **lista** com busca por nome e ordenação, e a **navegação inferior** (Bottom Tabs) que organiza o app em 4 abas: Início, Hospitais, Mapa e Perfil. A migração de Drawer (atual) para Bottom Tabs é parte desta feature, pois a navegação de 1 polegar é mandatória para a persona paciente (mãos ocupadas, pressa, uma mão só).
 
   O mapa (`react-native-maps`) exibe hospitais ativos como pins `MapPin` em `primary`, com geofence renderizado como polígono translúcido. O FAB centraliza no GPS do usuário. Ao tocar em um pin, abre o card de detalhe rápido com nome, distância e nota — toque no card leva ao Detalhe do Hospital (F-06).
@@ -526,7 +527,7 @@ O MVP prioriza **zero fricção**: detecção por geofence nativo (sem drenar ba
 - **ID:** F-11
 - **Épico:** Épico 7 — Painel Administrativo Web
 - **Prioridade:** P0 — a partir desta feature, **toda a gestão administrativa deixa de existir no app mobile** e passa a viver exclusivamente na aplicação web; sem ela, não há como operar o cadastro de hospitais e a moderação de sugestões (F-10) de forma apropriada ao perfil de uso (desktop, múltiplas camadas de mapa, formulários extensos).
-- **Status de implementação:** 🔴 **Inexistente — adiada por decisão do Product Owner (02/09/2026).** Nenhuma aplicação web foi iniciada. A decisão registrada é: *"O Painel ADMIN ainda não é prioritário, será desenvolvido depois que o app estiver todo desenvolvido sem pendências, nem débitos técnicos."* Em consequência, a prioridade de F-11 muda de **P0 para P2** e o Épico 7 sai do caminho crítico: ele só entra depois de fechados o Épico 8 (estabilização e desempenho), os débitos técnicos e as validações V-01..V-09. O `Plano-Tecnico-Painel-Administrativo-Web-v1.0.md` permanece válido como proposta e **não deve ser executado** antes desse marco.
+- **Status de implementação:** 🔴 **Inexistente a UI — adiada por decisão do Product Owner (02/09/2026) — com backend parcial entregue em 12/09/2026.** Nenhuma aplicação web foi iniciada. **Novo:** o backend serve as 4 camadas geográficas em `GET /api/v1/camadas/{tipo}` (GeoJSON simplificado, 919 KB — ver `Especificacao-API-v2.2.md` §3.6), base pronta para o mapa multi-camada quando o painel sair do adiamento. Nenhuma estória E7-01..09 muda de status (sem UI, sem entrega efetiva — ver `De-Para-Backlog-Features.md`). A decisão registrada é: *"O Painel ADMIN ainda não é prioritário, será desenvolvido depois que o app estiver todo desenvolvido sem pendências, nem débitos técnicos."* Em consequência, a prioridade de F-11 muda de **P0 para P2** e o Épico 7 sai do caminho crítico: ele só entra depois de fechados o Épico 8 (estabilização e desempenho), os débitos técnicos e as validações V-01..V-09. O `Plano-Tecnico-Painel-Administrativo-Web-v1.0.md` permanece válido como proposta e **não deve ser executado** antes desse marco.
 - **Descrição:** Aplicação web separada do app mobile, destinada exclusivamente a administradores (papel `ADMIN`), consumindo a mesma API REST do backend (nenhum endpoint novo é criado por esta feature além dos já previstos em E1/E1-06). Oferece:
   1. **Listagem de todos os hospitais** cadastrados (ativos e inativos), com filtros por nome, tipo, status e por divisão geográfica (Região Administrativa, Região de Saúde, Macrorregião de Saúde).
   2. **Visualização em mapa** com 4 camadas geográficas sobrepostas e alternáveis: Região Administrativa, Região Integrada de Desenvolvimento, Regiões de Saúde e Macrorregiões de Saúde — construídas a partir dos shapefiles em `D:\saude-monitor\multiplas_camadas_saude_14` (convertidos para GeoJSON e servidos pelo backend).
@@ -981,7 +982,7 @@ sequenceDiagram
 
     rect rgb(136, 78, 0, 0.1)
         Note over App,DB: F-05: Feedback
-        App->>App: Aguarda 1-5 min → notificação local
+        App->>App: Aguarda 1 min → notificação local
         User->>App: Abre formulário de feedback
         User->>App: Responde 4 perguntas + comentário (opcional)
         App->>API: POST /feedbacks { visita_id, respostas, nota }
@@ -1058,7 +1059,7 @@ sequenceDiagram
 - [ ] `POST /feedbacks` com deduplicação (`visita_id` único)
 - [ ] `CSFeedbackForm` implementado (4 passos, barra de progresso, "Pular")
 - [ ] `CSRatingStars` funcional (estrelas 32×32, labels âncora, acessibilidade)
-- [ ] Notificação local disparada 1-5 min pós-saída
+- [ ] Notificação local disparada 1 min pós-saída
 - [ ] Lembrete único (~6h após) funcional
 - [ ] Expiração de 24h (status `SEM_FEEDBACK`) funcional
 - [ ] Feedback anônimo ponta a ponta

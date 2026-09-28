@@ -2,7 +2,13 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '../config/api.config';
-import { Hospital, HospitalDetalheResponse, ListarHospitaisParams, PageResponse } from './hospital.models';
+import {
+  Hospital,
+  HospitalDetalheResponse,
+  HospitalRequest,
+  ListarHospitaisParams,
+  PageResponse,
+} from './hospital.models';
 
 /**
  * Cliente da API de hospitais para o painel admin.
@@ -50,5 +56,13 @@ export class HospitalApi {
    */
   buscarPorId(id: string): Observable<HospitalDetalheResponse> {
     return this.http.get<HospitalDetalheResponse>(`${this.apiBaseUrl}/api/v1/hospitais/${id}`);
+  }
+
+  /**
+   * Edita os dados cadastrais e o geofence (E7-06) — `PUT /api/v1/hospitais/{id}`
+   * (restrito a ADMIN no backend, que revalida o geofence e a unicidade de nome/CNPJ).
+   */
+  atualizar(id: string, request: HospitalRequest): Observable<HospitalDetalheResponse> {
+    return this.http.put<HospitalDetalheResponse>(`${this.apiBaseUrl}/api/v1/hospitais/${id}`, request);
   }
 }

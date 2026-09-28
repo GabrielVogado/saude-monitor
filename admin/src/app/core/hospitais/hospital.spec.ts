@@ -67,6 +67,25 @@ describe('HospitalApi', () => {
     req2.flush(pagina);
   });
 
+  it('edita via PUT /api/v1/hospitais/{id} com o corpo informado (E7-06)', () => {
+    const corpo = {
+      nome: 'Hosp A',
+      cnpj: null,
+      tipo: 'PUBLICO' as const,
+      categoria: 'UPA' as const,
+      endereco: { logradouro: 'Rua 1', cidade: 'Brasília', uf: 'DF' },
+      contato: null,
+      geofence: { type: 'Polygon' as const, coordinates: [[[0, 0], [1, 0], [0, 1], [0, 0]]] },
+    };
+    let resp: unknown;
+    api.atualizar('h1', corpo).subscribe((r) => (resp = r));
+    const req = http.expectOne(`${BASE}/api/v1/hospitais/h1`);
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual(corpo);
+    req.flush({ id: 'h1', nome: 'Hosp A', tipo: 'PUBLICO', ativo: true });
+    expect(resp).toEqual({ id: 'h1', nome: 'Hosp A', tipo: 'PUBLICO', ativo: true });
+  });
+
   it('altera status via PATCH /{id}/status com corpo { ativo }', () => {
     api.alterarStatus('h1', false).subscribe();
     const req = http.expectOne(`${BASE}/api/v1/hospitais/h1/status`);

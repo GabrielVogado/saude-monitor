@@ -12,6 +12,7 @@ import * as L from 'leaflet';
 import { Camada, TipoCamada } from '../../core/camadas/camada';
 import { HospitalApi } from '../../core/hospitais/hospital';
 import { Hospital } from '../../core/hospitais/hospital.models';
+import { criarMapaBase } from '../../core/mapa/mapa-base';
 
 /** Camadas selecionáveis no painel de controle (E7-04). */
 interface OpcaoCamada {
@@ -30,8 +31,6 @@ const CAMADAS: readonly OpcaoCamada[] = [
 /** Centro aproximado do Distrito Federal — todo o catálogo de hospitais fica nessa área. */
 const CENTRO_DF: L.LatLngTuple = [-15.79, -47.88];
 const ZOOM_INICIAL = 10;
-/** O `tile.openstreetmap.org` só publica até z19 (ver BUG-06, ADR-014) — pedir mais 404. */
-const ZOOM_MAXIMO = 19;
 
 /**
  * Mapa multi-camada do painel (E7-04) com marcadores de hospital que levam ao
@@ -53,14 +52,8 @@ export class Mapa implements AfterViewInit, OnDestroy {
   private mapa: L.Map | null = null;
   /** Cache das camadas já buscadas — evita rebuscar ao alternar o toggle (mitigação T-W1). */
   private readonly camadasCarregadas = new Map<TipoCamada, L.GeoJSON>();
-  /**
-   * O Leaflet mede o container no momento do `L.map()`. Como o `<div #mapaEl>` está
-   * dentro de um bloco com animação (`fadeInUp`) e layout flex, o tamanho final só se
-   * estabiliza depois do primeiro paint — sem recalcular, o grid de tiles fica cortado
-   * (buracos/blocos faltando). O ResizeObserver cobre isso e qualquer mudança futura
-   * (ex.: sidebar recolhendo).
-   */
-  private resizeObserver: ResizeObserver | null = null;
+  /** Limpeza do mapa base (observer de tamanho + `remove()`), ver `criarMapaBase`. */
+  private destruirMapa: (() => void) | null = null;
 
   protected readonly opcoesCamada = CAMADAS;
   protected readonly camadasAtivas = signal<ReadonlySet<TipoCamada>>(new Set());
@@ -69,23 +62,15 @@ export class Mapa implements AfterViewInit, OnDestroy {
   protected readonly totalHospitais = signal(0);
 
   ngAfterViewInit(): void {
-    this.mapa = L.map(this.mapaEl.nativeElement).setView(CENTRO_DF, ZOOM_INICIAL);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: ZOOM_MAXIMO,
-      attribution: '&copy; OpenStreetMap contributors',
-    }).addTo(this.mapa);
+    const { mapa, destruir } = criarMapaBase(this.mapaEl.nativeElement);
+    this.mapa = mapa.setView(CENTRO_DF, ZOOM_INICIAL);
+    this.destruirMapa = destruir;
     this.carregarHospitais();
-
-    // jsdom (ambiente de teste) não implementa ResizeObserver — degrada sem quebrar.
-    if (typeof ResizeObserver !== 'undefined') {
-      this.resizeObserver = new ResizeObserver(() => this.mapa?.invalidateSize());
-      this.resizeObserver.observe(this.mapaEl.nativeElement);
-    }
   }
 
   ngOnDestroy(): void {
-    this.resizeObserver?.disconnect();
-    this.mapa?.remove();
+    this.destruirMapa?.();
+    this.mapa = null;
   }
 
   /** Liga/desliga uma camada geográfica (checkbox). Busca só na primeira vez (lazy-load). */

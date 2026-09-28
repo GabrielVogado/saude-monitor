@@ -51,6 +51,14 @@ describe('HospitalDetalhe', () => {
     expect(el.textContent).toContain('Brasília');
   });
 
+  it('oferece o link de edição para /hospitais/:id/editar (E7-06)', () => {
+    api.buscarPorId.mockReturnValue(of(hospital()));
+    montar('h1');
+
+    const link = Array.from(el.querySelectorAll('a')).find((a) => a.textContent?.trim() === 'Editar');
+    expect(link?.getAttribute('href')).toBe('/hospitais/h1/editar');
+  });
+
   it('mostra erro quando a API falha', () => {
     api.buscarPorId.mockReturnValue(throwError(() => new Error('falha')));
     montar('h1');

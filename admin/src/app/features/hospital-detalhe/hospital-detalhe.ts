@@ -4,10 +4,9 @@ import { HospitalApi } from '../../core/hospitais/hospital';
 import { HospitalDetalheResponse } from '../../core/hospitais/hospital.models';
 
 /**
- * Detalhe somente-leitura do hospital (E7-05 — ir ao detalhe via mapa/lista).
- *
- * A edição (E7-06) ainda não existe; esta tela é a base que ela vai reaproveitar —
- * por isso já busca o contrato completo (`HospitalDetalheResponse`), não um recorte.
+ * Detalhe somente-leitura do hospital (E7-05 — ir ao detalhe via mapa/lista), com o
+ * atalho para a edição (E7-06, `/hospitais/:id/editar`). Os indicadores continuam só
+ * leitura aqui (E7-08).
  */
 @Component({
   selector: 'app-hospital-detalhe',

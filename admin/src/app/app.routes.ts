@@ -34,6 +34,10 @@ export const routes: Routes = [
         path: 'mapa',
         loadComponent: () => import('./features/mapa/mapa').then((m) => m.Mapa),
       },
+      {
+        path: 'sugestoes',
+        loadComponent: () => import('./features/sugestoes/sugestoes').then((m) => m.Sugestoes),
+      },
     ],
   },
   { path: '**', redirectTo: 'login' },

@@ -36,6 +36,12 @@ describe('Shell', () => {
     expect(el.textContent).toContain('Hospitais');
   });
 
+  it('menu aponta Hospitais, Mapa e Sugestões para telas reais (E7-09)', () => {
+    const hrefs = Array.from(el.querySelectorAll('nav a')).map((a) => a.getAttribute('href'));
+    expect(hrefs).toEqual(['/dashboard', '/hospitais', '/mapa', '/sugestoes']);
+    expect(el.textContent).not.toContain('em breve');
+  });
+
   it('sair faz logout e navega ao login', () => {
     const router = TestBed.inject(Router);
     const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);

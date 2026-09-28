@@ -1,0 +1,186 @@
+<div class="animate-[fadeInUp_0.4s_ease-out]">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight text-ink">Sugestões</h1>
+      <p class="mt-1 text-sm text-ink-soft">
+        @if (!carregando() && !erro()) {
+          {{ totalElements() }} sugestão(ões)
+        } @else {
+          Estabelecimentos sugeridos pela população
+        }
+      </p>
+    </div>
+
+    <select
+      aria-label="Filtrar sugestões por status"
+      (change)="filtrarStatus($any($event.target).value)"
+      class="rounded-lg border border-outline-soft bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+    >
+      <option value="PENDENTE">Pendentes</option>
+      <option value="APROVADA">Aprovadas</option>
+      <option value="RECUSADA">Recusadas</option>
+      <option value="">Todas</option>
+    </select>
+  </div>
+
+  @if (aviso(); as msg) {
+    <p class="mt-3 rounded-lg border border-teal-100 bg-teal-100/40 px-3 py-2 text-sm font-medium text-teal-500" role="status">{{ msg }}</p>
+  }
+
+  <section class="mt-4 space-y-3">
+    @if (carregando()) {
+      <div class="rounded-xl border border-outline-soft/50 bg-surface-card p-8 text-center text-sm text-ink-soft shadow-sm">Carregando…</div>
+    } @else if (erro(); as mensagem) {
+      <div class="rounded-xl border border-outline-soft/50 bg-surface-card p-8 text-center text-sm text-danger-700 shadow-sm" role="alert">{{ mensagem }}</div>
+    } @else if (sugestoes().length === 0) {
+      <div class="rounded-xl border border-outline-soft/50 bg-surface-card p-8 text-center text-sm text-ink-soft shadow-sm">
+        {{ statusFiltro() === 'PENDENTE' ? 'Nenhuma sugestão aguardando revisão.' : 'Nenhuma sugestão encontrada.' }}
+      </div>
+    } @else {
+      @for (s of sugestoes(); track s.id) {
+        <article class="rounded-xl border border-outline-soft/50 bg-surface-card p-4 shadow-sm" [attr.data-sugestao]="s.id">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h2 class="text-base font-semibold text-ink">{{ s.nome }}</h2>
+              <p class="mt-0.5 text-sm text-ink-soft">{{ enderecoResumido(s.endereco) }}</p>
+              <p class="mt-0.5 text-xs text-ink-soft">Enviada em {{ s.criadoEm | date: 'dd/MM/yyyy HH:mm' }}</p>
+            </div>
+            <span
+              class="rounded-full px-2 py-0.5 text-xs font-semibold"
+              [class]="s.status === 'PENDENTE'
+                ? 'bg-brand-100 text-brand-700'
+                : s.status === 'APROVADA' ? 'bg-teal-100 text-teal-500' : 'bg-surface-muted text-ink-soft'"
+            >{{ s.status === 'PENDENTE' ? 'Pendente' : s.status === 'APROVADA' ? 'Aprovada' : 'Recusada' }}</span>
+          </div>
+
+          @if (s.observacao) {
+            <p class="mt-2 whitespace-pre-line text-sm text-ink">{{ s.observacao }}</p>
+          }
+
+          @if (s.status === 'APROVADA') {
+            <p class="mt-2 text-sm text-ink-soft">
+              Aprovada em {{ s.revisadoEm | date: 'dd/MM/yyyy HH:mm' }}
+              @if (s.hospitalId) {
+                · <a [routerLink]="['/hospitais', s.hospitalId]" class="font-semibold text-brand-500 hover:underline">ver hospital vinculado</a>
+              }
+            </p>
+          } @else if (s.status === 'RECUSADA') {
+            <p class="mt-2 text-sm text-ink-soft">
+              Recusada em {{ s.revisadoEm | date: 'dd/MM/yyyy HH:mm' }}@if (s.motivoRecusa) {: {{ s.motivoRecusa }}}
+            </p>
+          } @else {
+            @if (acao()?.id !== s.id) {
+              <div class="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  (click)="abrirAprovar(s)"
+                  class="rounded-lg border border-teal-100 px-3 py-1.5 text-xs font-semibold text-teal-500 transition hover:bg-teal-100/40"
+                >Aprovar</button>
+                <button
+                  type="button"
+                  (click)="abrirRecusar(s)"
+                  class="rounded-lg border border-danger-100 px-3 py-1.5 text-xs font-semibold text-danger-700 transition hover:bg-danger-100/40"
+                >Recusar</button>
+              </div>
+            } @else if (acao()?.tipo === 'aprovar') {
+              <div class="mt-3 rounded-lg border border-outline-soft/60 bg-surface-muted/40 p-3">
+                <p class="text-sm font-semibold text-ink">Vincular a um hospital cadastrado</p>
+                <p class="mt-0.5 text-xs text-ink-soft">A aprovação liga a sugestão a um estabelecimento que já existe no cadastro.</p>
+                <div class="mt-2 flex gap-2">
+                  <input
+                    type="search"
+                    aria-label="Buscar hospital para vincular"
+                    [value]="termoHospital()"
+                    (input)="termoHospital.set($any($event.target).value)"
+                    (keyup.enter)="buscarHospitais()"
+                    class="min-w-0 flex-1 rounded-lg border border-outline-soft bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                  />
+                  <button
+                    type="button"
+                    (click)="buscarHospitais()"
+                    class="rounded-lg bg-brand-500 px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                  >Buscar</button>
+                </div>
+
+                @if (buscandoHospitais()) {
+                  <p class="mt-2 text-sm text-ink-soft">Buscando…</p>
+                } @else if (hospitaisEncontrados(); as hs) {
+                  @if (hs.length === 0) {
+                    <p class="mt-2 text-sm text-ink-soft">Nenhum hospital encontrado com esse nome.</p>
+                  } @else {
+                    <ul class="mt-2 divide-y divide-outline-soft/40">
+                      @for (h of hs; track h.id) {
+                        <li class="flex items-center justify-between gap-3 py-2">
+                          <div class="min-w-0">
+                            <p class="text-sm font-medium text-ink">{{ h.nome }}</p>
+                            <p class="text-xs text-ink-soft">{{ enderecoResumido(h.endereco) }}{{ h.ativo ? '' : ' · Inativo' }}</p>
+                          </div>
+                          <button
+                            type="button"
+                            (click)="vincular(s, h)"
+                            [disabled]="enviando()"
+                            class="rounded-lg border border-teal-100 px-3 py-1.5 text-xs font-semibold text-teal-500 transition hover:bg-teal-100/40 disabled:cursor-progress disabled:opacity-40"
+                          >Vincular</button>
+                        </li>
+                      }
+                    </ul>
+                  }
+                }
+
+                @if (erroAcao(); as msg) {
+                  <p class="mt-2 text-sm font-medium text-danger-700" role="alert">{{ msg }}</p>
+                }
+                <button type="button" (click)="fecharAcao()" class="mt-2 text-xs font-semibold text-ink-soft hover:text-ink">Cancelar</button>
+              </div>
+            } @else {
+              <div class="mt-3 rounded-lg border border-outline-soft/60 bg-surface-muted/40 p-3">
+                <label for="motivo-{{ s.id }}" class="text-sm font-semibold text-ink">Motivo da recusa</label>
+                <textarea
+                  id="motivo-{{ s.id }}"
+                  rows="3"
+                  [attr.maxlength]="motivoMax"
+                  [value]="motivo()"
+                  (input)="motivo.set($any($event.target).value)"
+                  class="mt-1 w-full rounded-lg border border-outline-soft bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                ></textarea>
+                <p class="text-xs text-ink-soft">Entre {{ motivoMin }} e {{ motivoMax }} caracteres ({{ motivo().trim().length }}).</p>
+                @if (erroAcao(); as msg) {
+                  <p class="mt-2 text-sm font-medium text-danger-700" role="alert">{{ msg }}</p>
+                }
+                <div class="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    (click)="recusar(s)"
+                    [disabled]="!motivoValido() || enviando()"
+                    class="rounded-lg bg-danger-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                  >{{ enviando() ? '…' : 'Confirmar recusa' }}</button>
+                  <button type="button" (click)="fecharAcao()" class="text-xs font-semibold text-ink-soft hover:text-ink">Cancelar</button>
+                </div>
+              </div>
+            }
+          }
+        </article>
+      }
+
+      @if (totalPages() > 1) {
+        <div class="flex items-center justify-between gap-3 text-sm">
+          <span class="text-ink-soft">Página {{ page() + 1 }} de {{ totalPages() }}</span>
+          <div class="flex gap-2">
+            <button
+              type="button"
+              (click)="irPara(page() - 1)"
+              [disabled]="page() === 0"
+              class="rounded-lg border border-outline-soft px-3 py-1.5 font-semibold text-ink-soft transition hover:border-brand-500 hover:text-brand-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >Anterior</button>
+            <button
+              type="button"
+              (click)="irPara(page() + 1)"
+              [disabled]="page() + 1 >= totalPages()"
+              class="rounded-lg border border-outline-soft px-3 py-1.5 font-semibold text-ink-soft transition hover:border-brand-500 hover:text-brand-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >Próxima</button>
+          </div>
+        </div>
+      }
+    }
+  </section>
+</div>

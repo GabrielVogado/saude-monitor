@@ -5,6 +5,15 @@
 
 ---
 
+## 📌 Revisão 28/09/2026 — Notificação de feedback: 1 min + piso de 2 min
+
+**O que entrou:** decisão do PO — a notificação de feedback pós-saída passa de "1 a 5 minutos" para **1 minuto** após a saída (RN-08); o piso de 2 min para convidar (RN-01/RN-07) passa a ser aplicado no cliente. Correções de código no PR #163 e registro em `Historico-Melhorias.md` (M-024).
+**Documentos versionados:** `Documento-Negocial` v2.0 → v2.1 · `Backlog-MVP` v2.1 → v2.2 · `Padrao-UI-UX` v2.0 → v2.1 · `Features-MVP` v2.2 → v2.3 · `Especificacao-API` v2.2 → v2.3 · `Plano-Sprints` v2.1 → v2.2 · `Relatorio-Aderencia` v3.8 → v3.9 (anteriores preservadas em `_historico/`). Ponteiros ativos atualizados; menções em notas de revisão datadas foram preservadas (não reescrevem o histórico).
+**Housekeeping:** removidas 3 duplicatas de versões antigas que estavam nas pastas ativas (`Features-MVP-v2.1.md`, `Especificacao-API-v2.1.md`, `Arvore-Tecnologica-v2.0.md`) — idênticas às cópias já existentes em `_historico/`.
+**Sem mudança de status:** nenhuma estória muda de status (E3-01 segue ✅); o `De-Para-Backlog-Features.md` teve só a descrição da E3-01 atualizada.
+
+---
+
 ## 📌 Revisão 23/09/2026 — Plano de divulgação
 
 **O que entrou:** nova pasta `13-marketing/` com o [`Plano-Divulgacao-v1.0.md`](./13-marketing/Plano-Divulgacao-v1.0.md), um plano de 12 semanas para lançar o Radar Saúde no DF (preparação → beta fechado → lançamento local → crescimento), escrito para quem não tem experiência em marketing. Versão visual em [`Plano-Divulgacao-v1.0.html`](./13-marketing/Plano-Divulgacao-v1.0.html). O critério de saída do beta segue a V-09 do `Plano-Sprints-v2.1` §22.4.
@@ -94,7 +103,7 @@
 Este repositório de documentação segue uma estrutura versionada:
 
 - **`_historico/`** — documentos das fases anteriores, preservados como memória institucional (não editar).
-- **Documentos ativos** — a documentação vigente do produto, organizada por domínio. Após a revisão de 12/09/2026, as versões correntes são: Negocial v2.0 · Arquitetura v2.1 · UI/UX v2.0 · **Backlog v2.1** · **Features v2.2** · **Plano de Sprints v2.1** · **Aderência v3.7** · **Consolidação Técnica v1.1** · **API v2.2** (revisão de 02/09/2026 mantida no histórico abaixo).
+- **Documentos ativos** — a documentação vigente do produto, organizada por domínio. Após a revisão de 28/09/2026, as versões correntes são: **Negocial v2.1** · Arquitetura v2.1 · **UI/UX v2.1** · **Backlog v2.2** · **Features v2.3** · **Plano de Sprints v2.2** · **Aderência v3.9** · **Consolidação Técnica v1.1** · **API v2.3** (revisões anteriores mantidas no histórico abaixo).
 
 Regra de versionamento: toda alteração relevante de um documento ativo deve gerar uma **nova versão** (ex.: `v2.0` → `v2.1`) e o conteúdo antigo é movido para `_historico/`. Nunca sobrescreva o histórico.
 
@@ -107,27 +116,27 @@ Documentos/
 ├── 00-INDICE.md                              ← você está aqui
 │
 ├── 01-negocio/                               ← visão de negócio do produto
-│   └── Documento-Negocial-v2.0.md            ← problema, público, jornada, regras de negócio, LGPD, KPIs
+│   └── Documento-Negocial-v2.1.md            ← problema, público, jornada, regras de negócio, LGPD, KPIs
 │
 ├── 02-arquitetura-tecnica/                   ← visão técnica e de engenharia
 │   ├── Arvore-Tecnologica-v2.1.md            ← stack atual vs. proposta, manter/refatorar, ADRs, roadmap
-│   ├── Especificacao-API-v2.2.md             ← contratos REST (OpenAPI), modelo de dados MongoDB, fluxos (+ §3.6 camadas)
+│   ├── Especificacao-API-v2.3.md             ← contratos REST (OpenAPI), modelo de dados MongoDB, fluxos (+ §3.6 camadas)
 │   └── Plano-Tecnico-Painel-Administrativo-Web-v1.0.md  ← stack, estrutura de pastas e consumo de API do painel web (F-11)
 │
 ├── 03-ui-ux/                                 ← padrão de experiência e interface
-│   └── Padrao-UI-UX-v2.0.md                  ← princípios, personas, jornada, design system, acessibilidade, LGPD
+│   └── Padrao-UI-UX-v2.1.md                  ← princípios, personas, jornada, design system, acessibilidade, LGPD
 │
 ├── 04-backlog/                               ← planejamento de produto e entregas
-│   └── Backlog-MVP-v2.1.md                   ← épicos/estórias priorizadas (MoSCoW), critérios de aceite, Épico 8, sprints
+│   └── Backlog-MVP-v2.2.md                   ← épicos/estórias priorizadas (MoSCoW), critérios de aceite, Épico 8, sprints
 │
 ├── 05-features/                              ← features detalhadas + aderência ao código real
-│   ├── Features-MVP-v2.2.md                  ← 11 features com status real, estado operacional (§2.1), DoDs, rastreabilidade
+│   ├── Features-MVP-v2.3.md                  ← 11 features com status real, estado operacional (§2.1), DoDs, rastreabilidade
 │   ├── Relatorio-Aderencia-Codigo-vs-Features.md ← verificação arquivo a arquivo (v3.8) + aderência operacional (§1.1)
 │   ├── Pendencias-Epico-01.md                ← débitos do ETL CNES/DATASUS e divergências de contrato
 │   └── Registro-Correcao-Checkin-Manual-e-Performance-v1.0.md ← RN-03A (exclusividade de visita ativa)
 │
 ├── 06-sprints/                               ← planejamento de entregas ágeis
-│   └── Plano-Sprints-v2.1.md                 ← S0–S8 executadas, S7 adiada, S9–S12 planejadas (§22)
+│   └── Plano-Sprints-v2.2.md                 ← S0–S8 executadas, S7 adiada, S9–S12 planejadas (§22)
 │
 ├── 07-dados/                                 ← relatórios de importação e enriquecimento de dados
 │   └── (7 relatórios de ETL CNES/DATASUS, auditoria de campos, auditoria de duplicatas e validação do georreferenciamento 12/09/2026)
@@ -165,16 +174,16 @@ Documentos/
 
 | # | Documento | Versão | Status | Resumo |
 |---|---|---|---|---|
-| 1 | [Documento Negocial](./01-negocio/Documento-Negocial-v2.0.md) | 2.0 | ✅ Ativo | Problema, proposta de valor, público, jornada do usuário, regras de negócio do geofence/feedback, modelo de dados conceitual, KPIs, roadmap e conformidade LGPD. |
+| 1 | [Documento Negocial](./01-negocio/Documento-Negocial-v2.1.md) | **2.1** | ✅ Ativo | Problema, proposta de valor, público, jornada do usuário, regras de negócio do geofence/feedback, modelo de dados conceitual, KPIs, roadmap e conformidade LGPD. |
 | 2 | [Árvore Tecnológica](./02-arquitetura-tecnica/Arvore-Tecnologica-v2.1.md) | **2.1** | ✅ Ativo | Mapa da stack atual (Spring Boot 4 + MongoDB + Expo 55 + **Mapbox v10**), decisões manter/refatorar/adicionar, matriz comparativa, ADRs e plano de evolução. **v2.1 (12/09/2026):** linhagem do mapa (`react-native-maps` → MapLibre → Mapbox) + contexto `regiao`. |
-| 3 | [Especificação da API](./02-arquitetura-tecnica/Especificacao-API-v2.2.md) | **2.2** | ✅ Ativo | Contratos REST de todos os endpoints (auth, hospitais, visitas, feedbacks, agregados, **camadas**), coleções MongoDB com índices/GeoJSON e fluxo geofence → API. **v2.2 (12/09/2026):** novo §3.6 `GET /api/v1/camadas/{tipo}` (F-11). v2.1 (06/09/2026) fechava CONT-01/CONT-02 (E8-14). |
+| 3 | [Especificação da API](./02-arquitetura-tecnica/Especificacao-API-v2.3.md) | **2.3** | ✅ Ativo | Contratos REST de todos os endpoints (auth, hospitais, visitas, feedbacks, agregados, **camadas**), coleções MongoDB com índices/GeoJSON e fluxo geofence → API. **v2.2 (12/09/2026):** novo §3.6 `GET /api/v1/camadas/{tipo}` (F-11). v2.1 (06/09/2026) fechava CONT-01/CONT-02 (E8-14). |
 | 3b | [Plano Técnico — Painel Administrativo Web](./02-arquitetura-tecnica/Plano-Tecnico-Painel-Administrativo-Web-v1.0.md) | 1.0 | 🟡 Proposta | Stack (React + Vite + Leaflet), estrutura de pastas de `web-admin/` e estratégia de consumo da API existente para o painel administrativo (F-11). |
-| 4 | [Padrão UI/UX](./03-ui-ux/Padrao-UI-UX-v2.0.md) | 2.0 | ✅ Ativo | Princípios de UX, personas, jornada ponta a ponta, arquitetura de informação, design system completo (tokens, componentes), acessibilidade WCAG AA, LGPD por design e protótipos ASCII. |
-| 5 | [Backlog do MVP](./04-backlog/Backlog-MVP-v2.1.md) | **2.1** | ✅ Ativo | Backlog priorizado (Fase 0 + 8 épicos), decisões de priorização (§2.1), **Épico 8 — Estabilização e Desempenho**, sequência real S0–S8 + planejada S9–S12, DoD com situação real e regra de atualização documental. |
-| 6 | [Plano de Sprints](./06-sprints/Plano-Sprints-v2.1.md) | **2.1** | ✅ Ativo | S0–S6 e S8 concluídas, S7 adiada, **S9–S12 planejadas (§22)** com diagnóstico de desempenho medido, velocity, riscos, cerimônias e métricas. |
+| 4 | [Padrão UI/UX](./03-ui-ux/Padrao-UI-UX-v2.1.md) | **2.1** | ✅ Ativo | Princípios de UX, personas, jornada ponta a ponta, arquitetura de informação, design system completo (tokens, componentes), acessibilidade WCAG AA, LGPD por design e protótipos ASCII. |
+| 5 | [Backlog do MVP](./04-backlog/Backlog-MVP-v2.2.md) | **2.2** | ✅ Ativo | Backlog priorizado (Fase 0 + 8 épicos), decisões de priorização (§2.1), **Épico 8 — Estabilização e Desempenho**, sequência real S0–S8 + planejada S9–S12, DoD com situação real e regra de atualização documental. |
+| 6 | [Plano de Sprints](./06-sprints/Plano-Sprints-v2.2.md) | **2.2** | ✅ Ativo | S0–S6 e S8 concluídas, S7 adiada, **S9–S12 planejadas (§22)** com diagnóstico de desempenho medido, velocity, riscos, cerimônias e métricas. |
 | 7 | [Registro de Correção - Check-in Manual e Performance](./05-features/Registro-Correcao-Checkin-Manual-e-Performance-v1.0.md) | 1.0 | ✅ Implementado | Exclusividade de visita ativa (RN-03A), correção da interação do card e da latência artificial na primeira carga da lista. A validação pendente nº 5 (*"medir login e primeira lista no ambiente de destino"*) foi executada em 02/09/2026 — resultado no `Features-MVP-v2.2.md` §2.1 (apontador atualizado na revisão de 12/09/2026; conteúdo inalterado). |
-| 8 | [Features do MVP](./05-features/Features-MVP-v2.2.md) | **2.2** | ✅ Ativo | As 11 features com status real por feature, **§2.1 — estado operacional** (implementado ≠ utilizável), DoD por feature, matriz de rastreabilidade e roteiro de validação V-01..V-12 com situação de cada uma. **v2.2 (12/09/2026):** F-07 Mapbox + BUG-10; F-11 com backend parcial. |
-| 9 | [Relatório de Aderência Código × Features](./05-features/Relatorio-Aderencia-Codigo-vs-Features.md) | **3.8** | ✅ Ativo | Verificação arquivo a arquivo das 9 features do escopo (100% cobertas) + **§1.1 aderência operacional**, que reprova o RNF-02 por medição. **v3.8 (20/09/2026):** §F-07 card do hospital sobre o mapa. **v3.7 (12/09/2026):** §F-07 Mapbox; parcial F-11 registrado sem mudar status. |
+| 8 | [Features do MVP](./05-features/Features-MVP-v2.3.md) | **2.3** | ✅ Ativo | As 11 features com status real por feature, **§2.1 — estado operacional** (implementado ≠ utilizável), DoD por feature, matriz de rastreabilidade e roteiro de validação V-01..V-12 com situação de cada uma. **v2.2 (12/09/2026):** F-07 Mapbox + BUG-10; F-11 com backend parcial. |
+| 9 | [Relatório de Aderência Código × Features](./05-features/Relatorio-Aderencia-Codigo-vs-Features.md) | **3.9** | ✅ Ativo | Verificação arquivo a arquivo das 9 features do escopo (100% cobertas) + **§1.1 aderência operacional**, que reprova o RNF-02 por medição. **v3.8 (20/09/2026):** §F-07 card do hospital sobre o mapa. **v3.7 (12/09/2026):** §F-07 Mapbox; parcial F-11 registrado sem mudar status. |
 | 10 | [De-Para Backlog × Features](./De-Para-Backlog-Features.md) | 02/09/2026 | ✅ Ativo | **Fonte de verdade do status de cada estória.** Placar: 42 de 43 estórias do app entregues; Épico 7 adiado; Épico 8 aberto. |
 | 11 | [Consolidação Técnica e Backlog Pendente](./08-analise%20tecnica/Consolidacao-Tecnica-e-Backlog-Pendente-v1.1.md) | **1.1** | ✅ Ativo | Fonte única do que está entregue, do que está pendente (48 itens + PERF) e da **ordem de execução em 6 ondas**, com as decisões do PO registradas literalmente. |
 | 12 | [Relatório de Auditoria Técnica](./08-analise%20tecnica/relatorio_auditoria_tecnica.md) | **3.1** | 🟡 Proposta | 11 problemas de arquitetura do frontend. A v3.1 declara o commit-base e **corrige 3 afirmações** que não se sustentaram na reverificação. |
@@ -201,12 +210,12 @@ Documentos/
 
 | Quem é você | Comece por |
 |---|---|
-| **Product Owner / Negócio** | `01-negocio/Documento-Negocial-v2.0.md` → `04-backlog/Backlog-MVP-v2.1.md` → `De-Para-Backlog-Features.md` (status real) |
-| **Arquiteto / Backend** | `02-arquitetura-tecnica/Arvore-Tecnologica-v2.0.md` (decisões, ADRs) → `02-arquitetura-tecnica/Especificacao-API-v2.1.md` (contratos) |
-| **Frontend / Mobile** | `03-ui-ux/Padrao-UI-UX-v2.0.md` → `02-arquitetura-tecnica/Especificacao-API-v2.1.md` (consumo) |
-| **Designer** | `03-ui-ux/Padrao-UI-UX-v2.0.md` → `_historico/v1.2-design-clinical-sanctuary/` (base da identidade) |
+| **Product Owner / Negócio** | `01-negocio/Documento-Negocial-v2.1.md` → `04-backlog/Backlog-MVP-v2.2.md` → `De-Para-Backlog-Features.md` (status real) |
+| **Arquiteto / Backend** | `02-arquitetura-tecnica/Arvore-Tecnologica-v2.1.md` (decisões, ADRs) → `02-arquitetura-tecnica/Especificacao-API-v2.3.md` (contratos) |
+| **Frontend / Mobile** | `03-ui-ux/Padrao-UI-UX-v2.1.md` → `02-arquitetura-tecnica/Especificacao-API-v2.3.md` (consumo) |
+| **Designer** | `03-ui-ux/Padrao-UI-UX-v2.1.md` → `_historico/v1.2-design-clinical-sanctuary/` (base da identidade) |
 | **QA / Testes** | Regras de negócio (Documento Negocial §6) + critérios de aceite (Backlog) + contratos (Especificação da API) |
-| **Scrum Master / Agile Coach** | `06-sprints/Plano-Sprints-v2.1.md` (§22 = próximas sprints) → `04-backlog/Backlog-MVP-v2.1.md` |
+| **Scrum Master / Agile Coach** | `06-sprints/Plano-Sprints-v2.2.md` (§22 = próximas sprints) → `04-backlog/Backlog-MVP-v2.2.md` |
 | **Quem vai retomar o desenvolvimento** | `08-analise tecnica/Consolidacao-Tecnica-e-Backlog-Pendente-v1.1.md` §0 — é a fonte da priorização vigente e diz, em uma página, o que fazer primeiro e por quê |
 | **Novo integrante** | `00-INDICE.md` → leia na ordem: 1 (negócio) → 4 (UI/UX) → 2 (arquitetura) → 3 (API) → 5 (backlog) |
 

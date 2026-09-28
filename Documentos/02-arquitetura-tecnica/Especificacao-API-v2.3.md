@@ -1,14 +1,16 @@
-# 🔌 Especificação da API REST — saude-monitor v2.1
+# 🔌 Especificação da API REST — saude-monitor v2.3
 
 > **Contratos de integração e modelo de dados MongoDB para o Clinical Sanctuary**
 >
 > | Campo | Valor |
 > |---|---|
-> | **Versão** | 2.1 |
-> | **Status** | Contrato em validação — endpoints já implementados na `develop` (auditoria 30/08/2026); alterações refletidas neste documento e registradas por PR |
-> | **Data** | 07/08/2026 (última atualização: 06/09/2026) |
-> | **Base** | Árvore Tecnológica v2.0 (ADRs) · Documento Negocial v2.0 (RN) · Backlog v2.0 (E1–E6) |
-> | **Padrão** | REST + JSON · OpenAPI 3.1 (geração automática a partir do código proposta na E8-09, PR #88 — não incluída neste PR) |
+> | **Versão** | 2.3 |
+> | **Status** | Contrato em validação — endpoints já implementados na `develop`; alterações refletidas neste documento e registradas por PR |
+> | **Data** | 07/08/2026 (última atualização: 28/09/2026) |
+> | **Base** | Árvore Tecnológica v2.1 (ADRs) · Documento Negocial v2.1 (RN) · Backlog v2.2 (Fase 0 + E1–E8) |
+> | **Padrão** | REST + JSON · OpenAPI 3.1 (geração automática a partir do código — E8-09 entregue) |
+> | **O que mudou na v2.3** | Nota do fluxo geofence → API: a notificação local de feedback é agendada **1 min** após a saída (antes 1–5 min), por decisão do PO (RN-08). Comportamento de cliente; nenhum contrato REST alterado. Ver [M-024](../09-melhoria-continua/Historico-Melhorias.md). |
+> | **O que mudou na v2.2** | Novo §3.6 — `GET /api/v1/camadas/{tipo}` (F-11, §5 do plano do painel web): as 4 camadas geográficas em GeoJSON servidas pelo backend. Nenhum contrato anterior alterado. Versão anterior (2.1) preservada em `_historico/Especificacao-API-v2.1.md`. |
 
 ## 📌 Revisão 06/09/2026 (E8-14 — CONT-01/CONT-02)
 
@@ -499,6 +501,28 @@ Ranking por `ordem=nota|tempo`. Query: `ordem`, `tipo`, `page`, `size`. Ordena p
 
 ---
 
+### 3.6 Camadas geográficas (F-11, §5 do plano do painel web)
+
+#### `GET /api/v1/camadas/{tipo}` 🔓
+GeoJSON (`FeatureCollection`, RFC 7946, lon/lat) de uma das 4 divisões geográficas — base do mapa multi-camada do futuro painel web e de toggles no app. `tipo` ∈ `regiao-administrativa` | `ride` | `regiao-saude` | `macrorregiao-saude`. Leitura pública (mesmo regime dos GET de hospitais; rate limit PÚBLICO 60/min/IP), `Cache-Control: max-age=86400`. Slug fora da lista → **404** no envelope padrão (`RECURSO_NAO_ENCONTRADO`).
+**200 OK** (`GET /api/v1/camadas/regiao-saude`)
+```json
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "nome": "Central", "macrorregiaoSaude": "Macrorregião 2", "regioesAdministrativas": "Cruzeiro, Lago Norte, ..." },
+      "geometry": { "type": "Polygon", "coordinates": [[["..."]]] }
+    }
+  ]
+}
+```
+**Atributos por camada:** `regiao-administrativa` (35 features: `nome`, `regiaoSaude`, `macrorregiaoSaude`) · `ride` (33: `nome`) · `regiao-saude` (7: `nome`, `macrorregiaoSaude`, `regioesAdministrativas`) · `macrorregiao-saude` (3: `nome`, `regioesSaude`).
+**Origem e servimento:** `multiplas_camadas_saude_14/*.shp` (CRS `GCS_WGS_1984`, sem reprojeção) → `mapshaper -simplify 10% keep-shapes` + renomeação de atributos → 919 KB em `backend/src/main/resources/camadas/` (regeneração: `backend/data/camadas/README.md`). Servido do classpath com carga única na subida (`RegiaoService`), **sem** coleção Mongo — desvio validado do §5.2 item 4 do plano (divisão quase imutável, nenhuma query espacial no servidor; contrato idêntico). Valores de atributo preservados da fonte (`Sudoeste/Octogonal` literal).
+
+---
+
 ## 4. Fluxo de Detecção (Geofence → API)
 
 ```mermaid
@@ -520,7 +544,7 @@ sequenceDiagram
     D->>API: POST /visitas/{id}/checkout (posicao)
     API->>DB: atualiza saida + duracaoMinutos (FINALIZADA)
     API-->>D: 200 visita finalizada
-    Note over D: agenda notificação local de feedback (1–5min, RN-08)
+    Note over D: agenda notificação local de feedback (1min, RN-08)
     D->>API: POST /feedbacks (anônimo ou logado)
     API->>DB: grava feedback + dispara recálculo agregado
 ```

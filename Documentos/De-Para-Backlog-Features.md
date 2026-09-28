@@ -55,7 +55,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 ## Épico 3 — Feedback Pós-Saída
 | ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |
 |---|---|---|---|
-| **E3-01** | Notificação de feedback 1-5m | **F-05** | ✅ Existente |
+| **E3-01** | Notificação de feedback | **F-05** | ✅ Existente — pedido enviado **1 min** após a saída (ajuste do PO em 28/09/2026, antes 1–5 min), com **piso de 2 min** aplicado no cliente (visita curta não convida, RN-01/RN-07) e deep-link da notificação corrigido para abrir o formulário no cold start ("Fechar tudo") e em foreground. Ver [M-024](09-melhoria-continua/Historico-Melhorias.md) |
 | **E3-02** | Form < 45s (4 perguntas) | **F-05** | ✅ Existente — os três desvios de RN foram corrigidos: **select searchable** de especialidade com lista curada (RN-10), ramificação **"triagem ≠ Sim → pula a Tela 2"** (RN-11) e opção **"Não interagi"** zerando `tratamentoEquipe`. Verificado em `FeedbackFormScreen.js` + `FeedbackFormScreen.test.js` |
 | **E3-03** | Responder em 24h + lembrete | **F-05** | ✅ Existente — janela de 24h, lembrete **único agendado em ~6h** (alinhado à doc, `FeedbackNotificationService.js`) e job `SEM_FEEDBACK` |
 | **E3-04** | Bloquear feedback duplicado | **F-05** | ✅ Existente (unique `visitaId`) |

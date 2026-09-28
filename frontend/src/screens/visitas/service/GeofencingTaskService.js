@@ -4,6 +4,7 @@ import HospitalService from "../../hospitais/service/HospitalService";
 import VisitaService from "./VisitaService";
 import { agendarFeedback } from "../../feedback/service/FeedbackNotificationService";
 import { centroDoHospital } from "../../../utils/geojson";
+import { duracaoMinutosDesde } from "../../../utils/format";
 
 /**
  * Geofencing nativo (F-03/ADR-002): substitui o GPS contínuo (que não funciona em
@@ -75,6 +76,10 @@ let visitaAtivaId = null;
 // Hospital da visita ativa, para o feedback pós-saída (Épico 03 — E3-01).
 let visitaAtivaHospitalId = null;
 
+// Entrada da visita ativa (ISO), para calcular a duração no checkout offline e decidir se
+// convida para feedback (RN-01/RN-07). Online a duração vem da resposta do checkout.
+let visitaAtivaEntrada = null;
+
 function limparTimer(mapa, hospitalId) {
   const timer = mapa.get(hospitalId);
   if (timer) {
@@ -141,6 +146,7 @@ async function confirmarEntrada(hospitalId) {
     visitaAtivaId = resposta?.id || visitaAtivaId;
     if (resposta?.id) {
       visitaAtivaHospitalId = hospitalId;
+      visitaAtivaEntrada = resposta?.entrada || new Date().toISOString();
     }
   } catch (erro) {
     // Aparelho sem internet: o check-in foi para a fila offline (OPS-05) e sai
@@ -171,27 +177,31 @@ async function confirmarSaida(_hospitalId) {
     return;
   }
 
-  const encerrarLocalmente = () => {
-    // Épico 03 — E3-01: pede o feedback ~1–5 min após a saída automática por geofence.
+  const encerrarLocalmente = (duracaoMinutos) => {
+    // Épico 03 — E3-01: pede o feedback ~1–5 min após a saída automática por geofence,
+    // só se a visita passou do piso de 2 min (RN-01/RN-07). Online a duração vem da
+    // resposta do checkout; offline é calculada a partir da entrada guardada.
     agendarFeedback({
       visitaId: visitaAtivaId,
       hospitalId: visitaAtivaHospitalId,
       hospitalNome: null,
       saidaEm: new Date().toISOString(),
+      duracaoMinutos,
     });
     visitaAtivaId = null;
     visitaAtivaHospitalId = null;
+    visitaAtivaEntrada = null;
   };
 
   try {
-    await VisitaService.checkout(visitaAtivaId, {});
-    encerrarLocalmente();
+    const resposta = await VisitaService.checkout(visitaAtivaId, {});
+    encerrarLocalmente(resposta?.duracaoMinutos);
   } catch (erro) {
     // Sem internet, o checkout ficou na fila offline (OPS-05) com o horário real
     // da saída: a entrega está garantida, então o app pode encerrar a visita
     // localmente. Insistir aqui só reenfileiraria o mesmo evento.
     if (erro?.enfileirado) {
-      encerrarLocalmente();
+      encerrarLocalmente(duracaoMinutosDesde(visitaAtivaEntrada));
       return;
     }
 
@@ -315,10 +325,13 @@ export async function iniciarGeofencing() {
 }
 
 /** Informa a este serviço qual visita está ativa (para confirmar o checkout automático). */
-export function sincronizarVisitaAtiva(visitaId) {
+export function sincronizarVisitaAtiva(visitaId, entrada = null) {
   visitaAtivaId = visitaId || null;
   if (!visitaId) {
     visitaAtivaHospitalId = null;
+    visitaAtivaEntrada = null;
+  } else if (entrada) {
+    visitaAtivaEntrada = entrada;
   }
 }
 
@@ -330,6 +343,7 @@ export async function pararGeofencing() {
   timersSaida.clear();
   visitaAtivaId = null;
   visitaAtivaHospitalId = null;
+  visitaAtivaEntrada = null;
 
   const tarefaRegistrada = await TaskManager.isTaskRegisteredAsync(GEOFENCING_TASK);
   if (tarefaRegistrada) {

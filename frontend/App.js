@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import {createNativeStackNavigator} from "@react-navigation/native-stack";
 import {createBottomTabNavigator} from "@react-navigation/bottom-tabs";
 import {NavigationContainer} from "@react-navigation/native";
@@ -178,11 +178,25 @@ function Tabs() {
 
 export default function App() {
     const navigationRef = useRef(null);
+    // Cold start (bug: "Fechar tudo" → notificação → app abria na tela inicial): quando o
+    // toque na notificação INICIA o app do zero, a resposta chega antes de a árvore de
+    // navegação montar. Estes refs seguram o destino até o NavigationContainer ficar pronto.
+    const navegacaoPronta = useRef(false);
+    const feedbackPendente = useRef(null);
 
-    useEffect(() => {
-        // E3-01/E3-03: abre o formulário de feedback quando o usuário toca na
-        // notificação local de feedback pós-saída.
-        const tratarResposta = async (resposta) => {
+    const abrirFeedback = useCallback((params) => {
+        if (navegacaoPronta.current && navigationRef.current) {
+            navigationRef.current.navigate("Feedback", { screen: "FeedbackForm", params });
+        } else {
+            // Ainda montando (cold start): guarda para o onReady do container despachar.
+            feedbackPendente.current = params;
+        }
+    }, []);
+
+    const tratarResposta = useCallback(
+        async (resposta) => {
+            // E3-01/E3-03: abre o formulário de feedback quando o usuário toca na
+            // notificação local de feedback pós-saída.
             const data = resposta?.notification?.request?.content?.data;
             if (!data?.abrirFeedback || !data?.visitaId) {
                 return;
@@ -200,21 +214,33 @@ export default function App() {
             if (!disponivel) {
                 return;
             }
-            // Pedido de feedback visualizado: agenda o lembrete único (RN-09/E3-03)
-            // caso ele não responda de imediato.
-            await agendarLembrete({ visitaId: data.visitaId, hospitalNome: pendencia.hospitalNome });
-            navigationRef.current?.navigate("Feedback", {
-                screen: "FeedbackForm",
-                params: {
-                    visitaId: data.visitaId,
-                    hospitalNome: pendencia.hospitalNome,
-                },
-            });
-        };
+            // Navega PRIMEIRO — o toque é a ação crítica. O lembrete (RN-09/E3-03) é
+            // efeito colateral: se `agendarLembrete` falhar ou travar, não pode impedir
+            // a abertura do formulário. Antes ele era aguardado ANTES do navigate, então
+            // uma falha ali deixava o usuário na tela em que estava (bug relatado em
+            // foreground) sem nunca chegar ao feedback.
+            abrirFeedback({ visitaId: data.visitaId, hospitalNome: pendencia.hospitalNome });
+            agendarLembrete({ visitaId: data.visitaId, hospitalNome: pendencia.hospitalNome }).catch(
+                () => {}
+            );
+        },
+        [abrirFeedback]
+    );
 
+    useEffect(() => {
         const subscricao = Notifications.addNotificationResponseReceivedListener(tratarResposta);
+
+        // Cold start: a resposta que abriu o app do zero não passa pelo listener acima
+        // (ela ocorreu antes de o listener existir) — é entregue por
+        // getLastNotificationResponseAsync. Sem isto, tocar a notificação com o app
+        // fechado abria a tela inicial em vez do feedback (relatado após "Fechar tudo").
+        const ultima = Notifications.getLastNotificationResponseAsync?.();
+        if (ultima?.then) {
+            ultima.then((resposta) => resposta && tratarResposta(resposta)).catch(() => {});
+        }
+
         return () => subscricao.remove();
-    }, []);
+    }, [tratarResposta]);
 
     useEffect(() => {
         // OPS-05: check-in e checkout registrados sem internet ficam na fila
@@ -247,7 +273,20 @@ export default function App() {
 
     return (
         <SafeAreaProvider>
-            <NavigationContainer ref={navigationRef}>
+            <NavigationContainer
+                ref={navigationRef}
+                onReady={() => {
+                    navegacaoPronta.current = true;
+                    // Despacha o feedback que chegou por cold start antes de a navegação montar.
+                    if (feedbackPendente.current) {
+                        navigationRef.current?.navigate("Feedback", {
+                            screen: "FeedbackForm",
+                            params: feedbackPendente.current,
+                        });
+                        feedbackPendente.current = null;
+                    }
+                }}
+            >
                 <Stack.Navigator screenOptions={{ headerShown: false }}>
                     <Stack.Screen name="Tabs" component={Tabs} />
                     <Stack.Screen name="Feedback" component={FeedbackStack} />

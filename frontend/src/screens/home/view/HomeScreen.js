@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Image, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
@@ -25,6 +25,10 @@ import { preservarSeSemConexao } from "../../../utils/alertas";
  */
 export default function HomeScreen() {
     const [visitaAtivaId, setVisitaAtivaId] = useState(null);
+    // Entrada da visita ativa reidratada, repassada ao geofencing para calcular a duração
+    // no checkout offline após reinício do app (RN-01/RN-07). Ref (não estado) porque só é
+    // lida dentro do efeito de sincronização, sem precisar disparar re-render.
+    const visitaAtivaEntradaRef = useRef(null);
 
     useEffect(() => {
         // Inicializa o geofencing nativo (F-03/ADR-002) uma vez, no ciclo de vida global
@@ -42,7 +46,10 @@ export default function HomeScreen() {
     // silenciosamente o heartbeat (E2-09) de uma visita geofence real e ativa.
     const carregarVisitaAtiva = useCallback(() => {
         VisitaService.buscarAtiva()
-            .then((data) => setVisitaAtivaId(data?.visita?.id || null))
+            .then((data) => {
+                visitaAtivaEntradaRef.current = data?.visita?.entrada || null;
+                setVisitaAtivaId(data?.visita?.id || null);
+            })
             .catch((e) => preservarSeSemConexao(e, setVisitaAtivaId));
     }, []);
 
@@ -56,7 +63,7 @@ export default function HomeScreen() {
     );
 
     useEffect(() => {
-        sincronizarVisitaAtiva(visitaAtivaId);
+        sincronizarVisitaAtiva(visitaAtivaId, visitaAtivaEntradaRef.current);
         if (visitaAtivaId) {
             iniciarHeartbeat(visitaAtivaId);
         } else {

@@ -200,4 +200,23 @@ describe("confirmação de entrada", () => {
 
     expect(VisitaService.checkin).not.toHaveBeenCalled();
   });
+
+  it("na saída, repassa a duração do checkout para o convite de feedback (RN-01/RN-07)", async () => {
+    const { agendarFeedback } = require("../../../screens/feedback/service/FeedbackNotificationService");
+    Location.getCurrentPositionAsync.mockResolvedValue({ coords: POSICAO_REAL });
+    VisitaService.checkin.mockResolvedValue({ id: "v1", entrada: new Date().toISOString() });
+    VisitaService.checkout.mockResolvedValue({ id: "v1", duracaoMinutos: 12 });
+    const { executarTask } = carregarServico();
+
+    await dispararEntrada(executarTask); // Enter → +2min → checkin
+    executarTask({
+      data: { eventType: Location.GeofencingEventType.Exit, region: REGIAO },
+    });
+    await jest.advanceTimersByTimeAsync(5 * 60 * 1000); // +5min → checkout
+
+    expect(VisitaService.checkout).toHaveBeenCalledWith("v1", {});
+    expect(agendarFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({ visitaId: "v1", duracaoMinutos: 12 })
+    );
+  });
 });

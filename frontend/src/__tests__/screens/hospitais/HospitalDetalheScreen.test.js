@@ -162,11 +162,12 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     expect(screen.queryByText("Check-in manual ativo")).toBeNull();
   });
 
-  test("'Não estou aqui' finaliza o check-out e agenda o feedback", async () => {
+  test("'Não estou aqui' finaliza o check-out e repassa a duração ao feedback (RN-01/RN-07)", async () => {
     VisitaService.buscarAtiva.mockResolvedValue({
       visita: { id: "v1", origem: "MANUAL", hospitalId: "h1", entrada: new Date().toISOString() },
     });
-    VisitaService.checkout.mockResolvedValue({ id: "v1", status: "FINALIZADA" });
+    // A duração vem da resposta do checkout; quem decide convidar ou não é agendarFeedback.
+    VisitaService.checkout.mockResolvedValue({ id: "v1", status: "FINALIZADA", duracaoMinutos: 8 });
 
     renderizar();
     fireEvent.press(await screen.findByText("Não estou aqui"));
@@ -175,9 +176,33 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
 
     expect(VisitaService.checkout).toHaveBeenCalledWith("v1", { encerramentoManual: true });
     expect(agendarFeedback).toHaveBeenCalledWith(
-      expect.objectContaining({ visitaId: "v1", hospitalId: "h1", hospitalNome: "Hospital Central" })
+      expect.objectContaining({
+        visitaId: "v1",
+        hospitalId: "h1",
+        hospitalNome: "Hospital Central",
+        duracaoMinutos: 8,
+      })
     );
     expect(screen.queryByText("Check-in manual ativo")).toBeNull();
+  });
+
+  test("check-out de visita curta (<2 min) repassa a duração — não convida para feedback (RN-01/RN-07)", async () => {
+    // Bug relatado: check-in seguido de checkout imediato ainda disparava a pesquisa. A
+    // duração curta é repassada e o gate de 2 min em agendarFeedback (testado em unidade)
+    // suprime a notificação.
+    VisitaService.buscarAtiva.mockResolvedValue({
+      visita: { id: "v1", origem: "MANUAL", hospitalId: "h1", entrada: new Date().toISOString() },
+    });
+    VisitaService.checkout.mockResolvedValue({ id: "v1", status: "FINALIZADA", duracaoMinutos: 1 });
+
+    renderizar();
+    fireEvent.press(await screen.findByText("Não estou aqui"));
+
+    await act(async () => {});
+
+    expect(agendarFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({ visitaId: "v1", duracaoMinutos: 1 })
+    );
   });
 
   test("erro no check-out mantém a visita ativa e mostra alerta", async () => {

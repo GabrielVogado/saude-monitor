@@ -16,9 +16,23 @@ import { solicitarPermissaoNotificacao } from "../../../services/NotificacaoPerm
 
 const FECHADO_KEY = "@saude_monitor:feedbackPendente";
 
-// Janela de resposta total (24h) e prazo (em ms) para o pedido inicial (1–5 min, E3-01).
+// Janela de resposta total (24h) e prazo (em ms) para o pedido inicial após a saída.
 const JANELA_MS = 24 * 60 * 60 * 1000;
-const ATRASO_PEDIDO_MAX_MS = 5 * 60 * 1000;
+
+/**
+ * Atraso do pedido de feedback após a saída: 1 minuto (decisão do PO em 28/09/2026,
+ * reduzido do intervalo 1–5 min anterior de E3-01, para o convite chegar logo após o
+ * checkout). Fixo, então reagendar a mesma visita cai no mesmo horário (idempotência).
+ */
+const ATRASO_PEDIDO_MS = 1 * 60 * 1000;
+
+/**
+ * RN-01/RN-07: visita com menos de 2 minutos não gera convite de feedback — é o mesmo
+ * piso que a agregação do backend usa para descartar visitas curtas das estatísticas.
+ * Sem esta guarda, um check-in seguido de checkout imediato (típico do check-in manual)
+ * disparava a pesquisa mesmo assim.
+ */
+export const DURACAO_MINIMA_FEEDBACK_MIN = 2;
 
 // Handler para exibir notificação no foreground sem nativo.
 Notifications.setNotificationHandler({
@@ -68,16 +82,22 @@ export async function pedirPermissaoNotificacao() {
  * Agenda o pedido de feedback após a saída (E3-01) e o lembretete (E3-03, 1x).
  * Idempotente: novas chamadas para a mesma visita substituem a pendência.
  */
-export async function agendarFeedback({ visitaId, hospitalId, hospitalNome, saidaEm }) {
+export async function agendarFeedback({ visitaId, hospitalId, hospitalNome, saidaEm, duracaoMinutos }) {
+  // RN-01/RN-07: visita curta (< 2 min) não convida para feedback. Quando a duração é
+  // conhecida (resposta do checkout, ou cálculo local no caminho offline) e fica abaixo do
+  // piso, não agenda nada e nem grava pendência — devolve null para o chamador saber.
+  if (Number.isFinite(duracaoMinutos) && duracaoMinutos < DURACAO_MINIMA_FEEDBACK_MIN) {
+    return null;
+  }
+
   const granted = await pedirPermissaoNotificacao();
   const pendencia = montarPendencia({ visitaId, hospitalId, hospitalNome, saidaEm });
 
   const disparaAgora = Number(saidaEm ? new Date(saidaEm).getTime() : Date.now());
   const base = Number.isFinite(disparaAgora) ? disparaAgora : Date.now();
 
-  // E3-01: pedido inicial entre 1 e 5 minutos após a saída (valor determinístico por visita).
-  const atrasoInicialMs = ATRASO_PEDIDO_MAX_MS * 0.2 + (visitaId.length % 5) * ATRASO_PEDIDO_MAX_MS * 0.2;
-  const pedidoEm = base + atrasoInicialMs;
+  // Pedido inicial 1 minuto após a saída (E3-01, ajustado pelo PO em 28/09/2026).
+  const pedidoEm = base + ATRASO_PEDIDO_MS;
 
   // Limpa agendamentos anteriores desta visita antes de reagendar.
   const agendamentos = await Notifications.getAllScheduledNotificationsAsync();

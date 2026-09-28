@@ -62,7 +62,7 @@ describe("FeedbackNotificationService (Épico 03)", () => {
     expect(await pendenciaAtual()).not.toBeNull();
   });
 
-  test("agendarFeedback agenda o pedido entre 1 e 5 min após a saída (E3-01)", async () => {
+  test("agendarFeedback agenda o pedido 1 min após a saída (E3-01, ajuste do PO)", async () => {
     const agora = Date.now();
     jest.setSystemTime(agora);
     await agendarFeedback({
@@ -79,12 +79,55 @@ describe("FeedbackNotificationService (Épico 03)", () => {
 
     expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
     const [args] = Notifications.scheduleNotificationAsync.mock.calls[0];
-    const triggerDate = new Date(args.trigger.date).getTime();
-    const deltaMs = triggerDate - agora;
-    // 1–5 minutos (300000ms) após a saída
-    expect(deltaMs).toBeGreaterThanOrEqual(1 * 60 * 1000);
-    expect(deltaMs).toBeLessThanOrEqual(5 * 60 * 1000);
+    const deltaMs = new Date(args.trigger.date).getTime() - agora;
+    // exatamente 1 minuto após a saída
+    expect(deltaMs).toBe(1 * 60 * 1000);
     expect(args.content.data.abrirFeedback).toBe(true);
+  });
+
+  test("o atraso é fixo em 1 min, independente do visitaId", async () => {
+    // Antes, um bug prendia o atraso no teto de 5 min; e o espalhamento por id foi removido
+    // quando o PO fixou o pedido em 1 min. Ids diferentes agora dão o mesmo atraso.
+    const agora = Date.now();
+    jest.setSystemTime(agora);
+
+    await agendarFeedback({ visitaId: "a".repeat(24), hospitalNome: "UPA", saidaEm: new Date(agora).toISOString() });
+    const deltaA = new Date(Notifications.scheduleNotificationAsync.mock.calls[0][0].trigger.date).getTime() - agora;
+
+    Notifications.scheduleNotificationAsync.mockClear();
+    AsyncStorage.__reset();
+
+    await agendarFeedback({ visitaId: "b".repeat(24), hospitalNome: "UPA", saidaEm: new Date(agora).toISOString() });
+    const deltaB = new Date(Notifications.scheduleNotificationAsync.mock.calls[0][0].trigger.date).getTime() - agora;
+
+    expect(deltaA).toBe(1 * 60 * 1000);
+    expect(deltaB).toBe(1 * 60 * 1000);
+  });
+
+  test("não agenda nem grava pendência quando a visita durou menos de 2 min (RN-01/RN-07)", async () => {
+    // Bug relatado: check-in seguido de checkout imediato convidava para feedback.
+    const resultado = await agendarFeedback({
+      visitaId: "v-curta",
+      hospitalId: "h1",
+      hospitalNome: "UPA",
+      duracaoMinutos: 1,
+    });
+
+    expect(resultado).toBeNull();
+    expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+    expect(await pendenciaAtual()).toBeNull();
+  });
+
+  test("agenda normalmente quando a visita atingiu o piso de 2 min (RN-01/RN-07)", async () => {
+    await agendarFeedback({
+      visitaId: "v-ok",
+      hospitalId: "h1",
+      hospitalNome: "UPA",
+      duracaoMinutos: 2,
+    });
+
+    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+    expect(await pendenciaAtual()).not.toBeNull();
   });
 
   test("agendarLembrete dispara apenas 1 lembrete (E3-03)", async () => {

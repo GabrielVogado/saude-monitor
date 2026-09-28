@@ -202,7 +202,6 @@ describe("confirmação de entrada", () => {
   });
 
   it("na saída, repassa a duração do checkout para o convite de feedback (RN-01/RN-07)", async () => {
-    // eslint-disable-next-line global-require
     const { agendarFeedback } = require("../../../screens/feedback/service/FeedbackNotificationService");
     Location.getCurrentPositionAsync.mockResolvedValue({ coords: POSICAO_REAL });
     VisitaService.checkin.mockResolvedValue({ id: "v1", entrada: new Date().toISOString() });

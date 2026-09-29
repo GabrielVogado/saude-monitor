@@ -133,7 +133,12 @@ jobs:
           cache-dependency-path: admin/package-lock.json
 
       - name: Instalar dependências
-        run: npm ci
+        # O lockfile do admin foi gerado com o npm 11.6.1 (`packageManager` no
+        # package.json). O npm 10 que vem com o Node 20 recusa esse lockfile no `npm ci`
+        # ("Missing: @emnapi/core@1.11.3"), então o job fixa a mesma versão do projeto.
+        run: |
+          npm install -g npm@11.6.1
+          npm ci
 
       - name: Testes (Vitest)
         run: npx ng test --watch=false

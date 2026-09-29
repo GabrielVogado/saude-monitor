@@ -63,7 +63,7 @@ class MassaAvaliacoesDevIntegracaoTest extends IntegracaoTestBase {
 
     private JsonNode ranking(String ordem) throws Exception {
         String corpo = mockMvc.perform(get("/api/v1/hospitais/ranking")
-                        .param("ordem", ordem).param("page", "0").param("size", "500"))
+                        .param("ordem", ordem).param("page", "0").param("size", "100")) // máximo do endpoint; cobre os ~44 avaliados e parte dos sem indicadores
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return objectMapper.readTree(corpo).get("content");

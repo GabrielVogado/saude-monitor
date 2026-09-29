@@ -3,7 +3,6 @@ package br.com.saude_monitor.api.feedback.seed;
 import br.com.saude_monitor.api.agregado.service.AgregadoService;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
-import br.com.saude_monitor.api.hospital.seed.ReconciliacaoRegiaoAdministrativaRunner;
 import br.com.saude_monitor.api.user.document.ConsentimentoItem;
 import br.com.saude_monitor.api.user.document.ConsentimentosDocument;
 import br.com.saude_monitor.api.user.document.Papel;
@@ -11,15 +10,15 @@ import br.com.saude_monitor.api.user.document.UserDocument;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
-import org.springframework.core.annotation.Order;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -50,17 +49,20 @@ import java.util.regex.Pattern;
  * massa completa, o boot só recalcula os agregados e sincroniza a senha. A massa é regerada
  * com datas atuais quando tem mais de 30 dias (antes de sair da janela de 90 dias, RN-14),
  * quando sobrou uma carga interrompida ou no modo {@code recriar}.</p>
+ *
+ * <p><b>Fora do caminho de startup:</b> roda em segundo plano depois de
+ * {@link ApplicationReadyEvent} (os seeds de hospitais já terminaram). Como
+ * {@code ApplicationRunner}, a carga segurava o readiness em {@code OUT_OF_SERVICE}: no
+ * Cloud Run a CPU fica quase parada fora de requisição depois que a porta abre, a carga
+ * não terminava a tempo e o smoke test do deploy do dev (29/09/2026) recebia 503 em
+ * {@code /actuator/health}.</p>
  */
 @Slf4j
 @Component
 @Profile("dev")
-@Order(MassaAvaliacoesRunner.ORDEM)
 @ConditionalOnProperty(prefix = "app.massa-avaliacoes", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
-public class MassaAvaliacoesRunner implements ApplicationRunner {
-
-    /** Depois do seed e das reconciliações de hospitais ({@link ReconciliacaoRegiaoAdministrativaRunner#ORDEM}). */
-    public static final int ORDEM = ReconciliacaoRegiaoAdministrativaRunner.ORDEM + 10;
+public class MassaAvaliacoesRunner {
 
     /** Semente fixa: a mesma base de hospitais gera sempre a mesma distribuição. */
     static final long SEMENTE = 20260929L;
@@ -93,12 +95,18 @@ public class MassaAvaliacoesRunner implements ApplicationRunner {
     private final AgregadoService agregadoService;
     private final MassaAvaliacoesProperties properties;
 
+    /** Dispara a carga em segundo plano quando a aplicação está pronta. */
+    @Async
+    @EventListener(ApplicationReadyEvent.class)
+    public void aoFicarPronta() {
+        executarCarga();
+    }
+
     /**
-     * A massa é opcional: qualquer falha é registrada e a aplicação sobe mesmo assim — um
-     * erro aqui não pode derrubar o ambiente de desenvolvimento.
+     * A massa é opcional: qualquer falha é registrada e a aplicação segue — um erro aqui
+     * não pode derrubar o ambiente de desenvolvimento.
      */
-    @Override
-    public void run(ApplicationArguments args) {
+    public void executarCarga() {
         try {
             executar();
         } catch (RuntimeException e) {

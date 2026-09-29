@@ -15,12 +15,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.lang.reflect.Method;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -105,7 +110,7 @@ class MassaAvaliacoesRunnerTest {
     void recusaBancoQueNaoEDeDesenvolvimento(String banco) {
         when(database.getName()).thenReturn(banco);
 
-        runner(null, "senha").run(null);
+        runner(null, "senha").executarCarga();
 
         verify(mongoTemplate, never()).exists(any(Query.class), any(Class.class));
         verify(mongoTemplate, never()).insertAll(any());
@@ -117,7 +122,7 @@ class MassaAvaliacoesRunnerTest {
         when(database.getName()).thenReturn("test");
         comHospitaisAtivos(5);
 
-        runner(null, "senha").run(null);
+        runner(null, "senha").executarCarga();
 
         verify(mongoTemplate, times(3)).insertAll(any());
     }
@@ -127,7 +132,7 @@ class MassaAvaliacoesRunnerTest {
         comMassaCompleta(Instant.now().minus(Duration.ofDays(3)), "hash");
         when(passwordEncoder.matches("senha", "hash")).thenReturn(true);
 
-        runner("skip-if-present", "senha").run(null);
+        runner("skip-if-present", "senha").executarCarga();
 
         verify(agregadoService).recalcular("hospital-da-massa");
         verify(mongoTemplate, never()).insertAll(any());
@@ -140,7 +145,7 @@ class MassaAvaliacoesRunnerTest {
         comMassaCompleta(Instant.now().minus(Duration.ofDays(31)), "hash");
         comHospitaisAtivos(10);
 
-        runner(null, "senha").run(null);
+        runner(null, "senha").executarCarga();
 
         verificaQueRegerou();
         verify(agregadoService).recalcular("hospital-da-massa");
@@ -152,7 +157,7 @@ class MassaAvaliacoesRunnerTest {
         when(mongoTemplate.remove(any(Query.class), any(Class.class))).thenReturn(DeleteResult.acknowledged(1));
         comHospitaisAtivos(10);
 
-        runner(null, "senha").run(null);
+        runner(null, "senha").executarCarga();
 
         verificaQueRegerou();
     }
@@ -162,7 +167,7 @@ class MassaAvaliacoesRunnerTest {
         comMassaCompleta(Instant.now(), "hash-antigo");
         when(passwordEncoder.matches("nova", "hash-antigo")).thenReturn(false);
 
-        runner(null, "nova").run(null);
+        runner(null, "nova").executarCarga();
 
         verify(passwordEncoder).encode("nova");
         ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
@@ -176,7 +181,7 @@ class MassaAvaliacoesRunnerTest {
     void tirarASenhaDaConfiguracaoBloqueiaOLoginDeNovo() {
         comMassaCompleta(Instant.now(), "hash-da-senha-antiga");
 
-        runner(null, null).run(null);
+        runner(null, null).executarCarga();
 
         ArgumentCaptor<String> senha = ArgumentCaptor.forClass(String.class);
         verify(passwordEncoder).encode(senha.capture());
@@ -188,7 +193,7 @@ class MassaAvaliacoesRunnerTest {
     void injetaUsuariosVisitasEAvaliacoesERecalculaOsAgregados() {
         comHospitaisAtivos(80);
 
-        runner(null, "S3nh@Dev").run(null);
+        runner(null, "S3nh@Dev").executarCarga();
 
         List<UserDocument> usuarios = inserido(UserDocument.class);
         assertThat(usuarios).hasSize(MassaAvaliacoesRunner.QUANTIDADE_USUARIOS)
@@ -212,7 +217,7 @@ class MassaAvaliacoesRunnerTest {
     void semSenhaConfiguradaOsUsuariosRecebemSenhaAleatoria() {
         comHospitaisAtivos(10);
 
-        runner(null, " ").run(null);
+        runner(null, " ").executarCarga();
 
         ArgumentCaptor<String> senha = ArgumentCaptor.forClass(String.class);
         verify(passwordEncoder).encode(senha.capture());
@@ -224,7 +229,7 @@ class MassaAvaliacoesRunnerTest {
         comMassaCompleta(Instant.now(), "hash");
         comHospitaisAtivos(10);
 
-        runner("RECRIAR", "senha").run(null);
+        runner("RECRIAR", "senha").executarCarga();
 
         ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
         verify(mongoTemplate).remove(query.capture(), eq(FeedbackDocument.class));
@@ -237,7 +242,7 @@ class MassaAvaliacoesRunnerTest {
     void semHospitalAtivoNaoGravaNada() {
         comHospitaisAtivos(0);
 
-        runner(null, "senha").run(null);
+        runner(null, "senha").executarCarga();
 
         verify(mongoTemplate, never()).insertAll(any());
         verifyNoInteractions(agregadoService);
@@ -248,7 +253,20 @@ class MassaAvaliacoesRunnerTest {
         comHospitaisAtivos(10);
         when(mongoTemplate.insertAll(any())).thenThrow(new DataAccessResourceFailureException("Atlas fora"));
 
-        assertThatCode(() -> runner(null, "senha").run(null)).doesNotThrowAnyException();
+        assertThatCode(() -> runner(null, "senha").executarCarga()).doesNotThrowAnyException();
         verifyNoInteractions(agregadoService);
+    }
+
+    /**
+     * Regressão do deploy do dev de 29/09/2026: a carga como ApplicationRunner segurava o
+     * readiness em OUT_OF_SERVICE e o smoke test recebia 503. Ela precisa rodar em segundo
+     * plano, depois de a aplicação ficar pronta.
+     */
+    @Test
+    void cargaRodaEmSegundoPlanoDepoisDaAplicacaoPronta() throws NoSuchMethodException {
+        assertThat(ApplicationRunner.class.isAssignableFrom(MassaAvaliacoesRunner.class)).isFalse();
+        Method gatilho = MassaAvaliacoesRunner.class.getMethod("aoFicarPronta");
+        assertThat(gatilho.getAnnotation(Async.class)).isNotNull();
+        assertThat(gatilho.getAnnotation(EventListener.class).value()).containsExactly(ApplicationReadyEvent.class);
     }
 }

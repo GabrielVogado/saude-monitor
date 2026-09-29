@@ -1,10 +1,12 @@
 package br.com.saude_monitor.api.integracao;
 
+import br.com.saude_monitor.api.agregado.document.AgregadoHospitalDocument;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.feedback.seed.MassaAvaliacoesRunner;
 import br.com.saude_monitor.api.user.document.UserDocument;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,17 +22,19 @@ import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * A massa de avaliações de desenvolvimento, com contexto Spring real e Mongo real: o
- * runner sobe no perfil {@code dev} sobre os hospitais do seed, e o que se verifica é o
+ * A massa de avaliações de desenvolvimento, com contexto Spring real e Mongo real: a
+ * carga roda no perfil {@code dev} sobre os hospitais do seed, e o que se verifica é o
  * que o PO vai testar — o ranking com diferenças claras, hospitais sem indicadores e o
  * histórico de avaliações de um usuário de teste logado.
  */
@@ -60,6 +64,16 @@ class MassaAvaliacoesDevIntegracaoTest extends IntegracaoTestBase {
 
     @Autowired
     private MassaAvaliacoesRunner runner;
+
+    /**
+     * A carga roda em segundo plano depois do {@code ApplicationReadyEvent}: espera os
+     * agregados dos 50 hospitais da massa (o banco do container só tem os dela).
+     */
+    @BeforeEach
+    void aguardarCarga() {
+        await().atMost(Duration.ofSeconds(60)).until(() ->
+                mongoTemplate.count(new Query(), AgregadoHospitalDocument.class) >= 50);
+    }
 
     private JsonNode ranking(String ordem) throws Exception {
         String corpo = mockMvc.perform(get("/api/v1/hospitais/ranking")
@@ -129,7 +143,7 @@ class MassaAvaliacoesDevIntegracaoTest extends IntegracaoTestBase {
         long feedbacks = mongoTemplate.count(new Query(), FeedbackDocument.class);
         assertThat(feedbacks).isPositive();
 
-        runner.run(null);
+        runner.executarCarga();
 
         assertThat(mongoTemplate.count(new Query(), UserDocument.class)).isEqualTo(usuarios);
         assertThat(mongoTemplate.count(new Query(), VisitaDocument.class)).isEqualTo(visitas);

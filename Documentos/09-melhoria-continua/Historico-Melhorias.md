@@ -1728,6 +1728,11 @@ chamada voltava 401 em silêncio e as telas ficavam vazias (o dashboard mostrava
 - Na tela (backend local contra o banco de dev): sessão vencida → `POST /auth/refresh` 200 →
   chamada repetida 200 e os 340 estabelecimentos no mapa; refresh inválido → login com o
   aviso de sessão expirada.
+- Teste de regressão `sessao-vencida.spec.ts`, pedido pelo PO: sobe os providers reais do
+  `appConfig` (não dublês) e cobre token vencido → refresh → chamada repetida, as 4 páginas do
+  mapa vencendo juntas com um único refresh, refresh recusado, 503 no refresh e ausência de
+  laço. Com o interceptor anterior (o código do bug) ou sem o interceptor no `appConfig`, os
+  5 casos falham. Suíte: 105 testes verdes.
 - A cobertura do `admin/` não foi medida: `@vitest/coverage-v8` não está instalado no painel.
 
 ---

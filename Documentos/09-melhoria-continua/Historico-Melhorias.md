@@ -1737,6 +1737,44 @@ chamada voltava 401 em silêncio e as telas ficavam vazias (o dashboard mostrava
 
 ---
 
+## M-027 — Massa de dados de avaliações para o ambiente de desenvolvimento
+
+**Data:** 29/09/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Pedido do PO: testar avaliações de hospitais, a visualização das avaliações e o ranking
+no ambiente de desenvolvimento. O banco de dev não tinha visitas nem avaliações
+suficientes — todo hospital aparecia com "indicadores indisponíveis" (RN-15 exige 5
+avaliações) e o ranking era só a lista em ordem alfabética.
+
+### O que mudou
+
+- Novo `MassaAvaliacoesRunner` (backend): 30 usuários de teste, ~890 visitas e ~850
+  avaliações em 50 hospitais, com perfis de qualidade (excelente, bom, regular, ruim e
+  poucas avaliações) para o ranking ter diferenças claras por nota e por tempo, e os
+  demais hospitais sem avaliação. Os agregados são recalculados ao final da carga.
+- Três travas contra homologação/produção: perfil Spring `dev`, flag
+  `app.massa-avaliacoes.enabled` (padrão `false`) e nome do banco (precisa conter `dev` ou
+  `test` e não conter `hom`/`prod`). Idempotente pelo prefixo `massa-dev-` nos `_id`; a
+  cada boot recalcula os agregados, e a massa se regera sozinha com mais de 30 dias. Falha
+  na carga não derruba a aplicação.
+- `cd-backend-google.yml` liga o perfil `dev` e a flag só no serviço de dev.
+- Como usar, senha dos usuários de teste e remoção:
+  [`07-dados/Massa-Dados-Avaliacoes-Dev.md`](../07-dados/Massa-Dados-Avaliacoes-Dev.md).
+
+### Verificação
+
+- 26 testes unitários novos (gerador e runner): distribuição dos perfis, médias em ordem,
+  regras do formulário (RN-10), vínculo avaliação → visita finalizada, janela de 90 dias,
+  travas de banco, idempotência, validade de 30 dias, carga interrompida, `recriar`, senha
+  aplicada e retirada depois da carga, e falha do banco sem derrubar a aplicação.
+- Teste de integração com Mongo real (Testcontainers, roda no CI): ranking por nota e por
+  tempo ordenado com hospitais sem indicadores no fim, login de usuário de teste com
+  histórico de avaliações e segunda execução sem duplicar nada.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

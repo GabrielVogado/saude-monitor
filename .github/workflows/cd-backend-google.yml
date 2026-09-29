@@ -40,6 +40,8 @@ jobs:
       github_env: ${{ steps.resolve.outputs.github_env }}
       ratelimit_auth: ${{ steps.resolve.outputs.ratelimit_auth }}
       ratelimit_publico: ${{ steps.resolve.outputs.ratelimit_publico }}
+      spring_profile: ${{ steps.resolve.outputs.spring_profile }}
+      massa_avaliacoes: ${{ steps.resolve.outputs.massa_avaliacoes }}
     steps:
       - id: resolve
         run: |
@@ -51,6 +53,8 @@ jobs:
             echo "github_env=producao" >> "$GITHUB_OUTPUT"
             echo "ratelimit_auth=10" >> "$GITHUB_OUTPUT"
             echo "ratelimit_publico=60" >> "$GITHUB_OUTPUT"
+            echo "spring_profile=prod" >> "$GITHUB_OUTPUT"
+            echo "massa_avaliacoes=false" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
             # Homologacao (decisao do PO, 22/09/2026). Servico, banco e JWT proprios:
             # os secrets `_HOM` apontam para o banco `saude_monitor_hom`. Sem eles o
@@ -69,6 +73,8 @@ jobs:
             # ficam com os limites da spec F0-04.
             echo "ratelimit_auth=300" >> "$GITHUB_OUTPUT"
             echo "ratelimit_publico=2000" >> "$GITHUB_OUTPUT"
+            echo "spring_profile=hom" >> "$GITHUB_OUTPUT"
+            echo "massa_avaliacoes=false" >> "$GITHUB_OUTPUT"
           else
             echo "env=dev" >> "$GITHUB_OUTPUT"
             echo "tag=dev" >> "$GITHUB_OUTPUT"
@@ -77,6 +83,13 @@ jobs:
             echo "github_env=desenvolvimento" >> "$GITHUB_OUTPUT"
             echo "ratelimit_auth=10" >> "$GITHUB_OUTPUT"
             echo "ratelimit_publico=60" >> "$GITHUB_OUTPUT"
+            # Massa de avaliacoes (29/09/2026) so no dev: o MassaAvaliacoesRunner exige o
+            # perfil `dev` E a flag, e ainda recusa banco com "hom"/"prod" no nome.
+            # Idempotente -- cold starts seguintes nao duplicam nada. Sem senha aqui de
+            # proposito (servico publico): os usuarios de teste nascem sem login; ver
+            # Documentos/07-dados/Massa-Dados-Avaliacoes-Dev.md.
+            echo "spring_profile=dev" >> "$GITHUB_OUTPUT"
+            echo "massa_avaliacoes=true" >> "$GITHUB_OUTPUT"
           fi
 
   build-and-deploy:
@@ -168,6 +181,8 @@ jobs:
             RESEND_FROM_EMAIL=senha@saudemonitor.dev
             APP_RATELIMIT_AUTH_POR_MINUTO=${{ needs.resolve-env.outputs.ratelimit_auth }}
             APP_RATELIMIT_PUBLICO_POR_MINUTO=${{ needs.resolve-env.outputs.ratelimit_publico }}
+            SPRING_PROFILES_ACTIVE=${{ needs.resolve-env.outputs.spring_profile }}
+            APP_MASSA_AVALIACOES_ENABLED=${{ needs.resolve-env.outputs.massa_avaliacoes }}
           flags: >-
             --allow-unauthenticated
             --service-account=saude-monitor-run@${{ env.PROJECT_ID }}.iam.gserviceaccount.com

@@ -1691,6 +1691,47 @@ de salvo, sem erro nem log visível para quem editou.
 
 ---
 
+## M-026 — Mapa do painel vazio após 15 min e divisões pouco legíveis
+
+**Data:** 28/09/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+No E2E local do Épico 7, o PO abriu o mapa do painel e não viu nenhum hospital, nem
+uma divisão clara entre as regiões. A aba de rede mostrou a causa dos hospitais sumidos:
+`GET /api/v1/admin/hospitais` → **401**. O access token vive 15 min e o painel nunca o
+renovava; passado esse tempo, o guard seguia deixando entrar (havia token guardado), toda
+chamada voltava 401 em silêncio e as telas ficavam vazias (o dashboard mostrava "—").
+
+### O que mudou
+
+- **Sessão:** o `authInterceptor` trata o 401 da API renovando o par com
+  `POST /api/v1/auth/refresh` (já existia no backend, com rotação) e repete a chamada uma
+  vez. Chamadas que recebem 401 juntas compartilham uma única renovação: como o backend
+  revoga o refresh anterior na rotação, um segundo `/refresh` com ele derrubaria a sessão
+  recém-renovada. Se o refresh for recusado (401/403), a sessão é encerrada e o login abre
+  com "Sua sessão expirou"; falha de rede ou 5xx (ex.: 503 do cold start) não desloga.
+- **Mapa:** os estabelecimentos passam a ser coloridos por **categoria**, na mesma divisão
+  das camadas de pontos da base `multiplas_camadas_saude_14` que gerou o seed (Hospitais,
+  UPA, UBS, Policlínicas, CAPS, Centros especializados, Outras unidades), cada uma com
+  toggle e contagem; inativos em cinza. As divisões abrem com a **Região Administrativa
+  ligada**, cada área com preenchimento próprio, contorno mais forte e nome ao passar o
+  mouse (fixo nas camadas de poucas áreas: Região e Macrorregião de Saúde). Os marcadores
+  ganharam um pane acima das áreas: antes, uma camada ligada depois deles era desenhada
+  por cima e tomava o clique.
+
+### Verificação
+
+- 100 testes (Vitest) verdes e `ng build` limpo. Seis mutações mortas: sem a renovação
+  compartilhada, sem a exceção das rotas de auth (laço de refresh), sem o logout na recusa,
+  com logout em 503, sem o fallback de categoria e com o toggle de categoria que não remove.
+- Na tela (backend local contra o banco de dev): sessão vencida → `POST /auth/refresh` 200 →
+  chamada repetida 200 e os 340 estabelecimentos no mapa; refresh inválido → login com o
+  aviso de sessão expirada.
+- A cobertura do `admin/` não foi medida: `@vitest/coverage-v8` não está instalado no painel.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

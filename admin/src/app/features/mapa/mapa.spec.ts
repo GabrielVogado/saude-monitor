@@ -86,8 +86,16 @@ describe('Mapa', () => {
     expect(el.textContent).toContain('1 hospital(is)');
   });
 
+  it('abre com a Região Administrativa ligada, buscada uma vez só', () => {
+    const checkbox = el.querySelector('input[aria-label="Região Administrativa"]') as HTMLInputElement;
+    expect(camadaApi.buscar).toHaveBeenCalledTimes(1);
+    expect(camadaApi.buscar).toHaveBeenCalledWith('regiao-administrativa');
+    expect(checkbox.checked).toBe(true);
+  });
+
   it('busca a camada só na primeira vez que o toggle é ligado (cache)', () => {
-    const checkbox = el.querySelector('input[type=checkbox]') as HTMLInputElement;
+    camadaApi.buscar.mockClear();
+    const checkbox = el.querySelector('input[aria-label="RIDE"]') as HTMLInputElement;
 
     checkbox.checked = true;
     checkbox.dispatchEvent(new Event('change'));
@@ -97,7 +105,7 @@ describe('Mapa', () => {
     checkbox.dispatchEvent(new Event('change'));
 
     expect(camadaApi.buscar).toHaveBeenCalledTimes(1);
-    expect(camadaApi.buscar).toHaveBeenCalledWith('regiao-administrativa');
+    expect(camadaApi.buscar).toHaveBeenCalledWith('ride');
   });
 
   it('mostra aviso e desmarca o checkbox se a camada falhar ao carregar', async () => {
@@ -106,7 +114,7 @@ describe('Mapa', () => {
     // intermediário com o checkbox marcado antes do erro desmarcá-lo — replicar isso é o
     // que prova que o binding `[checked]` (achado do code-review) funciona de verdade.
     camadaApi.buscar.mockReturnValue(from(Promise.reject(new Error('falha'))));
-    const checkbox = el.querySelector('input[type=checkbox]') as HTMLInputElement;
+    const checkbox = el.querySelector('input[aria-label="RIDE"]') as HTMLInputElement;
 
     checkbox.checked = true;
     checkbox.dispatchEvent(new Event('change'));
@@ -118,6 +126,62 @@ describe('Mapa', () => {
 
     expect(el.textContent).toContain('Não foi possível carregar a camada');
     expect(checkbox.checked).toBe(false);
+  });
+
+  it('conta os estabelecimentos por categoria, sem categoria contando como "Outras unidades"', () => {
+    const loc = { latitude: -15.9, longitude: -47.9 };
+    hospitalApi.listar.mockReturnValue(
+      of(
+        pagina([
+          { id: '1', nome: 'H', tipo: 'PUBLICO', categoria: 'HOSPITAL', ativo: true, localizacao: loc },
+          { id: '2', nome: 'U1', tipo: 'PUBLICO', categoria: 'UBS', ativo: true, localizacao: loc },
+          { id: '3', nome: 'U2', tipo: 'PUBLICO', categoria: 'UBS', ativo: false, localizacao: loc },
+          { id: '4', nome: 'X', tipo: 'PUBLICO', categoria: null, ativo: true, localizacao: loc },
+        ]),
+      ),
+    );
+    fixture = TestBed.createComponent(Mapa);
+    el = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+
+    const rotulo = (nome: string) =>
+      (el.querySelector(`input[aria-label="${nome}"]`)!.parentElement as HTMLElement).textContent!;
+    expect(rotulo('Hospitais')).toContain('(1)');
+    expect(rotulo('UBS')).toContain('(2)');
+    expect(rotulo('Outras unidades')).toContain('(1)');
+    expect(el.textContent).toContain('Inativo');
+    expect(el.textContent).toContain('4 visíveis');
+  });
+
+  it('esconde e volta a mostrar os marcadores de uma categoria', () => {
+    const loc = { latitude: -15.9, longitude: -47.9 };
+    hospitalApi.listar.mockReturnValue(
+      of(
+        pagina([
+          { id: '1', nome: 'H', tipo: 'PUBLICO', categoria: 'HOSPITAL', ativo: true, localizacao: loc },
+          { id: '2', nome: 'U', tipo: 'PUBLICO', categoria: 'UBS', ativo: true, localizacao: loc },
+        ]),
+      ),
+    );
+    fixture = TestBed.createComponent(Mapa);
+    el = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mapa = (fixture.componentInstance as any).mapa as import('leaflet').Map;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const grupoUbs = (fixture.componentInstance as any).gruposCategoria.get('UBS');
+    expect(mapa.hasLayer(grupoUbs)).toBe(true);
+
+    const checkbox = el.querySelector('input[aria-label="UBS"]') as HTMLInputElement;
+    checkbox.checked = false;
+    checkbox.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(mapa.hasLayer(grupoUbs)).toBe(false);
+    expect(el.textContent).toContain('1 visíveis');
+
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event('change'));
+    expect(mapa.hasLayer(grupoUbs)).toBe(true);
   });
 
   it('mostra aviso se a listagem de hospitais falhar', () => {

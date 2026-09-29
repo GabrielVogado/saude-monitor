@@ -47,6 +47,12 @@
         }
       </label>
 
+      @if (sessaoExpirada && !erro()) {
+        <p class="rounded-lg border border-outline-soft bg-surface-card px-3 py-2.5 text-sm font-medium text-ink" role="status">
+          Sua sessão expirou. Entre novamente para continuar.
+        </p>
+      }
+
       @if (erro(); as mensagem) {
         <p class="rounded-lg border border-danger-100 bg-danger-100/40 px-3 py-2.5 text-sm font-medium text-danger-700" role="alert">
           {{ mensagem }}

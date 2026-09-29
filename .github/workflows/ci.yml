@@ -110,3 +110,38 @@ jobs:
 
       - name: Build web (export Expo)
         run: npx expo export --platform web
+
+  admin:
+    # Até 28/09/2026 o Painel Admin (Angular) não passava por CI nenhum: um PR que
+    # quebrasse teste ou build do `admin/` ficava verde. Foi assim que a sessão vencida
+    # sem renovação (M-026) chegou à develop sem nenhum sinal.
+    name: Admin (Angular)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        # Angular 21 exige Node >= 20.19; a linha 20 do setup-node já entrega isso.
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Instalar dependências
+        # O lockfile do admin foi gerado com o npm 11.6.1 (`packageManager` no
+        # package.json). O npm 10 que vem com o Node 20 recusa esse lockfile no `npm ci`
+        # ("Missing: @emnapi/core@1.11.3"), então o job fixa a mesma versão do projeto.
+        run: |
+          npm install -g npm@11.6.1
+          npm ci
+
+      - name: Testes (Vitest)
+        run: npx ng test --watch=false
+
+      - name: Build
+        run: npx ng build

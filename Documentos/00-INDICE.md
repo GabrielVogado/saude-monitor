@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 29/09/2026 — Massa de dados de avaliações (dev)
+
+**O que entrou:** carga de usuários de teste, visitas e avaliações para o ambiente de desenvolvimento, para testar indicadores e ranking sem visitas reais. Uso, travas contra homologação/produção e remoção em [`07-dados/Massa-Dados-Avaliacoes-Dev.md`](./07-dados/Massa-Dados-Avaliacoes-Dev.md). Registro em `Historico-Melhorias.md` (M-027).
+**Sem mudança:** `De-Para-Backlog-Features.md` (é ferramenta de teste, nenhuma estória muda de status).
+
+---
+
 ## 📌 Revisão 28/09/2026 — Notificação de feedback: 1 min + piso de 2 min
 
 **O que entrou:** decisão do PO — a notificação de feedback pós-saída passa de "1 a 5 minutos" para **1 minuto** após a saída (RN-08); o piso de 2 min para convidar (RN-01/RN-07) passa a ser aplicado no cliente. Correções de código no PR #163 e registro em `Historico-Melhorias.md` (M-024).
@@ -139,7 +146,8 @@ Documentos/
 │   └── Plano-Sprints-v2.2.md                 ← S0–S8 executadas, S7 adiada, S9–S12 planejadas (§22)
 │
 ├── 07-dados/                                 ← relatórios de importação e enriquecimento de dados
-│   └── (7 relatórios de ETL CNES/DATASUS, auditoria de campos, auditoria de duplicatas e validação do georreferenciamento 12/09/2026)
+│   ├── (7 relatórios de ETL CNES/DATASUS, auditoria de campos, auditoria de duplicatas e validação do georreferenciamento 12/09/2026)
+│   └── Massa-Dados-Avaliacoes-Dev.md         ← massa de avaliações do ambiente dev (usuários, visitas, avaliações, ranking): como injetar e remover
 │
 ├── 08-analise tecnica/                       ← auditoria técnica e consolidação de pendências
 │   ├── Consolidacao-Tecnica-e-Backlog-Pendente-v1.1.md ← fonte única do que está entregue, pendente e priorizado

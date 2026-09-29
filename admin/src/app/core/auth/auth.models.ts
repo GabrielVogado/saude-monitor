@@ -24,3 +24,8 @@ export interface AuthResponse {
   expiraEm: number;
   usuario: Usuario;
 }
+
+/** Corpo do `POST /api/v1/auth/refresh` (e do logout). */
+export interface RefreshRequest {
+  refreshToken: string;
+}

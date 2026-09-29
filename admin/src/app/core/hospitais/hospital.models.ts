@@ -37,6 +37,8 @@ export interface Hospital {
   id: string;
   nome: string;
   tipo: TipoEstabelecimento;
+  /** Categoria do estabelecimento (camada de origem no seed: Hospitais, UBS, CAPS…). */
+  categoria?: CategoriaEstabelecimento | null;
   tipoUnidade?: string;
   endereco?: Endereco;
   localizacao?: Localizacao;

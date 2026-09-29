@@ -74,4 +74,61 @@ describe('Auth', () => {
     expect(service.accessToken).toBeNull();
     expect(service.usuario()).toBeNull();
   });
+
+  describe('renovar', () => {
+    const renovado = { ...respostaAdmin, accessToken: 'novo.access', refreshToken: 'novo.refresh' };
+
+    function logar() {
+      service.login('admin@x.com', 'senha').subscribe();
+      http.expectOne(`${BASE}/api/v1/auth/login`).flush(respostaAdmin);
+    }
+
+    it('troca o refresh token por um par novo e o persiste', () => {
+      logar();
+      let token: string | undefined;
+      service.renovar().subscribe((t) => (token = t));
+
+      const req = http.expectOne(`${BASE}/api/v1/auth/refresh`);
+      expect(req.request.body).toEqual({ refreshToken: 'r.e.f' });
+      req.flush(renovado);
+
+      expect(token).toBe('novo.access');
+      expect(service.accessToken).toBe('novo.access');
+      // A próxima renovação já usa o refresh rotacionado.
+      service.renovar().subscribe();
+      expect(http.expectOne(`${BASE}/api/v1/auth/refresh`).request.body).toEqual({ refreshToken: 'novo.refresh' });
+    });
+
+    it('chamadas simultâneas compartilham um único POST /refresh', () => {
+      logar();
+      const tokens: string[] = [];
+      service.renovar().subscribe((t) => tokens.push(t));
+      service.renovar().subscribe((t) => tokens.push(t));
+
+      http.expectOne(`${BASE}/api/v1/auth/refresh`).flush(renovado);
+
+      expect(tokens).toEqual(['novo.access', 'novo.access']);
+    });
+
+    it('falha sem chamar a API quando não há refresh token', () => {
+      let erro: unknown;
+      service.renovar().subscribe({ error: (e) => (erro = e) });
+
+      http.expectNone(`${BASE}/api/v1/auth/refresh`);
+      expect(erro).toBeInstanceOf(Error);
+    });
+
+    it('recusa renovação que devolve conta não-ADMIN', () => {
+      logar();
+      let erro: unknown;
+      service.renovar().subscribe({ error: (e) => (erro = e) });
+
+      http
+        .expectOne(`${BASE}/api/v1/auth/refresh`)
+        .flush({ ...renovado, usuario: { ...renovado.usuario, papel: 'USUARIO' } });
+
+      expect(erro).toBeInstanceOf(AcessoNaoAdminError);
+      expect(service.accessToken).toBe('a.b.c');
+    });
+  });
 });

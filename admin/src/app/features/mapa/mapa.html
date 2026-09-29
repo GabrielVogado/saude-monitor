@@ -1,29 +1,61 @@
 <div class="animate-[fadeInUp_0.4s_ease-out]">
-  <div class="flex flex-wrap items-end justify-between gap-3">
-    <div>
-      <h1 class="text-2xl font-bold tracking-tight text-ink">Mapa</h1>
-      <p class="mt-1 text-sm text-ink-soft">
-        {{ totalHospitais() }} hospital(is) no mapa · toque num marcador para ver detalhes
-      </p>
-    </div>
+  <div>
+    <h1 class="text-2xl font-bold tracking-tight text-ink">Mapa</h1>
+    <p class="mt-1 text-sm text-ink-soft">
+      {{ totalHospitais() }} hospital(is) no mapa · {{ totalVisiveis() }} visíveis · toque num marcador para ver detalhes
+    </p>
+  </div>
 
-    <div class="flex flex-wrap items-center gap-3 rounded-lg border border-outline-soft/50 bg-surface-card px-3 py-2">
-      @for (opcao of opcoesCamada; track opcao.tipo) {
-        <label class="flex items-center gap-1.5 text-sm text-ink">
-          <input
-            type="checkbox"
-            [checked]="camadasAtivas().has(opcao.tipo)"
-            [attr.aria-label]="opcao.rotulo"
-            (change)="alternarCamada(opcao.tipo, $any($event.target).checked)"
-          />
-          <span class="h-2.5 w-2.5 rounded-full" [style.background]="opcao.cor"></span>
-          {{ opcao.rotulo }}
-          @if (carregandoCamada() === opcao.tipo) {
-            <span class="text-ink-soft">(carregando…)</span>
-          }
-        </label>
-      }
-    </div>
+  <div class="mt-4 grid gap-3 lg:grid-cols-2">
+    <fieldset class="rounded-lg border border-outline-soft/50 bg-surface-card px-3 py-2">
+      <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-ink-soft">Divisões</legend>
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+        @for (opcao of opcoesCamada; track opcao.tipo) {
+          <label class="flex items-center gap-1.5 text-sm text-ink">
+            <input
+              type="checkbox"
+              [checked]="camadasAtivas().has(opcao.tipo)"
+              [attr.aria-label]="opcao.rotulo"
+              (change)="alternarCamada(opcao.tipo, $any($event.target).checked)"
+            />
+            <span
+              class="inline-block h-0 w-5 border-t-[3px]"
+              [style.border-color]="opcao.cor"
+              [style.border-top-style]="opcao.tracejado ? 'dashed' : 'solid'"
+            ></span>
+            {{ opcao.rotulo }}
+            @if (carregandoCamada() === opcao.tipo) {
+              <span class="text-ink-soft">(carregando…)</span>
+            }
+          </label>
+        }
+      </div>
+    </fieldset>
+
+    <fieldset class="rounded-lg border border-outline-soft/50 bg-surface-card px-3 py-2">
+      <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-ink-soft">Estabelecimentos</legend>
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+        @for (opcao of opcoesCategoria; track opcao.categoria) {
+          <label class="flex items-center gap-1.5 text-sm text-ink">
+            <input
+              type="checkbox"
+              [checked]="!categoriasOcultas().has(opcao.categoria)"
+              [attr.aria-label]="opcao.rotulo"
+              (change)="alternarCategoria(opcao.categoria, $any($event.target).checked)"
+            />
+            <span class="h-3 w-3 rounded-full ring-1 ring-white" [style.background]="opcao.cor"></span>
+            {{ opcao.rotulo }}
+            <span class="text-ink-soft">({{ contagem(opcao.categoria) }})</span>
+          </label>
+        }
+        @if (haInativos()) {
+          <span class="flex items-center gap-1.5 text-sm text-ink-soft">
+            <span class="h-3 w-3 rounded-full" [style.background]="corInativo"></span>
+            Inativo
+          </span>
+        }
+      </div>
+    </fieldset>
   </div>
 
   @if (erro(); as msg) {
@@ -34,6 +66,6 @@
 
   <div
     #mapaEl
-    class="mt-4 h-[32rem] w-full overflow-hidden rounded-xl border border-outline-soft/50 shadow-sm"
+    class="mt-4 h-[36rem] w-full overflow-hidden rounded-xl border border-outline-soft/50 shadow-sm"
   ></div>
 </div>

@@ -1,1 +1,15 @@
 /* You can add global styles to this file, and also import other style files */
+
+/* Nome das áreas no mapa do painel (tooltips do Leaflet ficam fora do componente). */
+.leaflet-tooltip.rotulo-area {
+  background: rgba(255, 255, 255, 0.85);
+  border: none;
+  box-shadow: none;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1d2939;
+}
+.leaflet-tooltip.rotulo-area::before {
+  display: none;
+}

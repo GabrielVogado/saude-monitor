@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AcessoNaoAdminError, Auth } from '../../core/auth/auth';
 
@@ -22,6 +22,9 @@ export class Login {
 
   protected readonly carregando = signal(false);
   protected readonly erro = signal<string | null>(null);
+  /** Chegou aqui porque a sessão venceu e não pôde ser renovada (ver `authInterceptor`). */
+  protected readonly sessaoExpirada =
+    inject(ActivatedRoute, { optional: true })?.snapshot.queryParamMap.get('sessao') === 'expirada';
 
   protected enviar(): void {
     if (this.form.invalid) {

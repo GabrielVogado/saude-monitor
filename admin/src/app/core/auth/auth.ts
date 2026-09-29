@@ -1,8 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { Observable, finalize, map, shareReplay, throwError } from 'rxjs';
 import { API_BASE_URL } from '../config/api.config';
-import { AuthResponse, LoginRequest, Usuario } from './auth.models';
+import { AuthResponse, LoginRequest, RefreshRequest, Usuario } from './auth.models';
 import { TokenStorage } from './token-storage';
 
 /**
@@ -25,6 +25,8 @@ export class Auth {
 
   private readonly accessTokenSig = signal<string | null>(this.storage.getAccessToken());
   private readonly usuarioSig = signal<Usuario | null>(this.storage.getUsuario());
+  /** Renovação em voo, compartilhada entre as chamadas que receberam 401 juntas. */
+  private renovacaoEmCurso: Observable<string> | null = null;
 
   /** Usuário autenticado (ou `null`). */
   readonly usuario = this.usuarioSig.asReadonly();
@@ -54,6 +56,40 @@ export class Auth {
           return resposta.usuario;
         }),
       );
+  }
+
+  /**
+   * Troca o refresh token por um novo par (o backend rotaciona e revoga o anterior) e
+   * devolve o novo access token. O access token vive 15 min: sem isto, passado esse
+   * tempo toda chamada recebia 401 e as telas ficavam vazias sem aviso.
+   *
+   * Chamadas simultâneas compartilham a mesma renovação: como o refresh anterior é
+   * revogado na rotação, um segundo `POST /refresh` com ele seria recusado e derrubaria
+   * a sessão que o primeiro acabou de renovar.
+   */
+  renovar(): Observable<string> {
+    if (this.renovacaoEmCurso) {
+      return this.renovacaoEmCurso;
+    }
+    const refreshToken = this.storage.getRefreshToken();
+    if (!refreshToken) {
+      return throwError(() => new Error('Sessão sem refresh token.'));
+    }
+    const corpo: RefreshRequest = { refreshToken };
+    this.renovacaoEmCurso = this.http
+      .post<AuthResponse>(`${this.apiBaseUrl}/api/v1/auth/refresh`, corpo)
+      .pipe(
+        map((resposta) => {
+          if (resposta.usuario?.papel !== 'ADMIN') {
+            throw new AcessoNaoAdminError();
+          }
+          this.persistir(resposta);
+          return resposta.accessToken;
+        }),
+        finalize(() => (this.renovacaoEmCurso = null)),
+        shareReplay({ bufferSize: 1, refCount: false }),
+      );
+    return this.renovacaoEmCurso;
   }
 
   /** Encerra a sessão local. (Revogação do refresh no servidor entra em estória futura.) */

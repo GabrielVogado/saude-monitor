@@ -48,6 +48,16 @@ O deploy (`cd-backend-google.yml`) só liga o perfil `dev` e a flag no serviço
 `false`, produção perfil `prod` e flag `false`. Uma falha na carga é registrada em log e
 não impede a aplicação de subir.
 
+## Quando roda
+
+Em segundo plano, logo depois de a aplicação ficar pronta (seeds de hospitais já
+concluídos). A carga não atrasa o startup nem o `/actuator/health`. No Cloud Run, a CPU
+fora de requisição é mínima: a carga avança conforme o serviço recebe chamadas, e o
+ranking pode aparecer incompleto nos primeiros acessos depois de um deploy ou cold start.
+
+> Até 29/09/2026 a carga rodava no startup (antes do readiness) e derrubou o smoke test do
+> deploy do dev com HTTP 503 em `/actuator/health`; ver M-027 no `Historico-Melhorias.md`.
+
 ## Idempotência e validade
 
 Todo documento da massa tem `_id` começando com `massa-dev-`. É por esse prefixo que a

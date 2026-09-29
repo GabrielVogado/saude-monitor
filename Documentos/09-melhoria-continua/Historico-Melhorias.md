@@ -1773,6 +1773,16 @@ avaliações) e o ranking era só a lista em ordem alfabética.
   tempo ordenado com hospitais sem indicadores no fim, login de usuário de teste com
   histórico de avaliações e segunda execução sem duplicar nada.
 
+### Correção pós-merge (29/09/2026)
+
+O primeiro deploy do dev com a massa (#171) falhou no smoke test: `/actuator/health`
+respondeu 503 (`OUT_OF_SERVICE`) nas 6 tentativas. A carga era um `ApplicationRunner`, e o
+readiness só fica pronto depois de todos eles; no Cloud Run a CPU fora de requisição é
+mínima depois que a porta abre, então a carga (inserções + recálculo de 50 agregados no
+Atlas) não terminava dentro da janela do smoke test. A carga passou a rodar em segundo
+plano (`@Async` no `ApplicationReadyEvent`), fora do caminho de startup; teste de
+regressão garante que ela não volte a ser `ApplicationRunner`.
+
 ---
 
 ## Anexo A — Matriz de roteamento de skills (transcrição)

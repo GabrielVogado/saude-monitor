@@ -96,7 +96,8 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   };
 
   useEffect(() => {
-    if (id) carregar();
+    // `carregar` mostra a falha em `erro`: disparo intencional.
+    if (id) void carregar();
   }, [id]);
 
   // Sincroniza o estado da visita manual ao focar a tela (ex.: ao voltar do check-in
@@ -120,7 +121,8 @@ export default function HospitalDetalheScreen({ navigation, route }) {
 
   useFocusEffect(
     useCallback(() => {
-      if (id) carregarVisitaManual();
+      // `carregarVisitaManual` trata a falha (preservarSeSemConexao): disparo intencional.
+      if (id) void carregarVisitaManual();
     }, [id])
   );
 
@@ -149,6 +151,11 @@ export default function HospitalDetalheScreen({ navigation, route }) {
         hospitalNome: hospital?.nome,
         saidaEm: new Date().toISOString(),
         duracaoMinutos,
+      }).catch((erro) => {
+        // A saída já está registrada; perder a pendência de avaliação não justifica
+        // alertar o usuário, mas a falha (ex.: disco cheio) não pode sumir em silêncio.
+        // eslint-disable-next-line no-console
+        console.warn("HospitalDetalheScreen: falha ao agendar o feedback", erro?.message);
       });
       setVisitaManual(null);
     };

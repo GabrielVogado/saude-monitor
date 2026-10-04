@@ -20,7 +20,7 @@ jest.mock("@rnmapbox/maps", () => {
   const stub = (props) => <View {...props} />;
   return {
     __esModule: true,
-    default: { setAccessToken: jest.fn(), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
+    default: { setAccessToken: jest.fn(() => Promise.resolve(null)), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
     StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
     MapView: stub,
     Camera: stub,

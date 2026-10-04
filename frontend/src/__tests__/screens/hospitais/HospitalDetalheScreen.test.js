@@ -32,7 +32,7 @@ jest.mock("@rnmapbox/maps", () => {
   const stub = (props) => <View {...props} />;
   return {
     __esModule: true,
-    default: { setAccessToken: jest.fn(), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
+    default: { setAccessToken: jest.fn(() => Promise.resolve(null)), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
     StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
     MapView: stub,
     Camera: stub,
@@ -112,6 +112,8 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     HospitalService.buscarPorId.mockResolvedValue(HOSPITAL);
     HospitalService.buscarIndicadores.mockResolvedValue(INDICADORES);
     VisitaService.buscarAtiva.mockResolvedValue({ visita: null });
+    // Assíncrona como a real: a tela encadeia `.catch` no retorno.
+    agendarFeedback.mockResolvedValue(null);
   });
 
   test("sai de carregando para os dados prontos sem quebrar (Regras de Hooks)", async () => {
@@ -203,6 +205,24 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     expect(agendarFeedback).toHaveBeenCalledWith(
       expect.objectContaining({ visitaId: "v1", duracaoMinutos: 1 })
     );
+  });
+
+  test("falha ao agendar o feedback é registrada e o cronômetro some mesmo assim", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    VisitaService.buscarAtiva.mockResolvedValue({
+      visita: { id: "v1", origem: "MANUAL", hospitalId: "h1", entrada: new Date().toISOString() },
+    });
+    VisitaService.checkout.mockResolvedValue({ id: "v1", status: "FINALIZADA", duracaoMinutos: 8 });
+    agendarFeedback.mockRejectedValue(new Error("disco cheio"));
+
+    renderizar();
+    fireEvent.press(await screen.findByText("Não estou aqui"));
+
+    await act(async () => {});
+
+    expect(warn).toHaveBeenCalledWith("HospitalDetalheScreen: falha ao agendar o feedback", "disco cheio");
+    expect(screen.queryByText("Check-in manual ativo")).toBeNull();
+    warn.mockRestore();
   });
 
   test("erro no check-out mantém a visita ativa e mostra alerta", async () => {

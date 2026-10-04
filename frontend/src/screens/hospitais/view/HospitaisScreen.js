@@ -167,7 +167,8 @@ export default function HospitaisScreen({ navigation }) {
   useEffect(() => {
     if (!carregamentoInicialFeitoRef.current) {
       carregamentoInicialFeitoRef.current = true;
-      carregar();
+      // `carregar` mostra a falha em `erro`: disparo intencional.
+      void carregar();
       return undefined;
     }
 

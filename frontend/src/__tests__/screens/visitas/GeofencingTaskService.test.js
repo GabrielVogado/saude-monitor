@@ -35,7 +35,8 @@ jest.mock("../../../screens/visitas/service/VisitaService", () => ({
 
 jest.mock("../../../screens/feedback/service/FeedbackNotificationService", () => ({
   __esModule: true,
-  agendarFeedback: jest.fn(),
+  // Assíncrona como a real: o serviço encadeia `.catch` no retorno.
+  agendarFeedback: jest.fn(() => Promise.resolve(null)),
 }));
 
 const HOSPITAL_LAT = -15.9023;
@@ -544,6 +545,23 @@ describe("falhas e casos de borda", () => {
 
     expect(agendarFeedback).toHaveBeenCalledWith(
       expect.objectContaining({ visitaId: "v9", hospitalId: "hospital-1", duracaoMinutos: 35 })
+    );
+    expect(JSON.parse(await AsyncStorage.getItem("@saude_monitor:geofencing")).visita).toBeNull();
+  });
+
+  it("falha ao agendar o feedback é registrada e não impede encerrar a visita local", async () => {
+    const { agendarFeedback } = require("../../../screens/feedback/service/FeedbackNotificationService");
+    agendarFeedback.mockRejectedValueOnce(new Error("disco cheio"));
+    VisitaService.checkout.mockResolvedValue({ id: "v9", duracaoMinutos: 20 });
+    const { executarTask, sincronizarVisitaAtiva } = carregarServico();
+    await sincronizarVisitaAtiva("v9", null, "hospital-1");
+
+    await sair(executarTask);
+    await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    expect(console.warn).toHaveBeenCalledWith(
+      "GeofencingTaskService: falha ao agendar o feedback",
+      "disco cheio"
     );
     expect(JSON.parse(await AsyncStorage.getItem("@saude_monitor:geofencing")).visita).toBeNull();
   });

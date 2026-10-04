@@ -59,7 +59,8 @@ export default function PerfilScreen({ navigation }) {
 
   useFocusEffect(
     useCallback(() => {
-      carregar();
+      // `carregar` mostra a falha em `erroInicial`: disparo intencional.
+      void carregar();
     }, [carregar])
   );
 
@@ -94,7 +95,8 @@ export default function PerfilScreen({ navigation }) {
   useEffect(() => {
     const inscricao = AppState.addEventListener("change", (estado) => {
       if (estado === "active") {
-        sincronizarPermissao();
+        // `sincronizarPermissao` tenta de novo na próxima volta ao app: disparo intencional.
+        void sincronizarPermissao();
       }
     });
     return () => inscricao?.remove?.();

@@ -65,6 +65,40 @@ function normalizar(texto) {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+/**
+ * Respostas do formulário. As de múltipla escolha guardam a CHAVE da opção (string,
+ * vinda de `OPCOES_SIM_NAO`/`rotulos`) ou `null` enquanto não respondidas; as
+ * estrelas guardam número.
+ *
+ * O tipo é declarado porque o estado nasce todo em `null` e só muda via `setCampo`
+ * (chave dinâmica): sem a anotação, a inferência de tipos vê `fezTriagem: null` para
+ * sempre e trata `form.fezTriagem === "SIM"` como comparação impossível.
+ *
+ * @typedef {object} FormFeedback
+ * @property {string | null} fezTriagem
+ * @property {string} especialidadeProcurada
+ * @property {string | null} foiAtendido
+ * @property {string | null} teveMedico
+ * @property {string | null} motivoNaoAtendido
+ * @property {string | null} medicacaoReceita
+ * @property {number | null} tratamentoEquipe
+ * @property {number | null} nota
+ * @property {string} comentario
+ */
+
+/** @type {FormFeedback} */
+const FORM_INICIAL = {
+  fezTriagem: null,
+  especialidadeProcurada: "",
+  foiAtendido: null,
+  teveMedico: null,
+  motivoNaoAtendido: null,
+  medicacaoReceita: null,
+  tratamentoEquipe: null,
+  nota: null,
+  comentario: "",
+};
+
 const ROTULOS_TRATAMENTO = ["Ruim", "Regular", "Bom", "Muito bom", "Excelente"];
 
 const OpcoesFezTriagem = ({ valor, aoSelecionar, rotulo, opcoes = OPCOES_SIM_NAO }) => (
@@ -149,17 +183,7 @@ export default function FeedbackFormScreen({ navigation, route }) {
   const [jaAvaliado, setJaAvaliado] = useState(false);
   const [naoInteragi, setNaoInteragi] = useState(false);
 
-  const [form, setForm] = useState({
-    fezTriagem: null,
-    especialidadeProcurada: "",
-    foiAtendido: null,
-    teveMedico: null,
-    motivoNaoAtendido: null,
-    medicacaoReceita: null,
-    tratamentoEquipe: null,
-    nota: null,
-    comentario: "",
-  });
+  const [form, setForm] = useState(FORM_INICIAL);
 
   // RN-11: a Tela 2 (especialidade + atendimento) só aparece quando triagem = Sim.
   // Sem triagem o fluxo vai direto da Tela 1 para a Tela 3.
@@ -194,7 +218,8 @@ export default function FeedbackFormScreen({ navigation, route }) {
       return;
     }
     if (ultimoPasso) {
-      enviar();
+      // `enviar` trata as próprias falhas (mostra o erro na tela): disparo intencional.
+      void enviar();
     } else {
       setEtapa((e) => e + 1);
     }

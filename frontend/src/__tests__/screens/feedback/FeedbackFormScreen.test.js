@@ -119,6 +119,46 @@ describe("FeedbackFormScreen (Épico 03)", () => {
     expect(concluirFeedback).toHaveBeenCalledWith("v1");
   });
 
+  /** Triagem Sim → Tela 2 → aplica `naTela2` → pula Tela 3 → nota 4 → envia. */
+  async function enviarPassandoPelaTela2(naTela2) {
+    renderizar();
+    fireEvent.press(screen.getByText("Sim"));
+    fireEvent.press(screen.getByText("Continuar"));
+    naTela2();
+    fireEvent.press(screen.getByText("Continuar"));
+    fireEvent.press(screen.getByText("Pular"));
+    fireEvent.press(screen.getByTestId("star-4"));
+    fireEvent.press(screen.getByText("Enviar avaliação"));
+    await screen.findByText("Obrigado pela sua avaliação!");
+    return FeedbackService.enviar.mock.calls[0][0];
+  }
+
+  // As comparações de triagem/atendimento/motivo com as chaves das opções ("SIM",
+  // "NAO", "CLASSIFICACAO_RISCO") foram apontadas pela análise estática como sempre
+  // falsas, por inferir o estado inicial (`null`) como único tipo do campo. Os testes
+  // abaixo fixam que os ramos guardados por elas são alcançados no fluxo real.
+  test("motivo 'Casos mais graves' vai como CASOS_MAIS_GRAVES_PRIORIDADE (F-05)", async () => {
+    const payload = await enviarPassandoPelaTela2(() => {
+      fireEvent.press(screen.getByText("Não fui atendido"));
+      fireEvent.press(screen.getByText("Casos mais graves têm prioridade"));
+    });
+
+    expect(payload.foiAtendido).toBe("NAO");
+    expect(payload.motivoNaoAtendido).toBe("CASOS_MAIS_GRAVES_PRIORIDADE");
+  });
+
+  test("motivo escolhido e depois 'Fui atendido' não envia motivo de não atendimento", async () => {
+    const payload = await enviarPassandoPelaTela2(() => {
+      fireEvent.press(screen.getByText("Não fui atendido"));
+      fireEvent.press(screen.getByText("Falta de médico"));
+      fireEvent.press(screen.getByText("Fui atendido"));
+      expect(screen.queryByText("Qual foi o principal motivo?")).toBeNull();
+    });
+
+    expect(payload.foiAtendido).toBe("SIM");
+    expect(payload.motivoNaoAtendido).toBeUndefined();
+  });
+
   test("'Não interagi' zera a nota de tratamento da equipe (RN-10)", async () => {
     renderizar();
     fireEvent.press(screen.getByText("Sim"));

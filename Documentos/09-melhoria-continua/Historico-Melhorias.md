@@ -1955,6 +1955,49 @@ e no backend.
 
 ---
 
+## M-031 — Cobertura mínima de 90% no código novo e cobertura total que não cai
+
+**Data:** 04/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Pedido do PO: "os testes não devem ser aceitos como passed se o coverage estiver menos de
+90%". Escolha do PO entre as opções apresentadas: **os dois** — 90% no código que o PR
+altera e a cobertura total de cada área sem poder cair.
+
+Exigir 90% no total já travaria todo PR de backend (78,8% hoje) e de mobile (83,6%) até
+alguém escrever os testes que faltam no código antigo. Por isso o total funciona como
+catraca: só sobe, até chegar à meta.
+
+### O que mudou
+
+- **90% no código novo** (passo "Cobertura do código novo (mínimo 90%)" em cada job de
+  área do `ci.yml`, só em PR). O `diff-cover` cruza o relatório de cobertura da área
+  (JaCoCo XML no backend, `lcov` no frontend e no admin) com as linhas alteradas pelo PR
+  em relação à branch de destino e reprova abaixo de 90%. Área que o PR não altera passa
+  sem medir.
+- **Cobertura total que não cai** (job `Trava de contagem de testes`, agora "de contagem
+  de testes e de cobertura"). O `contagem_testes.py contar` grava também a cobertura de
+  linhas da área; o `comparar` reprova o PR que altera o código de produção da área e
+  deixa a cobertura dela abaixo da base, com folga de 0,1 ponto. Área que o PR não altera
+  só registra: achado do `code-review`, código dependente de tempo cobre uma linha a mais
+  ou a menos entre execuções e reprovaria um PR de documentação. Na área que já passou de 90%, o piso é a própria meta:
+  sem esse teto, código novo coberto a exatamente 90% baixaria um total de 95% e
+  reprovaria um PR que cumpre a regra do código novo. Base sem cobertura registrada (CI
+  anterior a esta mudança) só registra.
+- O resumo do job mostra, por área, testes e cobertura da base e do PR.
+
+### Verificação
+
+- `diff-cover` exercitado localmente com o JaCoCo do backend (`--src-roots
+  backend/src/main/java`) e com o `lcov` do frontend e do admin reescrito para caminhos
+  relativos à raiz do repositório.
+- Leitura da cobertura conferida nos três formatos (admin 92,33% no `lcov.info`).
+- Na primeira execução real, a base ainda não tem cobertura registrada: a catraca do total
+  só passa a valer depois do primeiro CI de push na `develop` com esta mudança.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

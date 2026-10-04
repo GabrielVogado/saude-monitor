@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 04/10/2026 — Cobertura mínima de 90% na esteira
+
+**O que entrou:** o CI reprova o PR cujas linhas alteradas tenham menos de 90% de cobertura e o PR que faz a cobertura total de uma área cair. Regra em `10-git-flow/MANUAL.md` §4.4. Registro em `Historico-Melhorias.md` (M-031).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre a esteira de qualidade).
+
+---
+
 ## 📌 Revisão 04/10/2026 — Trava de contagem de testes e SonarQube Cloud
 
 **O que entrou:** o CI passa a reprovar o PR que reduz a quantidade de testes de uma área ou que altera o código de produção de uma área sem acrescentar teste a ela; e cada área (backend, mobile, admin) ganha um projeto no SonarQube Cloud, analisado pelo próprio CI assim que o secret `SONAR_TOKEN` existir. Regra e passo a passo em `10-git-flow/MANUAL.md` §4.4. Registro em `Historico-Melhorias.md` (M-030).

@@ -59,7 +59,7 @@ describe('authInterceptor — sessão vencida', () => {
 
   function configurar(renovar: () => Observable<string>) {
     const auth = { accessToken: 'velho', renovar: vi.fn(renovar), logout: vi.fn() };
-    const router = { navigate: vi.fn() };
+    const router = { navigate: vi.fn().mockResolvedValue(true) };
     TestBed.configureTestingModule({
       providers: [
         { provide: Auth, useValue: auth },
@@ -105,6 +105,21 @@ describe('authInterceptor — sessão vencida', () => {
     expect(auth.logout).toHaveBeenCalledTimes(1);
     expect(router.navigate).toHaveBeenCalledWith(['/login'], { queryParams: { sessao: 'expirada' } });
     expect((r.erro() as HttpErrorResponse).status).toBe(401);
+  });
+
+  it('se a navegação ao login falhar, registra o erro e ainda devolve o 401', async () => {
+    const { auth, router } = configurar(() => throwError(() => new HttpErrorResponse({ status: 401 })));
+    const falha = new Error('chunk do login não carregou');
+    router.navigate.mockRejectedValue(falha);
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const r = executar(new HttpRequest('GET', `${BASE}/api/v1/hospitais`), () => throwError(() => erro401()));
+    await Promise.resolve();
+
+    expect(auth.logout).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith('Sessão encerrada, mas a navegação ao login falhou.', falha);
+    expect((r.erro() as HttpErrorResponse).status).toBe(401);
+    log.mockRestore();
   });
 
   it('se o refresh for recusado (401), encerra a sessão', () => {

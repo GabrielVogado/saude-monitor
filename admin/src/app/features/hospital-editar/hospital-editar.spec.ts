@@ -212,6 +212,19 @@ describe('HospitalEditar', () => {
     expect(el.textContent).toContain('Duas letras');
   });
 
+  it('salvou mas a navegação ao detalhe falha: avisa que as alterações foram salvas', async () => {
+    api.atualizar.mockReturnValue(of(hospital()));
+    montar();
+    navigate.mockRejectedValue(new Error('chunk do detalhe não carregou'));
+
+    enviar();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(navigate).toHaveBeenCalledWith(['/hospitais', 'h1']);
+    expect(el.querySelector('[role=alert]')?.textContent).toContain('Alterações salvas');
+  });
+
   it('resposta que chega depois de sair da tela não navega', () => {
     const resposta = new Subject<HospitalDetalheResponse>();
     api.atualizar.mockReturnValue(resposta);

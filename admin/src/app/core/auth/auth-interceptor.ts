@@ -50,7 +50,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
             return throwError(() => falhaRenovacao);
           }
           auth.logout();
-          router.navigate(['/login'], { queryParams: { sessao: 'expirada' } });
+          // A sessão já foi encerrada; se a ida ao login falhar (ex.: chunk da rota não
+          // carrega após um deploy), registra para não sumir em silêncio.
+          router
+            .navigate(['/login'], { queryParams: { sessao: 'expirada' } })
+            .catch((falhaNavegacao: unknown) =>
+              console.error('Sessão encerrada, mas a navegação ao login falhou.', falhaNavegacao),
+            );
           return throwError(() => erro);
         }),
         switchMap((novoToken) => next(comToken(req, novoToken))),

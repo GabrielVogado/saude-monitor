@@ -51,6 +51,21 @@ describe('Shell', () => {
     expect(navSpy).toHaveBeenCalledWith(['/login']);
   });
 
+  it('se a navegação ao login falhar depois do logout, registra o erro em vez de engolir', async () => {
+    const router = TestBed.inject(Router);
+    const falha = new Error('chunk do login não carregou');
+    vi.spyOn(router, 'navigate').mockRejectedValue(falha);
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const botaoSair = Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Sair'))!;
+
+    botaoSair.click();
+    await fixture.whenStable();
+
+    expect(auth.logout).toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith('Logout feito, mas a navegação ao login falhou.', falha);
+    log.mockRestore();
+  });
+
   function botaoMenu(): HTMLButtonElement {
     return el.querySelector('button[aria-label="Abrir menu de navegação"]') as HTMLButtonElement;
   }
@@ -58,7 +73,7 @@ describe('Shell', () => {
   it('menu mobile começa fechado (aside sem translate-x-0, sem overlay)', () => {
     expect(botaoMenu().getAttribute('aria-expanded')).toBe('false');
     expect(el.querySelector('aside')?.classList.contains('translate-x-0')).toBe(false);
-    expect(el.querySelector('[aria-hidden="true"].fixed')).toBeNull();
+    expect(el.querySelector('button[aria-label="Fechar menu de navegação"]')).toBeNull();
   });
 
   it('clicar no hamburger abre o menu (overlay + aside deslocado)', () => {
@@ -66,13 +81,13 @@ describe('Shell', () => {
     fixture.detectChanges();
     expect(botaoMenu().getAttribute('aria-expanded')).toBe('true');
     expect(el.querySelector('aside')?.classList.contains('translate-x-0')).toBe(true);
-    expect(el.querySelector('[aria-hidden="true"].fixed')).not.toBeNull();
+    expect(el.querySelector('button[aria-label="Fechar menu de navegação"]')).not.toBeNull();
   });
 
   it('clicar no overlay fecha o menu', () => {
     botaoMenu().click();
     fixture.detectChanges();
-    (el.querySelector('[aria-hidden="true"].fixed') as HTMLElement).click();
+    (el.querySelector('button[aria-label="Fechar menu de navegação"]') as HTMLElement).click();
     fixture.detectChanges();
     expect(botaoMenu().getAttribute('aria-expanded')).toBe('false');
   });
@@ -86,5 +101,18 @@ describe('Shell', () => {
     await router.navigateByUrl('/hospitais');
     fixture.detectChanges();
     expect(botaoMenu().getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('overlay do menu é um botão acionável por teclado, com nome acessível', () => {
+    botaoMenu().click();
+    fixture.detectChanges();
+    const overlay = el.querySelector('.fixed.inset-0') as HTMLElement;
+
+    expect(overlay.tagName).toBe('BUTTON');
+    expect(overlay.getAttribute('type')).toBe('button');
+    expect(overlay.getAttribute('aria-label')).toBe('Fechar menu de navegação');
+    expect(overlay.hasAttribute('aria-hidden')).toBe(false);
+    overlay.focus();
+    expect(document.activeElement).toBe(overlay);
   });
 });

@@ -122,3 +122,6 @@ pr_body_retrofit.txt
 
 # Travas temporarias do LibreOffice sobre os .dbf geoespaciais
 .~lock.*#
+
+# diff-cover (M-031): lcov reescrito com caminhos da raiz
+lcov-*.info

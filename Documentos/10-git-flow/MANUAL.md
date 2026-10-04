@@ -135,7 +135,7 @@ feature/* ──► develop ──► master ──► release/<tag>
 
 | Workflow | Gatilho | Ação |
 |----------|---------|------|
-| `ci.yml` | push/PR em `develop`/`master` | Build + testes do backend, do frontend e do Painel Admin (`admin/`, desde 28/09/2026); análise no SonarQube Cloud quando há `SONAR_TOKEN`; em PR, **trava de contagem de testes** (§4.4, desde 04/10/2026) |
+| `ci.yml` | push/PR em `develop`/`master` | Build + testes do backend, do frontend e do Painel Admin (`admin/`, desde 28/09/2026); análise no SonarQube Cloud quando há `SONAR_TOKEN`; em PR, **trava de contagem de testes** (§4.4, desde 04/10/2026) e **cobertura mínima de 90% no código novo** com o total sem cair (§4.4, M-031) |
 | `cd-backend-google.yml` | push em `develop`, `release/**` (caminho `backend/**`) + manual + `workflow_call` | Docker → Artifact Registry → deploy no **Cloud Run** + 3 smoke tests. **Falha com mensagem explícita** se o ambiente não tiver secrets |
 | `cd-homologacao.yml` | push em `master` + manual | **Homologação:** versão `vX.Y.Z-rc.N` → backend HML → APK HML → tag + GitHub Release (§3.3) |
 | `cd-mobile-apk.yml` | push em `develop` (caminho `frontend/**`) + manual + `workflow_call` | Build do APK com Gradle no próprio Actions. Artefato do run (30 dias). Pacote, nome e versão por ambiente |
@@ -223,7 +223,7 @@ Actions se autentica por Workload Identity Federation, sem chave. No GitHub:
 | `RENDER_API_KEY_DEV`, `RENDER_SERVICE_ID_DEV` | Só para o rollback manual do Render |
 | `SONAR_TOKEN` | Token do SonarQube Cloud (§4.4). Sem ele, a análise é pulada e o CI segue |
 
-### 4.4 Qualidade: trava de contagem de testes e SonarQube Cloud
+### 4.4 Qualidade: trava de testes, cobertura e SonarQube Cloud
 
 **Trava de contagem de testes** (job `Trava de contagem de testes` do `ci.yml`, só em
 PR). Cada área conta os testes executados no relatório real da execução e compara com o
@@ -238,6 +238,19 @@ estiver verde, o do ancestral verde mais próximo, com aviso no job):
 Teste ignorado (`@Disabled`, `it.skip`, `it.todo`) não conta. O recorte de "código de
 produção" e a regra estão em `.github/scripts/contagem_testes.py`. O resumo do job mostra
 base, PR e resultado por área.
+
+**Cobertura** (M-031, decisão do PO: "os dois"). Duas exigências, só em PR:
+
+| Regra | Onde | Reprova quando |
+|---|---|---|
+| Código novo | passo "Cobertura do código novo (mínimo 90%)" de cada job de área (`diff-cover`) | as linhas que o PR altera na área têm menos de 90% de cobertura |
+| Total da área | job `Trava de contagem de testes` | o PR altera o código da área e a cobertura de linhas dela fica abaixo da base (ou abaixo de 90%, se a base já passava de 90%), com folga de 0,1 ponto |
+
+O total de hoje (backend 78,8%, mobile 83,6%, admin ~90%) não precisa estar em 90%: ele só
+não pode cair, e sobe a cada PR que testa mais do que altera. Depois de chegar a 90%, só
+não pode voltar para baixo da meta. Para conferir o código novo
+localmente, depois de rodar os testes com cobertura:
+`pip install diff-cover==10.6.0 && diff-cover <relatório> --compare-branch=origin/develop --fail-under=90`.
 
 **SonarQube Cloud** (gratuito para repositório público). Três projetos na organização
 `gabrielvogado`:

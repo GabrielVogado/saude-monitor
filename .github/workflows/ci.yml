@@ -61,7 +61,22 @@ jobs:
           if-no-files-found: ignore
 
       - name: Contar testes executados (backend)
-        run: python3 ../.github/scripts/contagem_testes.py contar --area backend --relatorio build/test-results/test --saida ../contagem-testes
+        run: >-
+          python3 ../.github/scripts/contagem_testes.py contar --area backend
+          --relatorio build/test-results/test
+          --cobertura build/reports/jacoco/test/jacocoTestReport.xml --saida ../contagem-testes
+
+      - name: Cobertura do código novo (mínimo 90%)
+        # M-031: as linhas que o PR altera nesta área precisam de pelo menos 90% de
+        # cobertura (decisão do PO em 04/10/2026). Linhas fora do recorte da
+        # cobertura da área (DTOs, estilos...) não entram na conta.
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        env:
+          BASE: origin/${{ github.base_ref }}
+        run: |
+          pip install --quiet diff-cover==10.6.0
+          diff-cover backend/build/reports/jacoco/test/jacocoTestReport.xml --compare-branch="$BASE" --src-roots backend/src/main/java --fail-under=90
 
       - name: Publicar contagem de testes (backend)
         uses: actions/upload-artifact@v4
@@ -146,7 +161,26 @@ jobs:
           if-no-files-found: ignore
 
       - name: Contar testes executados (frontend)
-        run: python3 ../.github/scripts/contagem_testes.py contar --area frontend --relatorio test-results/jest.json --saida ../contagem-testes
+        run: >-
+          python3 ../.github/scripts/contagem_testes.py contar --area frontend
+          --relatorio test-results/jest.json
+          --cobertura coverage/coverage-summary.json --saida ../contagem-testes
+
+      - name: Cobertura do código novo (mínimo 90%)
+        # M-031: as linhas que o PR altera nesta área precisam de pelo menos 90% de
+        # cobertura (decisão do PO em 04/10/2026). Linhas fora do recorte da
+        # cobertura da área (DTOs, estilos...) não entram na conta.
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        env:
+          BASE: origin/${{ github.base_ref }}
+        run: |
+          pip install --quiet diff-cover==10.6.0
+          # O lcov do Jest traz caminhos absolutos ou relativos a frontend/; o
+          # diff-cover compara com caminhos relativos à raiz do repositório.
+          sed -e "s#^SF:$GITHUB_WORKSPACE/#SF:#" -e '/^SF:frontend\//!s#^SF:#SF:frontend/#' \
+            frontend/coverage/lcov.info > lcov-frontend.info
+          diff-cover lcov-frontend.info --compare-branch="$BASE" --fail-under=90
 
       - name: Publicar contagem de testes (frontend)
         uses: actions/upload-artifact@v4
@@ -212,7 +246,24 @@ jobs:
           --reporters=json --reporters=default --output-file=test-results/vitest.json
 
       - name: Contar testes executados (admin)
-        run: python3 ../.github/scripts/contagem_testes.py contar --area admin --relatorio test-results/vitest.json --saida ../contagem-testes
+        run: >-
+          python3 ../.github/scripts/contagem_testes.py contar --area admin
+          --relatorio test-results/vitest.json
+          --cobertura coverage/admin/lcov.info --saida ../contagem-testes
+
+      - name: Cobertura do código novo (mínimo 90%)
+        # M-031: as linhas que o PR altera nesta área precisam de pelo menos 90% de
+        # cobertura (decisão do PO em 04/10/2026). Linhas fora do recorte da
+        # cobertura da área (DTOs, estilos...) não entram na conta.
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        env:
+          BASE: origin/${{ github.base_ref }}
+        run: |
+          pip install --quiet diff-cover==10.6.0
+          # O lcov do Vitest traz caminhos relativos a admin/.
+          sed -e '/^SF:admin\//!s#^SF:#SF:admin/#' admin/coverage/admin/lcov.info > lcov-admin.info
+          diff-cover lcov-admin.info --compare-branch="$BASE" --fail-under=90
 
       - name: Publicar contagem de testes (admin)
         uses: actions/upload-artifact@v4
@@ -240,6 +291,8 @@ jobs:
     # base, publicada pelos próprios jobs acima. Regra e recorte de "código
     # de produção" em .github/scripts/contagem_testes.py.
     name: Trava de contagem de testes
+    # O nome do check fica o mesmo; desde a M-031 o job também barra queda da
+    # cobertura total de cada área.
     if: github.event_name == 'pull_request'
     needs: [backend, frontend, admin]
     runs-on: ubuntu-latest

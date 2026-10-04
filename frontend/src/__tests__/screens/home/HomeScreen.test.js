@@ -45,39 +45,64 @@ describe("HomeScreen — sincronização da visita ativa sobrevive a uma oscila�
   beforeEach(() => {
     jest.clearAllMocks();
     iniciarGeofencing.mockResolvedValue(undefined);
+    sincronizarVisitaAtiva.mockResolvedValue(undefined);
   });
 
   test("um refoco sem internet não para o heartbeat de uma visita geofence real", async () => {
     // Reidrata id + entrada: a entrada alimenta o cálculo de duração no checkout offline
     // do geofence (RN-01/RN-07), então é repassada ao sincronizarVisitaAtiva.
     VisitaService.buscarAtiva.mockResolvedValue({
-      visita: { id: "v1", entrada: "2026-09-28T10:00:00.000Z" },
+      visita: { id: "v1", entrada: "2026-09-28T10:00:00.000Z", hospitalId: "h1" },
     });
 
     render(<HomeScreen />);
     await waitFor(() => expect(iniciarHeartbeat).toHaveBeenCalledWith("v1"));
     pararHeartbeat.mockClear();
+    sincronizarVisitaAtiva.mockClear();
 
     VisitaService.buscarAtiva.mockRejectedValue(new ErroSemInternet("http://exemplo"));
     await refocarTela();
 
     expect(pararHeartbeat).not.toHaveBeenCalled();
-    expect(sincronizarVisitaAtiva).toHaveBeenLastCalledWith("v1", "2026-09-28T10:00:00.000Z");
+    // O geofencing guarda a visita em disco; sem resposta do servidor, nada a sincronizar.
+    expect(sincronizarVisitaAtiva).not.toHaveBeenCalled();
   });
 
-  test("um refoco com erro real ainda limpa a visita e para o heartbeat", async () => {
+  test("repassa id, entrada e hospital da visita reidratada ao geofencing", async () => {
+    VisitaService.buscarAtiva.mockResolvedValue({
+      visita: { id: "v1", entrada: "2026-09-28T10:00:00.000Z", hospitalId: "h1" },
+    });
+
+    render(<HomeScreen />);
+
+    await waitFor(() =>
+      expect(sincronizarVisitaAtiva).toHaveBeenCalledWith("v1", "2026-09-28T10:00:00.000Z", "h1")
+    );
+  });
+
+  test("sem visita ativa no servidor, limpa a visita guardada pelo geofencing", async () => {
+    VisitaService.buscarAtiva.mockResolvedValue({ visita: null });
+
+    render(<HomeScreen />);
+
+    await waitFor(() => expect(sincronizarVisitaAtiva).toHaveBeenCalledWith(null, null, null));
+  });
+
+  test("um refoco com erro real para o heartbeat, mas não apaga a visita do geofencing", async () => {
     VisitaService.buscarAtiva.mockResolvedValue({
       visita: { id: "v1", entrada: "2026-09-28T10:00:00.000Z" },
     });
 
     render(<HomeScreen />);
     await waitFor(() => expect(iniciarHeartbeat).toHaveBeenCalledWith("v1"));
+    sincronizarVisitaAtiva.mockClear();
 
     VisitaService.buscarAtiva.mockRejectedValue(new Error("Sessão expirada. Faça login novamente."));
     await refocarTela();
 
     await waitFor(() => expect(pararHeartbeat).toHaveBeenCalled());
-    // visita limpa → id null; a entrada guardada acompanha (não há visita ativa).
-    expect(sincronizarVisitaAtiva).toHaveBeenLastCalledWith(null, "2026-09-28T10:00:00.000Z");
+    // Erro não é resposta "sem visita": a visita guardada para o checkout automático
+    // continua (o logout por sessão expirada já encerra o geofencing por conta própria).
+    expect(sincronizarVisitaAtiva).not.toHaveBeenCalled();
   });
 });

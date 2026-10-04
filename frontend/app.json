@@ -56,7 +56,9 @@
         {
           "locationWhenInUsePermission": "Permita acesso a sua localizacao para exibir o mapa em tempo real.",
           "locationAlwaysAndWhenInUsePermission": "Permita acesso a sua localizacao em segundo plano para detectar automaticamente sua entrada e saida de hospitais.",
-          "isAndroidBackgroundLocationEnabled": true
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "isIosBackgroundLocationEnabled": true
         }
       ],
       "expo-notifications",

@@ -41,8 +41,8 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 ## Épico 2 — Detecção de Visitas (Geofence)
 | ID Backlog | Estória | Feature(s) Relacionada(s) | Status Implementação |
 |---|---|---|---|
-| **E2-01** | Detecção entrada automática | **F-03** | ✅ Existente (geofencing nativo) |
-| **E2-02** | Detecção saída automática | **F-03** | ✅ Existente |
+| **E2-01** | Detecção entrada automática | **F-03** | ✅ Existente (geofencing nativo; com o app fechado desde 04/10/2026 — M-028) |
+| **E2-02** | Detecção saída automática | **F-03** | ✅ Existente (com o app fechado desde 04/10/2026 — M-028) |
 | **E2-03** | Expirar visitas > 24h | **F-03** | ✅ Existente (job `EXPIRADA`) |
 | **E2-04** | Tratar conflito sobreposição | **F-03** | ✅ Existente (hospital mais próximo) |
 | **E2-05** | Recuperar GPS interrompido | **F-03** | ✅ Existente (timeout 10min) |

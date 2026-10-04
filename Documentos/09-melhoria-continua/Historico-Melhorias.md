@@ -1785,6 +1785,67 @@ regressão garante que ela não volte a ser `ApplicationRunner`.
 
 ---
 
+## M-028 — Check-in e check-out automáticos com o app fechado
+
+**Data:** 04/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Teste de campo do PO no Hospital Regional de Ceilândia (03/10/2026), mais de duas horas
+no hospital: a entrada na zona do hospital não foi registrada com o app fechado e só
+aconteceu quando o app foi aberto. O check-out tinha a mesma dependência.
+
+### Causas
+
+1. **O APK não podia pedir localização em segundo plano.** O APK é gerado pelo Gradle a
+   partir do `frontend/android/` versionado, sem `expo prebuild`. As permissões
+   `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE` e `FOREGROUND_SERVICE_LOCATION`
+   estavam só no `app.json` e nunca chegaram ao `AndroidManifest.xml`. Sem elas, o
+   Android nega o pedido da permissão "o tempo todo" na hora, e o geofencing nativo nem
+   chegava a ser ligado.
+2. **A tolerância de 2 min (RN-01) e de 5 min (RN-03) era um `setTimeout` em memória.** O
+   SO acorda o app no evento da região, mas o iOS o suspende em segundos e o Android
+   congela ou mata o processo bem antes dos 2 minutos. O timer só disparava quando o
+   usuário abria o app.
+3. **A visita ativa ficava só em memória.** Uma saída entregue a um processo novo não
+   encontrava a visita e não fazia o checkout.
+
+### O que mudou
+
+- `AndroidManifest.xml` com as três permissões. No `app.json`, o plugin do
+  `expo-location` passa a habilitar o modo de localização em segundo plano do iOS
+  (`UIBackgroundModes: location`) e o serviço em primeiro plano do Android.
+- Estado do geofencing (visita ativa e entradas/saídas aguardando a tolerância) salvo no
+  AsyncStorage, com gravações em série. Só ids e instantes: nenhuma coordenada fica em
+  disco.
+- Durante a tolerância, o app liga atualizações de localização em segundo plano. No
+  Android isso aparece como uma notificação fixa: "Confirmando sua chegada ou saída do
+  hospital". O acompanhamento é desligado assim que nada está pendente; fora dessas
+  janelas, quem vigia é o geofencing nativo, de baixo consumo. Cada leitura, cada evento
+  e a abertura do app confirmam o que já venceu.
+- Monitora os 19 hospitais mais próximos mais uma região de recálculo em volta do
+  usuário (o iOS aceita no máximo 20 regiões). Quando o usuário sai dela, a lista é
+  refeita em segundo plano.
+- Antes de pedir a permissão "o tempo todo", o app explica para que ela serve
+  (divulgação exigida pelo Google Play). Se o usuário recusar, o app não insiste por 3
+  dias.
+- Uma entrada sem sinal de GPS volta para a fila por até 30 min em vez de se perder. Uma
+  saída antiga de um hospital não encerra a visita de outro. Um checkout que recebe 404
+  ou 409 esquece a visita local. Um logout no meio de um check-in não regrava a visita.
+- A Home só sincroniza a visita com o geofencing a partir de uma resposta do servidor:
+  uma falha de rede não apaga mais a visita guardada.
+
+### Verificação
+
+- 29 testes novos no `GeofencingTaskService` (de 9 para 38), que agora tem 96% de cobertura de linhas.
+  Os cenários de segundo plano simulam a morte do processo: os timers somem, o módulo é
+  recarregado do zero e o tempo avança. Também foram adicionados testes da Home.
+- Exige um **build nativo novo** (APK do CD ou dev build). O Expo Go não roda tarefas de
+  localização em segundo plano. No aparelho, é preciso conceder a localização
+  "Permitir o tempo todo".
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

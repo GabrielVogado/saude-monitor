@@ -41,6 +41,15 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                // CSRF desligado de propósito (Sonar java:S4502 revisado como "Safe"): nenhuma
+                // credencial vai sozinha do navegador. A autenticação é só o Bearer no cabeçalho
+                // Authorization (JwtAuthenticationFilter) — o app guarda o token no SecureStore e
+                // o Painel Admin no sessionStorage, anexado pelo interceptor; o refresh vai no
+                // corpo JSON. Sessão STATELESS (sem JSESSIONID), sem formLogin/httpBasic/cookie e
+                // CORS sem credenciais. Um site terceiro não consegue pôr o cabeçalho num POST de
+                // formulário, logo não há o que forjar. Se o ADR-013 (refresh em cookie HttpOnly)
+                // for implementado, as rotas que lerem o cookie passam a exigir defesa CSRF.
+                // Guarda: SecurityConfigCsrfTest.
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 // HSTS (achado F-03 do pentest de 23/09/2026): o writer padrão do Spring

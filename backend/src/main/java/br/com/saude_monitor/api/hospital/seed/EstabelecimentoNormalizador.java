@@ -2,6 +2,7 @@ package br.com.saude_monitor.api.hospital.seed;
 
 import java.text.Normalizer;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -134,19 +135,23 @@ final class EstabelecimentoNormalizador {
         return digitos.substring(0, 5) + "-" + digitos.substring(5);
     }
 
-    /** Converte "SIM"/"NÃO" (tolerante) em booleano; null se ausente/ambíguo. */
-    static Boolean simNaoParaBool(String s) {
+    /**
+     * Converte "SIM"/"NÃO" (tolerante) em booleano. Valor ausente ou ambíguo vira
+     * {@link Optional#empty()}, que significa "não informado na fonte" — quem grava o
+     * documento decide como representar essa ausência.
+     */
+    static Optional<Boolean> simNaoParaBool(String s) {
         if (s == null) {
-            return null;
+            return Optional.empty();
         }
         String v = semAcento(s.trim()).toUpperCase(Locale.ROOT);
         if ("SIM".equals(v) || "S".equals(v)) {
-            return true;
+            return Optional.of(Boolean.TRUE);
         }
         if ("NAO".equals(v) || "N".equals(v) || "NO".equals(v)) {
-            return false;
+            return Optional.of(Boolean.FALSE);
         }
-        return null;
+        return Optional.empty();
     }
 
     /** Corrige U+FFFD (ex.: "N�" → "Nº") e colapsa espaços. */

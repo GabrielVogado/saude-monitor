@@ -37,7 +37,11 @@ export class Login {
     this.auth.login(email, password).subscribe({
       next: () => {
         this.carregando.set(false);
-        this.router.navigate(['/dashboard']);
+        // Login válido mas a tela não abre (ex.: chunk do painel não carrega após um deploy):
+        // sem isto o botão destravava e nada acontecia.
+        this.router.navigate(['/dashboard']).catch(() => {
+          this.erro.set('Login feito, mas não foi possível abrir o painel. Recarregue a página.');
+        });
       },
       error: (e: unknown) => {
         this.carregando.set(false);

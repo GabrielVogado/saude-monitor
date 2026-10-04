@@ -240,7 +240,12 @@ export class HospitalEditar implements OnInit {
       .subscribe({
         next: (atualizado) => {
           this.salvando.set(false);
-          this.router.navigate(['/hospitais', atualizado.id]);
+          this.router.navigate(['/hospitais', atualizado.id]).catch(() => {
+            // O PUT já foi gravado: avisa que salvou, em vez de deixar o usuário sem retorno.
+            this.erroEnvio.set(
+              'Alterações salvas, mas não foi possível abrir o detalhe do hospital. Recarregue a página.',
+            );
+          });
         },
         error: (e: unknown) => {
           this.salvando.set(false);

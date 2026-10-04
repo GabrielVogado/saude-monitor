@@ -15,6 +15,7 @@ describe('Login', () => {
   beforeEach(async () => {
     auth.login.mockReset();
     router.navigate.mockReset();
+    router.navigate.mockResolvedValue(true);
     await TestBed.configureTestingModule({
       imports: [Login],
       providers: [
@@ -69,5 +70,17 @@ describe('Login', () => {
     preencher('a@x.com', 'senha');
     enviar();
     expect(el.querySelector('[role=alert]')?.textContent).toContain('inválidos');
+  });
+
+  it('login válido mas a navegação ao painel falha: avisa o usuário', async () => {
+    auth.login.mockReturnValue(of({ id: '1', nome: 'A', email: 'a@x.com', papel: 'ADMIN' }));
+    router.navigate.mockRejectedValue(new Error('chunk do painel não carregou'));
+    preencher('a@x.com', 'senha');
+    enviar();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[role=alert]')?.textContent).toContain('não foi possível abrir o painel');
+    expect((el.querySelector('button[type=submit]') as HTMLButtonElement).disabled).toBe(false);
   });
 });

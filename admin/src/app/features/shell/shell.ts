@@ -49,6 +49,8 @@ export class Shell {
 
   protected sair(): void {
     this.auth.logout();
-    this.router.navigate(['/login']);
+    this.router
+      .navigate(['/login'])
+      .catch((falha: unknown) => console.error('Logout feito, mas a navegação ao login falhou.', falha));
   }
 }

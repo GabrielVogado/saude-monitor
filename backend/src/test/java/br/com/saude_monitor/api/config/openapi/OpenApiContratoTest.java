@@ -32,7 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * (`/auth/confirmar-email`, `/auth/reenviar-confirmacao`), somando 35; as camadas
  * geográficas (F-11, §5 — `GET /api/v1/camadas/{tipo}`) somam 36; a listagem
  * administrativa (E7-02/E7-07 — `GET /api/v1/admin/hospitais`, restrita a ADMIN) soma
- * **37**. Este teste mede o total de operações que o springdoc realmente gera, não
+ * 37; as avaliações pendentes do titular (M-029 — `GET /api/v1/contas/feedbacks/pendentes`)
+ * somam **38**. Este teste mede o total de operações que o springdoc realmente gera, não
  * presume que bateu.</p>
  */
 @Testcontainers
@@ -80,7 +81,7 @@ class OpenApiContratoTest {
             }
         }
 
-        assertThat(operacoes).isEqualTo(37);
+        assertThat(operacoes).isEqualTo(38);
     }
 
     /**

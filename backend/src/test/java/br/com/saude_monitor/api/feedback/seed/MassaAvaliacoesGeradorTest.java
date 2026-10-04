@@ -123,6 +123,22 @@ class MassaAvaliacoesGeradorTest {
     }
 
     @Test
+    void tratamentoDaEquipeFicaAUmPontoDaNotaELimitadoEntre1E5() {
+        List<FeedbackDocument> comTratamento = gerar().feedbacks().stream()
+                .filter(f -> f.getTratamentoEquipe() != null)
+                .toList();
+
+        assertThat(comTratamento).isNotEmpty();
+        for (FeedbackDocument f : comTratamento) {
+            assertThat(f.getTratamentoEquipe()).as(f.getId())
+                    .isBetween(Math.max(1, f.getNota() - 1), Math.min(5, f.getNota() + 1));
+        }
+        // Os extremos passam pelo clamp: nota 1 nunca gera 0 e nota 5 nunca gera 6.
+        assertThat(comTratamento).anyMatch(f -> f.getNota() == 1 && f.getTratamentoEquipe() == 1);
+        assertThat(comTratamento).anyMatch(f -> f.getNota() == 5 && f.getTratamentoEquipe() == 5);
+    }
+
+    @Test
     void cadaAvaliacaoApontaParaUmaVisitaFinalizadaDoMesmoHospitalEDono() {
         MassaAvaliacoesGerador.Massa massa = gerar();
         Map<String, VisitaDocument> visitas = massa.visitas().stream()

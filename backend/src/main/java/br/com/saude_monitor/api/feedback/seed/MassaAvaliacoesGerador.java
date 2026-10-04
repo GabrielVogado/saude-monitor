@@ -283,7 +283,7 @@ public final class MassaAvaliacoesGerador {
                 : escolher(new int[]{55, 15, 30}, MedicacaoReceita.values());
 
         Integer tratamentoEquipe = random.nextInt(100) < 80
-                ? Math.clamp(nota + random.nextInt(3) - 1, 1, 5)
+                ? Math.clamp((long) nota + random.nextInt(3) - 1, 1, 5)
                 : null;
 
         String comentario = null;

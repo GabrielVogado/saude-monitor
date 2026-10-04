@@ -379,4 +379,12 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     fireEvent.press(screen.getByLabelText(/[Vv]oltar/));
     expect(NAVEGACAO.goBack).toHaveBeenCalled();
   });
+
+  test("sem id na rota não consulta hospital nem visita", async () => {
+    renderizar(null);
+    await act(async () => {});
+
+    expect(HospitalService.buscarPorId).not.toHaveBeenCalled();
+    expect(VisitaService.buscarAtiva).not.toHaveBeenCalled();
+  });
 });

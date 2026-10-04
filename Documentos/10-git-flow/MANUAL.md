@@ -246,7 +246,7 @@ base, PR e resultado por área.
 |---|---|---|
 | backend | `gabrielvogado_saude-monitor-backend` | bloco `sonar` em `backend/build.gradle` |
 | mobile | `gabrielvogado_saude-monitor-mobile` | `frontend/sonar-project.properties` |
-| admin | `gabrielvogado_saude-monitor-admin` | `admin/sonar-project.properties` |
+| admin | `gabrielvogado_saude-monitor-painel-admin` | `admin/sonar-project.properties` |
 
 Configuração inicial (uma vez, pelo dono do repositório):
 

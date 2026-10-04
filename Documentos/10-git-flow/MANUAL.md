@@ -135,7 +135,7 @@ feature/* ──► develop ──► master ──► release/<tag>
 
 | Workflow | Gatilho | Ação |
 |----------|---------|------|
-| `ci.yml` | push/PR em `develop`/`master` | Build + testes do backend, do frontend e do Painel Admin (`admin/`, desde 28/09/2026) |
+| `ci.yml` | push/PR em `develop`/`master` | Build + testes do backend, do frontend e do Painel Admin (`admin/`, desde 28/09/2026); análise no SonarQube Cloud quando há `SONAR_TOKEN`; em PR, **trava de contagem de testes** (§4.4, desde 04/10/2026) |
 | `cd-backend-google.yml` | push em `develop`, `release/**` (caminho `backend/**`) + manual + `workflow_call` | Docker → Artifact Registry → deploy no **Cloud Run** + 3 smoke tests. **Falha com mensagem explícita** se o ambiente não tiver secrets |
 | `cd-homologacao.yml` | push em `master` + manual | **Homologação:** versão `vX.Y.Z-rc.N` → backend HML → APK HML → tag + GitHub Release (§3.3) |
 | `cd-mobile-apk.yml` | push em `develop` (caminho `frontend/**`) + manual + `workflow_call` | Build do APK com Gradle no próprio Actions. Artefato do run (30 dias). Pacote, nome e versão por ambiente |
@@ -221,6 +221,47 @@ Actions se autentica por Workload Identity Federation, sem chave. No GitHub:
 | `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_STORE_PASSWORD`, `ANDROID_RELEASE_KEY_ALIAS`, `ANDROID_RELEASE_KEY_PASSWORD` | Chave de release do APK. Obrigatórios para homologação — ver [`deploy/android/README.md`](../../deploy/android/README.md) |
 | `EXPO_PUBLIC_MAPBOX_TOKEN` | Token público do Mapbox embutido no APK |
 | `RENDER_API_KEY_DEV`, `RENDER_SERVICE_ID_DEV` | Só para o rollback manual do Render |
+| `SONAR_TOKEN` | Token do SonarQube Cloud (§4.4). Sem ele, a análise é pulada e o CI segue |
+
+### 4.4 Qualidade: trava de contagem de testes e SonarQube Cloud
+
+**Trava de contagem de testes** (job `Trava de contagem de testes` do `ci.yml`, só em
+PR). Cada área conta os testes executados no relatório real da execução e compara com o
+CI de push do commit da base contra o qual o PR foi testado (se esse CI não
+estiver verde, o do ancestral verde mais próximo, com aviso no job):
+
+| O PR altera o código de produção da área? | Exigência |
+|---|---|
+| Sim | a contagem precisa **subir** |
+| Não (documentação, workflow, outra área) | a contagem **não pode cair** |
+
+Teste ignorado (`@Disabled`, `it.skip`, `it.todo`) não conta. O recorte de "código de
+produção" e a regra estão em `.github/scripts/contagem_testes.py`. O resumo do job mostra
+base, PR e resultado por área.
+
+**SonarQube Cloud** (gratuito para repositório público). Três projetos na organização
+`gabrielvogado`:
+
+| Área | Chave do projeto | Configuração |
+|---|---|---|
+| backend | `gabrielvogado_saude-monitor-backend` | bloco `sonar` em `backend/build.gradle` |
+| mobile | `gabrielvogado_saude-monitor-mobile` | `frontend/sonar-project.properties` |
+| admin | `gabrielvogado_saude-monitor-painel-admin` | `admin/sonar-project.properties` |
+
+Configuração inicial (uma vez, pelo dono do repositório):
+
+1. Entrar em https://sonarcloud.io com a conta do GitHub e importar a organização
+   `GabrielVogado` (instala o app do SonarQube Cloud no repositório). A chave da
+   organização precisa ficar `gabrielvogado`; se ficar outra, trocar
+   `sonar.organization` nos três arquivos acima.
+2. Escolher **Import a monorepo**, selecionar `saude-monitor` e criar os três projetos com
+   as chaves da tabela.
+3. Em cada projeto, **Administration → Analysis Method**: desligar a *Automatic Analysis*
+   (a análise vem do CI, que leva a cobertura).
+4. **My Account → Security**: gerar um token e cadastrá-lo no GitHub em
+   *Settings → Secrets and variables → Actions* como `SONAR_TOKEN`.
+5. Rodar o CI (push na `develop` ou novo PR): o passo "Análise SonarQube Cloud" de cada
+   job deixa de ser pulado.
 
 ---
 

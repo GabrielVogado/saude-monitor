@@ -84,6 +84,11 @@ coverage/
 frontend/coverage/
 backend/build/
 
+# Resultado das execucoes de teste (Jest/Vitest --json), base da trava de contagem
+test-results/
+contagem-testes/
+.scannerwork/
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Limpeza de 03/09/2026 — o que nao e relevante para o desenvolvimento do sistema
 # nao sobe para o repositorio (decisao do PO)

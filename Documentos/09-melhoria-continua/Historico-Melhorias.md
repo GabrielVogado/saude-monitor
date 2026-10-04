@@ -1903,6 +1903,58 @@ na hora ou ficou com o celular descarregado.
 
 ---
 
+## M-030 — Trava de contagem de testes e SonarQube Cloud na esteira
+
+**Data:** 04/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Pedido do PO: "a quantidade de testes não pode ser menor ou igual ao cenário de testes
+anterior, e isso a esteira deve avaliar", e configurar o Sonar gratuito no mobile, no admin
+e no backend.
+
+### O que mudou
+
+- **Trava de contagem de testes** (job `Trava de contagem de testes` do `ci.yml`, só em PR).
+  Cada job de área conta os testes **executados** no relatório real da execução (XML JUnit
+  no backend, `--json` do Jest no frontend, reporter `json` do Vitest no admin) e publica a
+  contagem como artefato. O job da trava compara com a contagem do CI de push do commit da
+  base contra o qual o PR rodou (o primeiro pai do merge commit do PR; se esse CI não
+  estiver verde, o ancestral verde mais próximo, com aviso). Comparar com o "último CI
+  verde" da branch, achado do `code-review`, misturaria código diferente num re-run.
+  Regra:
+  - área cujo código de produção o PR altera: a contagem precisa **subir**;
+  - demais áreas: a contagem **não pode cair** (PR só de documentação ou de workflow não
+    tem teste a acrescentar numa área que não tocou).
+  - Teste ignorado (`@Disabled`, `it.skip`, `it.todo`) não conta: trocar um teste por um
+    skip reprova.
+  - "Código de produção" segue o recorte da cobertura de cada área: `backend/src/main/java`,
+    `frontend/src` + `App.js` sem `__tests__`, `css` e `theme`, `admin/src/app` (`.ts` e
+    `.html`, sem `.spec.ts`) + `admin/src/main.ts`.
+  - Sem contagem na base (primeira execução, ou base sem CI verde há mais de 90 dias, a
+    retenção do artefato), a trava só registra e avisa.
+- **SonarQube Cloud** (plano gratuito; o repositório é público, então não há limite de
+  linhas). Três projetos, um por área, analisados no próprio `ci.yml` depois dos testes:
+  backend pelo plugin Gradle `org.sonarqube` com a cobertura do JaCoCo, frontend e admin
+  pela `sonarqube-scan-action` com o `lcov`. O admin passa a medir cobertura
+  (`@vitest/coverage-v8`; sem piso por enquanto, 92% de linhas na medição de hoje).
+  A análise só roda quando o secret `SONAR_TOKEN` existe: até o PO configurar, o passo
+  é pulado sem reprovar o CI. Passo a passo em `10-git-flow/MANUAL.md` §4.4.
+- `checkout` com histórico completo nos três jobs: o Sonar usa o blame para separar o
+  código novo do antigo.
+
+### Verificação
+
+- Regras da trava exercitadas localmente (área alterada com contagem igual reprova, sem
+  alteração e contagem igual passa, queda reprova, base ausente passa com aviso).
+- Contagem real: admin 105 testes no `vitest.json`; backend lida do XML JUnit.
+- `./gradlew help --task sonar` resolve o plugin; o `ng test` com cobertura e reporter
+  `json` gera `coverage/admin/lcov.info` e `test-results/vitest.json`.
+- A análise do Sonar não pôde ser executada fora do CI (a sessão não alcança o
+  sonarcloud.io): a primeira execução real acontece no CI depois de o secret existir.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

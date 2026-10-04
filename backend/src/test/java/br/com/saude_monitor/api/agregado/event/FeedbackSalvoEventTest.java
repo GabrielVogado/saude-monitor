@@ -4,6 +4,7 @@ import br.com.saude_monitor.api.feedback.dto.FeedbackRequest;
 import br.com.saude_monitor.api.feedback.document.FoiAtendido;
 import br.com.saude_monitor.api.feedback.repository.FeedbackRepository;
 import br.com.saude_monitor.api.feedback.service.impl.FeedbackServiceImpl;
+import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import br.com.saude_monitor.api.visita.document.StatusVisita;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
 import br.com.saude_monitor.api.visita.repository.VisitaRepository;
@@ -26,9 +27,10 @@ class FeedbackSalvoEventTest {
 
     private final FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
     private final VisitaRepository visitaRepository = mock(VisitaRepository.class);
+    private final HospitalRepository hospitalRepository = mock(HospitalRepository.class);
     private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     private final FeedbackServiceImpl service =
-            new FeedbackServiceImpl(feedbackRepository, visitaRepository, publisher);
+            new FeedbackServiceImpl(feedbackRepository, visitaRepository, hospitalRepository, publisher);
 
     private VisitaDocument visitaFinalizada(String id, String hospitalId) {
         return VisitaDocument.builder().id(id).hospitalId(hospitalId).status(StatusVisita.FINALIZADA).build();

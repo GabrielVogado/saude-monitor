@@ -10,6 +10,7 @@ import TokenStorage from "../../../services/TokenStorage";
 // `jest.mock` em import dinâmico (sem `__esModule: true` no mock, o binding vinha
 // undefined) — trocava um risco teórico por um problema demonstrado.
 import { pararGeofencing } from "../../visitas/service/GeofencingTaskService";
+import { limparPendencias } from "../../feedback/service/FeedbackNotificationService";
 
 const BASE_PATH = "/api/v1/auth";
 
@@ -68,6 +69,18 @@ async function pararGeofencingBestEffort() {
   } catch {
     // best-effort: falha ao parar o monitoramento nativo não pode impedir a
     // limpeza local da sessão (nem, na exclusão, a conta já excluída no servidor).
+  }
+}
+
+/**
+ * Apaga as avaliações pendentes guardadas no aparelho (hospital visitado é dado de
+ * saúde). Best-effort pelo mesmo motivo do geofencing acima.
+ */
+async function limparPendenciasBestEffort() {
+  try {
+    await limparPendencias();
+  } catch {
+    // best-effort
   }
 }
 
@@ -148,6 +161,7 @@ class LoginService {
     }
 
     await pararGeofencingBestEffort();
+    await limparPendenciasBestEffort();
     await TokenStorage.limparTokens();
   }
 
@@ -247,6 +261,7 @@ class LoginService {
     }
 
     await pararGeofencingBestEffort();
+    await limparPendenciasBestEffort();
     await TokenStorage.limparTokens();
     return data;
   }

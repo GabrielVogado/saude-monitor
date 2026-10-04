@@ -1,9 +1,11 @@
 package br.com.saude_monitor.api.feedback.service;
 
+import br.com.saude_monitor.api.feedback.dto.FeedbackPendenteResponse;
 import br.com.saude_monitor.api.feedback.dto.FeedbackRequest;
 import br.com.saude_monitor.api.feedback.dto.FeedbackResponse;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -22,6 +24,13 @@ public interface FeedbackService {
 
     /** Histórico paginado de feedbacks do usuário (E5-03/RN-22) — apenas os dele. */
     PageResponse<FeedbackResponse> historico(String usuarioId, int page, int size);
+
+    /**
+     * Visitas do usuário que ainda aceitam feedback (RN-09): encerradas há menos de 24h,
+     * com 2 min ou mais (RN-01/RN-07) e sem avaliação. Permite ao app mostrar a pendência
+     * mesmo quando a notificação se perdeu (celular descarregado, app reinstalado).
+     */
+    List<FeedbackPendenteResponse> pendentes(String usuarioId);
 
     /**
      * Job periódico (RN-09): marca {@code SEM_FEEDBACK} as visitas {@code FINALIZADA}

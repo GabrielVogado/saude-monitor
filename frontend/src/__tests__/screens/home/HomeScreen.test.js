@@ -20,6 +20,8 @@ import { ErroSemInternet } from "../../../config/http";
 jest.mock("../../../screens/visitas/service/VisitaService");
 jest.mock("../../../screens/visitas/service/GeofencingTaskService");
 jest.mock("../../../screens/visitas/service/HeartbeatService");
+// O card de avaliações pendentes tem teste próprio (FeedbacksPendentesCard.test.js).
+jest.mock("../../../screens/feedback/view/FeedbacksPendentesCard", () => () => null);
 
 // Guarda o callback de foco mais recente para o teste poder simular um segundo
 // foco da Home (ex.: voltar de outra aba) sem desmontar o componente.

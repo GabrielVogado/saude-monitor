@@ -8,10 +8,14 @@ import * as Network from "expo-network";
 import LoginService from "../../../screens/auth/service/LoginService";
 import TokenStorage from "../../../services/TokenStorage";
 import { pararGeofencing } from "../../../screens/visitas/service/GeofencingTaskService";
+import { limparPendencias } from "../../../screens/feedback/service/FeedbackNotificationService";
 import * as httpModule from "../../../config/http";
 
 jest.mock("../../../screens/visitas/service/GeofencingTaskService", () => ({
   pararGeofencing: jest.fn(),
+}));
+jest.mock("../../../screens/feedback/service/FeedbackNotificationService", () => ({
+  limparPendencias: jest.fn(),
 }));
 
 function jsonResponse(body, status = 200) {
@@ -83,6 +87,19 @@ describe("LoginService (Fase 0)", () => {
     // achado da auditoria (08/09/2026): o geofencing nativo não era parado no
     // logout e continuava monitorando regiões após a sessão encerrar
     expect(pararGeofencing).toHaveBeenCalledTimes(1);
+    // avaliações pendentes carregam o hospital visitado (dado de saúde): não ficam
+    // para a próxima pessoa que usar o aparelho
+    expect(limparPendencias).toHaveBeenCalledTimes(1);
+  });
+
+  test("logout é best-effort: falha ao apagar as avaliações pendentes ainda limpa a sessão", async () => {
+    await TokenStorage.salvarTokens({ accessToken: "A", refreshToken: "R", usuario: { id: "u1" } });
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ success: true }));
+    limparPendencias.mockRejectedValueOnce(new Error("disco"));
+
+    await LoginService.logout();
+
+    expect(await TokenStorage.getAccessToken()).toBeNull();
   });
 
   test("logout é best-effort: falha de rede ainda limpa a sessão local", async () => {
@@ -145,6 +162,7 @@ describe("LoginService (Fase 0)", () => {
     // após a exclusão a sessão local é removida (logout)
     expect(await TokenStorage.getAccessToken()).toBeNull();
     expect(pararGeofencing).toHaveBeenCalledTimes(1);
+    expect(limparPendencias).toHaveBeenCalledTimes(1);
   });
 
   test("excluirConta sem sessão lança erro", async () => {

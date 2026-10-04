@@ -118,6 +118,14 @@ class FeedbackService {
     return request(`${BASE_PATH}/${id}`, { method: "PUT", body: payload, idempotente: true });
   }
 
+  /**
+   * Visitas do usuário logado que ainda aguardam feedback, dentro da janela de 24h
+   * (RN-09): `[{ visitaId, hospitalId, hospitalNome, saida, prazo }]`.
+   */
+  static listarPendentes() {
+    return request(`/api/v1/contas/feedbacks/pendentes`);
+  }
+
   /** Histórico paginado de feedbacks do usuário (E5-03/RN-22 — namespace contas). */
   static listarHistorico({ page = 0, size = 20 } = {}) {
     return request(`/api/v1/contas/feedbacks?page=${page}&size=${size}`);

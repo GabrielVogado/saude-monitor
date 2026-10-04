@@ -180,8 +180,7 @@ describe("App — abrir formulário a partir da notificação de feedback (RN-09
   }
 
   test("pendência dentro da janela de 24h abre o formulário de feedback", async () => {
-    jest.spyOn(FeedbackNotificationService, "feedbackAvaliavel").mockResolvedValue(true);
-    jest.spyOn(FeedbackNotificationService, "pendenciaAtual").mockResolvedValue({
+    jest.spyOn(FeedbackNotificationService, "pendenciaDaVisita").mockResolvedValue({
       visitaId: "v1",
       hospitalNome: "Hospital Central",
     });
@@ -201,11 +200,8 @@ describe("App — abrir formulário a partir da notificação de feedback (RN-09
     // Achado da auditoria de código morto (08/09/2026): a notificação pode ficar
     // parada na bandeja além da janela de 24h; antes desta correção, tocá-la ainda
     // abria o formulário, que só falhava ao enviar (backend responde 404).
-    jest.spyOn(FeedbackNotificationService, "pendenciaAtual").mockResolvedValue({
-      visitaId: "v1",
-      hospitalNome: "Hospital Central",
-    });
-    jest.spyOn(FeedbackNotificationService, "feedbackAvaliavel").mockResolvedValue(false);
+    // pendenciaDaVisita devolve null para a pendência vencida (ou já respondida).
+    jest.spyOn(FeedbackNotificationService, "pendenciaDaVisita").mockResolvedValue(null);
     const agendarLembreteSpy = jest.spyOn(FeedbackNotificationService, "agendarLembrete");
 
     render(<App />);
@@ -220,20 +216,14 @@ describe("App — abrir formulário a partir da notificação de feedback (RN-09
     expect(agendarLembreteSpy).not.toHaveBeenCalled();
   });
 
-  test("notificação de uma visita já substituída por outra não abre o formulário", async () => {
-    // Achado do code-review (08/09/2026): só existe uma pendência guardada por vez
-    // (concluirFeedback). Se o usuário visitar outro hospital antes de responder,
-    // a notificação antiga (visitaId diferente) ainda pode estar na bandeja.
-    // feedbackAvaliavel() sozinho checaria a validade da pendência ATUAL (da visita
-    // nova, ainda dentro da janela) e abriria o formulário com o hospital errado.
-    jest.spyOn(FeedbackNotificationService, "pendenciaAtual").mockResolvedValue({
-      visitaId: "v2-mais-recente",
-      hospitalNome: "Hospital Novo",
-    });
-    const feedbackAvaliavelSpy = jest
-      .spyOn(FeedbackNotificationService, "feedbackAvaliavel")
-      .mockResolvedValue(true);
-    const agendarLembreteSpy = jest.spyOn(FeedbackNotificationService, "agendarLembrete");
+  test("a notificação tocada consulta a pendência da PRÓPRIA visita", async () => {
+    // Achado do code-review (08/09/2026): com uma pendência só, uma notificação antiga
+    // abria o formulário com o hospital da visita mais recente. Agora cada visita tem a
+    // sua pendência e a busca é pelo visitaId da notificação.
+    const pendenciaDaVisitaSpy = jest
+      .spyOn(FeedbackNotificationService, "pendenciaDaVisita")
+      .mockResolvedValue({ visitaId: "v1-antiga", hospitalNome: "Hospital Antigo" });
+    jest.spyOn(FeedbackNotificationService, "agendarLembrete").mockResolvedValue(undefined);
 
     render(<App />);
     const tratarResposta = callbackDeResposta();
@@ -244,11 +234,8 @@ describe("App — abrir formulário a partir da notificação de feedback (RN-09
       );
     });
 
-    expect(screen.queryByText("Você passou pela triagem?")).toBeNull();
-    expect(screen.getByText("Início")).toBeOnTheScreen();
-    expect(agendarLembreteSpy).not.toHaveBeenCalled();
-    // curto-circuito: nem chega a checar a janela de 24h da pendência errada
-    expect(feedbackAvaliavelSpy).not.toHaveBeenCalled();
+    expect(pendenciaDaVisitaSpy).toHaveBeenCalledWith("v1-antiga");
+    expect(await screen.findByText("Hospital Antigo")).toBeOnTheScreen();
   });
 
   test("abre o formulário mesmo se o agendamento do lembrete falhar (bug de foreground)", async () => {
@@ -256,8 +243,7 @@ describe("App — abrir formulário a partir da notificação de feedback (RN-09
     // redirecionava. A causa era `await agendarLembrete(...)` ANTES do navigate — se o
     // agendamento falhasse, o navigate nunca rodava. Agora a navegação vem primeiro e o
     // lembrete é efeito colateral tolerante a falha.
-    jest.spyOn(FeedbackNotificationService, "feedbackAvaliavel").mockResolvedValue(true);
-    jest.spyOn(FeedbackNotificationService, "pendenciaAtual").mockResolvedValue({
+    jest.spyOn(FeedbackNotificationService, "pendenciaDaVisita").mockResolvedValue({
       visitaId: "v1",
       hospitalNome: "Hospital Central",
     });
@@ -279,8 +265,7 @@ describe("App — abrir formulário a partir da notificação de feedback (RN-09
     // Bug relatado: após "Fechar tudo", tocar a notificação abria a tela inicial. O
     // listener ao vivo não recebe a resposta que INICIA o app — ela vem por
     // getLastNotificationResponseAsync, tratada no mount.
-    jest.spyOn(FeedbackNotificationService, "feedbackAvaliavel").mockResolvedValue(true);
-    jest.spyOn(FeedbackNotificationService, "pendenciaAtual").mockResolvedValue({
+    jest.spyOn(FeedbackNotificationService, "pendenciaDaVisita").mockResolvedValue({
       visitaId: "v1",
       hospitalNome: "Hospital Central",
     });

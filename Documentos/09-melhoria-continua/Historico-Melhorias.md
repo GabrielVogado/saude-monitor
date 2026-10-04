@@ -1846,6 +1846,63 @@ aconteceu quando o app foi aberto. O check-out tinha a mesma dependência.
 
 ---
 
+## M-029 — Avaliação da visita pendente até 24h (sem depender da notificação)
+
+**Data:** 04/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Pedido do PO: o feedback deveria ficar pendente para o usuário que não conseguiu responder
+na hora ou ficou com o celular descarregado.
+
+### Causas
+
+1. **A notificação era o único caminho até o formulário.** Quem dispensava ou não via a
+   notificação não tinha onde avaliar dentro do app.
+2. **Só existia uma pendência por vez.** Uma segunda visita no mesmo dia apagava a
+   pendência da primeira.
+3. **O lembrete único (E3-03) nunca chegava.** Ao gravar a pendência, o app cancelava o
+   lembrete que tinha acabado de agendar. Além disso, ele só era agendado quando o usuário
+   tocava no primeiro pedido, ou seja, quem não viu o pedido ficava sem lembrete.
+4. **Celular descarregado dentro do hospital perdia a avaliação.** Sem sinal por 10 min, o
+   backend encerra a visita como `GPS_INTERROMPIDO` (RN-06). O app nunca passava pelo
+   checkout, então não agendava nada, e o `POST /feedbacks` só aceitava `FINALIZADA`.
+
+### O que mudou
+
+- **App:** cada visita encerrada vira uma pendência gravada no AsyncStorage (sobrevive ao
+  app fechado e ao celular desligado) até ser respondida, dispensada ou completar 24h após
+  a saída (RN-09). A pendência é gravada antes de qualquer chamada de notificação, então
+  uma falha de permissão ou de agendamento não a apaga. A pendência antiga (chave única)
+  é migrada.
+- **Home:** card "Avaliação pendente" com o hospital, o prazo ("Responda até hoje às
+  14:30"), o botão "Avaliar" e "Agora não". Some quando não há pendência.
+- **Lembrete:** pedido (1 min) e lembrete único (+6h) agendados juntos na saída.
+- **Servidor:** novo `GET /api/v1/contas/feedbacks/pendentes` (logado) com as visitas que
+  ainda aceitam feedback. O app soma essas visitas à lista local, o que cobre o celular que
+  apagou dentro do hospital e o app reinstalado, e agenda o lembrete delas se a notificação
+  já estiver permitida.
+- **Regra:** `POST /feedbacks` aceita visita `GPS_INTERROMPIDO` e recusa (404) a visita com
+  a janela de 24h vencida. Antes, a visita seguia avaliável até a próxima passada do job
+  `SEM_FEEDBACK`.
+- **Privacidade:** logout e exclusão de conta apagam as pendências do aparelho, porque o
+  hospital visitado é dado de saúde (LGPD, art. 11).
+
+### Verificação
+
+- Backend: 6 testes novos no `FeedbackServiceImplTest` e 1 no `ContaControllerTest`.
+- Frontend: `FeedbackNotificationService.test.js` reescrito (24 testes), novo
+  `FeedbacksPendentesCard.test.js` (12) e testes de logout no `LoginService`. Suíte: 479
+  testes passando.
+- O `code-review` do diff apontou 10 achados, e 9 foram corrigidos neste PR: corrida do
+  logout com a sincronização, pendência perdida quando o agendamento falha, 404 da fila
+  offline apagando a pendência, NPE com hospital sem nome, notificação de visita
+  dispensada reabrindo o formulário, visita do servidor sem lembrete, nome genérico
+  migrado, prazo calculado em três lugares e consulta ao servidor a cada foco. Ficou de
+  fora só a duplicação da busca de nomes de hospital, que já existia no serviço de visitas.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

@@ -2,6 +2,7 @@ package br.com.saude_monitor.api.user.controller;
 
 import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
+import br.com.saude_monitor.api.feedback.dto.FeedbackPendenteResponse;
 import br.com.saude_monitor.api.feedback.dto.FeedbackResponse;
 import br.com.saude_monitor.api.feedback.service.FeedbackService;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -72,6 +74,13 @@ public class ContaController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         String usuarioId = exigirUsuarioAutenticado();
         return ResponseEntity.ok(feedbackService.historico(usuarioId, page, size));
+    }
+
+    /** 🔒 Visitas do usuário que ainda aguardam feedback, dentro da janela de 24h (RN-09). */
+    @GetMapping("/feedbacks/pendentes")
+    public ResponseEntity<List<FeedbackPendenteResponse>> feedbacksPendentes() {
+        String usuarioId = exigirUsuarioAutenticado();
+        return ResponseEntity.ok(feedbackService.pendentes(usuarioId));
     }
 
     /** 🔒 Exportação de dados pessoais em JSON (E5-03 / art. 18 LGPD). */

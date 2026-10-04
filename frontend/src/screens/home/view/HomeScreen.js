@@ -9,6 +9,7 @@ import VisitaService from "../../visitas/service/VisitaService";
 import { iniciarGeofencing, sincronizarVisitaAtiva } from "../../visitas/service/GeofencingTaskService";
 import { iniciarHeartbeat, pararHeartbeat } from "../../visitas/service/HeartbeatService";
 import { preservarSeSemConexao } from "../../../utils/alertas";
+import FeedbacksPendentesCard from "../../feedback/view/FeedbacksPendentesCard";
 
 /**
  * Tela inicial (E6-01): apresentação do app.
@@ -82,6 +83,9 @@ export default function HomeScreen() {
                 contentContainerStyle={styles.content}
                 showsVerticalScrollIndicator={false}
             >
+                {/* Avaliações que o usuário ainda pode responder (RN-09) — some quando vazio */}
+                <FeedbacksPendentesCard />
+
                 {/* Headline destacada */}
                 <Text style={styles.headline}>
                     CUIDAMOS DE VOCÊ{" "}

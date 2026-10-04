@@ -238,8 +238,12 @@ export default function FeedbackFormScreen({ navigation, route }) {
       await concluirFeedback(visitaId);
       setEnviado(true);
     } catch (e) {
-      // Já avaliado (dedupe RN-12): não deixa enviar de novo.
+      // Já avaliado (dedupe RN-12): a pendência desta visita não tem mais o que
+      // esperar, então sai da lista da Home. O 404 NÃO remove: ele também vem quando o
+      // checkout ainda está na fila offline (visita aberta no servidor), e a pendência
+      // vence sozinha em 24h (RN-09) se a visita de fato não puder mais ser avaliada.
       if (e.status === 409) {
+        concluirFeedback(visitaId).catch(() => {});
         setJaAvaliado(true);
       } else if (e.status === 404) {
         setErro("Esta visita não está mais disponível para avaliação.");

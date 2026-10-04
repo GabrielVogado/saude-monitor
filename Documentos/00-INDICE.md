@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 04/10/2026 — Trava de contagem de testes e SonarQube Cloud
+
+**O que entrou:** o CI passa a reprovar o PR que reduz a quantidade de testes de uma área ou que altera o código de produção de uma área sem acrescentar teste a ela; e cada área (backend, mobile, admin) ganha um projeto no SonarQube Cloud, analisado pelo próprio CI assim que o secret `SONAR_TOKEN` existir. Regra e passo a passo em `10-git-flow/MANUAL.md` §4.4. Registro em `Historico-Melhorias.md` (M-030).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre a esteira de qualidade).
+
+---
+
 ## 📌 Revisão 04/10/2026 — Avaliação pendente da visita
 
 **O que entrou:** a avaliação da visita deixa de depender da notificação. Cada visita encerrada fica como pendência no aparelho por 24h (RN-09) e aparece num card na Home; quem está logado também recebe do servidor as visitas que aguardam avaliação, inclusive a encerrada como `GPS_INTERROMPIDO` quando o celular descarregou dentro do hospital, que passa a aceitar feedback. Registro em `Historico-Melhorias.md` (M-029).

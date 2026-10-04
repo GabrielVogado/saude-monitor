@@ -3,6 +3,8 @@ plugins {
 	id 'jacoco'
 	id 'org.springframework.boot' version '4.0.4'
 	id 'io.spring.dependency-management' version '1.1.7'
+	// Análise no SonarQube Cloud (`./gradlew sonar`, só no CI com SONAR_TOKEN).
+	id 'org.sonarqube' version '7.5.0.8588'
 }
 
 group = 'br.com.saude_monitor.api'
@@ -140,4 +142,22 @@ tasks.named('jacocoTestCoverageVerification') {
 
 tasks.named('check') {
 	dependsOn tasks.named('jacocoTestCoverageVerification')
+}
+
+/**
+ * SonarQube Cloud. A análise roda no CI depois do `build`, que já deixou as
+ * classes compiladas e o XML do JaCoCo. Organização e chave precisam ser
+ * exatamente as criadas no SonarQube Cloud (Documentos/10-git-flow/MANUAL.md §4.4).
+ */
+sonar {
+	properties {
+		property 'sonar.host.url', 'https://sonarcloud.io'
+		property 'sonar.organization', 'gabrielvogado'
+		property 'sonar.projectKey', 'gabrielvogado_saude-monitor-backend'
+		property 'sonar.projectName', 'Radar Saúde - Backend'
+		property 'sonar.coverage.jacoco.xmlReportPaths',
+			layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile.path
+		// Mesmo recorte da cobertura do JaCoCo acima.
+		property 'sonar.coverage.exclusions', excluidosDaCobertura.join(',')
+	}
 }

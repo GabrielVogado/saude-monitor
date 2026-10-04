@@ -13,12 +13,21 @@ jobs:
   backend:
     name: Backend (Spring Boot)
     runs-on: ubuntu-latest
+    env:
+      # Só "true"/"false": o token em si não fica exposto aos passos de build e
+      # teste. A análise do Sonar pula enquanto o secret não existir (e em PR de
+      # fork, que não recebe secrets) sem reprovar o CI.
+      TEM_SONAR: ${{ secrets.SONAR_TOKEN != '' }}
     defaults:
       run:
         working-directory: backend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Histórico completo: o SonarQube Cloud usa o blame para separar o
+          # código novo do antigo. Com o clone raso padrão, tudo vira "novo".
+          fetch-depth: 0
 
       - name: Setup Java 25
         uses: actions/setup-java@v4
@@ -51,15 +60,40 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      - name: Contar testes executados (backend)
+        run: python3 ../.github/scripts/contagem_testes.py contar --area backend --relatorio build/test-results/test --saida ../contagem-testes
+
+      - name: Publicar contagem de testes (backend)
+        uses: actions/upload-artifact@v4
+        with:
+          name: contagem-testes-backend
+          path: contagem-testes/backend.json
+          # A contagem do CI de push da develop/master é o "cenário anterior"
+          # da trava de testes: precisa sobreviver a períodos sem merge.
+          retention-days: 90
+
+      - name: Análise SonarQube Cloud (backend)
+        if: env.TEM_SONAR == 'true'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        # Reaproveita as classes e o XML do JaCoCo gerados pelo `build` acima.
+        run: ./gradlew --no-daemon sonar
+
   frontend:
     name: Frontend (Expo Web)
     runs-on: ubuntu-latest
+    env:
+      TEM_SONAR: ${{ secrets.SONAR_TOKEN != '' }}
     defaults:
       run:
         working-directory: frontend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Histórico completo: o SonarQube Cloud usa o blame para separar o
+          # código novo do antigo. Com o clone raso padrão, tudo vira "novo".
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -97,7 +131,10 @@ jobs:
       - name: Testes (Jest) com cobertura
         # O piso configurado em `jest.config.js` reprova o PR quando a cobertura
         # cai — mesma porta do backend (DOD-01 / E8-08).
-        run: npm run test:coverage -- --ci --maxWorkers=2
+        # `--json` grava o resultado da execução, de onde sai a contagem de testes.
+        run: |
+          mkdir -p test-results
+          npm run test:coverage -- --ci --maxWorkers=2 --json --outputFile=test-results/jest.json
 
       - name: Publicar relatório de cobertura (frontend)
         if: always()
@@ -108,6 +145,25 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      - name: Contar testes executados (frontend)
+        run: python3 ../.github/scripts/contagem_testes.py contar --area frontend --relatorio test-results/jest.json --saida ../contagem-testes
+
+      - name: Publicar contagem de testes (frontend)
+        uses: actions/upload-artifact@v4
+        with:
+          name: contagem-testes-frontend
+          path: contagem-testes/frontend.json
+          retention-days: 90
+
+      - name: Análise SonarQube Cloud (frontend)
+        if: env.TEM_SONAR == 'true'
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          # Configuração em frontend/sonar-project.properties.
+          projectBaseDir: frontend
+
       - name: Build web (export Expo)
         run: npx expo export --platform web
 
@@ -117,12 +173,18 @@ jobs:
     # sem renovação (M-026) chegou à develop sem nenhum sinal.
     name: Admin (Angular)
     runs-on: ubuntu-latest
+    env:
+      TEM_SONAR: ${{ secrets.SONAR_TOKEN != '' }}
     defaults:
       run:
         working-directory: admin
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Histórico completo: o SonarQube Cloud usa o blame para separar o
+          # código novo do antigo. Com o clone raso padrão, tudo vira "novo".
+          fetch-depth: 0
 
       - name: Setup Node
         # Angular 21 exige Node >= 20.19; a linha 20 do setup-node já entrega isso.
@@ -140,8 +202,106 @@ jobs:
           npm install -g npm@11.6.1
           npm ci
 
-      - name: Testes (Vitest)
-        run: npx ng test --watch=false
+      - name: Testes (Vitest) com cobertura
+        # O `lcov` alimenta o SonarQube Cloud; o reporter `json` grava o resultado
+        # da execução, de onde sai a contagem de testes. Sem piso de cobertura aqui
+        # (por enquanto só medida).
+        run: >-
+          npx ng test --watch=false
+          --coverage --coverage-reporters=lcov --coverage-reporters=text-summary
+          --reporters=json --reporters=default --output-file=test-results/vitest.json
+
+      - name: Contar testes executados (admin)
+        run: python3 ../.github/scripts/contagem_testes.py contar --area admin --relatorio test-results/vitest.json --saida ../contagem-testes
+
+      - name: Publicar contagem de testes (admin)
+        uses: actions/upload-artifact@v4
+        with:
+          name: contagem-testes-admin
+          path: contagem-testes/admin.json
+          retention-days: 90
+
+      - name: Análise SonarQube Cloud (admin)
+        if: env.TEM_SONAR == 'true'
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          # Configuração em admin/sonar-project.properties.
+          projectBaseDir: admin
 
       - name: Build
         run: npx ng build
+
+  contagem-testes:
+    # Trava de contagem de testes (M-030): o PR não pode reduzir a quantidade de
+    # testes de nenhuma área e, na área cujo código de produção ele altera, precisa
+    # aumentá-la. O "cenário anterior" é a contagem do CI de push do commit da
+    # base, publicada pelos próprios jobs acima. Regra e recorte de "código
+    # de produção" em .github/scripts/contagem_testes.py.
+    name: Trava de contagem de testes
+    if: github.event_name == 'pull_request'
+    needs: [backend, frontend, admin]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Contagem deste PR
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contagem-testes-*
+          path: atual
+          merge-multiple: true
+
+      - name: Contagem da base
+        # O checkout de PR é o merge commit: o primeiro pai é exatamente o commit da
+        # base contra o qual este CI rodou. A contagem vem do CI de push desse commit,
+        # e não do "último CI verde", que pode ser de outro commit (re-run de PR
+        # antigo, ou base com CI vermelho/em andamento) e comparar código diferente.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p base
+          BASE_SHA=$(git rev-parse HEAD^1)
+          run_do_commit() {
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$1&event=push&per_page=1" \
+              --jq '.workflow_runs[0] // empty | "\(.id) \(.status) \(.conclusion)"'
+          }
+          # O CI de push da base costuma estar terminando junto com este: espera até 20 min.
+          for _ in $(seq 40); do
+            read -r ID STATUS CONCLUSAO _ <<< "$(run_do_commit "$BASE_SHA") x x x"
+            [ "$STATUS" = "completed" ] || [ "$ID" = "x" ] && break
+            echo "CI $ID da base ($BASE_SHA) ainda em $STATUS; aguardando..."
+            sleep 30
+          done
+          # Base sem CI verde (vermelho, ou commit de antes da trava): usa o ancestral
+          # verde mais próximo e avisa, porque os testes entre ele e a base contam
+          # como do PR.
+          for SHA in $(git rev-list --first-parent -n 30 "$BASE_SHA"); do
+            read -r ID STATUS CONCLUSAO _ <<< "$(run_do_commit "$SHA") x x x"
+            [ "$CONCLUSAO" = "success" ] || continue
+            if gh run download "$ID" --repo "$GITHUB_REPOSITORY" --pattern 'contagem-testes-*' --dir baixado 2>/dev/null; then
+              find baixado -name '*.json' -exec cp {} base/ \;
+              echo "Base: CI $ID do commit $SHA"
+              if [ "$SHA" != "$BASE_SHA" ]; then
+                echo "::warning::A base ($BASE_SHA) não tem CI verde; comparando com o ancestral $SHA."
+              fi
+              exit 0
+            fi
+          done
+          echo "::warning::Nenhuma contagem de testes nos últimos 30 commits da base; a deste PR só fica registrada."
+
+      - name: Arquivos alterados no PR
+        # Diferença entre o merge commit e a base: exatamente o que o PR traz.
+        run: git diff --name-only HEAD^1 HEAD > alterados.txt
+
+      - name: Comparar
+        run: python3 .github/scripts/contagem_testes.py comparar --atual atual --base base --alterados alterados.txt

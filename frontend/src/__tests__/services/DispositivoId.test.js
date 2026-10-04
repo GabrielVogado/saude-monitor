@@ -28,4 +28,28 @@ describe("DispositivoId (modo anônimo)", () => {
 
     expect(segundo).toBe(primeiro);
   });
+
+  test("o id novo é um UUID v4 aleatório com o prefixo anon-", async () => {
+    const id = await DispositivoId.obter();
+
+    expect(id).toMatch(/^anon-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+
+  test("não usa Math.random (gerador previsível) para gerar o id (S2245)", async () => {
+    const random = jest.spyOn(Math, "random");
+    try {
+      await DispositivoId.obter();
+      expect(random).not.toHaveBeenCalled();
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  test("aparelhos diferentes (armazenamento vazio) recebem ids diferentes", async () => {
+    const primeiro = await DispositivoId.obter();
+    AsyncStorage.__reset();
+    const segundo = await DispositivoId.obter();
+
+    expect(segundo).not.toBe(primeiro);
+  });
 });

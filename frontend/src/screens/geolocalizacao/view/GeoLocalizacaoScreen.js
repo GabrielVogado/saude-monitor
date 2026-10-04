@@ -131,7 +131,8 @@ function GeolocalizacaoContent({ navigation }) {
   // Não depende de `coordenadas` diretamente: a posição muda a cada leitura do
   // watchPosition e dispararia uma requisição por atualização.
   useEffect(() => {
-    carregarHospitais();
+    // `carregarHospitais` mostra a falha em `erroHospitais`: disparo intencional.
+    void carregarHospitais();
   }, [carregarHospitais, temGps]);
 
   const regionAtual = useMemo(() => {

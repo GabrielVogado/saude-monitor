@@ -79,7 +79,8 @@ export default function HistoricoScreen({ navigation }) {
 
   useFocusEffect(
     useCallback(() => {
-      carregar();
+      // `carregar` mostra a falha em `erro`: disparo intencional.
+      void carregar();
     }, [carregar])
   );
 

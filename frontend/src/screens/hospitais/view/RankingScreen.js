@@ -93,7 +93,8 @@ export default function RankingScreen({ navigation }) {
   // Recarrega do zero sempre que o critério de ordenação ou o filtro mudam —
   // a posição no ranking é global, então paginar em cima da lista antiga mentiria.
   useEffect(() => {
-    carregar();
+    // `carregar` mostra a falha em `erro`: disparo intencional.
+    void carregar();
   }, [carregar]);
 
   const carregarMais = async () => {

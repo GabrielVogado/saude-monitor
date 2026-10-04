@@ -293,6 +293,10 @@ async function confirmarSaida(hospitalId) {
       hospitalNome: null,
       saidaEm: new Date().toISOString(),
       duracaoMinutos,
+    }).catch((erro) => {
+      // Não bloqueia o encerramento local da visita: só registra a falha.
+      // eslint-disable-next-line no-console
+      console.warn("GeofencingTaskService: falha ao agendar o feedback", erro?.message);
     });
     await alterarEstado((estado) => {
       if (estado.visita?.id === visita.id) {

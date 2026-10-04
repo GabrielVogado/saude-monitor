@@ -3,6 +3,7 @@
  * fica disponível para quem não respondeu na hora ou ficou com o celular descarregado.
  */
 import React from "react";
+import { AppState } from "react-native";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import FeedbacksPendentesCard, {
   __reiniciarSincronizacao,
@@ -133,6 +134,33 @@ describe("FeedbacksPendentesCard", () => {
 
     await waitFor(() => expect(listarPendencias).toHaveBeenCalled());
     expect(screen.queryByText(/pendente/)).toBeNull();
+  });
+
+  test("voltar ao primeiro plano recarrega a lista; ir para o fundo não", async () => {
+    const ouvintes = [];
+    const remove = jest.fn();
+    const spy = jest.spyOn(AppState, "addEventListener").mockImplementation((_evento, ouvinte) => {
+      ouvintes.push(ouvinte);
+      return { remove };
+    });
+    try {
+      listarPendencias.mockResolvedValue([]);
+      const { unmount } = render(<FeedbacksPendentesCard />);
+      await waitFor(() => expect(sincronizarPendenciasDoServidor).toHaveBeenCalled());
+      await waitFor(() => expect(listarPendencias).toHaveBeenCalledTimes(2));
+
+      listarPendencias.mockResolvedValue([PENDENCIA]);
+      ouvintes.forEach((ouvinte) => ouvinte("background"));
+      expect(listarPendencias).toHaveBeenCalledTimes(2);
+
+      ouvintes.forEach((ouvinte) => ouvinte("active"));
+      expect(await screen.findByText("UPA Ceilândia")).toBeOnTheScreen();
+
+      unmount();
+      expect(remove).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

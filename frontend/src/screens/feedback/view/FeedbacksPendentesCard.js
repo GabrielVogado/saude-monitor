@@ -76,7 +76,8 @@ export default function FeedbacksPendentesCard() {
 
   useFocusEffect(
     useCallback(() => {
-      carregar();
+      // `carregar` engole a falha de propósito (a lista é conveniência): disparo intencional.
+      void carregar();
     }, [carregar])
   );
 
@@ -84,7 +85,7 @@ export default function FeedbacksPendentesCard() {
   // Home): a Home não ganha foco de novo, então recarrega aqui.
   useEffect(() => {
     const inscricao = AppState.addEventListener("change", (estado) => {
-      if (estado === "active") carregar();
+      if (estado === "active") void carregar();
     });
     return () => inscricao.remove();
   }, [carregar]);

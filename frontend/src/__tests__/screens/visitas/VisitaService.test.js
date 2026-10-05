@@ -7,6 +7,8 @@ import * as Network from "expo-network";
 import VisitaService from "../../../screens/visitas/service/VisitaService";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../../screens/auth/service/LoginService";
+// Liga o cliente HTTP ao LoginService (mockado), como o index.js faz no app.
+import "../../../core/api/sessaoApi";
 import { itensDaFila, limparFila } from "../../../config/filaOffline";
 import { ErroServidorIndisponivel } from "../../../config/http";
 

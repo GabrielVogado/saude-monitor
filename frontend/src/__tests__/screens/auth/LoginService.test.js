@@ -10,6 +10,9 @@ import TokenStorage from "../../../services/TokenStorage";
 import { pararGeofencing } from "../../../screens/visitas/service/GeofencingTaskService";
 import { limparPendencias } from "../../../screens/feedback/service/FeedbackNotificationService";
 import * as httpModule from "../../../config/http";
+// Liga o cliente HTTP ao LoginService real, como o index.js faz no app.
+import "../../../core/api/sessaoApi";
+import { reiniciarControleDeRenovacao } from "../../../config/sessao";
 
 jest.mock("../../../screens/visitas/service/GeofencingTaskService", () => ({
   pararGeofencing: jest.fn(),
@@ -173,6 +176,43 @@ describe("LoginService (Fase 0)", () => {
     await TokenStorage.salvarTokens({ accessToken: "TOK" });
     global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "Falha ao excluir a conta: erro interno" }, 500));
     await expect(LoginService.excluirConta()).rejects.toThrow("Falha ao excluir a conta");
+  });
+
+  test("excluirConta com access token vencido renova a sessão e conclui a exclusão (auditoria v4 §4.1)", async () => {
+    reiniciarControleDeRenovacao();
+    await TokenStorage.salvarTokens({ accessToken: "OLD", refreshToken: "RT", usuario: { id: "u1" } });
+    global.fetch = jest.fn(async (url, config) => {
+      if (url.endsWith("/auth/refresh")) {
+        return jsonResponse({ accessToken: "NEW", refreshToken: "RT2", usuario: { id: "u1" } });
+      }
+      return config.headers.Authorization === "Bearer NEW"
+        ? jsonResponse({ success: true })
+        : jsonResponse({ message: "Token expirado" }, 401);
+    });
+
+    const resp = await LoginService.excluirConta();
+
+    expect(resp.success).toBe(true);
+    const exclusoes = global.fetch.mock.calls.filter(([url]) => url.endsWith("/contas/exclusao"));
+    expect(exclusoes).toHaveLength(2);
+    expect(await TokenStorage.getAccessToken()).toBeNull();
+  });
+
+  test("excluirConta com refresh rejeitado encerra a sessão e não exclui", async () => {
+    reiniciarControleDeRenovacao();
+    await TokenStorage.salvarTokens({ accessToken: "OLD", refreshToken: "RT" });
+    global.fetch = jest.fn(async (url) =>
+      url.endsWith("/contas/exclusao") || url.endsWith("/auth/refresh")
+        ? jsonResponse({ message: "Token inválido" }, 401)
+        : jsonResponse({})
+    );
+
+    await expect(LoginService.excluirConta()).rejects.toMatchObject({
+      status: 401,
+      message: "Sessão expirada. Faça login novamente.",
+    });
+    expect(await TokenStorage.getRefreshToken()).toBeNull();
+    expect(pararGeofencing).toHaveBeenCalledTimes(1);
   });
 
   // ------------------------------------------------ Esqueci minha senha (E8-05/BUG-03) ---

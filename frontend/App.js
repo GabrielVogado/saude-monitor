@@ -29,13 +29,14 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./src/core/query/queryClient";
 import { configurarQueryNoApp } from "./src/core/query/setupQueryClient";
 import { hidratarSessao } from "./src/core/stores/sessaoStore";
+import VisitaAtivaSync from "./src/screens/visitas/hooks/VisitaAtivaSync";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Stack da aba Início (E6-01): a Home é a âncora do geofencing/visita ativa (E2-07).
-// É uma tela de apresentação do app; o check-in manual agora vive na lista Hospitais
-// e o mapa é uma aba própria ("Mapa").
+// Stack da aba Início (E6-01): tela de apresentação do app; o check-in manual vive na
+// lista Hospitais e o mapa é uma aba própria ("Mapa"). A visita ativa (geofencing e
+// heartbeat) é acompanhada pelo `VisitaAtivaSync`, na raiz.
 function HomeStack() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -279,6 +280,8 @@ export default function App() {
 
     return (
         <QueryClientProvider client={queryClient}>
+            {/* Heartbeat e geofencing seguem a visita ativa em qualquer tela (§4.2.2). */}
+            <VisitaAtivaSync />
             <SafeAreaProvider>
                 <NavigationContainer
                     ref={navigationRef}

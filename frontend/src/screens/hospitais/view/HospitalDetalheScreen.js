@@ -16,6 +16,7 @@ import {
 import { colors, radii, spacing, typography } from "../../../theme/tokens";
 import HospitalService from "../service/HospitalService";
 import VisitaService from "../../visitas/service/VisitaService";
+import { invalidarVisitaAtiva } from "../../../core/query/queryClient";
 import { agendarFeedback } from "../../feedback/service/FeedbackNotificationService";
 import {
   calcularCentroide,
@@ -163,6 +164,8 @@ export default function HospitalDetalheScreen({ navigation, route }) {
     try {
       const resposta = await VisitaService.checkout(visitaManual.id, { encerramentoManual: true });
       encerrarLocalmente(resposta?.duracaoMinutos);
+      // Para o heartbeat da visita encerrada já, sem esperar o foco da aba Início.
+      void invalidarVisitaAtiva();
     } catch (e) {
       if (e.enfileirado) {
         // Sem conexão, o checkout foi guardado para sincronizar depois (OPS-05).

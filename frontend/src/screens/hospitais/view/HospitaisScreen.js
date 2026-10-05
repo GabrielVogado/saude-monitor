@@ -15,6 +15,7 @@ import {
 import { colors, spacing } from "../../../theme/tokens";
 import HospitalService from "../service/HospitalService";
 import VisitaService from "../../visitas/service/VisitaService";
+import { invalidarVisitaAtiva } from "../../../core/query/queryClient";
 import { normalizeText } from "../../../utils/normalize";
 import { avisarSemConexao, preservarSeSemConexao } from "../../../utils/alertas";
 
@@ -271,6 +272,9 @@ export default function HospitaisScreen({ navigation }) {
           origem: "MANUAL",
         });
         setVisitaAtiva({ ...resposta, origem: "MANUAL" });
+        // Avisa o observador global (heartbeat e geofencing) da visita nova, sem
+        // depender de a aba Início ganhar foco (Auditoria Técnica v4.0, §4.2.2).
+        void invalidarVisitaAtiva();
         // Redireciona ao detalhe do hospital, que exibe o temporizador + checkout
         // (específico do check-in manual).
         setCheckinEnviandoId(null);

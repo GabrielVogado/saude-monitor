@@ -65,7 +65,7 @@ export default function PerfilScreen({ navigation }) {
     }, [carregar])
   );
 
-  const emCarregamento = carregandoInicial || !sessaoHidratada;
+  const emCarregamento = Boolean(carregandoInicial) || !sessaoHidratada;
   const permissaoConcedida = permissao === "granted";
 
   // Espelha o estado da permissão para o listener do AppState, que é registrado uma

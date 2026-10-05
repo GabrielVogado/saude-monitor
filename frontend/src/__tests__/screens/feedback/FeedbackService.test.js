@@ -63,6 +63,14 @@ describe("FeedbackService (Épico 03)", () => {
     expect(c.url).toContain("/api/v1/feedbacks/fb1");
   });
 
+  test("listarHistorico repassa o signal de cancelamento ao fetch", async () => {
+    const controle = new AbortController();
+    await FeedbackService.listarHistorico({ signal: controle.signal });
+    expect(global.fetch.mock.calls[0][1].signal).toBeDefined();
+    await FeedbackService.listarHistorico();
+    expect(chamadas[1].url).toContain("page=0&size=20");
+  });
+
   test("listarHistorico faz GET em /api/v1/contas/feedbacks com paginação", async () => {
     await FeedbackService.listarHistorico({ page: 1, size: 10 });
     const c = chamadas[0];

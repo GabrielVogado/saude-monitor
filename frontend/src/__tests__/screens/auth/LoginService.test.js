@@ -12,6 +12,7 @@ import { limparPendencias } from "../../../screens/feedback/service/FeedbackNoti
 import * as httpModule from "../../../config/http";
 // Liga o cliente HTTP ao LoginService real, como o index.js faz no app.
 import "../../../core/api/sessaoApi";
+import { sessaoStore } from "../../../core/stores/sessaoStore";
 import { reiniciarControleDeRenovacao } from "../../../config/sessao";
 
 jest.mock("../../../screens/visitas/service/GeofencingTaskService", () => ({
@@ -213,6 +214,29 @@ describe("LoginService (Fase 0)", () => {
     });
     expect(await TokenStorage.getRefreshToken()).toBeNull();
     expect(pararGeofencing).toHaveBeenCalledTimes(1);
+  });
+
+  test("login, renovação e logout mantêm a sessão global em dia (SDD §6.4)", async () => {
+    reiniciarControleDeRenovacao();
+    global.fetch = jest.fn(async (url) => {
+      if (url.endsWith("/auth/login")) {
+        return jsonResponse({ accessToken: "A", refreshToken: "R", usuario: { id: "u1", nome: "Marina" } });
+      }
+      if (url.endsWith("/auth/refresh")) {
+        return jsonResponse({ accessToken: "A2", refreshToken: "R2" });
+      }
+      return jsonResponse({});
+    });
+
+    await LoginService.login({ email: "m@x.com", password: "s" });
+    expect(sessaoStore.getState().usuario).toEqual({ id: "u1", nome: "Marina" });
+
+    // Renovação sem `usuario` na resposta preserva o usuário já gravado.
+    await LoginService.refresh();
+    expect(sessaoStore.getState().usuario).toEqual({ id: "u1", nome: "Marina" });
+
+    await LoginService.logout();
+    expect(sessaoStore.getState().usuario).toBeNull();
   });
 
   // ------------------------------------------------ Esqueci minha senha (E8-05/BUG-03) ---

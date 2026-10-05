@@ -13,6 +13,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Bell, LogIn, MapPin, History, ShieldCheck, Trash2, UserPlus } from "lucide-react-native";
 import PerfilService from "../service/PerfilService";
 import LoginService from "../../auth/service/LoginService";
+import { useSessao } from "../../../core/stores/sessaoStore";
 import { CSLoadingList } from "../../../components/CSLoading";
 import CSEmptyState from "../../../components/CSEmptyState";
 import { colors } from "../../../theme";
@@ -34,7 +35,12 @@ import styles from "./css/PerfilStyle";
  * E6-03/E6-04: acessibilidade (role/labels) e estados de loading/erro com retry.
  */
 export default function PerfilScreen({ navigation }) {
-  const [usuario, setUsuario] = useState(null);
+  // Sessão global: o Perfil reage na hora ao login, ao logout e ao encerramento da
+  // sessão pelo interceptor 401, em vez de só descobrir no próximo foco.
+  const usuario = useSessao((estado) => estado.usuario);
+  // Até o app ler o usuário gravado no aparelho, o Perfil fica em carregamento em vez
+  // de piscar o convite ao login para quem já está logado.
+  const sessaoHidratada = useSessao((estado) => estado.hidratada);
   const [permissao, setPermissao] = useState("undetermined");
   const [carregando, setCarregando] = useState(false);
   const [carregandoInicial, setCarregandoInicial] = useState(true);
@@ -44,12 +50,7 @@ export default function PerfilScreen({ navigation }) {
     setCarregandoInicial(true);
     setErroInicial(null);
     try {
-      const [u, p] = await Promise.all([
-        PerfilService.usuarioLogado(),
-        PerfilService.permissaoLocalizacao(),
-      ]);
-      setUsuario(u);
-      setPermissao(p);
+      setPermissao(await PerfilService.permissaoLocalizacao());
     } catch (e) {
       setErroInicial(e?.message || "Não foi possível carregar seu perfil.");
     } finally {
@@ -64,6 +65,7 @@ export default function PerfilScreen({ navigation }) {
     }, [carregar])
   );
 
+  const emCarregamento = carregandoInicial || !sessaoHidratada;
   const permissaoConcedida = permissao === "granted";
 
   // Espelha o estado da permissão para o listener do AppState, que é registrado uma
@@ -170,7 +172,6 @@ export default function PerfilScreen({ navigation }) {
             setCarregando(true);
             try {
               await LoginService.excluirConta();
-              setUsuario(null);
               Alert.alert("Conta excluída", "Seus dados pessoais foram removidos com sucesso.");
             } catch (error) {
               Alert.alert("Falha ao excluir conta", error.message);
@@ -185,7 +186,6 @@ export default function PerfilScreen({ navigation }) {
 
   const deslogar = async () => {
     await PerfilService.deslogar();
-    setUsuario(null);
   };
 
   return (
@@ -195,9 +195,9 @@ export default function PerfilScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {carregandoInicial && <CSLoadingList count={2} />}
+        {emCarregamento && <CSLoadingList count={2} />}
 
-        {!carregandoInicial && erroInicial && (
+        {!emCarregamento && erroInicial && (
           <CSEmptyState
             icon={ShieldCheck}
             title="Não foi possível carregar"
@@ -207,7 +207,7 @@ export default function PerfilScreen({ navigation }) {
           />
         )}
 
-        {!carregandoInicial && !erroInicial && (
+        {!emCarregamento && !erroInicial && (
           <>
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Minha conta</Text>

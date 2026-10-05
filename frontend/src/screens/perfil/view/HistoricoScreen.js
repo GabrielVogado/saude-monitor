@@ -1,7 +1,7 @@
-import React, { useCallback, useState } from "react";
+import React, { useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
+import { useQuery } from "@tanstack/react-query";
 import { Building2, Download, History, MessageSquareText, Star } from "lucide-react-native";
 import CSHeader from "../../../components/CSHeader";
 import CSButton from "../../../components/CSButton";
@@ -10,6 +10,9 @@ import { CSLoadingList } from "../../../components/CSLoading";
 import VisitaService from "../../visitas/service/VisitaService";
 import FeedbackService from "../../feedback/service/FeedbackService";
 import PerfilService from "../service/PerfilService";
+import { useSessao } from "../../../core/stores/sessaoStore";
+import { queryKeys } from "../../../core/query/queryKeys";
+import { useRecarregarNoFoco } from "../../../core/query/useRecarregarNoFoco";
 import { formatarDuracao, formatarData } from "../../../utils/format";
 import { colors, spacing, typography, radii } from "../../../theme/tokens";
 
@@ -44,45 +47,42 @@ const ORIGEM_LABEL = {
  */
 export default function HistoricoScreen({ navigation }) {
   const [aba, setAba] = useState(ABA_VISITAS);
-  const [visitas, setVisitas] = useState([]);
-  const [feedbacks, setFeedbacks] = useState([]);
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState(null);
-  const [semSessao, setSemSessao] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [avisoExportacao, setAvisoExportacao] = useState(null);
   const [erroExportacao, setErroExportacao] = useState(null);
 
-  const carregar = useCallback(async () => {
-    setCarregando(true);
-    setErro(null);
-    try {
-      const usuario = await PerfilService.usuarioLogado();
-      if (!usuario) {
-        setSemSessao(true);
-        setCarregando(false);
-        return;
-      }
-      setSemSessao(false);
-      const [v, f] = await Promise.all([
-        VisitaService.listarHistorico({ page: 0, size: 100 }),
-        FeedbackService.listarHistorico({ page: 0, size: 100 }),
-      ]);
-      setVisitas(v?.content || []);
-      setFeedbacks(f?.content || []);
-    } catch (e) {
-      setErro(e?.message || "Não foi possível carregar seu histórico.");
-    } finally {
-      setCarregando(false);
-    }
-  }, []);
+  // Sessão global: sem usuário, a tela orienta o login sem consultar a API.
+  const usuarioId = useSessao((estado) => estado.usuario?.id ?? null);
+  // Enquanto o app lê o usuário gravado no aparelho, ainda não dá para dizer que é
+  // anônimo: a tela fica em carregamento em vez de piscar o convite ao login.
+  const hidratada = useSessao((estado) => estado.hidratada);
+  const semSessao = useSessao((estado) => estado.hidratada && !estado.usuario);
 
-  useFocusEffect(
-    useCallback(() => {
-      // `carregar` mostra a falha em `erro`: disparo intencional.
-      void carregar();
-    }, [carregar])
-  );
+  // A chave inclui o usuário: outra conta no mesmo aparelho nunca vê o cache da
+  // anterior, e o logout remove o domínio `conta` inteiro (setupQueryClient).
+  const historico = useQuery({
+    queryKey: queryKeys.conta.historico(usuarioId),
+    queryFn: async ({ signal }) => {
+      const [v, f] = await Promise.all([
+        VisitaService.listarHistorico({ page: 0, size: 100, signal }),
+        FeedbackService.listarHistorico({ page: 0, size: 100, signal }),
+      ]);
+      return { visitas: v?.content || [], feedbacks: f?.content || [] };
+    },
+    enabled: hidratada && !semSessao,
+  });
+  const { refetch } = historico;
+  useRecarregarNoFoco(refetch, hidratada && !semSessao);
+
+  const visitas = historico.data?.visitas || [];
+  const feedbacks = historico.data?.feedbacks || [];
+  const carregando = !hidratada || (historico.isPending && !semSessao);
+  const erro = historico.isError
+    ? historico.error?.message || "Não foi possível carregar seu histórico."
+    : null;
+  const carregar = () => {
+    void refetch();
+  };
 
   const irParaLogin = () => navigation?.navigate?.("Login");
 

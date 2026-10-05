@@ -25,6 +25,10 @@ import NotificacoesScreen from "./src/screens/perfil/view/NotificacoesScreen.js"
 import {colors} from "./src/theme";
 import { agendarLembrete, pendenciaDaVisita } from "./src/screens/feedback/service/FeedbackNotificationService";
 import { sincronizar } from "./src/services/SincronizacaoOffline";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./src/core/query/queryClient";
+import { configurarQueryNoApp } from "./src/core/query/setupQueryClient";
+import { hidratarSessao } from "./src/core/stores/sessaoStore";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -238,6 +242,13 @@ export default function App() {
     }, [tratarResposta]);
 
     useEffect(() => {
+        // Sessão global (SDD de TanStack Query e Zustand): lê o usuário persistido uma vez
+        // e liga o cache de queries ao foco do app, à conexão e ao logout.
+        hidratarSessao();
+        return configurarQueryNoApp(queryClient);
+    }, []);
+
+    useEffect(() => {
         // OPS-05: check-in e checkout registrados sem internet ficam na fila
         // offline. Os dois momentos em que vale tentar de novo são a volta ao
         // primeiro plano e o retorno da conexão — o segundo cobre o aparelho que
@@ -267,26 +278,28 @@ export default function App() {
     }, []);
 
     return (
-        <SafeAreaProvider>
-            <NavigationContainer
-                ref={navigationRef}
-                onReady={() => {
-                    navegacaoPronta.current = true;
-                    // Despacha o feedback que chegou por cold start antes de a navegação montar.
-                    if (feedbackPendente.current) {
-                        navigationRef.current?.navigate("Feedback", {
-                            screen: "FeedbackForm",
-                            params: feedbackPendente.current,
-                        });
-                        feedbackPendente.current = null;
-                    }
-                }}
-            >
-                <Stack.Navigator screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="Tabs" component={Tabs} />
-                    <Stack.Screen name="Feedback" component={FeedbackStack} />
-                </Stack.Navigator>
-            </NavigationContainer>
-        </SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+            <SafeAreaProvider>
+                <NavigationContainer
+                    ref={navigationRef}
+                    onReady={() => {
+                        navegacaoPronta.current = true;
+                        // Despacha o feedback que chegou por cold start antes de a navegação montar.
+                        if (feedbackPendente.current) {
+                            navigationRef.current?.navigate("Feedback", {
+                                screen: "FeedbackForm",
+                                params: feedbackPendente.current,
+                            });
+                            feedbackPendente.current = null;
+                        }
+                    }}
+                >
+                    <Stack.Navigator screenOptions={{ headerShown: false }}>
+                        <Stack.Screen name="Tabs" component={Tabs} />
+                        <Stack.Screen name="Feedback" component={FeedbackStack} />
+                    </Stack.Navigator>
+                </NavigationContainer>
+            </SafeAreaProvider>
+        </QueryClientProvider>
     );
 }

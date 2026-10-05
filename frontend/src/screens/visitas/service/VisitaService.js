@@ -136,8 +136,8 @@ class VisitaService {
   }
 
   /** Histórico paginado de visitas do usuário (E5-03 — namespace contas). */
-  static listarHistorico({ page = 0, size = 20 } = {}) {
-    return request(`/api/v1/contas/visitas${buildQuery({ page, size })}`);
+  static listarHistorico({ page = 0, size = 20, signal } = {}) {
+    return request(`/api/v1/contas/visitas${buildQuery({ page, size })}`, { signal });
   }
 }
 

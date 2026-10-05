@@ -284,7 +284,7 @@ export default React.memo(CSHospitalCard, (prev, next) =>
 ## ADR-004: Gerenciamento de Estado Global Reativo com React Context
 
 **Data:** 2026-08-31
-**Status:** Proposto
+**Status:** Substituído em 05/10/2026 pela [SDD de TanStack Query e Zustand](./SDD-TanStack-Query-Zustand-v1.0.md) (M-033). O critério que decidiu foi o próprio gatilho que este ADR previa ("surgir necessidade de estado fora do React"): a sessão é escrita pelo interceptor 401 e pela tarefa de geofencing, fora da árvore. A sessão virou um store do Zustand (`frontend/src/core/stores/sessaoStore.js`); a Context API segue para o GPS da tela de mapa.
 **Área:** Gerenciamento de Estado
 
 ---

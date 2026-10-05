@@ -2089,6 +2089,48 @@ consultas a cada foco, sem cache.
 
 ---
 
+## M-034 — Heartbeat e geofencing seguem a visita ativa em qualquer tela (Fase 2 da SDD)
+
+**Data:** 05/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Auditoria Técnica v4.0, §4.2.2, confirmada no código: quem alimentava o heartbeat
+(E2-09) e o `sincronizarVisitaAtiva` do geofencing era só a Home, e só quando a aba
+Início ganhava foco. Sequência real do defeito: abrir o app, ir para Hospitais, fazer
+check-in manual e seguir para o detalhe sem voltar ao Início. O heartbeat nunca
+começava, e o geofencing não conhecia a visita para o checkout automático. No caminho
+inverso, um checkout manual no detalhe deixava o heartbeat da visita encerrada rodando
+até o próximo foco da Home.
+
+### O que mudou
+
+- **`VisitaAtivaSync`** (`screens/visitas/hooks/`), montado na raiz do `App.js`: observa
+  a query compartilhada da visita ativa (`useVisitaAtiva`, chave por usuário, fresca por
+  30 s) e liga ou desliga o heartbeat e o `sincronizarVisitaAtiva` em qualquer tela. O
+  geofencing nativo também passa a ser iniciado ali.
+- Mantém as regras que a Home já seguia: só sincroniza com resposta do servidor (o dado
+  indefinido da abertura não apaga a visita guardada pelo geofencing), falha de rede não
+  para o heartbeat, e erro real do servidor para o heartbeat sem apagar a visita guardada.
+  Entrada e hospital continuam indo junto (a SDD repassava só o id).
+- Check-in manual na lista, checkout manual no detalhe, check-in e checkout automáticos do
+  geofencing com o app aberto e o envio da fila offline marcam a visita ativa como
+  desatualizada (`invalidarVisitaAtiva`), e o observador segue a visita nova na hora. A volta do app ao primeiro plano também recarrega a visita
+  (`refetchOnWindowFocus`).
+- A Home volta a ser só apresentação.
+- Fora do escopo: o polling de 60 s da visita ativa proposto na SDD (uma requisição por
+  minuto por usuário, sem ganho para um heartbeat de 30 min).
+
+### Verificação
+
+- `VisitaAtivaSync.test.js` (8 testes), incluindo o cenário do defeito (check-in em outra
+  aba liga o heartbeat) e o checkout manual parando o heartbeat. Os 4 testes de visita da
+  Home migraram para lá; a Home ficou com 1 teste de apresentação. No
+  `GeofencingTaskService.test.js`, check-in e checkout automáticos avisam o observador.
+- Suíte do app: 543 → 549 testes. Linhas alteradas com 100% de cobertura (`diff-cover`).
+
+---
+
 ## M-038 — Sinal da visita com o app fechado
 
 **Data:** 05/10/2026 · **PR:** (este PR)

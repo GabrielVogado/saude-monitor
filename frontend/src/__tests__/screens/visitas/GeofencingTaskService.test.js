@@ -39,6 +39,14 @@ jest.mock("../../../screens/feedback/service/FeedbackNotificationService", () =>
   agendarFeedback: jest.fn(() => Promise.resolve(null)),
 }));
 
+// Fora do `jest.isolateModules`: cada carga do serviço recebe um módulo novo, e o
+// prefixo `mock` deixa a fábrica apontar para a mesma função espiã.
+const mockInvalidarVisitaAtiva = jest.fn(() => Promise.resolve());
+jest.mock("../../../core/query/queryClient", () => ({
+  __esModule: true,
+  invalidarVisitaAtiva: (...args) => mockInvalidarVisitaAtiva(...args),
+}));
+
 const HOSPITAL_LAT = -15.9023;
 const HOSPITAL_LON = -48.0742;
 
@@ -336,6 +344,23 @@ describe("confirmação de entrada", () => {
     expect(agendarFeedback).toHaveBeenCalledWith(
       expect.objectContaining({ visitaId: "v1", duracaoMinutos: 12 })
     );
+  });
+
+  it("check-in e checkout automáticos avisam o observador da visita ativa (heartbeat)", async () => {
+    Location.getCurrentPositionAsync.mockResolvedValue({ coords: POSICAO_REAL });
+    VisitaService.checkin.mockResolvedValue({ id: "v1", entrada: new Date().toISOString() });
+    VisitaService.checkout.mockResolvedValue({ id: "v1", duracaoMinutos: 12 });
+    const { executarTask } = carregarServico();
+    mockInvalidarVisitaAtiva.mockClear();
+
+    await dispararEntrada(executarTask);
+    expect(mockInvalidarVisitaAtiva).toHaveBeenCalledTimes(1);
+
+    executarTask({
+      data: { eventType: Location.GeofencingEventType.Exit, region: REGIAO },
+    });
+    await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
+    expect(mockInvalidarVisitaAtiva).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -692,6 +717,7 @@ describe("falhas e casos de borda", () => {
     await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
 
     expect(JSON.parse(await AsyncStorage.getItem("@saude_monitor:geofencing")).visita).toBeNull();
+    expect(mockInvalidarVisitaAtiva).toHaveBeenCalled();
   });
 
   it("entrada sem sinal de GPS é tentada de novo até haver posição", async () => {

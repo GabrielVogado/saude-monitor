@@ -2131,6 +2131,52 @@ até o próximo foco da Home.
 
 ---
 
+## M-035 — Leituras de hospitais com TanStack Query (Fase 3 da SDD)
+
+**Data:** 05/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Auditoria Técnica v4.0 e SDD (§2, item 2): Hospitais, Ranking e Mapa controlavam a
+paginação e as corridas entre respostas com refs manuais (`geracaoRef`,
+`buscandoMaisRef`, `cargaEmAndamentoRef`), e o Detalhe buscava hospital e indicadores
+em sequência, sem cache. Voltar a uma tela já vista refazia todas as chamadas.
+
+### O que mudou
+
+- **`screens/hospitais/hooks/useHospitais.js`**: `useHospitaisLista` e
+  `useRankingHospitais` (`useInfiniteQuery`), `useHospital` e `useIndicadoresHospital`
+  (`useQuery`) e `useHospitaisMapa`. Cada busca, filtro, ordem ou raio é uma chave
+  própria: a resposta de um critério antigo é descartada pela biblioteca e a requisição
+  é cancelada pelo `signal`, o que elimina as três refs.
+- `HospitalService.listar`, `ranking`, `buscarPorId` e `buscarIndicadores` aceitam
+  `signal`.
+- **Hospitais:** a busca vai à consulta 400 ms depois da última tecla, normalizada e
+  filtrada de novo no cliente, como antes. O destaque do check-in ativo usa a mesma
+  chave do Detalhe, então abrir o detalhe desse hospital não repete a chamada.
+- **Ranking e Hospitais:** `fetchNextPage` com `cancelRefetch: false`, para que dois
+  `onEndReached` seguidos não peçam a mesma página duas vezes.
+- **Detalhe:** hospital e indicadores em paralelo; se os indicadores dedicados falharem,
+  continua valendo o fallback embutido. Uma atualização que falha com o hospital já na
+  tela não troca a tela pelo erro.
+- **Mapa:** o catálogo continua vindo em lotes de 100, agora pelas páginas da consulta.
+  Uma falha no meio mantém os lotes já carregados, mostra o aviso e não repete sem fim.
+  A posição do recorte por raio é fixada ao escolher o raio, como antes.
+- Ficam para a Fase 4: a visita ativa que Hospitais e Detalhe ainda consultam por conta
+  própria e as mutações de check-in, checkout e feedback.
+
+### Verificação
+
+- Os testes de corrida que protegiam as refs (refresh com página em voo, troca de
+  filtro com página antiga chegando depois, dois `onEndReached` seguidos) continuam
+  passando sem as refs. O de `onEndReached` pegou o `cancelRefetch` padrão.
+- Novos: `useHospitais.test.js`, `signal` no `HospitalService`, refresh e rodapé do
+  Ranking, erro e busca normalizada em Hospitais, atualização com falha no Detalhe e
+  página do meio com falha no Mapa.
+- Suíte do app: 549 → 564 testes. Linhas alteradas com 100% de cobertura (`diff-cover`).
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

@@ -42,6 +42,28 @@ describe("HospitalService (Épico 01)", () => {
     expect(capturada.search).toContain("size=50");
   });
 
+  test("leituras repassam o signal de cancelamento ao fetch (consultas do TanStack Query)", async () => {
+    const { signal } = new AbortController();
+
+    await HospitalService.listar({ size: 10, signal });
+    await HospitalService.ranking({ ordem: "TEMPO", signal });
+    await HospitalService.buscarPorId("h1", { signal });
+    await HospitalService.buscarIndicadores("h1", { signal });
+
+    expect(global.fetch).toHaveBeenCalledTimes(4);
+    global.fetch.mock.calls.forEach(([, config]) => expect(config.signal).toBeDefined());
+    expect(global.fetch.mock.calls[1][0]).toContain("/api/v1/hospitais/ranking?ordem=TEMPO&page=0&size=20");
+  });
+
+  test("leituras sem argumentos usam a primeira página e o ranking por nota", async () => {
+    await HospitalService.listar();
+    expect(capturada.search).toBe("?page=0&size=20");
+
+    await HospitalService.ranking();
+    expect(capturada.pathname).toBe("/api/v1/hospitais/ranking");
+    expect(capturada.search).toBe("?ordem=NOTA&page=0&size=20");
+  });
+
   test("listar omite parâmetros vazios/undefined", async () => {
     await HospitalService.listar({ size: 20 });
     expect(capturada.search).toContain("size=20");

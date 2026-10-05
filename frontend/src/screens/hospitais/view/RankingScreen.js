@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Trophy } from "lucide-react-native";
@@ -10,7 +10,7 @@ import {
   CSChip,
 } from "../../../components";
 import { colors, spacing, typography } from "../../../theme/tokens";
-import HospitalService from "../service/HospitalService";
+import { useRankingHospitais } from "../hooks/useHospitais";
 
 const ORDENS = [
   { value: "NOTA", label: "Melhor nota" },
@@ -24,115 +24,45 @@ const TIPO_FILTROS = [
   { value: "FILANTROPICO", label: "Filantrópico" },
 ];
 
-const TAMANHO_PAGINA = 20;
-
 /**
  * Ranking público de hospitais (E4-05).
  *
  * Consome `GET /api/v1/hospitais/ranking`, que já devolve a lista ordenada
  * globalmente (nota desc ou tempo asc) com os hospitais sem amostra suficiente
  * (RN-15) ao final. A tela não reordena nada no cliente: apenas troca `ordem`/`tipo`
- * e pagina de forma incremental conforme o usuário rola.
+ * e pagina de forma incremental conforme o usuário rola (`useRankingHospitais`).
  */
 export default function RankingScreen({ navigation }) {
   const [ordem, setOrdem] = useState("NOTA");
   const [tipo, setTipo] = useState("");
-  const [dados, setDados] = useState([]);
-  const [pagina, setPagina] = useState(0);
-  const [totalPaginas, setTotalPaginas] = useState(0);
-  const [carregando, setCarregando] = useState(true);
-  const [carregandoMais, setCarregandoMais] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [erro, setErro] = useState(null);
+  const [atualizando, setAtualizando] = useState(false);
 
-  // Guard contra corrida entre `carregar` (troca de ordem/tipo, ou refresh) e uma
-  // `carregarMais` já em voo — achado do code-review de 09/09/2026, mesma correção
-  // aplicada em HospitaisScreen.js. `geracaoRef` descarta a resposta de uma página
-  // pedida sob um critério que já não é o vigente; `buscandoMaisRef` bloqueia
-  // reentrância imediatamente (um fling rápido dispara `onEndReached` de novo antes
-  // do `carregandoMais` do estado sequer commitar no próximo render).
-  const geracaoRef = useRef(0);
-  const buscandoMaisRef = useRef(false);
+  // Cada critério (ordem/tipo) é uma chave própria: a posição no ranking é global, então
+  // trocar o critério recomeça da primeira página, e uma página pedida sob o critério
+  // anterior é descartada pela biblioteca (antes: `geracaoRef` e `buscandoMaisRef`).
+  const { data, error, isPending, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } =
+    useRankingHospitais({ ordem, tipo });
+  const dados = data ?? [];
+  const erro = error && !data ? error.message || "Não foi possível carregar o ranking." : null;
 
-  const carregar = useCallback(
-    async (modo = "inicial") => {
-      const minhaGeracao = ++geracaoRef.current;
-
-      if (modo === "refresh") setRefreshing(true);
-      else setCarregando(true);
-      setErro(null);
-
-      try {
-        const resposta = await HospitalService.ranking({
-          ordem,
-          tipo,
-          page: 0,
-          size: TAMANHO_PAGINA,
-        });
-        if (geracaoRef.current !== minhaGeracao) {
-          return;
-        }
-        setDados(resposta?.content || []);
-        setPagina(resposta?.page ?? 0);
-        setTotalPaginas(resposta?.totalPages ?? 0);
-      } catch (e) {
-        if (geracaoRef.current === minhaGeracao) {
-          setErro(e.message || "Não foi possível carregar o ranking.");
-          setDados([]);
-        }
-      } finally {
-        if (geracaoRef.current === minhaGeracao) {
-          setCarregando(false);
-          setRefreshing(false);
-        }
-      }
-    },
-    [ordem, tipo]
-  );
-
-  // Recarrega do zero sempre que o critério de ordenação ou o filtro mudam —
-  // a posição no ranking é global, então paginar em cima da lista antiga mentiria.
-  useEffect(() => {
-    // `carregar` mostra a falha em `erro`: disparo intencional.
-    void carregar();
-  }, [carregar]);
-
-  const carregarMais = async () => {
-    if (carregando || pagina + 1 >= totalPaginas || buscandoMaisRef.current) {
-      return;
-    }
-
-    buscandoMaisRef.current = true;
-    const minhaGeracao = geracaoRef.current;
-    setCarregandoMais(true);
+  const atualizar = useCallback(async () => {
+    setAtualizando(true);
     try {
-      const proxima = pagina + 1;
-      const resposta = await HospitalService.ranking({
-        ordem,
-        tipo,
-        page: proxima,
-        size: TAMANHO_PAGINA,
-      });
-      if (geracaoRef.current !== minhaGeracao) {
-        // O critério mudou (ou um refresh rodou) enquanto esta página estava em
-        // voo — aplicar agora concatenaria a página errada sobre um ranking que já
-        // foi resetado para outro critério.
-        return;
-      }
-      setDados((atual) => [...atual, ...(resposta?.content || [])]);
-      setPagina(resposta?.page ?? proxima);
-      setTotalPaginas(resposta?.totalPages ?? totalPaginas);
-    } catch (e) {
-      if (geracaoRef.current === minhaGeracao) {
-        setErro(e.message || "Não foi possível carregar mais hospitais.");
-      }
+      await refetch();
     } finally {
-      buscandoMaisRef.current = false;
-      if (geracaoRef.current === minhaGeracao) {
-        setCarregandoMais(false);
-      }
+      setAtualizando(false);
     }
-  };
+  }, [refetch]);
+
+  const carregarMais = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      // A falha de uma página seguinte mantém a lista já visível; rolar até o fim de
+      // novo tenta outra vez.
+      // `cancelRefetch: false`: um segundo `onEndReached` antes do próximo render (fling
+      // rápido) reaproveita a página em voo em vez de cancelá-la e pedir de novo.
+      fetchNextPage({ cancelRefetch: false }).catch(() => {});
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const abrirDetalhe = useCallback(
     (hospital) => {
@@ -166,7 +96,7 @@ export default function RankingScreen({ navigation }) {
           title="Algo deu errado"
           message={erro}
           actionLabel="Tentar novamente"
-          onAction={() => carregar()}
+          onAction={() => refetch()}
         />
       );
     }
@@ -178,7 +108,7 @@ export default function RankingScreen({ navigation }) {
         message="Assim que os hospitais tiverem avaliações suficientes, eles aparecem aqui."
       />
     );
-  }, [erro, carregar]);
+  }, [erro, refetch]);
 
   const legenda =
     ordem === "NOTA"
@@ -220,7 +150,7 @@ export default function RankingScreen({ navigation }) {
         <Text style={styles.legenda}>{legenda}</Text>
       </View>
 
-      {carregando ? (
+      {isPending ? (
         <CSLoadingList count={3} />
       ) : (
         <FlatList
@@ -229,7 +159,7 @@ export default function RankingScreen({ navigation }) {
           renderItem={renderItem}
           ListEmptyComponent={renderVazio}
           ListFooterComponent={
-            carregandoMais ? (
+            isFetchingNextPage ? (
               <ActivityIndicator
                 style={styles.rodape}
                 color={colors.primary}
@@ -242,8 +172,8 @@ export default function RankingScreen({ navigation }) {
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => carregar("refresh")}
+              refreshing={atualizando}
+              onRefresh={atualizar}
               tintColor={colors.primary}
             />
           }

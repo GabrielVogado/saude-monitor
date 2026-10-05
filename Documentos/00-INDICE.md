@@ -10,6 +10,7 @@
 **O que entrou:** a Auditoria Técnica v4.0 do app, a SDD de adoção de TanStack Query e Zustand e a conferência das duas contra o código, em `08-analise tecnica/`. A Fase 0 da SDD (cliente HTTP único, com renovação de token também na exclusão de conta) foi entregue e o ADR-001 passa a "Implementado". Registro em `Historico-Melhorias.md` (M-032).
 **Fase 1 (M-033):** sessão global com Zustand e cache de queries com TanStack Query; Perfil e Histórico reagem ao login e ao logout na hora. ADR-004 (Context API) passa a "Substituído".
 **Fase 2 (M-034):** heartbeat e geofencing passam a seguir a visita ativa em qualquer tela, não só no foco da aba Início (defeito da auditoria, §4.2.2).
+**Fase 3 (M-035):** Hospitais, Ranking, Detalhe e Mapa leem pelo TanStack Query, sem as refs manuais contra respostas fora de ordem.
 **Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória muda de status).
 
 ---

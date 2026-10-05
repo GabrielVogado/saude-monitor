@@ -14,7 +14,8 @@
  * paint), então qualquer regressão nas Regras de Hooks volta a quebrar estes testes.
  */
 import React from "react";
-import { render, fireEvent, screen, act } from "@testing-library/react-native";
+import { fireEvent, screen, act } from "@testing-library/react-native";
+import { renderComProviders } from "../../helpers/renderComProviders";
 import HospitalDetalheScreen from "../../../screens/hospitais/view/HospitalDetalheScreen";
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
 import VisitaService from "../../../screens/visitas/service/VisitaService";
@@ -96,7 +97,7 @@ const NAVEGACAO = { goBack: jest.fn(), navigate: jest.fn() };
 
 function renderizar(id = "h1") {
   const route = { params: { id } };
-  return render(<HospitalDetalheScreen navigation={NAVEGACAO} route={route} />);
+  return renderComProviders(<HospitalDetalheScreen navigation={NAVEGACAO} route={route} />);
 }
 
 /** Simula a tela ganhando foco de novo (ex.: voltar de outro app), sem remontar. */
@@ -371,6 +372,27 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     HospitalService.buscarPorId.mockResolvedValueOnce(HOSPITAL);
     fireEvent.press(screen.getByText("Tentar novamente"));
     expect(await screen.findByText("Hospital Central")).toBeTruthy();
+  });
+
+  test("erro sem mensagem mostra o texto padrão", async () => {
+    HospitalService.buscarPorId.mockRejectedValueOnce(new Error(""));
+
+    renderizar();
+
+    expect(await screen.findByText("Não foi possível carregar o hospital.")).toBeTruthy();
+  });
+
+  test("uma atualização que falha com o hospital já na tela não troca a tela pelo erro", async () => {
+    const { queryClient } = renderizar();
+    await screen.findByText("Hospital Central");
+
+    HospitalService.buscarPorId.mockRejectedValueOnce(new Error("Sem conexão."));
+    await act(async () => {
+      await queryClient.refetchQueries();
+    });
+
+    expect(screen.getByText("Hospital Central")).toBeTruthy();
+    expect(screen.queryByText("Não foi possível carregar")).toBeNull();
   });
 
   test("botão voltar aciona a navegação", async () => {

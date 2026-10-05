@@ -6,8 +6,12 @@ on:
   # para producao nao era validada por nada.
   push:
     branches: [develop, master]
+  # `feature/**` e `bugfix/**` desde 05/10/2026, a pedido do PO: PR empilhado (base em
+  # outra branch de trabalho) ficava sem CI e sem Sonar até o anterior entrar. Nesses
+  # PRs a trava de contagem compara com o ancestral verde mais próximo da base (em
+  # geral um commit da develop) e o diff-cover mede só as linhas do próprio PR.
   pull_request:
-    branches: [develop, master]
+    branches: [develop, master, 'feature/**', 'bugfix/**']
 
 jobs:
   backend:

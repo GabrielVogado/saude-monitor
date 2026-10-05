@@ -28,15 +28,13 @@ describe("useAcoesListaPaginada", () => {
     });
     const { result } = renderHook(() => useAcoesListaPaginada(props));
 
-    let recarga;
     act(() => {
-      recarga = result.current.atualizar();
+      result.current.atualizar();
     });
     expect(result.current.atualizando).toBe(true);
 
     await act(async () => {
       terminar();
-      await recarga;
     });
     expect(result.current.atualizando).toBe(false);
   });
@@ -45,10 +43,13 @@ describe("useAcoesListaPaginada", () => {
     const props = consulta({ refetch: jest.fn(() => Promise.reject(new Error("offline"))) });
     const { result } = renderHook(() => useAcoesListaPaginada(props));
 
+    let retorno;
     await act(async () => {
-      await expect(result.current.atualizar()).rejects.toThrow("offline");
+      retorno = result.current.atualizar();
     });
 
+    expect(retorno).toBeUndefined();
+    expect(props.refetch).toHaveBeenCalledTimes(1);
     expect(result.current.atualizando).toBe(false);
   });
 

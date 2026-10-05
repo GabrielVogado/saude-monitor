@@ -79,10 +79,11 @@ function GeolocalizacaoContent({ navigation }) {
   const hospitais = useMemo(() => consultaHospitais.data ?? [], [consultaHospitais.data]);
   // O erro aparece sem lista ou quando uma página do meio falhou (o mapa fica com os
   // lotes que já vieram); a falha de uma atualização com o mapa completo não alarma.
-  const erroHospitais =
-    consultaHospitais.error && (!consultaHospitais.data || consultaHospitais.isFetchNextPageError)
-      ? consultaHospitais.error.message || "Não foi possível carregar os hospitais."
-      : null;
+  const mostrarErroHospitais =
+    Boolean(consultaHospitais.error) && (!consultaHospitais.data || consultaHospitais.isFetchNextPageError);
+  const erroHospitais = mostrarErroHospitais
+    ? consultaHospitais.error.message || "Não foi possível carregar os hospitais."
+    : null;
 
   // Busca a página seguinte assim que a anterior chega, até o fim do catálogo. Parar
   // numa falha evita repetir sem fim a mesma página. `hospitais` entra nas

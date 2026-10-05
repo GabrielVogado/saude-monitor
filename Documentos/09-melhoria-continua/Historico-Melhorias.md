@@ -2164,6 +2164,44 @@ separado.
 
 ---
 
+## M-038 — Sinal da visita com o app fechado
+
+**Data:** 05/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Na conferência da Auditoria v4 apareceu que o heartbeat do app (`HeartbeatService`) só
+roda com o app aberto, a cada 30 min, enquanto o `VisitaGpsInterrompidoJob` encerrava a
+visita como `GPS_INTERROMPIDO` após 10 min sem posição. Com o app fechado nada chegava, e
+quem continuava no hospital tinha a visita cortada. Escolha do PO: **as duas** correções,
+em PRs separados. A janela de 45 min no backend é a primeira (M-037); esta é a segunda.
+
+### O que mudou
+
+- Com visita aberta e nenhuma entrada ou saída pendente, a tarefa de acompanhamento do
+  `GeofencingTaskService` continua ligada num **modo de visita**: leitura a cada 5 min (a
+  economia de bateria vem do intervalo) e notificação fixa "Visita em andamento". A cada leitura,
+  se o último sinal tem 9 min ou mais, manda `POST /visitas/{id}/heartbeat` com a posição
+  da própria leitura. Na prática, um sinal a cada ~10 min.
+- Entrada ou saída pendente continua no modo de 30 s, que tem prioridade. A troca de modo
+  chama `startLocationUpdatesAsync` de novo com a tarefa ligada, o que só troca as opções:
+  desligar e religar deixaria um intervalo sem serviço em primeiro plano, e o Android 12+
+  recusa iniciar outro com o app em segundo plano. O modo ligado fica salvo no estado.
+- A vez do sinal é reservada no estado antes do envio, para leituras simultâneas não
+  duplicarem o heartbeat. Falha de rede desfaz a reserva (a próxima leitura tenta de
+  novo); 404 ou 409 esquecem a visita e desligam o acompanhamento.
+- RN-23 e o heartbeat na especificação da API passam a descrever os dois intervalos.
+
+### Verificação
+
+- 13 testes novos em `GeofencingTaskService.test.js` (modo de visita, intervalo, leitura
+  em processo novo, corrida, falha de rede, visita fechada, troca de modo, estado antigo).
+- Pendente em campo: APK novo com "Permitir o tempo todo", visita de mais de 45 min com o
+  app fechado, conferir no painel que a visita segue `EM_ATENDIMENTO` e que a notificação
+  fixa some no checkout.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

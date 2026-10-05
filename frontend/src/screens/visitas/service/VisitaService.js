@@ -128,11 +128,11 @@ class VisitaService {
   }
 
   /** Visita ativa do usuário/dispositivo, para o card/cronômetro (E2-07). */
-  static async buscarAtiva() {
+  static async buscarAtiva({ signal } = {}) {
     const dispositivoId = (await TokenStorage.getAccessToken())
       ? undefined
       : await DispositivoId.obter();
-    return request(`${BASE_PATH}/ativas${buildQuery({ dispositivoId })}`);
+    return request(`${BASE_PATH}/ativas${buildQuery({ dispositivoId })}`, { signal });
   }
 
   /** Histórico paginado de visitas do usuário (E5-03 — namespace contas). */

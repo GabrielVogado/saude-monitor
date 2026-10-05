@@ -4,6 +4,7 @@ import * as TaskManager from "expo-task-manager";
 import * as Location from "expo-location";
 import HospitalService from "../../hospitais/service/HospitalService";
 import VisitaService from "./VisitaService";
+import { invalidarVisitaAtiva } from "../../../core/query/queryClient";
 import { agendarFeedback } from "../../feedback/service/FeedbackNotificationService";
 import { centroDoHospital } from "../../../utils/geojson";
 import { duracaoMinutosDesde } from "../../../utils/format";
@@ -254,6 +255,9 @@ async function confirmarEntrada(hospitalId) {
         };
       });
     }
+    // Com o app aberto em qualquer aba, o observador da visita ativa (VisitaAtivaSync)
+    // liga o heartbeat da visita nova; em segundo plano não há quem observe e nada muda.
+    void invalidarVisitaAtiva();
   } catch (erro) {
     // Aparelho sem internet: o check-in foi para a fila offline (OPS-05) e sai
     // quando a conexão voltar, com o horário real da entrada. Não é falha.
@@ -308,6 +312,7 @@ async function confirmarSaida(hospitalId) {
   try {
     const resposta = await VisitaService.checkout(visita.id, {});
     await encerrarLocalmente(resposta?.duracaoMinutos);
+    void invalidarVisitaAtiva();
   } catch (erro) {
     // Sem internet, o checkout ficou na fila offline (OPS-05) com o horário real
     // da saída: a entrega está garantida, então o app pode encerrar a visita
@@ -325,6 +330,7 @@ async function confirmarSaida(hospitalId) {
           estado.visita = null;
         }
       });
+      void invalidarVisitaAtiva();
       return;
     }
 

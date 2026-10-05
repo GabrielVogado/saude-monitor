@@ -245,7 +245,8 @@ export default function App() {
     useEffect(() => {
         // Sessão global (SDD de TanStack Query e Zustand): lê o usuário persistido uma vez
         // e liga o cache de queries ao foco do app, à conexão e ao logout.
-        hidratarSessao();
+        // Não rejeita: falha na leitura do armazenamento segue anônimo (`sessaoStore`).
+        void hidratarSessao();
         return configurarQueryNoApp(queryClient);
     }, []);
 

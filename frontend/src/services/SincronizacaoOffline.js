@@ -1,6 +1,7 @@
 import { ErroSemInternet } from "../config/http";
 import { itensDaFila, marcarTentativa, removerDaFila } from "../config/filaOffline";
 import VisitaService from "../screens/visitas/service/VisitaService";
+import { invalidarVisitaAtiva } from "../core/query/queryClient";
 
 /**
  * Envia o que ficou na fila offline (OPS-05).
@@ -69,6 +70,12 @@ export async function sincronizar() {
     }
   } finally {
     emAndamento = false;
+  }
+
+  if (enviados > 0) {
+    // Check-in ou checkout guardado offline acabou de chegar ao servidor: a visita
+    // ativa mudou, e o heartbeat e o geofencing precisam seguir a visita nova.
+    void invalidarVisitaAtiva();
   }
 
   const pendentes = (await itensDaFila()).length;

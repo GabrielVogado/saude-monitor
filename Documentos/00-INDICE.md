@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 05/10/2026 — CI também em PR empilhado
+
+**O que entrou:** o CI (e o SonarQube Cloud) passa a rodar em PR cuja base é uma branch `feature/**` ou `bugfix/**`, não só `develop` e `master`. Registro em `Historico-Melhorias.md` (M-039).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre a esteira).
+
+---
+
 ## 📌 Revisão 05/10/2026 — Sinal da visita com o app fechado
 
 **O que entrou:** com uma visita aberta, o app manda o heartbeat com a posição a cada ~10 min também com o app fechado, para a visita não ser encerrada como `GPS_INTERROMPIDO` enquanto a pessoa segue no hospital. RN-23 em `Documento-Negocial-v2.1.md` e heartbeat em `Especificacao-API-v2.4.md` atualizados. Registro em `Historico-Melhorias.md` (M-038).

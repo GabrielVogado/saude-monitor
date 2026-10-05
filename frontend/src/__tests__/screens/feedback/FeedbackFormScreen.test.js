@@ -6,7 +6,8 @@
  * tela de agradecimento (E3-06) — além do dedupe (RN-12, 409 -> "já avaliado").
  */
 import React from "react";
-import { render, fireEvent, screen } from "@testing-library/react-native";
+import { fireEvent, screen } from "@testing-library/react-native";
+import { renderComProviders } from "../../helpers/renderComProviders";
 import FeedbackFormScreen from "../../../screens/feedback/view/FeedbackFormScreen";
 import FeedbackService from "../../../screens/feedback/service/FeedbackService";
 import { concluirFeedback } from "../../../screens/feedback/service/FeedbackNotificationService";
@@ -17,7 +18,7 @@ jest.mock("../../../screens/feedback/service/FeedbackNotificationService");
 function renderizar() {
   const navigation = { goBack: jest.fn() };
   const route = { params: { visitaId: "v1", hospitalNome: "Hospital Central" } };
-  return render(<FeedbackFormScreen navigation={navigation} route={route} />);
+  return renderComProviders(<FeedbackFormScreen navigation={navigation} route={route} />);
 }
 
 describe("FeedbackFormScreen (Épico 03)", () => {

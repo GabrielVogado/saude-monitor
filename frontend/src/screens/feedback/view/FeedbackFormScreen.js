@@ -6,7 +6,7 @@ import CSChip from "../../../components/CSChip";
 import CSButton from "../../../components/CSButton";
 import CSTextField from "../../../components/CSTextField";
 import { colors, radii, spacing, typography } from "../../../theme/tokens";
-import FeedbackService from "../service/FeedbackService";
+import { useEnviarFeedback } from "../hooks/useEnviarFeedback";
 import { concluirFeedback } from "../service/FeedbackNotificationService";
 
 /**
@@ -178,6 +178,7 @@ export default function FeedbackFormScreen({ navigation, route }) {
 
   const [etapa, setEtapa] = useState(0);
   const [enviando, setEnviando] = useState(false);
+  const { mutateAsync: enviarFeedback } = useEnviarFeedback();
   const [enviado, setEnviado] = useState(false);
   const [erro, setErro] = useState(null);
   const [jaAvaliado, setJaAvaliado] = useState(false);
@@ -255,11 +256,7 @@ export default function FeedbackFormScreen({ navigation, route }) {
     };
 
     try {
-      if (feedbackId) {
-        await FeedbackService.atualizar(feedbackId, payload);
-      } else {
-        await FeedbackService.enviar(payload);
-      }
+      await enviarFeedback({ feedbackId, payload });
       await concluirFeedback(visitaId);
       setEnviado(true);
     } catch (e) {

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
 import { MapPinOff, Search, Trophy } from "lucide-react-native";
 import {
   CSHeader,
@@ -14,10 +13,10 @@ import {
 } from "../../../components";
 import { colors, spacing } from "../../../theme/tokens";
 import { useHospital, useHospitaisLista } from "../hooks/useHospitais";
-import VisitaService from "../../visitas/service/VisitaService";
-import { invalidarVisitaAtiva } from "../../../core/query/queryClient";
+import { useCheckinManual } from "../../visitas/hooks/useMutacoesVisita";
+import { useVisitaAtivaDaTela } from "../../visitas/hooks/useVisitaAtivaDaTela";
 import { useAcoesListaPaginada } from "../../../core/query/useAcoesListaPaginada";
-import { avisarSemConexao, preservarSeSemConexao } from "../../../utils/alertas";
+import { avisarSemConexao } from "../../../utils/alertas";
 
 const TIPO_FILTROS = [
   { value: "", label: "Todos" },
@@ -42,7 +41,6 @@ export default function HospitaisScreen({ navigation }) {
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [tipo, setTipo] = useState("");
 
-  const [visitaAtiva, setVisitaAtiva] = useState(null);
   const [checkinEnviandoId, setCheckinEnviandoId] = useState(null);
 
   useEffect(() => {
@@ -69,21 +67,11 @@ export default function HospitaisScreen({ navigation }) {
     isFetchingNextPage,
   });
 
-  // Reidrata a visita ativa ao focar a aba (e ao voltar do detalhe) para refletir o
-  // estado do botão de check-in por hospital (modo anônimo via dispositivoId, §3.3).
-  // Sem conexão não é "sem visita ativa" — ver `preservarSeSemConexao`, incluindo a
-  // limitação conhecida sobre a janela entre reconectar e a fila sincronizar.
-  const atualizarVisitaAtiva = useCallback(() => {
-    VisitaService.buscarAtiva()
-      .then((data) => setVisitaAtiva(data?.visita || null))
-      .catch((e) => preservarSeSemConexao(e, setVisitaAtiva));
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      atualizarVisitaAtiva();
-    }, [atualizarVisitaAtiva])
-  );
+  // Visita ativa compartilhada com o observador global, recarregada ao focar a aba (e
+  // ao voltar do detalhe) para refletir o botão de check-in de cada hospital (modo
+  // anônimo via dispositivoId, §3.3). Sem conexão não é "sem visita ativa".
+  const { visita: visitaAtiva, definirLocal: definirVisitaLocal } = useVisitaAtivaDaTela();
+  const { mutateAsync: registrarCheckin } = useCheckinManual();
 
   // Pedido do PO (10/09/2026): o hospital do check-in ativo aparece no topo, sem
   // precisar procurá-lo na lista paginada (pode estar numa página ainda não carregada).
@@ -140,14 +128,10 @@ export default function HospitaisScreen({ navigation }) {
 
       setCheckinEnviandoId(hospital.id);
       try {
-        const resposta = await VisitaService.checkin({
-          hospitalId: hospital.id,
-          origem: "MANUAL",
-        });
-        setVisitaAtiva({ ...resposta, origem: "MANUAL" });
-        // Avisa o observador global (heartbeat e geofencing) da visita nova, sem
+        // A mutação grava a visita confirmada na query compartilhada: o botão muda
+        // aqui e o observador global (heartbeat e geofencing) segue a visita nova sem
         // depender de a aba Início ganhar foco (Auditoria Técnica v4.0, §4.2.2).
-        void invalidarVisitaAtiva();
+        await registrarCheckin({ hospitalId: hospital.id });
         // Redireciona ao detalhe do hospital, que exibe o temporizador + checkout
         // (específico do check-in manual).
         setCheckinEnviandoId(null);
@@ -177,9 +161,9 @@ export default function HospitaisScreen({ navigation }) {
           // Marca a visita como ativa AQUI, localmente: arma o guard de "uma visita
           // por vez" (visitaAtivaRef, acima) antes da fila sincronizar. Janela residual
           // e decisão de aceitá-la documentadas em `preservarSeSemConexao`
-          // (utils/alertas.js) — o `id: null` é substituído pelo real quando
-          // `atualizarVisitaAtiva` rodar de novo (foco da aba).
-          setVisitaAtiva({ id: null, hospitalId: hospital.id, origem: "MANUAL" });
+          // (utils/alertas.js) — o `id: null` é substituído pelo real na próxima
+          // resposta do servidor (foco da aba ou volta da conexão).
+          definirVisitaLocal({ id: null, hospitalId: hospital.id, origem: "MANUAL" });
           avisarSemConexao(e.message);
           return;
         }
@@ -190,7 +174,7 @@ export default function HospitaisScreen({ navigation }) {
     // função não precisa mais ser recriada a cada mudança de visita -- fica estável
     // para o renderItem memoizado abaixo. O exhaustive-deps confirma que é dependência
     // desnecessária.
-    [navigation]
+    [navigation, registrarCheckin, definirVisitaLocal]
   );
 
   // ARQ-05: extraido do JSX e memoizado. Inline, ele criava uma funcao nova a cada

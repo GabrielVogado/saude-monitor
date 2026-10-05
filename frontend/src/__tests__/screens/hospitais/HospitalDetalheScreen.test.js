@@ -14,8 +14,9 @@
  * paint), então qualquer regressão nas Regras de Hooks volta a quebrar estes testes.
  */
 import React from "react";
-import { fireEvent, screen, act } from "@testing-library/react-native";
+import { fireEvent, screen, act, waitFor } from "@testing-library/react-native";
 import { renderComProviders } from "../../helpers/renderComProviders";
+import { definirUsuarioDaSessao } from "../../../core/stores/sessaoStore";
 import HospitalDetalheScreen from "../../../screens/hospitais/view/HospitalDetalheScreen";
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
 import VisitaService from "../../../screens/visitas/service/VisitaService";
@@ -100,6 +101,14 @@ function renderizar(id = "h1") {
   return renderComProviders(<HospitalDetalheScreen navigation={NAVEGACAO} route={route} />);
 }
 
+/** Checkout aceito: depois dele, o servidor passa a responder que não há visita ativa. */
+function checkoutComSucesso(resposta) {
+  VisitaService.checkout.mockImplementation(async () => {
+    VisitaService.buscarAtiva.mockResolvedValue({ visita: null });
+    return resposta;
+  });
+}
+
 /** Simula a tela ganhando foco de novo (ex.: voltar de outro app), sem remontar. */
 async function refocarTela() {
   await act(async () => {
@@ -110,6 +119,8 @@ async function refocarTela() {
 describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Sessão lida do aparelho (anônima): a visita ativa só é consultada depois disso.
+    definirUsuarioDaSessao(null);
     HospitalService.buscarPorId.mockResolvedValue(HOSPITAL);
     HospitalService.buscarIndicadores.mockResolvedValue(INDICADORES);
     VisitaService.buscarAtiva.mockResolvedValue({ visita: null });
@@ -170,7 +181,7 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
       visita: { id: "v1", origem: "MANUAL", hospitalId: "h1", entrada: new Date().toISOString() },
     });
     // A duração vem da resposta do checkout; quem decide convidar ou não é agendarFeedback.
-    VisitaService.checkout.mockResolvedValue({ id: "v1", status: "FINALIZADA", duracaoMinutos: 8 });
+    checkoutComSucesso({ id: "v1", status: "FINALIZADA", duracaoMinutos: 8 });
 
     renderizar();
     fireEvent.press(await screen.findByText("Não estou aqui"));
@@ -196,7 +207,7 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     VisitaService.buscarAtiva.mockResolvedValue({
       visita: { id: "v1", origem: "MANUAL", hospitalId: "h1", entrada: new Date().toISOString() },
     });
-    VisitaService.checkout.mockResolvedValue({ id: "v1", status: "FINALIZADA", duracaoMinutos: 1 });
+    checkoutComSucesso({ id: "v1", status: "FINALIZADA", duracaoMinutos: 1 });
 
     renderizar();
     fireEvent.press(await screen.findByText("Não estou aqui"));
@@ -213,7 +224,7 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     VisitaService.buscarAtiva.mockResolvedValue({
       visita: { id: "v1", origem: "MANUAL", hospitalId: "h1", entrada: new Date().toISOString() },
     });
-    VisitaService.checkout.mockResolvedValue({ id: "v1", status: "FINALIZADA", duracaoMinutos: 8 });
+    checkoutComSucesso({ id: "v1", status: "FINALIZADA", duracaoMinutos: 8 });
     agendarFeedback.mockRejectedValue(new Error("disco cheio"));
 
     renderizar();
@@ -272,6 +283,11 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
       "Sem conexão",
       "Sem conexão com a internet. O registro foi guardado e será enviado assim que a conexão voltar."
     );
+
+    // Voltar à tela ainda sem conexão não traz de volta o cronômetro da visita encerrada.
+    VisitaService.buscarAtiva.mockRejectedValue(new ErroSemInternet("http://exemplo"));
+    await refocarTela();
+    expect(screen.queryByText("Check-in manual ativo")).toBeNull();
   });
 
   test("um refoco sem internet não apaga o cronômetro de uma visita manual já carregada", async () => {
@@ -305,7 +321,7 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     VisitaService.buscarAtiva.mockRejectedValue(new Error("Sessão expirada. Faça login novamente."));
     await refocarTela();
 
-    expect(screen.queryByText("Check-in manual ativo")).toBeNull();
+    await waitFor(() => expect(screen.queryByText("Check-in manual ativo")).toBeNull());
   });
 
   test("indicadores insuficientes mostram a mensagem de transparência (RN-15)", async () => {
@@ -402,11 +418,13 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     expect(NAVEGACAO.goBack).toHaveBeenCalled();
   });
 
-  test("sem id na rota não consulta hospital nem visita", async () => {
+  test("sem id na rota não consulta o hospital", async () => {
+    // A visita ativa é a consulta compartilhada do app (o observador global já a
+    // mantém), então só o hospital depende do id.
     renderizar(null);
     await act(async () => {});
 
     expect(HospitalService.buscarPorId).not.toHaveBeenCalled();
-    expect(VisitaService.buscarAtiva).not.toHaveBeenCalled();
+    expect(HospitalService.buscarIndicadores).not.toHaveBeenCalled();
   });
 });

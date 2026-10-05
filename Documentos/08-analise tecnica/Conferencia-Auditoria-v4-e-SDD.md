@@ -53,4 +53,4 @@ A regra de negócio também se contradiz: RN-06 (10 min sem GPS) e RN-23 (heartb
 2. **Fase 1 (entregue, M-033):** dependências `@tanstack/react-query` e `zustand`, `queryClient`, managers de foco/rede, `queryKeys`, `sessaoStore` e sessão reativa em Login/Perfil/Histórico.
 3. **Fase 2 (entregue, M-034):** visita ativa global (`VisitaAtivaSync` na raiz), corrigindo o bug do heartbeat.
 4. **Fase 3 (entregue, M-035):** leitura de Hospitais, Ranking, Detalhe e Mapa com Query, sem as refs anti-corrida.
-5. **Fase 4:** check-in/checkout e feedback com `useMutation`.
+5. **Fase 4 (entregue, M-036):** check-in/checkout e feedback com `useMutation`. A troca por `FlashList` fica para um PR próprio, com validação no aparelho.

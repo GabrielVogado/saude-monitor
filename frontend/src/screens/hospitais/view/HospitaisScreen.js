@@ -15,6 +15,7 @@ import { colors, spacing } from "../../../theme/tokens";
 import { useHospital, useHospitaisLista } from "../hooks/useHospitais";
 import { useCheckinManual } from "../../visitas/hooks/useMutacoesVisita";
 import { useVisitaAtivaDaTela } from "../../visitas/hooks/useVisitaAtivaDaTela";
+import { useAcoesListaPaginada } from "../../../core/query/useAcoesListaPaginada";
 import { avisarSemConexao } from "../../../utils/alertas";
 
 const TIPO_FILTROS = [
@@ -39,7 +40,6 @@ export default function HospitaisScreen({ navigation }) {
   // cada letra digitada abriria uma chave nova e uma requisição.
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [tipo, setTipo] = useState("");
-  const [atualizando, setAtualizando] = useState(false);
 
   const [checkinEnviandoId, setCheckinEnviandoId] = useState(null);
 
@@ -58,26 +58,14 @@ export default function HospitaisScreen({ navigation }) {
   const dados = useMemo(() => data ?? [], [data]);
   const erro = error && !data ? error.message || "Não foi possível carregar os hospitais." : null;
 
-  const atualizar = useCallback(async () => {
-    setAtualizando(true);
-    try {
-      await refetch();
-    } finally {
-      setAtualizando(false);
-    }
-  }, [refetch]);
-
-  // Chamado pela FlatList ao chegar perto do fim (`onEndReached`) — busca a próxima
-  // página e concatena, sem recarregar nem perder a posição do scroll.
-  const carregarMais = useCallback(() => {
-    if (hasNextPage && !isFetchingNextPage) {
-      // Mantém a lista já visível; o usuário pode rolar até o fim de novo para
-      // tentar a próxima página outra vez, sem perder o que já carregou.
-      // `cancelRefetch: false`: um segundo `onEndReached` antes do próximo render (fling
-      // rápido) reaproveita a página em voo em vez de cancelá-la e pedir de novo.
-      fetchNextPage({ cancelRefetch: false }).catch(() => {});
-    }
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  // `carregarMais` é chamado pela FlatList ao chegar perto do fim (`onEndReached`):
+  // busca a próxima página e concatena, sem recarregar nem perder a posição do scroll.
+  const { atualizando, atualizar, carregarMais } = useAcoesListaPaginada({
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  });
 
   // Visita ativa compartilhada com o observador global, recarregada ao focar a aba (e
   // ao voltar do detalhe) para refletir o botão de check-in de cada hospital (modo

@@ -11,6 +11,7 @@ import {
 } from "../../../components";
 import { colors, spacing, typography } from "../../../theme/tokens";
 import { useRankingHospitais } from "../hooks/useHospitais";
+import { useAcoesListaPaginada } from "../../../core/query/useAcoesListaPaginada";
 
 const ORDENS = [
   { value: "NOTA", label: "Melhor nota" },
@@ -35,7 +36,6 @@ const TIPO_FILTROS = [
 export default function RankingScreen({ navigation }) {
   const [ordem, setOrdem] = useState("NOTA");
   const [tipo, setTipo] = useState("");
-  const [atualizando, setAtualizando] = useState(false);
 
   // Cada critério (ordem/tipo) é uma chave própria: a posição no ranking é global, então
   // trocar o critério recomeça da primeira página, e uma página pedida sob o critério
@@ -45,24 +45,12 @@ export default function RankingScreen({ navigation }) {
   const dados = data ?? [];
   const erro = error && !data ? error.message || "Não foi possível carregar o ranking." : null;
 
-  const atualizar = useCallback(async () => {
-    setAtualizando(true);
-    try {
-      await refetch();
-    } finally {
-      setAtualizando(false);
-    }
-  }, [refetch]);
-
-  const carregarMais = useCallback(() => {
-    if (hasNextPage && !isFetchingNextPage) {
-      // A falha de uma página seguinte mantém a lista já visível; rolar até o fim de
-      // novo tenta outra vez.
-      // `cancelRefetch: false`: um segundo `onEndReached` antes do próximo render (fling
-      // rápido) reaproveita a página em voo em vez de cancelá-la e pedir de novo.
-      fetchNextPage({ cancelRefetch: false }).catch(() => {});
-    }
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const { atualizando, atualizar, carregarMais } = useAcoesListaPaginada({
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  });
 
   const abrirDetalhe = useCallback(
     (hospital) => {

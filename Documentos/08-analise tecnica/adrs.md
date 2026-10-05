@@ -21,7 +21,7 @@
 ## ADR-001: Centralização do Cliente HTTP com Proteção contra Race Condition no Refresh de Token
 
 **Data:** 2026-08-31
-**Status:** Proposto — **não implementado** (reconfirmado em 02/09/2026 contra `develop@f26666e`)
+**Status:** Implementado em 05/10/2026 (M-032) — `frontend/src/core/api/apiClient.js`. Diferenças do desenho abaixo: a renovação usa a coordenação por geração de `config/sessao.js` (que já existia), o `LoginService` é injetado por `configurarSessao` em vez de import dinâmico, e o download binário do PDF reaproveita `renovarSessaoAposNaoAutorizado`. Ver [`Conferencia-Auditoria-v4-e-SDD.md`](./Conferencia-Auditoria-v4-e-SDD.md).
 **Área:** Camada de Comunicação com a API
 
 > ⚠️ **Complemento da revisão 3.1 (02/09/2026) — escopo incompleto.** O `apiClient` proposto assume que toda resposta é JSON. Desde a Sprint S8 existe um endpoint que **não é**: `GET /api/v1/contas/export/pdf` devolve `application/pdf` com `Content-Disposition: attachment` e é baixado no app via `expo-file-system` (`File.downloadFileAsync`), fora do `request()` atual. A implementação deste ADR precisa, portanto, prever um caminho para **download binário autenticado** — com o mesmo tratamento de refresh de token — ou o endpoint de exportação LGPD ficará de fora da centralização, recriando exatamente a duplicação que o ADR pretende eliminar.

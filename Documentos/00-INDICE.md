@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 22/09/2026 · Responsável: Gabriel Vogado
+> Última atualização: 05/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 05/10/2026 — Auditoria técnica v4.0, SDD de estado e cliente HTTP único
+
+**O que entrou:** a Auditoria Técnica v4.0 do app, a SDD de adoção de TanStack Query e Zustand e a conferência das duas contra o código, em `08-analise tecnica/`. A Fase 0 da SDD (cliente HTTP único, com renovação de token também na exclusão de conta) foi entregue e o ADR-001 passa a "Implementado". Registro em `Historico-Melhorias.md` (M-032).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória muda de status).
 
 ---
 
@@ -174,7 +181,10 @@ Documentos/
 ├── 08-analise tecnica/                       ← auditoria técnica e consolidação de pendências
 │   ├── Consolidacao-Tecnica-e-Backlog-Pendente-v1.1.md ← fonte única do que está entregue, pendente e priorizado
 │   ├── relatorio_auditoria_tecnica.md        ← 11 problemas de arquitetura frontend (v3.1)
-│   └── adrs.md                               ← ADR-001..010, todos em status Proposto (v3.1)
+│   ├── Relatorio-Auditoria-Tecnica-v4.0.md   ← auditoria do app v4.0 (out/2026): estado de servidor e de sessão
+│   ├── SDD-TanStack-Query-Zustand-v1.0.md    ← desenho da adoção de TanStack Query v5 e Zustand v5
+│   ├── Conferencia-Auditoria-v4-e-SDD.md     ← o que procede, o que mudou e as correções aos trechos da SDD
+│   └── adrs.md                               ← ADR-001..014 (ADR-001 implementado em 05/10/2026)
 │
 ├── 09-melhoria-continua/                     ← melhorias de processo e de comportamento do agente
 │   ├── Historico-Melhorias.md                ← o que entrou, quando, por qual PR e com que efeito

@@ -6,6 +6,8 @@
 import FeedbackService from "../../../screens/feedback/service/FeedbackService";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../../screens/auth/service/LoginService";
+// Liga o cliente HTTP ao LoginService (mockado), como o index.js faz no app.
+import "../../../core/api/sessaoApi";
 import * as httpModule from "../../../config/http";
 import { ErroServidorIndisponivel } from "../../../config/http";
 

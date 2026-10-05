@@ -14,6 +14,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import TokenStorage from "../../../services/TokenStorage";
 import PerfilService from "../../../screens/perfil/service/PerfilService";
 import LoginService from "../../../screens/auth/service/LoginService";
+// Liga o cliente HTTP ao LoginService (mockado), como o index.js faz no app.
+import "../../../core/api/sessaoApi";
 import { ErroServidorIndisponivel } from "../../../config/http";
 
 jest.mock("../../../screens/auth/service/LoginService");

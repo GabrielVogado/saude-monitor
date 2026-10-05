@@ -7,7 +7,9 @@
  * (d) exporta o relatório de dados pessoais em PDF (art. 18 da LGPD).
  */
 import React from "react";
-import { render, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { renderComProviders } from "../../helpers/renderComProviders";
+import { definirUsuarioDaSessao, sessaoStore } from "../../../core/stores/sessaoStore";
 import HistoricoScreen from "../../../screens/perfil/view/HistoricoScreen";
 import PerfilService from "../../../screens/perfil/service/PerfilService";
 import VisitaService from "../../../screens/visitas/service/VisitaService";
@@ -29,16 +31,70 @@ jest.mock("@react-navigation/native", () => ({
 const NAVEGACAO = { goBack: jest.fn(), navigate: jest.fn() };
 
 function renderizar() {
-  return render(<HistoricoScreen navigation={NAVEGACAO} />);
+  return renderComProviders(<HistoricoScreen navigation={NAVEGACAO} />);
 }
 
 describe("HistoricoScreen (E5-03/RN-22)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    definirUsuarioDaSessao(null);
+  });
+
+  test("encerrar a sessão com a tela aberta troca a lista pela orientação de login", async () => {
+    definirUsuarioDaSessao({ id: "u1", nome: "Marina" });
+    VisitaService.listarHistorico.mockResolvedValue({ content: [] });
+    FeedbackService.listarHistorico.mockResolvedValue({ content: [] });
+
+    const { queryClient } = renderizar();
+    expect(await screen.findByText("Nenhuma visita ainda")).toBeTruthy();
+    expect(queryClient.getQueryData(["conta", "u1", "historico"])).toEqual({ visitas: [], feedbacks: [] });
+
+    const { act } = require("@testing-library/react-native");
+    act(() => definirUsuarioDaSessao(null));
+
+    expect(await screen.findByText("Área logada")).toBeTruthy();
+  });
+
+  test("antes de ler o usuário gravado, não pisca o convite ao login nem consulta a API", async () => {
+    sessaoStore.setState({ usuario: null, hidratada: false });
+
+    renderizar();
+
+    expect(screen.queryByText("Área logada")).toBeNull();
+    expect(VisitaService.listarHistorico).not.toHaveBeenCalled();
+
+    const { act } = require("@testing-library/react-native");
+    act(() => definirUsuarioDaSessao(null));
+    expect(await screen.findByText("Área logada")).toBeTruthy();
+    expect(VisitaService.listarHistorico).not.toHaveBeenCalled();
+  });
+
+  test("falha sem mensagem mostra o texto padrão", async () => {
+    definirUsuarioDaSessao({ id: "u1", nome: "Marina" });
+    VisitaService.listarHistorico.mockRejectedValue(new Error(""));
+    FeedbackService.listarHistorico.mockResolvedValue({ content: [] });
+
+    renderizar();
+    expect(await screen.findByText("Não foi possível carregar seu histórico.")).toBeTruthy();
+  });
+
+  test("falha ao carregar mostra o erro e tenta de novo pelo botão", async () => {
+    definirUsuarioDaSessao({ id: "u1", nome: "Marina" });
+    VisitaService.listarHistorico
+      .mockRejectedValueOnce(new Error("Servidor fora do ar"))
+      .mockResolvedValue({ content: [] });
+    FeedbackService.listarHistorico.mockResolvedValue({ content: [] });
+
+    renderizar();
+    expect(await screen.findByText("Servidor fora do ar")).toBeTruthy();
+
+    fireEvent.press(screen.getByText("Tentar novamente"));
+    expect(await screen.findByText("Nenhuma visita ainda")).toBeTruthy();
+    expect(VisitaService.listarHistorico).toHaveBeenCalledTimes(2);
   });
 
   test("sem sessão orienta o login (área logada)", async () => {
-    PerfilService.usuarioLogado.mockResolvedValue(null);
+    definirUsuarioDaSessao(null);
 
     renderizar();
     expect(await screen.findByText("Área logada")).toBeTruthy();
@@ -49,7 +105,7 @@ describe("HistoricoScreen (E5-03/RN-22)", () => {
   });
 
   test("lista as visitas do usuário com o nome do hospital", async () => {
-    PerfilService.usuarioLogado.mockResolvedValue({ id: "u1", nome: "Marina" });
+    definirUsuarioDaSessao({ id: "u1", nome: "Marina" });
     VisitaService.listarHistorico.mockResolvedValue({
       content: [
         {
@@ -74,7 +130,7 @@ describe("HistoricoScreen (E5-03/RN-22)", () => {
   });
 
   test("alterna para a aba de avaliações e lista os feedbacks", async () => {
-    PerfilService.usuarioLogado.mockResolvedValue({ id: "u1", nome: "Marina" });
+    definirUsuarioDaSessao({ id: "u1", nome: "Marina" });
     VisitaService.listarHistorico.mockResolvedValue({ content: [] });
     FeedbackService.listarHistorico.mockResolvedValue({
       content: [
@@ -95,7 +151,7 @@ describe("HistoricoScreen (E5-03/RN-22)", () => {
 
   describe("exportação de dados em PDF (E5-03 / art. 18 LGPD)", () => {
     beforeEach(() => {
-      PerfilService.usuarioLogado.mockResolvedValue({ id: "u1", nome: "Marina" });
+      definirUsuarioDaSessao({ id: "u1", nome: "Marina" });
       VisitaService.listarHistorico.mockResolvedValue({ content: [] });
       FeedbackService.listarHistorico.mockResolvedValue({ content: [] });
     });

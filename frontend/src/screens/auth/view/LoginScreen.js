@@ -25,7 +25,8 @@ export default function LoginScreen({navigation}) {
     // v2.0 §4.1 — estado de sucesso do Login/Cadastro "Navega para Perfil"). É lá que o
     // usuário vê os dados da conta e o histórico de visitas/feedbacks (E5-03/RN-22).
     // O PerfilStack está dentro da aba Perfil; "Perfil" é a rota raiz desse stack, então
-    // o navigate volta à tela Perfil, cujo `useFocusEffect` recarrega o usuário logado.
+    // o navigate volta à tela Perfil, que já mostra a conta: o `LoginService` grava o
+    // usuário na sessão global (`core/stores/sessaoStore`).
     const redirectToAreaLogada = () => {
         navigation?.navigate?.("Perfil");
     };

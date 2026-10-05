@@ -8,12 +8,12 @@
 import React from "react";
 import {
   act,
-  render,
   fireEvent,
   screen,
   waitFor,
   within,
 } from "@testing-library/react-native";
+import { renderComProviders } from "../../helpers/renderComProviders";
 import GeoLocalizacaoScreen from "../../../screens/geolocalizacao/view/GeoLocalizacaoScreen";
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
 import { useGeolocalizacao } from "../../../screens/geolocalizacao/service/GeoLocalizacaoService";
@@ -111,7 +111,7 @@ function comGps(coordenadas) {
 }
 
 function renderizar() {
-  return render(<GeoLocalizacaoScreen navigation={NAVEGACAO} />);
+  return renderComProviders(<GeoLocalizacaoScreen navigation={NAVEGACAO} />);
 }
 
 function hospitalTeste(id, nome, extra = {}) {
@@ -160,7 +160,7 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     renderizar();
 
     await waitFor(() => {
-      expect(HospitalService.listar).toHaveBeenCalledWith({ page: 0, size: 100 });
+      expect(HospitalService.listar).toHaveBeenCalledWith({ page: 0, size: 100, signal: expect.anything() });
     });
   });
 
@@ -182,10 +182,10 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     renderizar();
 
     await waitFor(() => {
-      expect(HospitalService.listar).toHaveBeenLastCalledWith({ page: 2, size: 100 });
+      expect(HospitalService.listar).toHaveBeenLastCalledWith({ page: 2, size: 100, signal: expect.anything() });
     });
-    expect(HospitalService.listar).toHaveBeenNthCalledWith(1, { page: 0, size: 100 });
-    expect(HospitalService.listar).toHaveBeenNthCalledWith(2, { page: 1, size: 100 });
+    expect(HospitalService.listar).toHaveBeenNthCalledWith(1, { page: 0, size: 100, signal: expect.anything() });
+    expect(HospitalService.listar).toHaveBeenNthCalledWith(2, { page: 1, size: 100, signal: expect.anything() });
   });
 
   test("selecionar um raio envia latitude, longitude e raioKm ao backend", async () => {
@@ -200,6 +200,7 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
         longitude: -47.885,
         raioKm: 5,
         size: 100,
+        signal: expect.anything(),
       });
     });
   });
@@ -214,7 +215,7 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     expect(
       await screen.findByText("Aguardando o GPS para filtrar hospitais num raio de 10 km.")
     ).toBeTruthy();
-    expect(HospitalService.listar).toHaveBeenLastCalledWith({ page: 0, size: 100 });
+    expect(HospitalService.listar).toHaveBeenLastCalledWith({ page: 0, size: 100, signal: expect.anything() });
   });
 
   test("tocar no card do hospital selecionado abre o detalhe na própria pilha do Mapa", async () => {
@@ -426,7 +427,7 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
   test("BUG-04: sem `navigate`, o mapa NÃO é desmontado", async () => {
     // Desmontar antes de saber se há para onde ir deixaria a tela sem mapa e sem
     // conserto: quem remonta é o `focus`, e ele só vem se a tela tiver perdido o foco.
-    render(<GeoLocalizacaoScreen navigation={{ addListener: jest.fn() }} />);
+    renderComProviders(<GeoLocalizacaoScreen navigation={{ addListener: jest.fn() }} />);
     await selecionarPeloPoligono();
     await tocarNoCard();
 
@@ -463,8 +464,9 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     // recorta. Verificado por mutação: apagar qualquer uma das duas mantinha o teste
     // verde com o defeito de volta na tela.
     renderizar();
+    await screen.findByTestId("geofences-hospitais");
 
-    const container = await screen.findByTestId("mapa-container");
+    const container = screen.getByTestId("mapa-container");
     expect(container).toHaveStyle({ overflow: "hidden" });
     expect(within(container).getByTestId("geofences-hospitais")).toBeTruthy();
   });
@@ -637,5 +639,20 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     renderizar();
 
     expect(await screen.findByText("Backend indisponível.")).toBeTruthy();
+  });
+
+  test("falha numa página do meio mantém os lotes já carregados, avisa e não repete sem fim", async () => {
+    HospitalService.listar.mockImplementation(({ page }) =>
+      page === 0
+        ? Promise.resolve({ content: [hospitalTeste("h1", "Hospital Alfa")], totalElements: 2 })
+        : Promise.reject(new Error(""))
+    );
+
+    renderizar();
+
+    expect(await screen.findByText("Não foi possível carregar os hospitais.")).toBeTruthy();
+    const fonte = screen.getByTestId("geofences-hospitais");
+    expect(fonte.props.shape.features).toHaveLength(1);
+    expect(HospitalService.listar).toHaveBeenCalledTimes(2);
   });
 });

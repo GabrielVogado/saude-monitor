@@ -18,7 +18,7 @@ import {
   geofencesParaFeatureCollection,
 } from "../../../utils/geojson";
 import { formatarDistancia, haversineMetros } from "../../../utils/distancia";
-import HospitalService from "../../hospitais/service/HospitalService";
+import { useHospitaisMapa } from "../../hospitais/hooks/useHospitais";
 import { CSChip, CSHospitalCard, CSIconButton, CSOptionSheet } from "../../../components";
 import { colors, typography, spacing, radii, shadows } from "../../../theme";
 
@@ -50,8 +50,6 @@ function GeolocalizacaoContent({ navigation }) {
     iniciarMonitoramento,
     pararMonitoramento,
   } = useGeolocalizacao();
-  const [hospitais, setHospitais] = useState([]);
-  const [erroHospitais, setErroHospitais] = useState(null);
   const [raioKm, setRaioKm] = useState(null);
 
   // Item 05 (revisão de UX) + F-07: o mapa exibe todos os hospitais ativos e, quando
@@ -62,78 +60,39 @@ function GeolocalizacaoContent({ navigation }) {
   posicaoRef.current = coordenadas;
   const temGps = coordenadas !== null;
 
-  // Identifica a carga em andamento: ao trocar o raio (ou o GPS aparecer/desaparecer)
-  // no meio da paginação incremental abaixo, a chamada antiga precisa parar de
-  // escrever no estado em vez de sobrescrever a lista da carga nova.
-  const cargaEmAndamentoRef = useRef(0);
-
-  const carregarHospitais = useCallback(async () => {
-    const posicao = posicaoRef.current;
-    const idCarga = ++cargaEmAndamentoRef.current;
-
-    setErroHospitais(null);
-
-    // Filtro por raio exige posição: sem GPS, mantém o catálogo completo (bloco abaixo).
-    if (raioKm !== null && posicao) {
-      // O recorte geográfico já restringe o resultado a poucos hospitais — cabe
-      // numa única página.
-      try {
-        const data = await HospitalService.listar({
-          latitude: posicao.latitude,
-          longitude: posicao.longitude,
-          raioKm,
-          size: 100,
-        });
-        if (cargaEmAndamentoRef.current === idCarga) {
-          setHospitais(data?.content || data || []);
-        }
-      } catch (e) {
-        if (cargaEmAndamentoRef.current === idCarga) {
-          setErroHospitais(e.message || "Não foi possível carregar os hospitais.");
-        }
-      }
-      return;
-    }
-
-    // "Todos": o catálogo (~340 hospitais) excede o `size` máximo aceito pelo
-    // backend (100, ver HospitalController). Busca todas as páginas em sequência
-    // e vai atualizando o mapa lote a lote — mostrar todas as unidades (item 05)
-    // sem voltar a montar centenas de marcadores numa única leva, que era o risco
-    // de ANR já mitigado (Plano-Sprints-v2.1 §21.6 / BUG-04 no topo deste arquivo).
-    let pagina = 0;
-    let acumulado = [];
-    try {
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const data = await HospitalService.listar({ page: pagina, size: 100 });
-        if (cargaEmAndamentoRef.current !== idCarga) {
-          return;
-        }
-
-        const lote = data?.content || [];
-        acumulado = pagina === 0 ? lote : acumulado.concat(lote);
-        setHospitais(acumulado);
-
-        const total = data?.totalElements ?? acumulado.length;
-        if (lote.length === 0 || acumulado.length >= total) {
-          break;
-        }
-        pagina += 1;
-      }
-    } catch (e) {
-      if (cargaEmAndamentoRef.current === idCarga) {
-        setErroHospitais(e.message || "Não foi possível carregar os hospitais.");
-      }
-    }
-  }, [raioKm]);
-
-  // Refaz a busca ao trocar o raio e quando o GPS passa a ter (ou perde) posição.
-  // Não depende de `coordenadas` diretamente: a posição muda a cada leitura do
-  // watchPosition e dispararia uma requisição por atualização.
+  // Posição usada no recorte, fixada quando o raio muda ou o GPS aparece/desaparece.
+  // Não acompanha `coordenadas` diretamente: a posição muda a cada leitura do
+  // watchPosition e abriria uma consulta nova por atualização.
+  const [origemRaio, setOrigemRaio] = useState(null);
   useEffect(() => {
-    // `carregarHospitais` mostra a falha em `erroHospitais`: disparo intencional.
-    void carregarHospitais();
-  }, [carregarHospitais, temGps]);
+    setOrigemRaio(raioKm !== null && posicaoRef.current ? { ...posicaoRef.current } : null);
+  }, [raioKm, temGps]);
+
+  // "Todos": o catálogo (~340 hospitais) excede o `size` máximo aceito pelo backend
+  // (100, ver HospitalController). As páginas vêm em sequência e o mapa é atualizado
+  // lote a lote — mostrar todas as unidades (item 05) sem voltar a montar centenas de
+  // marcadores numa única leva, que era o risco de ANR já mitigado
+  // (Plano-Sprints-v2.1 §21.6 / BUG-04 no topo deste arquivo). Trocar o raio muda a
+  // chave, e a carga antiga deixa de escrever na tela (antes: `cargaEmAndamentoRef`).
+  const consultaHospitais = useHospitaisMapa({ raioKm, origem: origemRaio });
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = consultaHospitais;
+  const hospitais = useMemo(() => consultaHospitais.data ?? [], [consultaHospitais.data]);
+  // O erro aparece sem lista ou quando uma página do meio falhou (o mapa fica com os
+  // lotes que já vieram); a falha de uma atualização com o mapa completo não alarma.
+  const erroHospitais =
+    consultaHospitais.error && (!consultaHospitais.data || consultaHospitais.isFetchNextPageError)
+      ? consultaHospitais.error.message || "Não foi possível carregar os hospitais."
+      : null;
+
+  // Busca a página seguinte assim que a anterior chega, até o fim do catálogo. Parar
+  // numa falha evita repetir sem fim a mesma página. `hospitais` entra nas
+  // dependências porque o render de "buscando a próxima" pode não acontecer: sem ele,
+  // a chegada de uma página não reexecutaria o efeito e a carga pararia no segundo lote.
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage && !consultaHospitais.isFetchNextPageError) {
+      fetchNextPage({ cancelRefetch: false }).catch(() => {});
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, consultaHospitais.isFetchNextPageError, hospitais]);
 
   const regionAtual = useMemo(() => {
     if (!coordenadas) {

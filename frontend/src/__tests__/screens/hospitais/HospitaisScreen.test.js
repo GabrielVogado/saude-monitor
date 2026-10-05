@@ -8,7 +8,8 @@
  * usuário via o app fechar sozinho logo ao tocar em "Check-in".
  */
 import React from "react";
-import { render, fireEvent, screen, waitFor, act } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor, act } from "@testing-library/react-native";
+import { renderComProviders } from "../../helpers/renderComProviders";
 import { Alert } from "react-native";
 import HospitaisScreen from "../../../screens/hospitais/view/HospitaisScreen";
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
@@ -39,7 +40,7 @@ const HOSPITAL_B = { id: "hB", nome: "Hospital B", tipo: "PRIVADO", categoria: "
 const NAVEGACAO = { navigate: jest.fn(), goBack: jest.fn() };
 
 function renderizar() {
-  return render(<HospitaisScreen navigation={NAVEGACAO} />);
+  return renderComProviders(<HospitaisScreen navigation={NAVEGACAO} />);
 }
 
 /** Simula a aba ganhando foco de novo (ex.: voltar de outra tela), sem remontar. */
@@ -166,6 +167,33 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
 
     await screen.findByText("Hospital C");
     expect(chamadasDePaginaSeguinte).toBe(1);
+  });
+
+  test("falha na carga mostra o erro e 'Tentar novamente' consulta de novo", async () => {
+    HospitalService.listar.mockRejectedValueOnce(new Error("Backend indisponível."));
+
+    renderizar();
+    expect(await screen.findByText("Backend indisponível.")).toBeTruthy();
+
+    fireEvent.press(screen.getByText("Tentar novamente"));
+
+    expect(await screen.findByText("Hospital A")).toBeTruthy();
+  });
+
+  test("a busca vai ao backend normalizada, só depois da pausa na digitação", async () => {
+    renderizar();
+    await screen.findByText("Hospital A");
+    HospitalService.listar.mockClear();
+
+    fireEvent.changeText(screen.getByPlaceholderText("Buscar hospital por nome"), "Hospítal A");
+    expect(HospitalService.listar).not.toHaveBeenCalled();
+
+    await waitFor(() =>
+      expect(HospitalService.listar).toHaveBeenCalledWith(expect.objectContaining({ busca: "hospital a", page: 0 }))
+    );
+    // O filtro local descarta o que o backend devolveu fora do critério.
+    await waitFor(() => expect(screen.queryByText("Hospital B")).toBeNull());
+    expect(screen.getByText("Hospital A")).toBeTruthy();
   });
 
   test("check-in bem-sucedido navega para o detalhe do hospital selecionado", async () => {
@@ -349,7 +377,7 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
       renderizar();
       await screen.findByText("Hospital A");
 
-      await waitFor(() => expect(HospitalService.buscarPorId).toHaveBeenCalledWith("hZ"));
+      await waitFor(() => expect(HospitalService.buscarPorId).toHaveBeenCalledWith("hZ", { signal: expect.anything() }));
       await waitFor(() => {
         const nomes = screen.getAllByText(/^Hospital [ABZ]$/).map((el) => el.props.children);
         expect(nomes).toEqual(["Hospital Z", "Hospital A", "Hospital B"]);

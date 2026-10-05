@@ -8,10 +8,13 @@ class HospitalService {
    * Query opcional: latitude, longitude, raioKm, tipo, busca, page, size.
    *
    * A busca por nome é insensível a acentos/caixa (normalizada no backend e,
-   * defensivamente, na tela de listagem).
+   * defensivamente, na tela de listagem). `signal` cancela a requisição quando a
+   * consulta deixa de valer (ex.: o usuário mudou a busca).
    */
-  static listar({ latitude, longitude, raioKm, tipo, busca, page = 0, size = 20 } = {}) {
-    return request(`${BASE_PATH}${buildQuery({ latitude, longitude, raioKm, tipo, busca, page, size })}`);
+  static listar({ latitude, longitude, raioKm, tipo, busca, page = 0, size = 20, signal } = {}) {
+    return request(`${BASE_PATH}${buildQuery({ latitude, longitude, raioKm, tipo, busca, page, size })}`, {
+      signal,
+    });
   }
 
   /**
@@ -22,8 +25,8 @@ class HospitalService {
    * suficiente (RN-15) vêm com `indicadores.indicadoresDisponiveis = false` e são
    * posicionados ao final pelo backend.
    */
-  static ranking({ ordem = "NOTA", tipo, page = 0, size = 20 } = {}) {
-    return request(`${BASE_PATH}/ranking${buildQuery({ ordem, tipo, page, size })}`);
+  static ranking({ ordem = "NOTA", tipo, page = 0, size = 20, signal } = {}) {
+    return request(`${BASE_PATH}/ranking${buildQuery({ ordem, tipo, page, size })}`, { signal });
   }
 
   /**
@@ -37,8 +40,8 @@ class HospitalService {
    * `tipoUnidade` e `horarioFuncionamento` são opcionais (o backend passa a
    * fornecê-los); consumidores devem tratar ausência com fallback elegante.
    */
-  static buscarPorId(id) {
-    return request(`${BASE_PATH}/${id}`);
+  static buscarPorId(id, { signal } = {}) {
+    return request(`${BASE_PATH}/${id}`, { signal });
   }
 
   /** Retorna apenas o geofence (renderização no mapa). */
@@ -54,8 +57,8 @@ class HospitalService {
    * Quando `nAvaliacoes < 5`, `indicadoresDisponiveis = false` e `notaMedia`/
    * `tempoMedianoMinutos` são `null` (RN-15).
    */
-  static buscarIndicadores(id) {
-    return request(`${BASE_PATH}/${id}/indicadores`);
+  static buscarIndicadores(id, { signal } = {}) {
+    return request(`${BASE_PATH}/${id}/indicadores`, { signal });
   }
 
   /**

@@ -14,7 +14,7 @@ import {
   CSRatingStars,
 } from "../../../components";
 import { colors, radii, spacing, typography } from "../../../theme/tokens";
-import HospitalService from "../service/HospitalService";
+import { useHospital, useIndicadoresHospital } from "../hooks/useHospitais";
 import VisitaService from "../../visitas/service/VisitaService";
 import { invalidarVisitaAtiva } from "../../../core/query/queryClient";
 import { agendarFeedback } from "../../feedback/service/FeedbackNotificationService";
@@ -62,10 +62,29 @@ const BRASIL_REGION = {
 export default function HospitalDetalheScreen({ navigation, route }) {
   const { id } = route.params || {};
 
-  const [hospital, setHospital] = useState(null);
-  const [indicadores, setIndicadores] = useState(null);
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState(null);
+  // Dados e indicadores em consultas separadas, compartilhadas com a lista (destaque do
+  // check-in ativo) pela mesma chave. Os indicadores enriquecidos vêm do endpoint
+  // dedicado (§3.5 / E4-01..E4-04); se falharem (ex.: agregado ainda materializando),
+  // a tela usa os embutidos no detalhe.
+  const consultaHospital = useHospital(id);
+  const consultaIndicadores = useIndicadoresHospital(id);
+  const hospital = consultaHospital.data ?? null;
+  const indicadores = consultaIndicadores.data ?? null;
+  // Espera os indicadores só quando o hospital veio: sem ele a tela já é de erro.
+  const carregando =
+    Boolean(id) &&
+    (consultaHospital.isPending || (consultaHospital.isSuccess && consultaIndicadores.isPending));
+  // Uma atualização que falha com o hospital já na tela (ex.: volta ao app sem
+  // conexão) não troca a tela pelo erro.
+  const erro =
+    consultaHospital.error && !hospital
+      ? consultaHospital.error.message || "Não foi possível carregar o hospital."
+      : null;
+
+  const carregar = () => {
+    void consultaHospital.refetch();
+    void consultaIndicadores.refetch();
+  };
 
   // Navegação revisada: visita ativa do modo MANUAL deste hospital — exibe temporizador
   // hh:mm:ss + botão de checkout ("Não estou aqui"). Só é mostrada quando a visita ativa
@@ -73,33 +92,6 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   const [visitaManual, setVisitaManual] = useState(null);
   const [agora, setAgora] = useState(Date.now());
   const [enviandoCheckout, setEnviandoCheckout] = useState(false);
-
-  const carregar = async () => {
-    setCarregando(true);
-    setErro(null);
-    try {
-      const dados = await HospitalService.buscarPorId(id);
-      setHospital(dados);
-
-      // Indicadores enriquecidos do endpoint dedicado (§3.5 / E4-01..E4-04).
-      // Se falhar (ex.: agregado ainda materializando), mantém os embutidos do detalhe.
-      try {
-        const ind = await HospitalService.buscarIndicadores(id);
-        setIndicadores(ind);
-      } catch {
-        setIndicadores(dados?.indicadores || null);
-      }
-    } catch (e) {
-      setErro(e.message || "Não foi possível carregar o hospital.");
-    } finally {
-      setCarregando(false);
-    }
-  };
-
-  useEffect(() => {
-    // `carregar` mostra a falha em `erro`: disparo intencional.
-    if (id) void carregar();
-  }, [id]);
 
   // Sincroniza o estado da visita manual ao focar a tela (ex.: ao voltar do check-in
   // da lista Hospital → este detalhe). Modo anônimo usa `dispositivoId` (§3.3). Sem

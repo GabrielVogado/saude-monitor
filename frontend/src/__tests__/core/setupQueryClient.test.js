@@ -22,7 +22,7 @@ describe("configurarQueryNoApp", () => {
       ouvinteAppState = ouvinte;
       return { remove: removerAppState };
     });
-    Network.addNetworkStateListener = jest.fn((ouvinte) => {
+    Network.addNetworkStateListener.mockImplementation((ouvinte) => {
       ouvinteRede = ouvinte;
       return { remove: removerRede };
     });
@@ -63,13 +63,17 @@ describe("configurarQueryNoApp", () => {
   test("o estado inicial da rede é lido na inscrição, e uma falha na leitura é ignorada", async () => {
     Network.getNetworkStateAsync.mockResolvedValueOnce({ isConnected: false });
     desfazer = configurarQueryNoApp(criarQueryClient());
-    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => {
+      setImmediate(r);
+    });
     expect(onlineManager.isOnline()).toBe(false);
 
     desfazer();
     Network.getNetworkStateAsync.mockRejectedValueOnce(new Error("indisponível"));
     desfazer = configurarQueryNoApp(criarQueryClient());
-    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => {
+      setImmediate(r);
+    });
   });
 
   test("o fim da sessão remove o dado pessoal do cache, e só ele", () => {

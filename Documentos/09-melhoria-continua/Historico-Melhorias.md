@@ -2177,6 +2177,49 @@ em sequência, sem cache. Voltar a uma tela já vista refazia todas as chamadas.
 
 ---
 
+## M-036 — Check-in, checkout e feedback com mutações (Fase 4 da SDD)
+
+**Data:** 05/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Depois da Fase 3, Hospitais e Detalhe ainda consultavam a visita ativa por conta própria
+a cada foco (três consultas da mesma visita com o `VisitaAtivaSync`), guardavam cópias
+locais dela e chamavam o `VisitaService` direto para check-in e checkout. O envio do
+feedback também não avisava o cache, e o histórico da conta podia mostrar a lista sem a
+avaliação recém-enviada.
+
+### O que mudou
+
+- **`useCheckinManual` e `useCheckoutManual`** (`screens/visitas/hooks/useMutacoesVisita.js`):
+  ao confirmar, gravam a visita só na chave da visita ativa do usuário e pedem a
+  confirmação ao servidor. Nada é escrito em `visitas.all` (defeito 5 da conferência).
+  O `VisitaAtivaSync` reage na hora: liga ou desliga o heartbeat e avisa o geofencing.
+- **`useVisitaAtivaDaTela`**: Hospitais e Detalhe leem a mesma query do observador
+  global, recarregada ao voltar para a tela. Mantém as regras de antes: sem conexão
+  fica a última visita conhecida, erro real do servidor mostra "sem visita", e um
+  check-in ou checkout guardado na fila offline vale na tela até a próxima resposta do
+  servidor. Esse estado otimista fica na tela, fora do cache, para o observador não
+  parar o heartbeat por causa de uma visita sem id.
+- **`useEnviarFeedback`**: POST na criação e PUT na edição. Depois de gravar, o
+  histórico da conta é marcado como desatualizado.
+- Não entrou: a troca de `FlatList` por `FlashList` citada na SDD. É uma dependência
+  nova de renderização de lista, sem relação com o estado do app, que pede validação de
+  desempenho no aparelho; fica para um PR próprio.
+
+### Verificação
+
+- `useMutacoesVisita.test.js` (6 testes): chave certa no check-in sem tocar outra query
+  do domínio, checkout, falha sem efeito no cache, estado otimista até a próxima
+  resposta, nada antes de ler a sessão e o feedback com POST/PUT.
+- Detalhe: voltar à tela sem conexão depois de um checkout enfileirado não traz o
+  cronômetro de volta.
+- Testes de tela ajustados ao servidor real: depois do check-in ou checkout, a próxima
+  consulta da visita ativa responde com o estado novo.
+- Suíte do app: 564 → 570 testes. Linhas alteradas com 100% de cobertura (`diff-cover`).
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

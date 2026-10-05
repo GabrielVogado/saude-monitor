@@ -11,6 +11,7 @@
 **Fase 1 (M-033):** sessão global com Zustand e cache de queries com TanStack Query; Perfil e Histórico reagem ao login e ao logout na hora. ADR-004 (Context API) passa a "Substituído".
 **Fase 2 (M-034):** heartbeat e geofencing passam a seguir a visita ativa em qualquer tela, não só no foco da aba Início (defeito da auditoria, §4.2.2).
 **Fase 3 (M-035):** Hospitais, Ranking, Detalhe e Mapa leem pelo TanStack Query, sem as refs manuais contra respostas fora de ordem.
+**Fase 4 (M-036):** check-in, checkout e envio de feedback por mutações do TanStack Query; Hospitais e Detalhe leem a visita ativa compartilhada.
 **Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória muda de status).
 
 ---

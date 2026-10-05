@@ -10,6 +10,7 @@
 import React from "react";
 import { fireEvent, screen, waitFor, act } from "@testing-library/react-native";
 import { renderComProviders } from "../../helpers/renderComProviders";
+import { definirUsuarioDaSessao } from "../../../core/stores/sessaoStore";
 import { Alert } from "react-native";
 import HospitaisScreen from "../../../screens/hospitais/view/HospitaisScreen";
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
@@ -53,6 +54,8 @@ async function refocarTela() {
 describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Sessão lida do aparelho (anônima): a visita ativa só é consultada depois disso.
+    definirUsuarioDaSessao(null);
     HospitalService.listar.mockResolvedValue({ content: [HOSPITAL_A, HOSPITAL_B] });
     HospitalService.buscarPorId.mockResolvedValue(null);
     VisitaService.buscarAtiva.mockResolvedValue({ visita: null });
@@ -197,7 +200,12 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
   });
 
   test("check-in bem-sucedido navega para o detalhe do hospital selecionado", async () => {
-    VisitaService.checkin.mockResolvedValue({ id: "v1", hospitalId: "hA", status: "EM_ATENDIMENTO" });
+    const visita = { id: "v1", hospitalId: "hA", status: "EM_ATENDIMENTO" };
+    VisitaService.checkin.mockImplementation(async () => {
+      // Depois do check-in, o servidor passa a responder com a visita nova.
+      VisitaService.buscarAtiva.mockResolvedValue({ visita: { ...visita, origem: "MANUAL" } });
+      return visita;
+    });
 
     renderizar();
     await screen.findByText("Hospital A");
@@ -210,7 +218,12 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
   });
 
   test("após o check-in, o card do hospital ativo passa a oferecer 'ver' e os demais ficam desabilitados", async () => {
-    VisitaService.checkin.mockResolvedValue({ id: "v1", hospitalId: "hA", status: "EM_ATENDIMENTO" });
+    const visita = { id: "v1", hospitalId: "hA", status: "EM_ATENDIMENTO" };
+    VisitaService.checkin.mockImplementation(async () => {
+      // Depois do check-in, o servidor passa a responder com a visita nova.
+      VisitaService.buscarAtiva.mockResolvedValue({ visita: { ...visita, origem: "MANUAL" } });
+      return visita;
+    });
 
     renderizar();
     await screen.findByText("Hospital A");
@@ -235,7 +248,7 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
     VisitaService.buscarAtiva.mockRejectedValue(new Error("Sessão expirada. Faça login novamente."));
     await refocarTela();
 
-    expect(screen.getByLabelText("Fazer check-in em Hospital A")).not.toBeDisabled();
+    expect(await screen.findByLabelText("Fazer check-in em Hospital A")).not.toBeDisabled();
   });
 
   test("tocar em 'ver' no hospital com visita já ativa apenas reabre o detalhe (idempotente)", async () => {

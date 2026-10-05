@@ -12,6 +12,13 @@
 
 ---
 
+## 📌 Revisão 05/10/2026 — Sinal da visita com o app fechado
+
+**O que entrou:** com uma visita aberta, o app manda o heartbeat com a posição a cada ~10 min também com o app fechado, para a visita não ser encerrada como `GPS_INTERROMPIDO` enquanto a pessoa segue no hospital. RN-23 em `Documento-Negocial-v2.1.md` e heartbeat em `Especificacao-API-v2.4.md` atualizados. Registro em `Historico-Melhorias.md` (M-038).
+**Sem mudança:** `De-Para-Backlog-Features.md` (E2-05 e E2-09 já estavam entregues).
+
+---
+
 ## 📌 Revisão 05/10/2026 — Janela de GPS interrompido de 10 para 45 min
 
 **O que mudou:** a RN-06 (Documento Negocial v2.1) e a E2-05 (Backlog v2.2) passam de 10 para 45 min sem sinal antes de encerrar a visita como `GPS_INTERROMPIDO`. A janela antiga era menor que o heartbeat de 30 min (RN-23) e encerrava visitas longas com duração de poucos minutos. Registro em `Historico-Melhorias.md` (M-037). O sinal do app em segundo plano vem num PR separado.

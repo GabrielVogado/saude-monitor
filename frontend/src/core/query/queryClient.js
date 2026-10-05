@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { DOMINIOS_PESSOAIS } from "./queryKeys";
+import { DOMINIOS_PESSOAIS, queryKeys } from "./queryKeys";
 
 /** Dado considerado fresco por 2 minutos: trocar de aba não refaz a requisição. */
 export const STALE_TIME_PADRAO_MS = 2 * 60 * 1000;
@@ -44,4 +44,14 @@ export function removerDadosPessoais(cliente = queryClient) {
   for (const queryKey of DOMINIOS_PESSOAIS) {
     cliente.removeQueries({ queryKey });
   }
+}
+
+/**
+ * Marca a visita ativa como desatualizada e busca de novo quem a observa (o
+ * `VisitaAtivaSync` na raiz do app). Chamado depois de check-in e checkout manuais e
+ * quando a fila offline envia eventos, para que o heartbeat e o geofencing sigam a
+ * visita certa sem depender de a aba Início ganhar foco.
+ */
+export function invalidarVisitaAtiva(cliente = queryClient) {
+  return cliente.invalidateQueries({ queryKey: queryKeys.visitas.all });
 }

@@ -558,8 +558,8 @@ export async function enviarSinalDaVisita(locations, agora = Date.now()) {
 
   try {
     await VisitaService.heartbeat(reserva.visitaId, posicao);
-  } catch (erro) {
-    if (erro?.status === 404 || erro?.status === 409) {
+  } catch (error) {
+    if (error?.status === 404 || error?.status === 409) {
       // A visita já não está aberta no servidor (checkout em outro aparelho, expiração):
       // esquecê-la aqui desliga o acompanhamento e a notificação fixa.
       await alterarEstado((estado) => {
@@ -577,7 +577,7 @@ export async function enviarSinalDaVisita(locations, agora = Date.now()) {
       }
     });
     // eslint-disable-next-line no-console
-    console.warn("GeofencingTaskService: falha ao enviar o sinal da visita", erro?.message);
+    console.warn("GeofencingTaskService: falha ao enviar o sinal da visita", error?.message);
   }
 }
 

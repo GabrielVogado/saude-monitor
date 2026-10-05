@@ -197,7 +197,7 @@ export default function PerfilScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.content}>
         {emCarregamento && <CSLoadingList count={2} />}
 
-        {!emCarregamento && erroInicial && (
+        {!emCarregamento && Boolean(erroInicial) && (
           <CSEmptyState
             icon={ShieldCheck}
             title="Não foi possível carregar"

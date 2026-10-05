@@ -551,7 +551,7 @@ export async function enviarSinalDaVisita(locations, agora = Date.now()) {
     return;
   }
 
-  const ultima = Array.isArray(locations) ? locations[locations.length - 1] : null;
+  const ultima = Array.isArray(locations) ? locations.at(-1) : null;
   const posicao = ultima?.coords
     ? { type: "Point", coordinates: [ultima.coords.longitude, ultima.coords.latitude] }
     : undefined;

@@ -764,6 +764,10 @@ describe("falhas e casos de borda", () => {
   });
 });
 
+function avancar(ms) {
+  jest.setSystemTime(Date.now() + ms);
+}
+
 describe("sinal da visita em segundo plano (RN-06)", () => {
   const LEITURA = [{ coords: { latitude: HOSPITAL_LAT, longitude: HOSPITAL_LON } }];
   const POSICAO = { type: "Point", coordinates: [HOSPITAL_LON, HOSPITAL_LAT] };
@@ -778,10 +782,6 @@ describe("sinal da visita em segundo plano (RN-06)", () => {
   afterEach(() => {
     jest.useRealTimers();
   });
-
-  function avancar(ms) {
-    jest.setSystemTime(Date.now() + ms);
-  }
 
   it("visita aberta liga o acompanhamento econômico com a notificação de visita", async () => {
     const { sincronizarVisitaAtiva, ACOMPANHAMENTO_TASK } = carregarServico();

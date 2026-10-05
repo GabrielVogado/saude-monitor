@@ -2202,6 +2202,34 @@ em PRs separados. A janela de 45 min no backend é a primeira (M-037); esta é a
 
 ---
 
+## M-039 — CI e Sonar também em PR empilhado
+
+**Data:** 05/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Observação do PO: "aparentemente o sonar não rodou em todas as branches". Os PRs da SDD
+de TanStack Query e Zustand estão empilhados (cada um com base na branch do anterior), e
+o `ci.yml` só disparava em PR para `develop` ou `master`. Só o primeiro da pilha tinha CI
+e Sonar; os outros só seriam medidos depois de reapontados para a `develop`.
+
+### O que mudou
+
+- `pull_request` do `ci.yml` passa a aceitar também bases `feature/**` e `bugfix/**`.
+- Nesses PRs, o `diff-cover` mede só as linhas do próprio PR (compara com a branch de
+  base). A trava de contagem e de cobertura total compara com o ancestral verde mais
+  próximo da base, que é um commit da `develop`, porque branch de trabalho não tem CI de
+  push. Na prática a régua é a da `develop`, e os testes das fases anteriores da pilha
+  contam a favor.
+
+### Verificação
+
+- Gatilho conferido com o YAML carregado (`develop`, `master`, `feature/**`, `bugfix/**`).
+- A primeira execução real acontece nos PRs empilhados ao serem atualizados depois do
+  merge deste.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

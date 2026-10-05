@@ -195,7 +195,7 @@ export default function PerfilScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {emCarregamento && <CSLoadingList count={2} />}
+        {emCarregamento ? <CSLoadingList count={2} /> : null}
 
         {!emCarregamento && Boolean(erroInicial) && (
           <CSEmptyState

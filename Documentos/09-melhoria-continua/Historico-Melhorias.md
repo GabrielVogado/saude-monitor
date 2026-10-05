@@ -2131,6 +2131,39 @@ até o próximo foco da Home.
 
 ---
 
+## M-037 — Visitas longas deixam de cair como GPS_INTERROMPIDO entre dois heartbeats
+
+**Data:** 05/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Conferência da Auditoria Técnica v4.0 (`08-analise tecnica/Conferencia-Auditoria-v4-e-SDD.md`,
+§2): o `VisitaGpsInterrompidoJob` encerrava como `GPS_INTERROMPIDO` toda visita sem sinal
+há mais de 10 min (RN-06), mas o app só manda heartbeat a cada 30 min (RN-23), e só com
+o app aberto. Toda visita que passava de 10 a 25 min sem checkout de geofence era
+encerrada com `saida` no check-in e duração de poucos minutos, distorcendo o tempo
+mediano (RN-15). As duas regras se contradiziam no Documento Negocial.
+
+### Decisão do PO (05/10/2026)
+
+"As duas": janela de 45 min agora, e o app mandando sinal em segundo plano num PR
+separado.
+
+### O que mudou
+
+- `VisitaServiceImpl.LIMITE_GPS_INTERROMPIDO`: 10 → 45 min. Cobre um heartbeat perdido
+  e o ciclo de 15 min do job. O último sinal continua sendo o mais recente entre
+  heartbeat e posição, e a saída continua sendo esse último sinal.
+- RN-06 (Documento Negocial v2.1) e E2-05 (Backlog v2.2) atualizadas.
+
+### Verificação
+
+- `VisitaServiceImplTest`: visita 31 min sem sinal (entre dois heartbeats) continua
+  ativa, e o corte consultado no Mongo é agora menos 45 min. Os dois testes que usavam
+  15 min sem sinal passaram para 50 min.
+
+---
+
 ## M-039 — CI e Sonar também em PR empilhado
 
 **Data:** 05/10/2026 · **PR:** (este PR)

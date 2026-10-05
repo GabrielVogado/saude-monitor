@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 22/09/2026 · Responsável: Gabriel Vogado
+> Última atualização: 05/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 05/10/2026 — Sinal da visita com o app fechado
+
+**O que entrou:** com uma visita aberta, o app manda o heartbeat com a posição a cada ~10 min também com o app fechado, para a visita não ser encerrada como `GPS_INTERROMPIDO` enquanto a pessoa segue no hospital. RN-23 em `Documento-Negocial-v2.1.md` e heartbeat em `Especificacao-API-v2.4.md` atualizados. Registro em `Historico-Melhorias.md` (M-038).
+**Sem mudança:** `De-Para-Backlog-Features.md` (E2-05 e E2-09 já estavam entregues).
 
 ---
 

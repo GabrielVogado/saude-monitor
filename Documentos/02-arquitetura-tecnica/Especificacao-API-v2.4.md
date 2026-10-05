@@ -405,7 +405,7 @@ Registra saída. **Request:** `{ "posicao": {...}, "gpsIndisponivel": false, "en
 > **`ocorridoEm` (opcional, OPS-05):** mesmas regras do check-in, com uma restrição a mais — a saída nunca é anterior à entrada. Um relógio atrasado no aparelho produziria duração negativa, que envenenaria a mediana de permanência (RN-15); nesse caso o servidor usa a própria entrada.
 
 #### `POST /api/v1/visitas/{id}/heartbeat` 🔒
-Sinal de vida da visita (RN-23). O app envia a cada **30 minutos** enquanto a visita está ativa (também serve de fallback quando o app está em primeiro plano). Atualiza `ultimoHeartbeat`; se a visita estava `SUSPEITA` (2h sem heartbeat), retorna ao status `EM_ATENDIMENTO`. **200** `{ "status": "EM_ATENDIMENTO", "ultimoHeartbeat": "2026-08-07T16:30:00Z" }`
+Sinal de vida da visita (RN-23). O app envia a cada **30 minutos** enquanto a visita está ativa e o app está aberto e, com o app fechado, a cada **~10 minutos** com `posicao`, pela tarefa de localização em segundo plano (desde 05/10/2026). Atualiza `ultimoHeartbeat`; se a visita estava `SUSPEITA` (2h sem heartbeat), retorna ao status `EM_ATENDIMENTO`. **200** `{ "status": "EM_ATENDIMENTO", "ultimoHeartbeat": "2026-08-07T16:30:00Z" }`
 
 #### `PATCH /api/v1/visitas/{id}/tipo-permanencia` 🔒
 Sinaliza internação/observação (RN-24) — disponível quando a visita tem ≥ 12h de duração. **Request:** `{ "tipoPermanencia": "INTERNACAO" }` → **200** `{ "tipoPermanencia": "INTERNACAO" }`. A visita continua ativa, mas **sai do cálculo do tempo médio de pronto-atendimento**.

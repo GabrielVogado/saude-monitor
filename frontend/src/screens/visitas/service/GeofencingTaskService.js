@@ -83,6 +83,39 @@ function comTimeout(promise, ms) {
  */
 export const ACOMPANHAMENTO_TASK = "VISITAS_ACOMPANHAMENTO_TASK";
 
+/**
+ * Sinal da visita em segundo plano (RN-06/RN-23, decisão do PO em 05/10/2026).
+ *
+ * Com uma visita aberta e nenhuma entrada ou saída pendente, o acompanhamento continua
+ * ligado num modo mais econômico, só para mandar ao backend um heartbeat com a posição
+ * do aparelho a cada ~10 min. Sem isso, o único sinal vinha do `HeartbeatService`, que
+ * só roda com o app aberto: com o app fechado nada chegava, e o job de GPS interrompido
+ * encerrava como `GPS_INTERROMPIDO` visitas de quem continuava no hospital.
+ */
+const MODO_PENDENCIA = "pendencia";
+const MODO_VISITA = "visita";
+
+const OPCOES_ACOMPANHAMENTO = {
+  [MODO_PENDENCIA]: {
+    accuracy: Location.Accuracy.Balanced,
+    timeInterval: 30 * 1000,
+    notificationBody: "Confirmando sua chegada ou saída do hospital.",
+  },
+  [MODO_VISITA]: {
+    // Mesma precisão de quarteirão (~100 m) do outro modo, que vira ponto amostral da
+    // visita no backend; a economia de bateria vem do intervalo de 5 min.
+    accuracy: Location.Accuracy.Balanced,
+    timeInterval: 5 * 60 * 1000,
+    notificationBody: "Visita em andamento. Avisaremos o hospital que você continua lá.",
+  },
+};
+
+/**
+ * Intervalo mínimo entre dois sinais da mesma visita. Com leituras a cada 5 min, o sinal
+ * sai a cada ~10 min, bem dentro da janela de 45 min do `VisitaGpsInterrompidoJob`.
+ */
+const INTERVALO_SINAL_VISITA_MS = 9 * 60 * 1000;
+
 /** Identificador da região que segue o usuário para recalcular os hospitais monitorados. */
 export const REGIAO_RECALCULO = "__recalcular_regioes__";
 
@@ -119,10 +152,12 @@ const INTERVALO_NOVA_EXPLICACAO_MS = 3 * 24 * 60 * 60 * 1000;
  *
  * - `visita`: `{ id, hospitalId, entrada }` da visita ativa conhecida;
  * - `entradas` / `saidas`: `{ [hospitalId]: instante do evento em ms }` aguardando a
- *   tolerância da RN-01 (2 min) ou da RN-03 (5 min).
+ *   tolerância da RN-01 (2 min) ou da RN-03 (5 min);
+ * - `sinal`: `{ visitaId, em }` do último heartbeat enviado em segundo plano;
+ * - `modo`: modo com que o acompanhamento foi ligado (`pendencia` ou `visita`).
  */
 function estadoVazio() {
-  return { visita: null, entradas: {}, saidas: {} };
+  return { visita: null, entradas: {}, saidas: {}, sinal: null, modo: null };
 }
 
 async function lerEstado() {
@@ -136,6 +171,8 @@ async function lerEstado() {
       visita: lido?.visita?.id ? lido.visita : null,
       entradas: lido?.entradas && typeof lido.entradas === "object" ? lido.entradas : {},
       saidas: lido?.saidas && typeof lido.saidas === "object" ? lido.saidas : {},
+      sinal: lido?.sinal?.visitaId ? lido.sinal : null,
+      modo: lido?.modo || null,
     };
   } catch {
     return estadoVazio();
@@ -375,7 +412,13 @@ export async function processarPendencias(agora = Date.now()) {
   await ajustarAcompanhamento();
 }
 
-/** Liga as atualizações de localização enquanto houver pendência; desliga quando não. */
+/**
+ * Liga as atualizações de localização enquanto houver pendência (leitura a cada 30 s) ou
+ * visita aberta (leitura a cada 5 min, para o sinal da visita); desliga quando não há
+ * nenhuma das duas. A troca de modo chama `startLocationUpdatesAsync` de novo com a tarefa
+ * já ligada, o que só troca as opções: desligar e religar abriria um intervalo sem serviço
+ * em primeiro plano, e o Android 12+ recusa iniciar outro com o app em segundo plano.
+ */
 // Roda na mesma fila do estado: ler "há pendência?" e ligar/desligar o GPS é uma
 // operação só, senão uma chamada que viu o estado vazio desliga o acompanhamento que
 // outra acabou de ligar para uma entrada nova.
@@ -383,28 +426,41 @@ function ajustarAcompanhamento() {
   return emSerie(ajustarAcompanhamentoEmSerie);
 }
 
+function modoDesejado({ visita, entradas, saidas }) {
+  if (Object.keys(entradas).length > 0 || Object.keys(saidas).length > 0) {
+    return MODO_PENDENCIA;
+  }
+  return visita ? MODO_VISITA : null;
+}
+
 async function ajustarAcompanhamentoEmSerie() {
-  const { entradas, saidas } = await lerEstado();
-  const haPendencia = Object.keys(entradas).length > 0 || Object.keys(saidas).length > 0;
+  const estado = await lerEstado();
+  const modo = modoDesejado(estado);
 
   try {
     const ligado = await Location.hasStartedLocationUpdatesAsync(ACOMPANHAMENTO_TASK);
-    if (haPendencia && !ligado) {
+    if (!modo && ligado) {
+      await Location.stopLocationUpdatesAsync(ACOMPANHAMENTO_TASK);
+    }
+    if (modo && (!ligado || estado.modo !== modo)) {
+      const { accuracy, timeInterval, notificationBody } = OPCOES_ACOMPANHAMENTO[modo];
       await Location.startLocationUpdatesAsync(ACOMPANHAMENTO_TASK, {
-        accuracy: Location.Accuracy.Balanced,
-        timeInterval: 30 * 1000,
+        accuracy,
+        timeInterval,
         distanceInterval: 0,
         pausesUpdatesAutomatically: false,
         activityType: Location.ActivityType?.Other,
         showsBackgroundLocationIndicator: true,
         foregroundService: {
           notificationTitle: "Radar Saúde",
-          notificationBody: "Confirmando sua chegada ou saída do hospital.",
+          notificationBody,
           notificationColor: "#006193",
         },
       });
-    } else if (!haPendencia && ligado) {
-      await Location.stopLocationUpdatesAsync(ACOMPANHAMENTO_TASK);
+    }
+    if (estado.modo !== modo) {
+      // Já dentro da fila do estado: grava direto, sem passar por `alterarEstado`.
+      await gravarEstado({ ...estado, modo });
     }
   } catch (erro) {
     // Sem o acompanhamento, o timer e a próxima abertura do app ainda confirmam a
@@ -473,14 +529,67 @@ TaskManager.defineTask(GEOFENCING_TASK, async ({ data, error }) => {
   }
 });
 
-TaskManager.defineTask(ACOMPANHAMENTO_TASK, async ({ error }) => {
+/**
+ * Heartbeat da visita aberta com a posição da leitura recebida pela tarefa, no máximo um
+ * a cada `INTERVALO_SINAL_VISITA_MS`. A vez é reservada no estado antes do envio, então
+ * leituras simultâneas não mandam o mesmo sinal duas vezes; se o envio falhar, a reserva
+ * é desfeita e a próxima leitura tenta de novo.
+ */
+export async function enviarSinalDaVisita(locations, agora = Date.now()) {
+  const reserva = await alterarEstado((estado) => {
+    const { visita, sinal } = estado;
+    if (!visita) {
+      return null;
+    }
+    if (sinal?.visitaId === visita.id && agora - sinal.em < INTERVALO_SINAL_VISITA_MS) {
+      return null;
+    }
+    estado.sinal = { visitaId: visita.id, em: agora };
+    return { visitaId: visita.id, anterior: sinal || null };
+  });
+  if (!reserva) {
+    return;
+  }
+
+  const ultima = Array.isArray(locations) ? locations[locations.length - 1] : null;
+  const posicao = ultima?.coords
+    ? { type: "Point", coordinates: [ultima.coords.longitude, ultima.coords.latitude] }
+    : undefined;
+
+  try {
+    await VisitaService.heartbeat(reserva.visitaId, posicao);
+  } catch (erro) {
+    if (erro?.status === 404 || erro?.status === 409) {
+      // A visita já não está aberta no servidor (checkout em outro aparelho, expiração):
+      // esquecê-la aqui desliga o acompanhamento e a notificação fixa.
+      await alterarEstado((estado) => {
+        if (estado.visita?.id === reserva.visitaId) {
+          estado.visita = null;
+          estado.sinal = null;
+        }
+      });
+      await ajustarAcompanhamento();
+      return;
+    }
+    await alterarEstado((estado) => {
+      if (estado.sinal?.visitaId === reserva.visitaId && estado.sinal.em === agora) {
+        estado.sinal = reserva.anterior;
+      }
+    });
+    // eslint-disable-next-line no-console
+    console.warn("GeofencingTaskService: falha ao enviar o sinal da visita", erro?.message);
+  }
+}
+
+TaskManager.defineTask(ACOMPANHAMENTO_TASK, async ({ data, error }) => {
   if (error) {
     return;
   }
   try {
     await processarPendencias();
+    await enviarSinalDaVisita(data?.locations);
   } catch {
-    // A próxima leitura (≈30 s) tenta de novo.
+    // A próxima leitura tenta de novo.
   }
 });
 
@@ -705,6 +814,8 @@ export async function pararGeofencing() {
     estado.visita = null;
     estado.entradas = {};
     estado.saidas = {};
+    estado.sinal = null;
+    estado.modo = null;
   });
 
   if (await Location.hasStartedLocationUpdatesAsync(ACOMPANHAMENTO_TASK)) {

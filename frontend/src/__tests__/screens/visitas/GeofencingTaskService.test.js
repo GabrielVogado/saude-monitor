@@ -30,7 +30,7 @@ jest.mock("../../../screens/hospitais/service/HospitalService", () => ({
 
 jest.mock("../../../screens/visitas/service/VisitaService", () => ({
   __esModule: true,
-  default: { checkin: jest.fn(), checkout: jest.fn(), buscarAtiva: jest.fn() },
+  default: { checkin: jest.fn(), checkout: jest.fn(), buscarAtiva: jest.fn(), heartbeat: jest.fn() },
 }));
 
 jest.mock("../../../screens/feedback/service/FeedbackNotificationService", () => ({
@@ -421,9 +421,14 @@ describe("segundo plano com o app fechado", () => {
     expect(VisitaService.checkin).toHaveBeenCalledWith(
       expect.objectContaining({ hospitalId: "hospital-1", origem: "GEOFENCE" })
     );
-    // Nada mais pendente: o GPS volta a ficar desligado.
-    expect(Location.stopLocationUpdatesAsync).toHaveBeenCalled();
-    expect(acompanhamentoLigado).toBe(false);
+    // Nada mais pendente: o acompanhamento troca para o modo econômico da visita, sem
+    // desligar o serviço em primeiro plano no meio.
+    expect(Location.stopLocationUpdatesAsync).not.toHaveBeenCalled();
+    expect(acompanhamentoLigado).toBe(true);
+    expect(Location.startLocationUpdatesAsync).toHaveBeenLastCalledWith(
+      novoProcesso.ACOMPANHAMENTO_TASK,
+      expect.objectContaining({ timeInterval: 5 * 60 * 1000 })
+    );
   });
 
   it("não confirma a entrada por leitura que chega antes dos 2 minutos", async () => {
@@ -732,7 +737,11 @@ describe("falhas e casos de borda", () => {
     await jest.advanceTimersByTimeAsync(60 * 1000);
 
     expect(VisitaService.checkin).toHaveBeenCalledTimes(1);
-    expect(acompanhamentoLigado).toBe(false);
+    // Segue ligado, agora só para o sinal da visita aberta.
+    expect(Location.startLocationUpdatesAsync).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.objectContaining({ timeInterval: 5 * 60 * 1000 })
+    );
   });
 
   it("desiste da entrada sem GPS depois de 30 minutos", async () => {
@@ -778,5 +787,179 @@ describe("falhas e casos de borda", () => {
 
     expect(alerta.mock.calls[0][1]).toMatch(/"Sempre"/);
     expect(Location.requestBackgroundPermissionsAsync).not.toHaveBeenCalled();
+  });
+});
+
+function avancar(ms) {
+  jest.setSystemTime(Date.now() + ms);
+}
+
+describe("sinal da visita em segundo plano (RN-06)", () => {
+  const LEITURA = [{ coords: { latitude: HOSPITAL_LAT, longitude: HOSPITAL_LON } }];
+  const POSICAO = { type: "Point", coordinates: [HOSPITAL_LON, HOSPITAL_LAT] };
+
+  beforeEach(() => {
+    permitirTudo();
+    jest.useFakeTimers();
+    VisitaService.heartbeat.mockReset();
+    VisitaService.heartbeat.mockResolvedValue({ status: "EM_ATENDIMENTO" });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("visita aberta liga o acompanhamento econômico com a notificação de visita", async () => {
+    const { sincronizarVisitaAtiva, ACOMPANHAMENTO_TASK } = carregarServico();
+
+    await sincronizarVisitaAtiva("v1", null, "hospital-1");
+
+    expect(acompanhamentoLigado).toBe(true);
+    expect(Location.startLocationUpdatesAsync).toHaveBeenCalledWith(
+      ACOMPANHAMENTO_TASK,
+      expect.objectContaining({
+        accuracy: "Balanced",
+        timeInterval: 5 * 60 * 1000,
+        foregroundService: expect.objectContaining({
+          notificationBody: expect.stringContaining("Visita em andamento"),
+        }),
+      })
+    );
+  });
+
+  it("chamar de novo com a mesma visita não religa o acompanhamento", async () => {
+    const { sincronizarVisitaAtiva } = carregarServico();
+
+    await sincronizarVisitaAtiva("v1", null, "hospital-1");
+    await sincronizarVisitaAtiva("v1", null, "hospital-1");
+
+    expect(Location.startLocationUpdatesAsync).toHaveBeenCalledTimes(1);
+    expect(Location.stopLocationUpdatesAsync).not.toHaveBeenCalled();
+  });
+
+  it("leitura com o app fechado manda o heartbeat com a posição da própria leitura", async () => {
+    await carregarServico().sincronizarVisitaAtiva("v1", null, "hospital-1");
+
+    // O SO entrega a leitura a um processo recém-criado.
+    await carregarServico().executarAcompanhamento({ data: { locations: LEITURA } });
+
+    expect(VisitaService.heartbeat).toHaveBeenCalledWith("v1", POSICAO);
+  });
+
+  it("manda no máximo um sinal a cada ~10 minutos", async () => {
+    const { sincronizarVisitaAtiva, executarAcompanhamento } = carregarServico();
+    await sincronizarVisitaAtiva("v1", null, "hospital-1");
+
+    await executarAcompanhamento({ data: { locations: LEITURA } });
+    avancar(5 * 60 * 1000);
+    await executarAcompanhamento({ data: { locations: LEITURA } });
+    expect(VisitaService.heartbeat).toHaveBeenCalledTimes(1);
+
+    avancar(5 * 60 * 1000);
+    await executarAcompanhamento({ data: { locations: LEITURA } });
+    expect(VisitaService.heartbeat).toHaveBeenCalledTimes(2);
+  });
+
+  it("leituras simultâneas não duplicam o sinal", async () => {
+    const { sincronizarVisitaAtiva, enviarSinalDaVisita } = carregarServico();
+    await sincronizarVisitaAtiva("v1", null, "hospital-1");
+
+    await Promise.all([enviarSinalDaVisita(LEITURA), enviarSinalDaVisita(LEITURA)]);
+
+    expect(VisitaService.heartbeat).toHaveBeenCalledTimes(1);
+  });
+
+  it("leitura sem coordenadas ainda manda o sinal, sem posição", async () => {
+    const { sincronizarVisitaAtiva, executarAcompanhamento } = carregarServico();
+    await sincronizarVisitaAtiva("v1", null, "hospital-1");
+
+    await executarAcompanhamento({ data: {} });
+
+    expect(VisitaService.heartbeat).toHaveBeenCalledWith("v1", undefined);
+  });
+
+  it("visita nova manda o sinal logo, sem esperar o intervalo da anterior", async () => {
+    const { sincronizarVisitaAtiva, enviarSinalDaVisita } = carregarServico();
+    await sincronizarVisitaAtiva("v1", null, "hospital-1");
+    await enviarSinalDaVisita(LEITURA);
+
+    await sincronizarVisitaAtiva("v2", null, "hospital-2");
+    await enviarSinalDaVisita(LEITURA);
+
+    expect(VisitaService.heartbeat).toHaveBeenLastCalledWith("v2", POSICAO);
+    expect(VisitaService.heartbeat).toHaveBeenCalledTimes(2);
+  });
+
+  it("sem visita aberta não manda sinal e mantém o GPS desligado", async () => {
+    const { enviarSinalDaVisita, sincronizarVisitaAtiva } = carregarServico();
+    await sincronizarVisitaAtiva(null);
+
+    await enviarSinalDaVisita(LEITURA);
+
+    expect(VisitaService.heartbeat).not.toHaveBeenCalled();
+    expect(acompanhamentoLigado).toBe(false);
+  });
+
+  it("falha de rede desfaz a reserva e a leitura seguinte tenta de novo", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    VisitaService.heartbeat.mockRejectedValueOnce(new Error("Network request failed"));
+    const { sincronizarVisitaAtiva, enviarSinalDaVisita } = carregarServico();
+    await sincronizarVisitaAtiva("v1", null, "hospital-1");
+
+    await enviarSinalDaVisita(LEITURA);
+    avancar(60 * 1000);
+    await enviarSinalDaVisita(LEITURA);
+
+    expect(VisitaService.heartbeat).toHaveBeenCalledTimes(2);
+    expect(console.warn).toHaveBeenCalledWith(
+      "GeofencingTaskService: falha ao enviar o sinal da visita",
+      "Network request failed"
+    );
+    console.warn.mockRestore();
+  });
+
+  it.each([404, 409])("visita fechada no servidor (%i) é esquecida e o acompanhamento desliga", async (status) => {
+    VisitaService.heartbeat.mockRejectedValueOnce(Object.assign(new Error("fechada"), { status }));
+    const { sincronizarVisitaAtiva, enviarSinalDaVisita } = carregarServico();
+    await sincronizarVisitaAtiva("v1", null, "hospital-1");
+
+    await enviarSinalDaVisita(LEITURA);
+
+    const estado = JSON.parse(await AsyncStorage.getItem("@saude_monitor:geofencing"));
+    expect(estado.visita).toBeNull();
+    expect(estado.sinal).toBeNull();
+    expect(acompanhamentoLigado).toBe(false);
+  });
+
+  it("pendência de saída durante a visita volta ao modo de leitura a cada 30 s", async () => {
+    const { sincronizarVisitaAtiva, executarTask } = carregarServico();
+    await sincronizarVisitaAtiva("v1", null, "hospital-1");
+
+    await executarTask({
+      data: { eventType: Location.GeofencingEventType.Exit, region: { identifier: "hospital-1" } },
+    });
+
+    expect(Location.startLocationUpdatesAsync).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.objectContaining({ accuracy: "Balanced", timeInterval: 30 * 1000 })
+    );
+    expect(acompanhamentoLigado).toBe(true);
+  });
+
+  it("estado gravado por versão anterior, sem modo, religa no modo certo", async () => {
+    await AsyncStorage.setItem(
+      "@saude_monitor:geofencing",
+      JSON.stringify({ visita: { id: "v1", hospitalId: "hospital-1" }, entradas: {}, saidas: {} })
+    );
+    acompanhamentoLigado = true;
+
+    await carregarServico().executarAcompanhamento({ data: { locations: LEITURA } });
+
+    expect(Location.stopLocationUpdatesAsync).not.toHaveBeenCalled();
+    expect(Location.startLocationUpdatesAsync).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ timeInterval: 5 * 60 * 1000 })
+    );
+    expect(JSON.parse(await AsyncStorage.getItem("@saude_monitor:geofencing")).modo).toBe("visita");
   });
 });

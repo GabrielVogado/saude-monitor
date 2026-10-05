@@ -197,7 +197,7 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
         duracaoMinutos: 8,
       })
     );
-    expect(screen.queryByText("Check-in manual ativo")).toBeNull();
+    await waitFor(() => expect(screen.queryByText("Check-in manual ativo")).toBeNull());
   });
 
   test("check-out de visita curta (<2 min) repassa a duração — não convida para feedback (RN-01/RN-07)", async () => {
@@ -233,7 +233,7 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     await act(async () => {});
 
     expect(warn).toHaveBeenCalledWith("HospitalDetalheScreen: falha ao agendar o feedback", "disco cheio");
-    expect(screen.queryByText("Check-in manual ativo")).toBeNull();
+    await waitFor(() => expect(screen.queryByText("Check-in manual ativo")).toBeNull());
     warn.mockRestore();
   });
 
@@ -278,7 +278,7 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     expect(agendarFeedback).toHaveBeenCalledWith(
       expect.objectContaining({ visitaId: "v1", hospitalId: "h1", hospitalNome: "Hospital Central" })
     );
-    expect(screen.queryByText("Check-in manual ativo")).toBeNull();
+    await waitFor(() => expect(screen.queryByText("Check-in manual ativo")).toBeNull());
     expect(AlertModule.alert).toHaveBeenCalledWith(
       "Sem conexão",
       "Sem conexão com a internet. O registro foi guardado e será enviado assim que a conexão voltar."

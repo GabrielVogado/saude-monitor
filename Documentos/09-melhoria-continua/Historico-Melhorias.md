@@ -1998,6 +1998,53 @@ catraca: só sobe, até chegar à meta.
 
 ---
 
+## M-032 — Cliente HTTP único no app (Fase 0 da SDD de TanStack Query e Zustand)
+
+**Data:** 05/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+A Auditoria Técnica v4.0 do app e a SDD de adoção de TanStack Query e Zustand
+(`08-analise tecnica/`) puseram como pré-requisito unificar o cliente HTTP. Conferido
+contra a `develop` em `08-analise tecnica/Conferencia-Auditoria-v4-e-SDD.md`:
+
+1. **Cinco cópias do mesmo `request()`.** `HospitalService`, `VisitaService`,
+   `FeedbackService` e `PerfilService` tinham cada um o seu, e o `HospitalService` lançava
+   erro sem `status` nem `data`: um 404 era indistinguível de um 500 no domínio mais
+   consultado do app.
+2. **Exclusão de conta sem renovação do token (LGPD, F0-05).** `LoginService.excluirConta()`
+   tinha a quinta cópia, sem o tratamento de 401: com o access token vencido (15 min), a
+   exclusão falhava com "Sessão expirada" mesmo com refresh token válido.
+3. **Ciclo de import.** Os serviços importavam o `LoginService` para o interceptor 401, e o
+   `LoginService` importava o `GeofencingTaskService`, que importa `HospitalService` e
+   `VisitaService`.
+
+### O que mudou
+
+- `frontend/src/core/api/apiClient.js`: `apiRequest` com `Authorization`, timeout e retry
+  (`fetchComRetry`), renovação em 401 com a coordenação por geração de `config/sessao.js`,
+  `signal` para cancelamento e `idempotente`. Erros fora de 2xx viram `ApiError
+  { status, data, message }` (`core/api/apiError.js`).
+- Os quatro serviços e a exclusão de conta passam a usar o cliente único. O download do
+  PDF de exportação (binário) reaproveita a mesma renovação.
+- O `apiClient` não importa o `LoginService`: o refresh e o logout são registrados por
+  `core/api/sessaoApi.js`, carregado no `index.js` antes das tarefas de geofencing. O ciclo
+  de import acabou.
+- ADR-001 passa a "Implementado". A auditoria v4.0, a SDD e a conferência entram no
+  repositório em `08-analise tecnica/`.
+
+### Verificação
+
+- `apiClient.test.js` (16 testes): contrato do `ApiError`, `signal`, `idempotente`,
+  renovação, encerramento só quando o servidor rejeita o refresh, falha de rede
+  classificada.
+- `LoginService.test.js`: exclusão de conta com token vencido renova e conclui; com refresh
+  rejeitado, encerra a sessão. `HospitalService.test.js`: erro da API com `status`.
+- Suíte do app: 489 → 508 testes, todos passando. Linhas alteradas com 100% de cobertura
+  (`diff-cover`). Lint sem aviso novo (16).
+
+---
+
 ## M-037 — Visitas longas deixam de cair como GPS_INTERROMPIDO entre dois heartbeats
 
 **Data:** 05/10/2026 · **PR:** (este PR)

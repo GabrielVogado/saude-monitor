@@ -4,8 +4,9 @@ import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { buildApiUrl } from "../../../config/api";
 
-import { fetchComRetry, fetchComTimeout } from "../../../config/http";
-import { deveEncerrarSessao, geracaoDaSessao, renovarSessao } from "../../../config/sessao";
+import { fetchComTimeout } from "../../../config/http";
+import { geracaoDaSessao } from "../../../config/sessao";
+import { apiRequest as request, renovarSessaoAposNaoAutorizado } from "../../../core/api/apiClient";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../auth/service/LoginService";
 
@@ -23,69 +24,9 @@ const CONSENTIMENTOS_PATH = "/api/v1/contas/consentimentos";
 const VERSAO_TERMOS = "1.0";
 
 /**
- * Chamada autenticada em JSON com renovação de token (401 → refresh → retry único),
- * no mesmo contrato de erro dos demais serviços (`VisitaService`, `HospitalService`).
- */
-async function request(path, { method = "GET", body } = {}) {
-  const doFetch = async () => {
-    const token = await TokenStorage.getAccessToken();
-    return fetchComRetry(buildApiUrl(path), {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
-  };
-
-  // Geração lida antes do 401: se ela mudar, outra requisição já renovou a
-  // sessão e esta só precisa repetir a chamada com o token novo.
-  const geracao = geracaoDaSessao();
-  let response = await doFetch();
-
-  if (response.status === 401 && (await TokenStorage.getRefreshToken())) {
-    try {
-      await renovarSessao(() => LoginService.refresh(), geracao);
-      response = await doFetch();
-    } catch (erroRenovacao) {
-      // Só desloga quando o servidor rejeitou o token (401/403) — falha de rede ou
-      // servidor indisponível (ex.: cold start) preserva a sessão local, o refresh
-      // token (30 dias) segue bom para a próxima tentativa (achado de 10/09/2026).
-      if (deveEncerrarSessao(erroRenovacao)) {
-        await LoginService.logout();
-        throw new Error("Sessão expirada. Faça login novamente.");
-      }
-      throw erroRenovacao;
-    }
-  }
-
-  const raw = await response.text();
-  let data = null;
-  if (raw) {
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      data = null;
-    }
-  }
-
-  if (!response.ok) {
-    const erro = new Error(
-      data?.message || data?.error || `Falha na requisição (HTTP ${response.status}).`
-    );
-    erro.status = response.status;
-    erro.data = data;
-    throw erro;
-  }
-
-  return data;
-}
-
-/**
  * Faz o download autenticado do PDF no cache do app, renovando o token uma única
- * vez quando o backend responde 401 — mesmo contrato do `request()` dos demais
- * serviços, que não pode ser reaproveitado aqui por se tratar de binário.
+ * vez quando o backend responde 401 — mesmo contrato do `apiRequest`, que não pode
+ * ser reaproveitado aqui por se tratar de binário.
  */
 async function baixarComToken(nomeArquivo, token) {
   const geracao = geracaoDaSessao();
@@ -107,18 +48,7 @@ async function baixarComToken(nomeArquivo, token) {
     }
   }
 
-  try {
-    await renovarSessao(() => LoginService.refresh(), geracao);
-  } catch (erroRenovacao) {
-    // Só desloga quando o servidor rejeitou o token (401/403) — falha de rede ou
-    // servidor indisponível (ex.: cold start) preserva a sessão local, o refresh
-    // token (30 dias) segue bom para a próxima tentativa (achado de 10/09/2026).
-    if (deveEncerrarSessao(erroRenovacao)) {
-      await LoginService.logout();
-      throw new Error("Sessão expirada. Faça login novamente.");
-    }
-    throw erroRenovacao;
-  }
+  await renovarSessaoAposNaoAutorizado(geracao);
 
   return baixar(await TokenStorage.getAccessToken());
 }

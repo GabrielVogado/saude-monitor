@@ -5,6 +5,8 @@
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../../screens/auth/service/LoginService";
+// Liga o cliente HTTP ao LoginService (mockado), como o index.js faz no app.
+import "../../../core/api/sessaoApi";
 import { reiniciarControleDeRenovacao } from "../../../config/sessao";
 import { ErroServidorIndisponivel } from "../../../config/http";
 
@@ -173,5 +175,14 @@ describe("HospitalService (Épico 01)", () => {
     await expect(HospitalService.buscarIndicadores("nao-existe")).rejects.toThrow(
       "Hospital não encontrado."
     );
+  });
+
+  test("erro da API traz status e corpo, como nos demais serviços (auditoria v4 §4.1)", async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "Hospital não encontrado." }, 404));
+
+    await expect(HospitalService.buscarPorId("x")).rejects.toMatchObject({
+      status: 404,
+      data: { message: "Hospital não encontrado." },
+    });
   });
 });

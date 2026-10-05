@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 22/09/2026 · Responsável: Gabriel Vogado
+> Última atualização: 05/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 05/10/2026 — Janela de GPS interrompido de 10 para 45 min
+
+**O que mudou:** a RN-06 (Documento Negocial v2.1) e a E2-05 (Backlog v2.2) passam de 10 para 45 min sem sinal antes de encerrar a visita como `GPS_INTERROMPIDO`. A janela antiga era menor que o heartbeat de 30 min (RN-23) e encerrava visitas longas com duração de poucos minutos. Registro em `Historico-Melhorias.md` (M-037). O sinal do app em segundo plano vem num PR separado.
+**Sem mudança:** `De-Para-Backlog-Features.md` (a E2-05 continua entregue; só o limite mudou).
 
 ---
 

@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 22/09/2026 · Responsável: Gabriel Vogado
+> Última atualização: 05/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 05/10/2026 — CI também em PR empilhado
+
+**O que entrou:** o CI (e o SonarQube Cloud) passa a rodar em PR cuja base é uma branch `feature/**` ou `bugfix/**`, não só `develop` e `master`. Registro em `Historico-Melhorias.md` (M-039).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre a esteira).
 
 ---
 

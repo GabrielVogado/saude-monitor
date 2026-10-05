@@ -94,7 +94,7 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   // `dispositivoId` (§3.3). Sem conexão não é "sem visita ativa".
   const { visita: visitaAtiva, definirLocal: definirVisitaLocal } = useVisitaAtivaDaTela();
   const visitaManual =
-    visitaAtiva && visitaAtiva.origem === "MANUAL" && visitaAtiva.hospitalId === id ? visitaAtiva : null;
+    visitaAtiva?.origem === "MANUAL" && visitaAtiva.hospitalId === id ? visitaAtiva : null;
   const [agora, setAgora] = useState(Date.now());
   const { mutateAsync: registrarCheckout, isPending: enviandoCheckout } = useCheckoutManual();
 

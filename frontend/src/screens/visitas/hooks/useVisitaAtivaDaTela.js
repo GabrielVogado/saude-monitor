@@ -40,7 +40,7 @@ export function useVisitaAtivaDaTela() {
     [ultimaResposta]
   );
 
-  if (local && local.aposResposta === ultimaResposta) {
+  if (local?.aposResposta === ultimaResposta) {
     return { visita: local.visita, definirLocal };
   }
   return { visita: erroReal ? null : data?.visita || null, definirLocal };

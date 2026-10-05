@@ -97,6 +97,14 @@ describe("VisitaService (Épico 02)", () => {
     expect(url).toContain("anon-");
   });
 
+  test("listarHistorico repassa o signal de cancelamento ao fetch", async () => {
+    const controle = new AbortController();
+    await VisitaService.listarHistorico({ signal: controle.signal });
+    expect(global.fetch.mock.calls[0][1].signal).toBeDefined();
+    await VisitaService.listarHistorico();
+    expect(chamadas[1].url).toContain("page=0");
+  });
+
   test("listarHistorico usa /contas/visitas com paginação", async () => {
     await VisitaService.listarHistorico({ page: 2, size: 20 });
     expect(chamadas[0].url).toContain("/api/v1/contas/visitas");

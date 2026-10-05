@@ -143,6 +143,7 @@ jest.mock("expo-network", () => ({
     isConnected: true,
     isInternetReachable: true,
   })),
+  addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
 }));
 
 // expo-sharing: menu de compartilhamento do sistema (E5-03).

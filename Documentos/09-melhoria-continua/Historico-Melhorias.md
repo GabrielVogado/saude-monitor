@@ -2045,6 +2045,50 @@ contra a `develop` em `08-analise tecnica/Conferencia-Auditoria-v4-e-SDD.md`:
 
 ---
 
+## M-033 — Sessão global e cache de queries no app (Fase 1 da SDD de TanStack Query e Zustand)
+
+**Data:** 05/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Auditoria Técnica v4.0, §4.2.2: o usuário logado era relido do AsyncStorage no foco de
+cada tela. Quando o interceptor 401 encerrava a sessão, nenhuma tela era avisada: o
+Perfil continuava mostrando a conta até o próximo foco. O Histórico refazia as duas
+consultas a cada foco, sem cache.
+
+### O que mudou
+
+- **Sessão global** (`core/stores/sessaoStore.js`, Zustand): o `LoginService` grava o
+  usuário a cada login, renovação, logout e exclusão de conta, e o app hidrata o store do
+  `TokenStorage` ao abrir. Perfil e Histórico leem dali e reagem na hora, inclusive ao
+  logout feito pelo interceptor 401. Sem persistência própria: o `TokenStorage` continua
+  sendo a única cópia no aparelho (correção à §6.4 da SDD, que gravava o usuário uma
+  segunda vez).
+- **TanStack Query** (`core/query/`): `QueryClient` com cache de 2 min, sem retry próprio
+  (o `apiClient` já repete com backoff; somar os dois chegaria a 9 requisições), ligado ao
+  foco do app (`AppState`) e à conexão (`expo-network`). Fábrica central de chaves.
+- **Logout limpa só o dado pessoal do cache** (`visitas` e `conta`); o catálogo público de
+  hospitais fica.
+- **Histórico** passa a usar `useQuery`, com a chave por usuário e recarga ao voltar à tela
+  (só com sessão: o `refetch` do TanStack Query ignora o `enabled`).
+- Perfil e Histórico esperam o app ler o usuário gravado antes de decidir que é anônimo,
+  para não piscar o convite ao login para quem já está logado.
+- ADR-004 (Context API) marcado como substituído.
+
+### Verificação
+
+- Testes novos: `sessaoStore` (7), `queryClient`/`queryKeys` (7), `setupQueryClient` (7),
+  `useRecarregarNoFoco` (2), Perfil (5: conta da sessão, sem piscar o convite ao login
+  antes de ler o usuário gravado, logout pelo interceptor, Sair, exclusão), Histórico (4:
+  logout com a tela aberta, sem consultar a API antes de ler o usuário, erro e nova
+  tentativa, erro sem mensagem), `LoginService` (sessão em dia no login, renovação e logout) e `signal` no
+  histórico dos dois serviços.
+- Suíte do app: 508 → 543 testes. Linhas alteradas com 98% de cobertura (`diff-cover`;
+  das 3 linhas sem cobertura, 2 são o `onReady` do `App.js`, só reindentado). Lint sem aviso
+  novo (16).
+
+---
+
 ## M-037 — Visitas longas deixam de cair como GPS_INTERROMPIDO entre dois heartbeats
 
 **Data:** 05/10/2026 · **PR:** (este PR)

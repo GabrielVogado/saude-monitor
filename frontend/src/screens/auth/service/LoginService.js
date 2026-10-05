@@ -2,6 +2,7 @@ import { buildApiUrl } from "../../../config/api";
 import { classificarErroDeRede, fetchComRetry } from "../../../config/http";
 import { apiRequest } from "../../../core/api/apiClient";
 import TokenStorage from "../../../services/TokenStorage";
+import { definirUsuarioDaSessao } from "../../../core/stores/sessaoStore";
 import { pararGeofencing } from "../../visitas/service/GeofencingTaskService";
 import { limparPendencias } from "../../feedback/service/FeedbackNotificationService";
 
@@ -109,6 +110,7 @@ class LoginService {
       refreshToken: response.refreshToken,
       usuario: response.usuario,
     });
+    definirUsuarioDaSessao(response.usuario);
 
     return response;
   }
@@ -126,11 +128,13 @@ class LoginService {
 
     const response = await post(`${BASE_PATH}/refresh`, { refreshToken });
 
+    const usuario = response.usuario ?? (await TokenStorage.getUsuario());
     await TokenStorage.salvarTokens({
       accessToken: response.accessToken,
       refreshToken: response.refreshToken,
-      usuario: response.usuario ?? (await TokenStorage.getUsuario()),
+      usuario,
     });
+    definirUsuarioDaSessao(usuario);
 
     return response;
   }
@@ -156,6 +160,8 @@ class LoginService {
     await pararGeofencingBestEffort();
     await limparPendenciasBestEffort();
     await TokenStorage.limparTokens();
+    // Avisa as telas (e limpa o cache de dados pessoais, ver `setupQueryClient`).
+    definirUsuarioDaSessao(null);
   }
 
   /**
@@ -232,6 +238,8 @@ class LoginService {
     await pararGeofencingBestEffort();
     await limparPendenciasBestEffort();
     await TokenStorage.limparTokens();
+    // Avisa as telas (e limpa o cache de dados pessoais, ver `setupQueryClient`).
+    definirUsuarioDaSessao(null);
     return data;
   }
 }

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
 import { MapPinOff, Search, Trophy } from "lucide-react-native";
 import {
   CSHeader,
@@ -13,11 +12,11 @@ import {
   CSIconButton,
 } from "../../../components";
 import { colors, spacing } from "../../../theme/tokens";
-import HospitalService from "../service/HospitalService";
-import VisitaService from "../../visitas/service/VisitaService";
-import { invalidarVisitaAtiva } from "../../../core/query/queryClient";
-import { normalizeText } from "../../../utils/normalize";
-import { avisarSemConexao, preservarSeSemConexao } from "../../../utils/alertas";
+import { useHospital, useHospitaisLista } from "../hooks/useHospitais";
+import { useCheckinManual } from "../../visitas/hooks/useMutacoesVisita";
+import { useVisitaAtivaDaTela } from "../../visitas/hooks/useVisitaAtivaDaTela";
+import { useAcoesListaPaginada } from "../../../core/query/useAcoesListaPaginada";
+import { avisarSemConexao } from "../../../utils/alertas";
 
 const TIPO_FILTROS = [
   { value: "", label: "Todos" },
@@ -25,11 +24,6 @@ const TIPO_FILTROS = [
   { value: "PRIVADO", label: "Privado" },
   { value: "FILANTROPICO", label: "Filantrópico" },
 ];
-
-// O backend limita `size` a 100 por chamada (HospitalController) e a base tem ~340
-// hospitais ativos — uma única página nunca traz o catálogo inteiro. 50 é o meio-termo
-// entre poucas chamadas e uma resposta que ainda cabe confortavelmente numa página.
-const TAMANHO_PAGINA = 50;
 
 /**
  * Listagem pública de hospitais ativos (E1-03).
@@ -42,181 +36,49 @@ const TAMANHO_PAGINA = 50;
  */
 export default function HospitaisScreen({ navigation }) {
   const [busca, setBusca] = useState("");
+  // Termo que de fato vai para a consulta, 400 ms depois da última tecla: sem isso,
+  // cada letra digitada abriria uma chave nova e uma requisição.
+  const [buscaAplicada, setBuscaAplicada] = useState("");
   const [tipo, setTipo] = useState("");
-  const [dados, setDados] = useState([]);
-  const [carregando, setCarregando] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [erro, setErro] = useState(null);
 
-  // Paginação incremental (E1-03 / bug relatado em 09/09/2026): sem isso, a lista
-  // pública mostrava só os primeiros 20 hospitais (o `size` padrão do serviço) e o
-  // usuário nunca via os ~320 restantes a menos que buscasse pelo nome exato.
-  const [pagina, setPagina] = useState(0);
-  const [temMais, setTemMais] = useState(false);
-  const [carregandoMais, setCarregandoMais] = useState(false);
-
-  const [visitaAtiva, setVisitaAtiva] = useState(null);
   const [checkinEnviandoId, setCheckinEnviandoId] = useState(null);
 
-  // Pedido do PO (10/09/2026): o hospital do check-in ativo deve aparecer no topo,
-  // sem precisar procurá-lo na lista paginada (~340 hospitais, 50 por página, ordem
-  // alfabética — o hospital ativo pode estar em qualquer página, inclusive uma ainda
-  // não carregada pelo scroll infinito). Buscado à parte, não depende de `dados`.
-  const [hospitalCheckinAtivo, setHospitalCheckinAtivo] = useState(null);
-
-  const debounceRef = useRef(null);
-  const carregamentoInicialFeitoRef = useRef(false);
-
-  // Geração da carga atual: `carregar()` incrementa a cada chamada (busca/tipo
-  // mudou, ou refresh). Uma `carregarMais()` cuja resposta chega depois de uma
-  // geração mais nova descarta o resultado em vez de concatenar a página de um
-  // critério de busca que já não é o vigente (code-review de 09/09/2026).
-  const geracaoRef = useRef(0);
-  // Guard de reentrância síncrono: `carregandoMais` (estado) só reflete no próximo
-  // render, então dois disparos de `onEndReached` antes desse commit passariam os
-  // dois pelo guard baseado em estado e pediriam a mesma página duas vezes. O ref
-  // bloqueia imediatamente, sem esperar o React re-renderizar.
-  const buscandoMaisRef = useRef(false);
-
-  /** Filtro defensivo no cliente: garante consistência acento/caixa mesmo que o
-   * backend devolva itens fora do critério (ex.: dados legados sem normalização). */
-  const filtrarLocalmente = useCallback((lista, termo) => {
-    return termo
-      ? lista.filter((hospital) => normalizeText(hospital?.nome).includes(termo))
-      : lista;
-  }, []);
-
-  const carregar = useCallback(async (modo = "inicial") => {
-    const minhaGeracao = ++geracaoRef.current;
-
-    if (modo === "refresh") setRefreshing(true);
-    else setCarregando(true);
-    setErro(null);
-
-    try {
-      // Normaliza a busca (acento/caixa) antes de enviar ao backend e de filtrar localmente.
-      const termo = normalizeText(busca);
-      const resposta = await HospitalService.listar({ busca: termo, tipo, page: 0, size: TAMANHO_PAGINA });
-      if (geracaoRef.current !== minhaGeracao) {
-        return;
-      }
-
-      const lista = resposta?.content || resposta || [];
-      const filtrados = filtrarLocalmente(lista, termo);
-
-      setDados(filtrados);
-      setPagina(0);
-      const total = resposta?.totalElements ?? lista.length;
-      setTemMais(lista.length > 0 && lista.length < total);
-    } catch (e) {
-      if (geracaoRef.current === minhaGeracao) {
-        setErro(e.message || "Não foi possível carregar os hospitais.");
-      }
-    } finally {
-      if (geracaoRef.current === minhaGeracao) {
-        setCarregando(false);
-        setRefreshing(false);
-      }
-    }
-  }, [busca, tipo, filtrarLocalmente]);
-
-  // Chamado pela FlatList ao chegar perto do fim (`onEndReached`) — busca a próxima
-  // página e concatena, sem recarregar nem perder a posição do scroll.
-  const carregarMais = useCallback(async () => {
-    if (!temMais || carregando || buscandoMaisRef.current) {
-      return;
-    }
-
-    buscandoMaisRef.current = true;
-    const minhaGeracao = geracaoRef.current;
-    setCarregandoMais(true);
-    try {
-      const termo = normalizeText(busca);
-      const proximaPagina = pagina + 1;
-      const resposta = await HospitalService.listar({
-        busca: termo,
-        tipo,
-        page: proximaPagina,
-        size: TAMANHO_PAGINA,
-      });
-      if (geracaoRef.current !== minhaGeracao) {
-        // A busca/tipo mudou (ou um refresh rodou) enquanto esta página estava em
-        // voo — aplicar agora concatenaria a página errada numa lista que já foi
-        // resetada para outro critério.
-        return;
-      }
-
-      const lista = resposta?.content || resposta || [];
-      const filtrados = filtrarLocalmente(lista, termo);
-
-      setDados((atual) => atual.concat(filtrados));
-      setPagina(proximaPagina);
-      const jaCarregado = (proximaPagina + 1) * TAMANHO_PAGINA;
-      const total = resposta?.totalElements ?? jaCarregado;
-      setTemMais(lista.length > 0 && jaCarregado < total);
-    } catch {
-      // Mantém a lista já visível; o usuário pode rolar até o fim de novo para
-      // tentar a próxima página outra vez, sem perder o que já carregou.
-    } finally {
-      buscandoMaisRef.current = false;
-      if (geracaoRef.current === minhaGeracao) {
-        setCarregandoMais(false);
-      }
-    }
-  }, [temMais, carregando, busca, tipo, pagina, filtrarLocalmente]);
-
   useEffect(() => {
-    if (!carregamentoInicialFeitoRef.current) {
-      carregamentoInicialFeitoRef.current = true;
-      // `carregar` mostra a falha em `erro`: disparo intencional.
-      void carregar();
-      return undefined;
-    }
+    const espera = setTimeout(() => setBuscaAplicada(busca), 400);
+    return () => clearTimeout(espera);
+  }, [busca]);
 
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => carregar(), 400);
-    return () => clearTimeout(debounceRef.current);
-  }, [carregar]);
+  // Paginação incremental (E1-03 / bug relatado em 09/09/2026): sem isso, a lista
+  // pública mostrava só os primeiros 20 hospitais e o usuário nunca via os ~320
+  // restantes a menos que buscasse pelo nome exato. Cada busca/tipo é uma chave
+  // própria, então uma página pedida sob o critério anterior é descartada pela
+  // biblioteca (antes: `geracaoRef` e `buscandoMaisRef`).
+  const { data, error, isPending, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } =
+    useHospitaisLista({ busca: buscaAplicada, tipo });
+  const dados = useMemo(() => data ?? [], [data]);
+  const erro = error && !data ? error.message || "Não foi possível carregar os hospitais." : null;
 
-  // Reidrata a visita ativa ao focar a aba (e ao voltar do detalhe) para refletir o
-  // estado do botão de check-in por hospital (modo anônimo via dispositivoId, §3.3).
-  // Sem conexão não é "sem visita ativa" — ver `preservarSeSemConexao`, incluindo a
-  // limitação conhecida sobre a janela entre reconectar e a fila sincronizar.
-  const atualizarVisitaAtiva = useCallback(() => {
-    VisitaService.buscarAtiva()
-      .then((data) => setVisitaAtiva(data?.visita || null))
-      .catch((e) => preservarSeSemConexao(e, setVisitaAtiva));
-  }, []);
+  // `carregarMais` é chamado pela FlatList ao chegar perto do fim (`onEndReached`):
+  // busca a próxima página e concatena, sem recarregar nem perder a posição do scroll.
+  const { atualizando, atualizar, carregarMais } = useAcoesListaPaginada({
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  });
 
-  useFocusEffect(
-    useCallback(() => {
-      atualizarVisitaAtiva();
-    }, [atualizarVisitaAtiva])
-  );
+  // Visita ativa compartilhada com o observador global, recarregada ao focar a aba (e
+  // ao voltar do detalhe) para refletir o botão de check-in de cada hospital (modo
+  // anônimo via dispositivoId, §3.3). Sem conexão não é "sem visita ativa".
+  const { visita: visitaAtiva, definirLocal: definirVisitaLocal } = useVisitaAtivaDaTela();
+  const { mutateAsync: registrarCheckin } = useCheckinManual();
 
-  // Busca o hospital do check-in ativo independente da paginação de `dados` — ele
-  // pode estar em qualquer página, carregada ou não. Falha silenciosa de propósito
-  // (ex.: sem conexão): a lista continua funcionando normalmente, só sem o destaque.
-  useEffect(() => {
-    const hospitalId = visitaAtiva?.hospitalId;
-    if (!hospitalId) {
-      setHospitalCheckinAtivo(null);
-      return undefined;
-    }
-
-    let cancelado = false;
-    HospitalService.buscarPorId(hospitalId)
-      .then((hospital) => {
-        if (!cancelado) setHospitalCheckinAtivo(hospital);
-      })
-      .catch(() => {
-        if (!cancelado) setHospitalCheckinAtivo(null);
-      });
-
-    return () => {
-      cancelado = true;
-    };
-  }, [visitaAtiva?.hospitalId]);
+  // Pedido do PO (10/09/2026): o hospital do check-in ativo aparece no topo, sem
+  // precisar procurá-lo na lista paginada (pode estar numa página ainda não carregada).
+  // Buscado à parte e compartilhado com o detalhe pela mesma chave. Falha silenciosa
+  // de propósito (ex.: sem conexão): a lista continua, só sem o destaque.
+  const { data: hospitalDoCheckin } = useHospital(visitaAtiva?.hospitalId);
+  const hospitalCheckinAtivo = visitaAtiva?.hospitalId ? hospitalDoCheckin ?? null : null;
 
   // Hospital do check-in ativo primeiro, sem duplicá-lo caso já esteja em `dados`
   // (página carregada por acaso contém o mesmo hospital, ordem alfabética).
@@ -265,16 +127,11 @@ export default function HospitaisScreen({ navigation }) {
       }
 
       setCheckinEnviandoId(hospital.id);
-      setErro(null);
       try {
-        const resposta = await VisitaService.checkin({
-          hospitalId: hospital.id,
-          origem: "MANUAL",
-        });
-        setVisitaAtiva({ ...resposta, origem: "MANUAL" });
-        // Avisa o observador global (heartbeat e geofencing) da visita nova, sem
+        // A mutação grava a visita confirmada na query compartilhada: o botão muda
+        // aqui e o observador global (heartbeat e geofencing) segue a visita nova sem
         // depender de a aba Início ganhar foco (Auditoria Técnica v4.0, §4.2.2).
-        void invalidarVisitaAtiva();
+        await registrarCheckin({ hospitalId: hospital.id });
         // Redireciona ao detalhe do hospital, que exibe o temporizador + checkout
         // (específico do check-in manual).
         setCheckinEnviandoId(null);
@@ -304,9 +161,9 @@ export default function HospitaisScreen({ navigation }) {
           // Marca a visita como ativa AQUI, localmente: arma o guard de "uma visita
           // por vez" (visitaAtivaRef, acima) antes da fila sincronizar. Janela residual
           // e decisão de aceitá-la documentadas em `preservarSeSemConexao`
-          // (utils/alertas.js) — o `id: null` é substituído pelo real quando
-          // `atualizarVisitaAtiva` rodar de novo (foco da aba).
-          setVisitaAtiva({ id: null, hospitalId: hospital.id, origem: "MANUAL" });
+          // (utils/alertas.js) — o `id: null` é substituído pelo real na próxima
+          // resposta do servidor (foco da aba ou volta da conexão).
+          definirVisitaLocal({ id: null, hospitalId: hospital.id, origem: "MANUAL" });
           avisarSemConexao(e.message);
           return;
         }
@@ -317,7 +174,7 @@ export default function HospitaisScreen({ navigation }) {
     // função não precisa mais ser recriada a cada mudança de visita -- fica estável
     // para o renderItem memoizado abaixo. O exhaustive-deps confirma que é dependência
     // desnecessária.
-    [navigation]
+    [navigation, registrarCheckin, definirVisitaLocal]
   );
 
   // ARQ-05: extraido do JSX e memoizado. Inline, ele criava uma funcao nova a cada
@@ -354,7 +211,7 @@ export default function HospitaisScreen({ navigation }) {
           title="Algo deu errado"
           message={erro}
           actionLabel="Tentar novamente"
-          onAction={() => carregar()}
+          onAction={() => refetch()}
         />
       );
     }
@@ -378,7 +235,7 @@ export default function HospitaisScreen({ navigation }) {
         onAction={() => navigation.navigate("SugerirHospital")}
       />
     );
-  }, [busca, tipo, erro, carregar, navigation]);
+  }, [busca, tipo, erro, refetch, navigation]);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -413,7 +270,7 @@ export default function HospitaisScreen({ navigation }) {
         </View>
       </View>
 
-      {carregando ? (
+      {isPending ? (
         <CSLoadingList count={3} />
       ) : (
         <FlatList
@@ -426,7 +283,7 @@ export default function HospitaisScreen({ navigation }) {
           onEndReached={carregarMais}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
-            carregandoMais ? (
+            isFetchingNextPage ? (
               <ActivityIndicator
                 style={styles.rodapeCarregando}
                 size="small"
@@ -437,8 +294,8 @@ export default function HospitaisScreen({ navigation }) {
           }
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => carregar("refresh")}
+              refreshing={atualizando}
+              onRefresh={atualizar}
               tintColor={colors.primary}
             />
           }

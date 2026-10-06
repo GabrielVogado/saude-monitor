@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
 import { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from "../../../utils/mapkit";
 import { Building2, Clock, Mail, MapPin, Phone } from "lucide-react-native";
 import {
@@ -14,9 +13,9 @@ import {
   CSRatingStars,
 } from "../../../components";
 import { colors, radii, spacing, typography } from "../../../theme/tokens";
-import HospitalService from "../service/HospitalService";
-import VisitaService from "../../visitas/service/VisitaService";
-import { invalidarVisitaAtiva } from "../../../core/query/queryClient";
+import { useHospital, useIndicadoresHospital } from "../hooks/useHospitais";
+import { useCheckoutManual } from "../../visitas/hooks/useMutacoesVisita";
+import { useVisitaAtivaDaTela } from "../../visitas/hooks/useVisitaAtivaDaTela";
 import { agendarFeedback } from "../../feedback/service/FeedbackNotificationService";
 import {
   calcularCentroide,
@@ -33,7 +32,7 @@ import {
   formatarNota,
   formatarPeriodo,
 } from "../../../utils/format";
-import { avisarSemConexao, preservarSeSemConexao } from "../../../utils/alertas";
+import { avisarSemConexao } from "../../../utils/alertas";
 import { avaliacaoSuficiente } from "../../../utils/indicadores";
 
 const TIPO_LABEL = {
@@ -62,70 +61,42 @@ const BRASIL_REGION = {
 export default function HospitalDetalheScreen({ navigation, route }) {
   const { id } = route.params || {};
 
-  const [hospital, setHospital] = useState(null);
-  const [indicadores, setIndicadores] = useState(null);
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState(null);
+  // Dados e indicadores em consultas separadas, compartilhadas com a lista (destaque do
+  // check-in ativo) pela mesma chave. Os indicadores enriquecidos vêm do endpoint
+  // dedicado (§3.5 / E4-01..E4-04); se falharem (ex.: agregado ainda materializando),
+  // a tela usa os embutidos no detalhe.
+  const consultaHospital = useHospital(id);
+  const consultaIndicadores = useIndicadoresHospital(id);
+  const hospital = consultaHospital.data ?? null;
+  const indicadores = consultaIndicadores.data ?? null;
+  // Espera os indicadores só quando o hospital veio: sem ele a tela já é de erro.
+  const carregando =
+    Boolean(id) &&
+    (consultaHospital.isPending || (consultaHospital.isSuccess && consultaIndicadores.isPending));
+  // Uma atualização que falha com o hospital já na tela (ex.: volta ao app sem
+  // conexão) não troca a tela pelo erro.
+  const erro =
+    consultaHospital.error && !hospital
+      ? consultaHospital.error.message || "Não foi possível carregar o hospital."
+      : null;
+
+  const carregar = () => {
+    void consultaHospital.refetch();
+    void consultaIndicadores.refetch();
+  };
 
   // Navegação revisada: visita ativa do modo MANUAL deste hospital — exibe temporizador
   // hh:mm:ss + botão de checkout ("Não estou aqui"). Só é mostrada quando a visita ativa
   // veio do check-in manual (§ específico), jamais para visitas GEOFENCE ou de outro hospital.
-  const [visitaManual, setVisitaManual] = useState(null);
+  //
+  // Lida da visita ativa compartilhada com o observador global e recarregada ao focar a
+  // tela (ex.: ao voltar do check-in da lista Hospital → este detalhe). Modo anônimo usa
+  // `dispositivoId` (§3.3). Sem conexão não é "sem visita ativa".
+  const { visita: visitaAtiva, definirLocal: definirVisitaLocal } = useVisitaAtivaDaTela();
+  const visitaManual =
+    visitaAtiva?.origem === "MANUAL" && visitaAtiva.hospitalId === id ? visitaAtiva : null;
   const [agora, setAgora] = useState(Date.now());
-  const [enviandoCheckout, setEnviandoCheckout] = useState(false);
-
-  const carregar = async () => {
-    setCarregando(true);
-    setErro(null);
-    try {
-      const dados = await HospitalService.buscarPorId(id);
-      setHospital(dados);
-
-      // Indicadores enriquecidos do endpoint dedicado (§3.5 / E4-01..E4-04).
-      // Se falhar (ex.: agregado ainda materializando), mantém os embutidos do detalhe.
-      try {
-        const ind = await HospitalService.buscarIndicadores(id);
-        setIndicadores(ind);
-      } catch {
-        setIndicadores(dados?.indicadores || null);
-      }
-    } catch (e) {
-      setErro(e.message || "Não foi possível carregar o hospital.");
-    } finally {
-      setCarregando(false);
-    }
-  };
-
-  useEffect(() => {
-    // `carregar` mostra a falha em `erro`: disparo intencional.
-    if (id) void carregar();
-  }, [id]);
-
-  // Sincroniza o estado da visita manual ao focar a tela (ex.: ao voltar do check-in
-  // da lista Hospital → este detalhe). Modo anônimo usa `dispositivoId` (§3.3). Sem
-  // conexão não é "sem visita ativa" — ver `preservarSeSemConexao`, incluindo a
-  // limitação conhecida sobre a janela entre reconectar e a fila sincronizar.
-  const carregarVisitaManual = async () => {
-    try {
-      const data = await VisitaService.buscarAtiva();
-      const visita = data?.visita || null;
-      setVisitaManual(
-        visita && visita.origem === "MANUAL" && visita.hospitalId === id ? visita : null
-      );
-      if (visita?.origem === "MANUAL" && visita.hospitalId === id) {
-        setAgora(Date.now());
-      }
-    } catch (e) {
-      preservarSeSemConexao(e, setVisitaManual);
-    }
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      // `carregarVisitaManual` trata a falha (preservarSeSemConexao): disparo intencional.
-      if (id) void carregarVisitaManual();
-    }, [id])
-  );
+  const { mutateAsync: registrarCheckout, isPending: enviandoCheckout } = useCheckoutManual();
 
   // Temporizador hh:mm:ss atualizado a cada segundo enquanto houver visita manual ativa.
   useEffect(() => {
@@ -138,7 +109,6 @@ export default function HospitalDetalheScreen({ navigation, route }) {
 
   const encerrarVisitaManual = async () => {
     if (!visitaManual) return;
-    setEnviandoCheckout(true);
 
     // Épico 03 — E3-01: agenda o pedido de feedback ~1–5 min após a saída. Chamado
     // tanto no sucesso quanto no checkout enfileirado (abaixo) — nos dois casos a
@@ -158,14 +128,13 @@ export default function HospitalDetalheScreen({ navigation, route }) {
         // eslint-disable-next-line no-console
         console.warn("HospitalDetalheScreen: falha ao agendar o feedback", erro?.message);
       });
-      setVisitaManual(null);
     };
 
     try {
-      const resposta = await VisitaService.checkout(visitaManual.id, { encerramentoManual: true });
+      // A mutação grava "sem visita" na query compartilhada: o cronômetro some e o
+      // heartbeat da visita encerrada para já, sem esperar o foco da aba Início.
+      const resposta = await registrarCheckout(visitaManual.id);
       encerrarLocalmente(resposta?.duracaoMinutos);
-      // Para o heartbeat da visita encerrada já, sem esperar o foco da aba Início.
-      void invalidarVisitaAtiva();
     } catch (e) {
       if (e.enfileirado) {
         // Sem conexão, o checkout foi guardado para sincronizar depois (OPS-05).
@@ -174,6 +143,7 @@ export default function HospitalDetalheScreen({ navigation, route }) {
         // Janela residual e decisão de aceitá-la documentadas em
         // `preservarSeSemConexao` (utils/alertas.js).
         encerrarLocalmente(duracaoMinutosDesde(visitaManual.entrada));
+        definirVisitaLocal(null);
         avisarSemConexao(e.message);
         return;
       }
@@ -181,8 +151,6 @@ export default function HospitalDetalheScreen({ navigation, route }) {
         "Check-out",
         e.message || "Não foi possível finalizar o check-out. Tente novamente."
       );
-    } finally {
-      setEnviandoCheckout(false);
     }
   };
 

@@ -135,7 +135,7 @@ feature/* ──► develop ──► master ──► release/<tag>
 
 | Workflow | Gatilho | Ação |
 |----------|---------|------|
-| `ci.yml` | push/PR em `develop`/`master` | Build + testes do backend, do frontend e do Painel Admin (`admin/`, desde 28/09/2026); análise no SonarQube Cloud quando há `SONAR_TOKEN`; em PR, **trava de contagem de testes** (§4.4, desde 04/10/2026) e **cobertura mínima de 90% no código novo** com o total sem cair (§4.4, M-031) |
+| `ci.yml` | push em `develop`/`master`; PR com base em `develop`, `master`, `feature/**` ou `bugfix/**` (as duas últimas desde 05/10/2026, para PR empilhado também rodar CI e Sonar — M-039) | Build + testes do backend, do frontend e do Painel Admin (`admin/`, desde 28/09/2026); análise no SonarQube Cloud quando há `SONAR_TOKEN`; em PR, **trava de contagem de testes** (§4.4, desde 04/10/2026) e **cobertura mínima de 90% no código novo** com o total sem cair (§4.4, M-031) |
 | `cd-backend-google.yml` | push em `develop`, `release/**` (caminho `backend/**`) + manual + `workflow_call` | Docker → Artifact Registry → deploy no **Cloud Run** + 3 smoke tests. **Falha com mensagem explícita** se o ambiente não tiver secrets |
 | `cd-homologacao.yml` | push em `master` + manual | **Homologação:** versão `vX.Y.Z-rc.N` → backend HML → APK HML → tag + GitHub Release (§3.3) |
 | `cd-mobile-apk.yml` | push em `develop` (caminho `frontend/**`) + manual + `workflow_call` | Build do APK com Gradle no próprio Actions. Artefato do run (30 dias). Pacote, nome e versão por ambiente |

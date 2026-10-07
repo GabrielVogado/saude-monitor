@@ -43,6 +43,8 @@
 | Mapas | react-native-maps | 1.20.1 | `MapView` + `Marker` |
 | Localização | expo-location | 19.0.7 | `watchPositionAsync` com `BestForNavigation`, 2s/3m |
 | Ícones | lucide-react-native | ^1.7.0 | Consistente com novo design |
+| Estado de servidor | TanStack Query | ^5.104 | Cache das leituras (hospitais, visita ativa) e mutações de check-in, checkout e feedback, desde 05/10/2026 (SDD, M-033 a M-036) |
+| Estado de sessão | Zustand | ^5.0 | Sessão global do usuário, desde 05/10/2026 (SDD, M-033) |
 | Telas | Home, Login, Cadastro, GeoLocalizacao | — | 4 telas em `src/screens/{home,auth,user,geolocalizacao}` |
 
 **⚠️ Achados críticos na varredura:**

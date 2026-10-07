@@ -2,7 +2,7 @@
 **Projeto:** Saúde Monitor — Frontend Mobile  
 **Versão:** 1.0  
 **Data:** Outubro de 2026  
-**Status:** Aprovado para Implementação  
+**Status:** Implementado (Fases 0 a 4 na `develop` em 06/10/2026 — PRs #183, #184, #185 e #191; M-032 a M-036). FlashList fica para um PR separado, com teste no aparelho.  
 **Autor:** Engenharia de Software / Arquitetura Frontend  
 **Público-alvo:** Desenvolvedores Frontend Mobile, Tech Leads, QA  
 **Documentos Relacionados:** [Relatório de Auditoria Técnica v4.0](./Relatorio-Auditoria-Tecnica-v4.0.md), [ADRs do Projeto](./adrs.md)

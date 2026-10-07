@@ -45,11 +45,11 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **E2-02** | Detecção saída automática | **F-03** | ✅ Existente (com o app fechado desde 04/10/2026 — M-028) |
 | **E2-03** | Expirar visitas > 24h | **F-03** | ✅ Existente (job `EXPIRADA`) |
 | **E2-04** | Tratar conflito sobreposição | **F-03** | ✅ Existente (hospital mais próximo) |
-| **E2-05** | Recuperar GPS interrompido | **F-03** | ✅ Existente (timeout 10min) |
+| **E2-05** | Recuperar GPS interrompido | **F-03** | ✅ Existente (janela de 45 min sem sinal desde 05/10/2026 — M-037; antes 10 min) |
 | **E2-06** | Check-in manual (Plano B) | **F-04** | ✅ Existente |
 | **E2-07** | Ver visita ativa (app) | **F-04** | ✅ Existente (card + cronômetro) |
 | **E2-08** | Ignorar visitas < 2 minutos | **F-04** | ✅ Existente (RN-07): síntese em `develop` não salvava; **corrigido** em `bugfix/ajustes-rn-feedback-estatisticas` (`DURACAO_MINIMA_MINUTOS=2` no `AgregadoServiceImpl`, filtro `>= 2min` + teste — commit `3ad5bf9`) |
-| **E2-09** | Enviar heartbeat 30 min | **F-03**, **F-04** | ✅ Existente |
+| **E2-09** | Enviar heartbeat 30 min | **F-03**, **F-04** | ✅ Existente (com o app fechado durante a visita, sinal com posição a cada ~10 min desde 05/10/2026 — M-038) |
 | **E2-10** | Prompt observação/internação | **F-04** | ✅ Existente (após 12h) |
 
 ## Épico 3 — Feedback Pós-Saída

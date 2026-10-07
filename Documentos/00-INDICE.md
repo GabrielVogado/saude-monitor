@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 05/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 07/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 07/10/2026 — Documentação da SDD conferida contra a `develop`
+
+**O que mudou:** os registros M-032 a M-039 do `Historico-Melhorias.md` ganharam o número do PR (antes "(este PR)") e M-035/M-036 voltaram à ordem numérica. A SDD de TanStack Query e Zustand passa a "Implementado". `De-Para-Backlog-Features.md` atualiza E2-05 (janela de 45 min, M-037) e E2-09 (sinal com o app fechado, M-038). O `MANUAL.md` do git-flow passa a listar as bases `feature/**` e `bugfix/**` do CI (M-039) e a Árvore Tecnológica registra TanStack Query e Zustand no app.
+**Sem mudança de código.**
 
 ---
 

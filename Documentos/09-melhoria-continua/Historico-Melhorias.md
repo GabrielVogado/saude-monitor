@@ -2000,7 +2000,7 @@ catraca: só sobe, até chegar à meta.
 
 ## M-032 — Cliente HTTP único no app (Fase 0 da SDD de TanStack Query e Zustand)
 
-**Data:** 05/10/2026 · **PR:** (este PR)
+**Data:** 05/10/2026 · **PR:** #183
 
 ### Como apareceu
 
@@ -2047,7 +2047,7 @@ contra a `develop` em `08-analise tecnica/Conferencia-Auditoria-v4-e-SDD.md`:
 
 ## M-033 — Sessão global e cache de queries no app (Fase 1 da SDD de TanStack Query e Zustand)
 
-**Data:** 05/10/2026 · **PR:** (este PR)
+**Data:** 05/10/2026 · **PR:** #184
 
 ### Como apareceu
 
@@ -2091,7 +2091,7 @@ consultas a cada foco, sem cache.
 
 ## M-034 — Heartbeat e geofencing seguem a visita ativa em qualquer tela (Fase 2 da SDD)
 
-**Data:** 05/10/2026 · **PR:** (este PR)
+**Data:** 05/10/2026 · **PR:** #185
 
 ### Como apareceu
 
@@ -2131,108 +2131,9 @@ até o próximo foco da Home.
 
 ---
 
-## M-037 — Visitas longas deixam de cair como GPS_INTERROMPIDO entre dois heartbeats
-
-**Data:** 05/10/2026 · **PR:** (este PR)
-
-### Como apareceu
-
-Conferência da Auditoria Técnica v4.0 (`08-analise tecnica/Conferencia-Auditoria-v4-e-SDD.md`,
-§2): o `VisitaGpsInterrompidoJob` encerrava como `GPS_INTERROMPIDO` toda visita sem sinal
-há mais de 10 min (RN-06), mas o app só manda heartbeat a cada 30 min (RN-23), e só com
-o app aberto. Toda visita que passava de 10 a 25 min sem checkout de geofence era
-encerrada com `saida` no check-in e duração de poucos minutos, distorcendo o tempo
-mediano (RN-15). As duas regras se contradiziam no Documento Negocial.
-
-### Decisão do PO (05/10/2026)
-
-"As duas": janela de 45 min agora, e o app mandando sinal em segundo plano num PR
-separado.
-
-### O que mudou
-
-- `VisitaServiceImpl.LIMITE_GPS_INTERROMPIDO`: 10 → 45 min. Cobre um heartbeat perdido
-  e o ciclo de 15 min do job. O último sinal continua sendo o mais recente entre
-  heartbeat e posição, e a saída continua sendo esse último sinal.
-- RN-06 (Documento Negocial v2.1) e E2-05 (Backlog v2.2) atualizadas.
-
-### Verificação
-
-- `VisitaServiceImplTest`: visita 31 min sem sinal (entre dois heartbeats) continua
-  ativa, e o corte consultado no Mongo é agora menos 45 min. Os dois testes que usavam
-  15 min sem sinal passaram para 50 min.
-
----
-
-## M-038 — Sinal da visita com o app fechado
-
-**Data:** 05/10/2026 · **PR:** (este PR)
-
-### Como apareceu
-
-Na conferência da Auditoria v4 apareceu que o heartbeat do app (`HeartbeatService`) só
-roda com o app aberto, a cada 30 min, enquanto o `VisitaGpsInterrompidoJob` encerrava a
-visita como `GPS_INTERROMPIDO` após 10 min sem posição. Com o app fechado nada chegava, e
-quem continuava no hospital tinha a visita cortada. Escolha do PO: **as duas** correções,
-em PRs separados. A janela de 45 min no backend é a primeira (M-037); esta é a segunda.
-
-### O que mudou
-
-- Com visita aberta e nenhuma entrada ou saída pendente, a tarefa de acompanhamento do
-  `GeofencingTaskService` continua ligada num **modo de visita**: leitura a cada 5 min (a
-  economia de bateria vem do intervalo) e notificação fixa "Visita em andamento". A cada leitura,
-  se o último sinal tem 9 min ou mais, manda `POST /visitas/{id}/heartbeat` com a posição
-  da própria leitura. Na prática, um sinal a cada ~10 min.
-- Entrada ou saída pendente continua no modo de 30 s, que tem prioridade. A troca de modo
-  chama `startLocationUpdatesAsync` de novo com a tarefa ligada, o que só troca as opções:
-  desligar e religar deixaria um intervalo sem serviço em primeiro plano, e o Android 12+
-  recusa iniciar outro com o app em segundo plano. O modo ligado fica salvo no estado.
-- A vez do sinal é reservada no estado antes do envio, para leituras simultâneas não
-  duplicarem o heartbeat. Falha de rede desfaz a reserva (a próxima leitura tenta de
-  novo); 404 ou 409 esquecem a visita e desligam o acompanhamento.
-- RN-23 e o heartbeat na especificação da API passam a descrever os dois intervalos.
-
-### Verificação
-
-- 13 testes novos em `GeofencingTaskService.test.js` (modo de visita, intervalo, leitura
-  em processo novo, corrida, falha de rede, visita fechada, troca de modo, estado antigo).
-- Pendente em campo: APK novo com "Permitir o tempo todo", visita de mais de 45 min com o
-  app fechado, conferir no painel que a visita segue `EM_ATENDIMENTO` e que a notificação
-  fixa some no checkout.
-
----
-
-## M-039 — CI e Sonar também em PR empilhado
-
-**Data:** 05/10/2026 · **PR:** (este PR)
-
-### Como apareceu
-
-Observação do PO: "aparentemente o sonar não rodou em todas as branches". Os PRs da SDD
-de TanStack Query e Zustand estão empilhados (cada um com base na branch do anterior), e
-o `ci.yml` só disparava em PR para `develop` ou `master`. Só o primeiro da pilha tinha CI
-e Sonar; os outros só seriam medidos depois de reapontados para a `develop`.
-
-### O que mudou
-
-- `pull_request` do `ci.yml` passa a aceitar também bases `feature/**` e `bugfix/**`.
-- Nesses PRs, o `diff-cover` mede só as linhas do próprio PR (compara com a branch de
-  base). A trava de contagem e de cobertura total compara com o ancestral verde mais
-  próximo da base, que é um commit da `develop`, porque branch de trabalho não tem CI de
-  push. Na prática a régua é a da `develop`, e os testes das fases anteriores da pilha
-  contam a favor.
-
-### Verificação
-
-- Gatilho conferido com o YAML carregado (`develop`, `master`, `feature/**`, `bugfix/**`).
-- A primeira execução real acontece nos PRs empilhados ao serem atualizados depois do
-  merge deste.
-
----
-
 ## M-035 — Leituras de hospitais com TanStack Query (Fase 3 da SDD)
 
-**Data:** 05/10/2026 · **PR:** (este PR)
+**Data:** 05/10/2026 · **PR:** #186 (entrou na `develop` pelo #191)
 
 ### Como apareceu
 
@@ -2278,7 +2179,7 @@ em sequência, sem cache. Voltar a uma tela já vista refazia todas as chamadas.
 
 ## M-036 — Check-in, checkout e feedback com mutações (Fase 4 da SDD)
 
-**Data:** 05/10/2026 · **PR:** (este PR)
+**Data:** 05/10/2026 · **PR:** #187 (entrou na `develop` pelo #191)
 
 ### Como apareceu
 
@@ -2316,6 +2217,105 @@ avaliação recém-enviada.
 - Testes de tela ajustados ao servidor real: depois do check-in ou checkout, a próxima
   consulta da visita ativa responde com o estado novo.
 - Suíte do app: 564 → 570 testes. Linhas alteradas com 100% de cobertura (`diff-cover`).
+
+---
+
+## M-037 — Visitas longas deixam de cair como GPS_INTERROMPIDO entre dois heartbeats
+
+**Data:** 05/10/2026 · **PR:** #188
+
+### Como apareceu
+
+Conferência da Auditoria Técnica v4.0 (`08-analise tecnica/Conferencia-Auditoria-v4-e-SDD.md`,
+§2): o `VisitaGpsInterrompidoJob` encerrava como `GPS_INTERROMPIDO` toda visita sem sinal
+há mais de 10 min (RN-06), mas o app só manda heartbeat a cada 30 min (RN-23), e só com
+o app aberto. Toda visita que passava de 10 a 25 min sem checkout de geofence era
+encerrada com `saida` no check-in e duração de poucos minutos, distorcendo o tempo
+mediano (RN-15). As duas regras se contradiziam no Documento Negocial.
+
+### Decisão do PO (05/10/2026)
+
+"As duas": janela de 45 min agora, e o app mandando sinal em segundo plano num PR
+separado.
+
+### O que mudou
+
+- `VisitaServiceImpl.LIMITE_GPS_INTERROMPIDO`: 10 → 45 min. Cobre um heartbeat perdido
+  e o ciclo de 15 min do job. O último sinal continua sendo o mais recente entre
+  heartbeat e posição, e a saída continua sendo esse último sinal.
+- RN-06 (Documento Negocial v2.1) e E2-05 (Backlog v2.2) atualizadas.
+
+### Verificação
+
+- `VisitaServiceImplTest`: visita 31 min sem sinal (entre dois heartbeats) continua
+  ativa, e o corte consultado no Mongo é agora menos 45 min. Os dois testes que usavam
+  15 min sem sinal passaram para 50 min.
+
+---
+
+## M-038 — Sinal da visita com o app fechado
+
+**Data:** 05/10/2026 · **PR:** #189
+
+### Como apareceu
+
+Na conferência da Auditoria v4 apareceu que o heartbeat do app (`HeartbeatService`) só
+roda com o app aberto, a cada 30 min, enquanto o `VisitaGpsInterrompidoJob` encerrava a
+visita como `GPS_INTERROMPIDO` após 10 min sem posição. Com o app fechado nada chegava, e
+quem continuava no hospital tinha a visita cortada. Escolha do PO: **as duas** correções,
+em PRs separados. A janela de 45 min no backend é a primeira (M-037); esta é a segunda.
+
+### O que mudou
+
+- Com visita aberta e nenhuma entrada ou saída pendente, a tarefa de acompanhamento do
+  `GeofencingTaskService` continua ligada num **modo de visita**: leitura a cada 5 min (a
+  economia de bateria vem do intervalo) e notificação fixa "Visita em andamento". A cada leitura,
+  se o último sinal tem 9 min ou mais, manda `POST /visitas/{id}/heartbeat` com a posição
+  da própria leitura. Na prática, um sinal a cada ~10 min.
+- Entrada ou saída pendente continua no modo de 30 s, que tem prioridade. A troca de modo
+  chama `startLocationUpdatesAsync` de novo com a tarefa ligada, o que só troca as opções:
+  desligar e religar deixaria um intervalo sem serviço em primeiro plano, e o Android 12+
+  recusa iniciar outro com o app em segundo plano. O modo ligado fica salvo no estado.
+- A vez do sinal é reservada no estado antes do envio, para leituras simultâneas não
+  duplicarem o heartbeat. Falha de rede desfaz a reserva (a próxima leitura tenta de
+  novo); 404 ou 409 esquecem a visita e desligam o acompanhamento.
+- RN-23 e o heartbeat na especificação da API passam a descrever os dois intervalos.
+
+### Verificação
+
+- 13 testes novos em `GeofencingTaskService.test.js` (modo de visita, intervalo, leitura
+  em processo novo, corrida, falha de rede, visita fechada, troca de modo, estado antigo).
+- Pendente em campo: APK novo com "Permitir o tempo todo", visita de mais de 45 min com o
+  app fechado, conferir no painel que a visita segue `EM_ATENDIMENTO` e que a notificação
+  fixa some no checkout.
+
+---
+
+## M-039 — CI e Sonar também em PR empilhado
+
+**Data:** 05/10/2026 · **PR:** #190
+
+### Como apareceu
+
+Observação do PO: "aparentemente o sonar não rodou em todas as branches". Os PRs da SDD
+de TanStack Query e Zustand estão empilhados (cada um com base na branch do anterior), e
+o `ci.yml` só disparava em PR para `develop` ou `master`. Só o primeiro da pilha tinha CI
+e Sonar; os outros só seriam medidos depois de reapontados para a `develop`.
+
+### O que mudou
+
+- `pull_request` do `ci.yml` passa a aceitar também bases `feature/**` e `bugfix/**`.
+- Nesses PRs, o `diff-cover` mede só as linhas do próprio PR (compara com a branch de
+  base). A trava de contagem e de cobertura total compara com o ancestral verde mais
+  próximo da base, que é um commit da `develop`, porque branch de trabalho não tem CI de
+  push. Na prática a régua é a da `develop`, e os testes das fases anteriores da pilha
+  contam a favor.
+
+### Verificação
+
+- Gatilho conferido com o YAML carregado (`develop`, `master`, `feature/**`, `bugfix/**`).
+- A primeira execução real acontece nos PRs empilhados ao serem atualizados depois do
+  merge deste.
 
 ---
 

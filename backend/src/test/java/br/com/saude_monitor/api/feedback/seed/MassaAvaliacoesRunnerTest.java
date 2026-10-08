@@ -1,6 +1,6 @@
 package br.com.saude_monitor.api.feedback.seed;
 
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.hospital.document.CategoriaEstabelecimento;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
@@ -48,14 +48,14 @@ class MassaAvaliacoesRunnerTest {
 
     private MongoTemplate mongoTemplate;
     private PasswordEncoder passwordEncoder;
-    private AgregadoService agregadoService;
+    private IndicadorService indicadorService;
     private MongoDatabase database;
 
     @BeforeEach
     void setUp() {
         mongoTemplate = mock(MongoTemplate.class);
         passwordEncoder = mock(PasswordEncoder.class);
-        agregadoService = mock(AgregadoService.class);
+        indicadorService = mock(IndicadorService.class);
         database = mock(MongoDatabase.class);
         when(mongoTemplate.getDb()).thenReturn(database);
         when(database.getName()).thenReturn("saude_monitor_dev");
@@ -63,7 +63,7 @@ class MassaAvaliacoesRunnerTest {
     }
 
     private MassaAvaliacoesRunner runner(String modo, String senha) {
-        return new MassaAvaliacoesRunner(mongoTemplate, passwordEncoder, agregadoService,
+        return new MassaAvaliacoesRunner(mongoTemplate, passwordEncoder, indicadorService,
                 new MassaAvaliacoesProperties(true, modo, senha));
     }
 
@@ -114,7 +114,7 @@ class MassaAvaliacoesRunnerTest {
 
         verify(mongoTemplate, never()).exists(any(Query.class), any(Class.class));
         verify(mongoTemplate, never()).insertAll(any());
-        verifyNoInteractions(agregadoService);
+        verifyNoInteractions(indicadorService);
     }
 
     @Test
@@ -128,13 +128,13 @@ class MassaAvaliacoesRunnerTest {
     }
 
     @Test
-    void massaCompletaERecenteSoRecalculaOsAgregados() {
+    void massaCompletaERecenteSoRecalculaOsIndicadores() {
         comMassaCompleta(Instant.now().minus(Duration.ofDays(3)), "hash");
         when(passwordEncoder.matches("senha", "hash")).thenReturn(true);
 
         runner("skip-if-present", "senha").executarCarga();
 
-        verify(agregadoService).recalcular("hospital-da-massa");
+        verify(indicadorService).recalcular("hospital-da-massa");
         verify(mongoTemplate, never()).insertAll(any());
         verify(mongoTemplate, never()).remove(any(Query.class), any(Class.class));
         verify(mongoTemplate, never()).updateMulti(any(Query.class), any(Update.class), eq(UserDocument.class));
@@ -148,7 +148,7 @@ class MassaAvaliacoesRunnerTest {
         runner(null, "senha").executarCarga();
 
         verificaQueRegerou();
-        verify(agregadoService).recalcular("hospital-da-massa");
+        verify(indicadorService).recalcular("hospital-da-massa");
     }
 
     @Test
@@ -190,7 +190,7 @@ class MassaAvaliacoesRunnerTest {
     }
 
     @Test
-    void injetaUsuariosVisitasEAvaliacoesERecalculaOsAgregados() {
+    void injetaUsuariosVisitasEAvaliacoesERecalculaOsIndicadores() {
         comHospitaisAtivos(80);
 
         runner(null, "S3nh@Dev").executarCarga();
@@ -210,7 +210,7 @@ class MassaAvaliacoesRunnerTest {
         verify(passwordEncoder).encode("S3nh@Dev");
         verify(mongoTemplate, never()).remove(any(Query.class), any(Class.class));
         long hospitaisComAvaliacao = feedbacks.stream().map(FeedbackDocument::getHospitalId).distinct().count();
-        verify(agregadoService, times((int) hospitaisComAvaliacao)).recalcular(anyString());
+        verify(indicadorService, times((int) hospitaisComAvaliacao)).recalcular(anyString());
     }
 
     @Test
@@ -235,7 +235,7 @@ class MassaAvaliacoesRunnerTest {
         verify(mongoTemplate).remove(query.capture(), eq(FeedbackDocument.class));
         assertThat(query.getValue().getQueryObject().toJson()).contains(MassaAvaliacoesGerador.PREFIXO_ID);
         verificaQueRegerou();
-        verify(agregadoService).recalcular("hospital-da-massa");
+        verify(indicadorService).recalcular("hospital-da-massa");
     }
 
     @Test
@@ -245,7 +245,7 @@ class MassaAvaliacoesRunnerTest {
         runner(null, "senha").executarCarga();
 
         verify(mongoTemplate, never()).insertAll(any());
-        verifyNoInteractions(agregadoService);
+        verifyNoInteractions(indicadorService);
     }
 
     @Test
@@ -254,7 +254,7 @@ class MassaAvaliacoesRunnerTest {
         when(mongoTemplate.insertAll(any())).thenThrow(new DataAccessResourceFailureException("Atlas fora"));
 
         assertThatCode(() -> runner(null, "senha").executarCarga()).doesNotThrowAnyException();
-        verifyNoInteractions(agregadoService);
+        verifyNoInteractions(indicadorService);
     }
 
     /**

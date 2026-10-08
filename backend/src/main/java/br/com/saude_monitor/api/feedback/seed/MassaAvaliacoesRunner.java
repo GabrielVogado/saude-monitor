@@ -1,6 +1,6 @@
 package br.com.saude_monitor.api.feedback.seed;
 
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.user.document.ConsentimentoItem;
@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
 /**
  * Injeta a massa de dados de avaliações no ambiente de desenvolvimento: usuários de
  * teste, visitas finalizadas e avaliações distribuídas em parte dos hospitais ativos,
- * seguidas do recálculo dos agregados — o suficiente para testar a avaliação, a
+ * seguidas do recálculo dos indicadores — o suficiente para testar a avaliação, a
  * visualização dos indicadores e o ranking (E4-05) sem precisar de visitas reais.
  *
  * <p><b>Nunca roda fora de desenvolvimento.</b> São três travas independentes: o perfil
@@ -46,7 +46,7 @@ import java.util.regex.Pattern;
  *
  * <p><b>Idempotente:</b> todo documento gerado tem {@code _id} com o prefixo
  * {@value MassaAvaliacoesGerador#PREFIXO_ID}, e só eles são apagados ou regerados. Com a
- * massa completa, o boot só recalcula os agregados e sincroniza a senha. A massa é regerada
+ * massa completa, o boot só recalcula os indicadores e sincroniza a senha. A massa é regerada
  * com datas atuais quando tem mais de 30 dias (antes de sair da janela de 90 dias, RN-14),
  * quando sobrou uma carga interrompida ou no modo {@code recriar}.</p>
  *
@@ -92,7 +92,7 @@ public class MassaAvaliacoesRunner {
 
     private final MongoTemplate mongoTemplate;
     private final PasswordEncoder passwordEncoder;
-    private final AgregadoService agregadoService;
+    private final IndicadorService indicadorService;
     private final MassaAvaliacoesProperties properties;
 
     /** Dispara a carga em segundo plano quando a aplicação está pronta. */
@@ -135,8 +135,8 @@ public class MassaAvaliacoesRunner {
             // Recalcula a cada boot: sem atividade recente, o job de 15 min não olharia
             // para estes hospitais e os indicadores ficariam congelados no dia da carga.
             List<String> hospitais = mongoTemplate.findDistinct(daMassa, "hospitalId", FeedbackDocument.class, String.class);
-            hospitais.forEach(agregadoService::recalcular);
-            log.info("[MassaAvaliacoes] Massa já presente no banco '{}'; agregados de {} hospitais recalculados.",
+            hospitais.forEach(indicadorService::recalcular);
+            log.info("[MassaAvaliacoes] Massa já presente no banco '{}'; indicadores de {} hospitais recalculados.",
                     banco, hospitais.size());
             return;
         }
@@ -149,7 +149,7 @@ public class MassaAvaliacoesRunner {
         List<HospitalDocument> hospitais = mongoTemplate.find(ativos, HospitalDocument.class);
         if (hospitais.isEmpty()) {
             log.warn("[MassaAvaliacoes] Nenhum hospital ativo no banco '{}'. Carga ignorada.", banco);
-            hospitaisAfetados.forEach(agregadoService::recalcular);
+            hospitaisAfetados.forEach(indicadorService::recalcular);
             return;
         }
 
@@ -163,7 +163,7 @@ public class MassaAvaliacoesRunner {
         mongoTemplate.insertAll(massa.feedbacks());
 
         hospitaisAfetados.addAll(massa.perfilPorHospital().keySet());
-        hospitaisAfetados.forEach(agregadoService::recalcular);
+        hospitaisAfetados.forEach(indicadorService::recalcular);
 
         log.info("[MassaAvaliacoes] Banco '{}': {} usuários, {} visitas e {} avaliações em {} hospitais "
                         + "({} ativos ficaram sem avaliação). Senha dos usuários {}.",
@@ -184,7 +184,7 @@ public class MassaAvaliacoesRunner {
                 || primeiro.getCreatedAt().isBefore(agora.minus(VALIDADE_MASSA));
     }
 
-    /** Apaga só os documentos da massa e devolve os hospitais cujo agregado precisa ser recalculado. */
+    /** Apaga só os documentos da massa e devolve os hospitais cujo indicador precisa ser recalculado. */
     private Set<String> apagarMassa() {
         Query daMassa = daMassa();
         Set<String> hospitais = new HashSet<>(

@@ -1,6 +1,6 @@
 package br.com.saude_monitor.api.feedback.service.impl;
 
-import br.com.saude_monitor.api.agregado.event.FeedbackSalvoEvent;
+import br.com.saude_monitor.api.indicador.event.FeedbackSalvoEvent;
 import br.com.saude_monitor.api.config.exception.AcessoNegadoException;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
@@ -112,7 +112,7 @@ public class FeedbackServiceImpl implements FeedbackService {
             throw new ConflitoException("Você já avaliou esta visita.");
         }
 
-        // Dispara o recálculo assíncrono do agregado do hospital (Épico 04, RN-18).
+        // Dispara o recálculo assíncrono do indicador do hospital (Épico 04, RN-18).
         // AFTER_COMMIT no listener garante que só recalcula depois do commit desta transação.
         eventPublisher.publishEvent(new FeedbackSalvoEvent(salvo.getHospitalId()));
 
@@ -152,7 +152,7 @@ public class FeedbackServiceImpl implements FeedbackService {
 
         FeedbackDocument salvo = feedbackRepository.save(feedback);
 
-        // Edição dentro da janela de 24h pode alterar a nota — recalcula o agregado (RN-18).
+        // Edição dentro da janela de 24h pode alterar a nota — recalcula o indicador (RN-18).
         eventPublisher.publishEvent(new FeedbackSalvoEvent(salvo.getHospitalId()));
 
         return toResponse(salvo, true);

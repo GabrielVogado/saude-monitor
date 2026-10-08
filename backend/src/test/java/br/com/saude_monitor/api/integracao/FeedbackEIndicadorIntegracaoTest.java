@@ -1,6 +1,6 @@
 package br.com.saude_monitor.api.integracao;
 
-import br.com.saude_monitor.api.agregado.repository.AgregadoHospitalRepository;
+import br.com.saude_monitor.api.indicador.repository.IndicadorHospitalRepository;
 import br.com.saude_monitor.api.auth.email.EmailService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -29,18 +29,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Fluxo crítico de feedback e agregação (E8-10 — DOD-03): visita finalizada → feedback →
- * recálculo do agregado do hospital, com contexto Spring real, Mongo real e o listener
- * assíncrono de verdade ({@link br.com.saude_monitor.api.agregado.service.impl.FeedbackSalvoEventListener}),
+ * recálculo do indicador do hospital, com contexto Spring real, Mongo real e o listener
+ * assíncrono de verdade ({@link br.com.saude_monitor.api.indicador.service.impl.FeedbackSalvoEventListener}),
  * não um evento disparado manualmente contra um serviço mockado.
  *
- * <p>O recálculo é {@code @Async}: por isso a verificação do agregado usa Awaitility em
+ * <p>O recálculo é {@code @Async}: por isso a verificação do indicador usa Awaitility em
  * vez de assumir que já aconteceu quando o POST /feedbacks retorna.</p>
  */
 @Testcontainers
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(properties = "app.geofence.reconciliacao.enabled=false")
-class FeedbackEAgregacaoIntegracaoTest extends IntegracaoTestBase {
+class FeedbackEIndicadorIntegracaoTest extends IntegracaoTestBase {
 
     @Container
     static final MongoDBContainer mongo = new MongoDBContainer("mongo:7.0");
@@ -53,7 +53,7 @@ class FeedbackEAgregacaoIntegracaoTest extends IntegracaoTestBase {
     private static final String SENHA = "S3nh@Forte!";
 
     @Autowired
-    private AgregadoHospitalRepository agregadoHospitalRepository;
+    private IndicadorHospitalRepository indicadorHospitalRepository;
 
     // Substitui o Resend real e permite capturar o código de confirmação gerado no
     // cadastro (10/09/2026) — não há outro jeito de lê-lo, só o hash BCrypt é persistido.
@@ -178,12 +178,12 @@ class FeedbackEAgregacaoIntegracaoTest extends IntegracaoTestBase {
     }
 
     @Test
-    void deveRecalcularOAgregadoDoHospitalAposOFeedback() throws Exception {
+    void deveRecalcularOIndicadorDoHospitalAposOFeedback() throws Exception {
         String hospitalId = hospitalAtivo();
         String token = tokenDeUsuarioNovo("agregacao@saude-teste.com");
         String visitaId = visitaFinalizada(hospitalId, token);
 
-        assertThat(agregadoHospitalRepository.findByHospitalId(hospitalId)).isEmpty();
+        assertThat(indicadorHospitalRepository.findByHospitalId(hospitalId)).isEmpty();
 
         String corpoFeedback = """
                 { "visitaId": "%s", "nota": 5 }
@@ -197,10 +197,10 @@ class FeedbackEAgregacaoIntegracaoTest extends IntegracaoTestBase {
         // O listener é @Async (FeedbackSalvoEventListener) — aguarda o recálculo real,
         // não assume que já aconteceu quando o POST retornou.
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
-            var agregado = agregadoHospitalRepository.findByHospitalId(hospitalId);
-            assertThat(agregado).isPresent();
-            assertThat(agregado.get().getNAvaliacoes()).isEqualTo(1);
-            assertThat(agregado.get().getNotaMedia()).isEqualTo(5.0);
+            var indicador = indicadorHospitalRepository.findByHospitalId(hospitalId);
+            assertThat(indicador).isPresent();
+            assertThat(indicador.get().getNAvaliacoes()).isEqualTo(1);
+            assertThat(indicador.get().getNotaMedia()).isEqualTo(5.0);
         });
     }
 }

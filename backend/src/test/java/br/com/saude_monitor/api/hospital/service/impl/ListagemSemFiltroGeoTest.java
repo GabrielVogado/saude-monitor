@@ -1,6 +1,6 @@
 package br.com.saude_monitor.api.hospital.service.impl;
 
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
@@ -48,13 +48,13 @@ class ListagemSemFiltroGeoTest {
     private final GeofenceValidator geofenceValidator = mock(GeofenceValidator.class);
     private final GeofenceFactory geofenceFactory = mock(GeofenceFactory.class);
     private final AutenticacaoHelper autenticacaoHelper = mock(AutenticacaoHelper.class);
-    private final AgregadoService agregadoService = mock(AgregadoService.class);
+    private final IndicadorService indicadorService = mock(IndicadorService.class);
     private final br.com.saude_monitor.api.regiao.service.RegiaoAdministrativaResolver regiaoAdministrativaResolver =
             mock(br.com.saude_monitor.api.regiao.service.RegiaoAdministrativaResolver.class);
 
     private final HospitalService service =
             new HospitalServiceImpl(hospitalRepository, sugestaoRepository, mongoTemplate,
-                    geofenceValidator, geofenceFactory, autenticacaoHelper, agregadoService,
+                    geofenceValidator, geofenceFactory, autenticacaoHelper, indicadorService,
                     regiaoAdministrativaResolver);
 
     @BeforeEach
@@ -64,7 +64,7 @@ class ListagemSemFiltroGeoTest {
                         hospital("h1", "Ubs 10 Recanto das Emas"),
                         hospital("h2", "Ubs 05 Recanto das Emas"),
                         hospital("h3", "Hospital Regional do Gama")));
-        when(agregadoService.mapaIndicadores(anyCollection()))
+        when(indicadorService.mapaIndicadores(anyCollection()))
                 .thenAnswer(inv -> ((java.util.Collection<?>) inv.getArgument(0)).stream()
                         .map(id -> IndicadoresResponse.indisponivel())
                         .toList());

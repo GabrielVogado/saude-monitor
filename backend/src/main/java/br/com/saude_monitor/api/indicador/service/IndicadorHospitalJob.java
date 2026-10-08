@@ -1,11 +1,11 @@
-package br.com.saude_monitor.api.agregado.service;
+package br.com.saude_monitor.api.indicador.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Job agendado de atualização dos agregados de indicadores (Épico 04, RN-18).
+ * Job agendado de atualização dos indicadores (Épico 04, RN-18).
  *
  * <p>Roda a cada 15 minutos, mesmo padrão dos demais jobs do sistema
  * ({@code FeedbackSemRespostaJob}, {@code VisitaExpiracaoJob}), garantindo que a
@@ -15,12 +15,12 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class AgregadoHospitalJob {
+public class IndicadorHospitalJob {
 
-    private final AgregadoService agregadoService;
+    private final IndicadorService indicadorService;
 
     @Scheduled(fixedRate = 15 * 60 * 1000L)
     public void executar() {
-        agregadoService.recalcularPendentes();
+        indicadorService.recalcularPendentes();
     }
 }

@@ -1,7 +1,7 @@
 package br.com.saude_monitor.api.hospital.controller;
 
-import br.com.saude_monitor.api.agregado.dto.IndicadoresDetalheResponse;
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.indicador.dto.IndicadoresDetalheResponse;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
 import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
 import br.com.saude_monitor.api.hospital.document.StatusSugestao;
@@ -54,7 +54,7 @@ public class HospitalController {
 
     private final HospitalService hospitalService;
     private final AutenticacaoHelper autenticacaoHelper;
-    private final AgregadoService agregadoService;
+    private final IndicadorService indicadorService;
 
     /** 🔓 Lista hospitais ativos, com filtro geoespacial (raio), tipo e busca textual. */
     @GetMapping
@@ -111,7 +111,7 @@ public class HospitalController {
     @GetMapping("/{id}/indicadores")
     @SecurityRequirements
     public ResponseEntity<IndicadoresDetalheResponse> buscarIndicadores(@PathVariable String id) {
-        IndicadoresDetalheResponse detalhe = agregadoService.obterDetalhe(id);
+        IndicadoresDetalheResponse detalhe = indicadorService.obterDetalhe(id);
         if (detalhe == null) {
             return ResponseEntity.notFound().build();
         }

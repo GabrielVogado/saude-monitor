@@ -136,7 +136,7 @@ graph TD
 | **Spring Data MongoDB + Percona 7** | ✅ **MANTER** | Banco já operacional. Documentos JSON casam bem com GeoJSON e com a natureza variável dos feedbacks. |
 | **Senha em texto puro** | 🔄 **REFATORAR (crítico, imediato)** | Implementar hash **BCrypt/Argon2** (Spring Security `PasswordEncoder`). Corrigir antes de qualquer exposição pública. |
 | **Auth sem token** | 🔄 **REFATORAR (crítico)** | Implementar **JWT (access 15min + refresh 30d)** com Spring Security; roles `USER`, `HOSPITAL_ADMIN` (futuro). Rate limiting em login. |
-| **Módulos de domínio** | ➕ **ADICIONAR** | Novos bounded contexts: `hospital` (geofence GeoJSON Polygon), `visita` (check-in/out + duração), `feedback` (survey), `agregado` (indicadores públicos). |
+| **Módulos de domínio** | ➕ **ADICIONAR** | Novos bounded contexts: `hospital` (geofence GeoJSON Polygon), `visita` (check-in/out + duração), `feedback` (survey), `indicador` (indicadores públicos; chamado `agregado` até 08/10/2026). |
 | **Geo queries** | ➕ **ADICIONAR** | Índice **2dsphere** em `hospital.geofence` e `visita.localizacao`; queries `$geoIntersects` / `$near` para detecção de entrada e listagem por raio. |
 | **Validação e tratamento de erros** | 🔄 **REFATORAR** | `GlobalExceptionHandler` existe; padronizar envelope de erro, mensagens pt-BR e códigos HTTP corretos. |
 | **Testes** | ➕ **ADICIONAR** | Cobertura mínima: serviços de visita (regras RN-01..RN-07) e agregação (RN-14..RN-18); testes de integração com Testcontainers. |
@@ -255,7 +255,7 @@ graph TD
 - [ ] Backend: módulo `hospital` com geofence GeoJSON + CRUD admin
 - [ ] Backend: módulo `visita` — check-in/out com `$geoIntersects`, regras RN-01..RN-07
 - [ ] Backend: módulo `feedback` — survey pós-saída, dedupe (RN-12)
-- [ ] Backend: módulo `agregado` — job de agregação (RN-14..RN-19)
+- [ ] Backend: módulo `indicador` — job de agregação (RN-14..RN-19)
 - [ ] Mobile: geofencing nativo (ADR-002) + notificação local
 - [ ] Mobile: telas Mapa (hospitais + geofences), Detalhe do Hospital, Feedback, Histórico
 - [ ] Mobile: migração de navegação Drawer → Bottom Tabs (Design System v2.0)
@@ -289,8 +289,8 @@ graph TD
 | **2dsphere** | Índice geoespacial do MongoDB para consultas de ponto/polígono/raio em coordenadas lon/lat. |
 | **GeoJSON** | Formato padrão (RFC 7946) para representar geometrias (`Polygon`, `Point`) — usado nos geofences dos hospitais. |
 | **JWT** | JSON Web Token — token de acesso assinado, stateless. |
-| **Bounded context** | Fronteira de domínio (DDD) — aqui: `auth`, `hospital`, `visita`, `feedback`, `agregado`. |
-| **Agregado público** | Documento materializado com nota média, N e tempo mediano por hospital (leitura rápida). |
+| **Bounded context** | Fronteira de domínio (DDD) — aqui: `auth`, `hospital`, `visita`, `feedback`, `indicador`. |
+| **Indicador público** | Documento materializado com nota média, N e tempo mediano por hospital (leitura rápida). O pacote do backend chamava `agregado` até 08/10/2026 e passou a `indicador` (M-040), para não confundir com o *aggregate* do DDD; a coleção no MongoDB manteve o nome `agregados_hospitais`. |
 
 ---
 

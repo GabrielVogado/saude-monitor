@@ -1,4 +1,4 @@
-package br.com.saude_monitor.api.agregado.document;
+package br.com.saude_monitor.api.indicador.document;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,7 +14,7 @@ import java.time.Instant;
 /**
  * Documento MongoDB da coleção {@code agregados_hospitais} (Épico 04 — Indicadores Públicos).
  *
- * <p>Armazena o agregado materializado por hospital (média de notas, mediana de tempo,
+ * <p>Armazena o indicador materializado por hospital (média de notas, mediana de tempo,
  * contagens e janela do período considerada). É um documento de <em>leitura pública</em>
  * (RN-19): jamais contém dados individuais de feedbacks/visitas, apenas estatísticas.</p>
  *
@@ -26,6 +26,10 @@ import java.time.Instant;
  *
  * <p>O documento é gravado (upsert) por {@code hospitalId} — índice único — a cada
  * recálculo (evento de feedback + job de 15min, RN-18).</p>
+ *
+ * <p>A coleção mantém o nome {@code agregados_hospitais} de quando o pacote se chamava
+ * {@code agregado}: renomear a coleção exigiria migrar os dados já gravados em cada
+ * ambiente, sem ganho para quem lê o código.</p>
  */
 @Document(collection = "agregados_hospitais")
 @Getter
@@ -33,12 +37,12 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class AgregadoHospitalDocument {
+public class IndicadorHospitalDocument {
 
     @Id
     private String id;
 
-    /** Hospital dono do agregado. Índice único — um agregado por hospital (§2.5). */
+    /** Hospital dono do indicador. Índice único — um indicador por hospital (§2.5). */
     @Indexed(unique = true)
     private String hospitalId;
 

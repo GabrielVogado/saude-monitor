@@ -1,6 +1,6 @@
 package br.com.saude_monitor.api.user.service.impl;
 
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.auth.service.AuthService;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
@@ -46,7 +46,7 @@ import java.util.Set;
  * (documento de usuário — a senha vive apenas como hash nesse mesmo documento, não há
  * coleção de autenticação separada) e os dados usados nas estatísticas
  * (visitas e feedbacks) são anonimizados — {@code usuarioId} zerado — preservando os
- * agregados públicos (nota/tempo), que nunca referenciam identidade.</p>
+ * indicadores públicos (nota/tempo), que nunca referenciam identidade.</p>
  */
 @Slf4j
 @Service
@@ -58,7 +58,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final MongoTemplate mongoTemplate;
-    private final AgregadoService agregadoService;
+    private final IndicadorService indicadorService;
     private final AuthService authService;
 
     @Override
@@ -186,7 +186,7 @@ public class UserServiceImpl implements UserService {
         UserDocument user = userRepository.findById(usuarioId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado."));
 
-        // Coleta os hospitais afetados ANTES de anonimizar, para recalcular os agregados
+        // Coleta os hospitais afetados ANTES de anonimizar, para recalcular os indicadores
         // e refletir a exclusão imediatamente (os dados permanecem, então os valores não
         // mudam, mas o job de 15min não precisa esperar).
         Set<String> hospitalIds = hospitaisAfetados(usuarioId);
@@ -202,12 +202,12 @@ public class UserServiceImpl implements UserService {
         log.info("Conta do usuário {} excluída (LGPD). Dados pessoais removidos; visitas/feedbacks anonimizados.",
                 usuarioId);
 
-        // Recalcula agregados dos hospitais afetados (best-effort).
+        // Recalcula indicadores dos hospitais afetados (best-effort).
         for (String hospitalId : hospitalIds) {
             try {
-                agregadoService.recalcular(hospitalId);
+                indicadorService.recalcular(hospitalId);
             } catch (Exception ex) {
-                log.warn("Falha ao recalcular agregado do hospital {} após exclusão de conta: {}",
+                log.warn("Falha ao recalcular indicador do hospital {} após exclusão de conta: {}",
                         hospitalId, ex.getMessage());
             }
         }

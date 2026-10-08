@@ -1,4 +1,4 @@
-package br.com.saude_monitor.api.agregado.service;
+package br.com.saude_monitor.api.indicador.service;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -20,7 +20,7 @@ public final class EstatisticaService {
     /**
      * Percentual mínimo de cobertura de GPS para a RN-17 — única fonte do limiar; usado
      * tanto pelo cálculo de cobertura abaixo quanto por quem decide se uma visita
-     * {@code GPS_INTERROMPIDO} entra no indicador de tempo ({@code AgregadoServiceImpl}).
+     * {@code GPS_INTERROMPIDO} entra no indicador de tempo ({@code IndicadorServiceImpl}).
      */
     public static final double PERCENTUAL_MINIMO_COBERTURA_GPS = 0.90;
 

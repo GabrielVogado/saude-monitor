@@ -1,6 +1,6 @@
 package br.com.saude_monitor.api.hospital.service.impl;
 
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
@@ -37,13 +37,13 @@ class HospitalServiceImplTest {
     private final GeofenceValidator geofenceValidator = mock(GeofenceValidator.class);
     private final GeofenceFactory geofenceFactory = mock(GeofenceFactory.class);
     private final AutenticacaoHelper autenticacaoHelper = mock(AutenticacaoHelper.class);
-    private final AgregadoService agregadoService = mock(AgregadoService.class);
+    private final IndicadorService indicadorService = mock(IndicadorService.class);
     private final br.com.saude_monitor.api.regiao.service.RegiaoAdministrativaResolver regiaoAdministrativaResolver =
             mock(br.com.saude_monitor.api.regiao.service.RegiaoAdministrativaResolver.class);
 
     private final HospitalService service =
             new HospitalServiceImpl(hospitalRepository, sugestaoRepository, mongoTemplate,
-                    geofenceValidator, geofenceFactory, autenticacaoHelper, agregadoService,
+                    geofenceValidator, geofenceFactory, autenticacaoHelper, indicadorService,
                     regiaoAdministrativaResolver);
 
     @BeforeEach
@@ -70,7 +70,7 @@ class HospitalServiceImplTest {
                             .filter(h -> String.valueOf(h.getTipo()).equals(String.valueOf(tipoFilter)))
                             .toList();
                 });
-        when(agregadoService.mapaIndicadores(org.mockito.ArgumentMatchers.anyCollection()))
+        when(indicadorService.mapaIndicadores(org.mockito.ArgumentMatchers.anyCollection()))
                 .thenAnswer(inv -> {
                     java.util.Collection<String> ids = inv.getArgument(0);
                     return ids.stream().map(id -> {
@@ -126,5 +126,16 @@ class HospitalServiceImplTest {
         assertThat(result.totalElements()).isEqualTo(6);
         assertThat(result.page()).isEqualTo(0);
         assertThat(result.size()).isEqualTo(2);
+    }
+    /** O detalhe de um hospital traz os indicadores dele, lidos do pacote indicador. */
+    @Test
+    void buscarPorIdTrazOsIndicadoresDoHospital() {
+        when(hospitalRepository.findById("h-nota5"))
+                .thenReturn(java.util.Optional.of(hospital("h-nota5", "Mais Nota", TipoEstabelecimento.PUBLICO)));
+
+        var resposta = service.buscarPorId("h-nota5");
+
+        assertThat(resposta.id()).isEqualTo("h-nota5");
+        assertThat(resposta.indicadores().notaMedia()).isEqualTo(5.0);
     }
 }

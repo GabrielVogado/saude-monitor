@@ -1,8 +1,8 @@
-package br.com.saude_monitor.api.agregado.service.impl;
+package br.com.saude_monitor.api.indicador.service.impl;
 
-import br.com.saude_monitor.api.agregado.document.AgregadoHospitalDocument;
-import br.com.saude_monitor.api.agregado.repository.AgregadoHospitalRepository;
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.indicador.document.IndicadorHospitalDocument;
+import br.com.saude_monitor.api.indicador.repository.IndicadorHospitalRepository;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.feedback.repository.FeedbackRepository;
 import br.com.saude_monitor.api.hospital.dto.IndicadoresResponse;
@@ -24,25 +24,27 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Testes do {@link AgregadoServiceImpl} (Épico 04) — regras de agregação RN-14..RN-17,
+ * Testes do {@link IndicadorServiceImpl} (Épico 04) — regras de agregação RN-14..RN-17,
  * RN-15 (N ≥ 5) e exibição embutida/enriquecida.
  */
-class AgregadoServiceImplTest {
+class IndicadorServiceImplTest {
 
-    private final AgregadoHospitalRepository agregadoRepository = mock(AgregadoHospitalRepository.class);
+    private final IndicadorHospitalRepository indicadorRepository = mock(IndicadorHospitalRepository.class);
     private final FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
     private final VisitaRepository visitaRepository = mock(VisitaRepository.class);
     private final HospitalRepository hospitalRepository = mock(HospitalRepository.class);
     private final MongoTemplate mongoTemplate = mock(MongoTemplate.class);
-    private final AgregadoService service =
-            new AgregadoServiceImpl(agregadoRepository, feedbackRepository, visitaRepository, hospitalRepository, mongoTemplate);
+    private final IndicadorService service =
+            new IndicadorServiceImpl(indicadorRepository, feedbackRepository, visitaRepository, hospitalRepository, mongoTemplate);
 
     @BeforeEach
     void setup() {
@@ -62,14 +64,14 @@ class AgregadoServiceImplTest {
         when(feedbackRepository.findByHospitalIdAndCriadoEmAfterAndNotaNotNull(eq("h1"), any()))
                 .thenReturn(List.of(feedback("h1", 4), feedback("h1", 5), feedback("h1", 3)));
 
-        AgregadoHospitalDocument agregado = service.recalcular("h1");
+        IndicadorHospitalDocument indicador = service.recalcular("h1");
 
-        assertThat(agregado.getNotaMedia()).isEqualTo(4.0);
-        assertThat(agregado.getNAvaliacoes()).isEqualTo(3);
-        assertThat(agregado.getHospitalId()).isEqualTo("h1");
-        assertThat(agregado.getPeriodoInicio()).isNotNull();
-        assertThat(agregado.getPeriodoFim()).isNotNull();
-        verify(mongoTemplate).upsert(any(), any(), eq(AgregadoHospitalDocument.class));
+        assertThat(indicador.getNotaMedia()).isEqualTo(4.0);
+        assertThat(indicador.getNAvaliacoes()).isEqualTo(3);
+        assertThat(indicador.getHospitalId()).isEqualTo("h1");
+        assertThat(indicador.getPeriodoInicio()).isNotNull();
+        assertThat(indicador.getPeriodoFim()).isNotNull();
+        verify(mongoTemplate).upsert(any(), any(), eq(IndicadorHospitalDocument.class));
     }
 
     @Test
@@ -79,10 +81,10 @@ class AgregadoServiceImplTest {
         when(feedbackRepository.findByHospitalIdAndCriadoEmAfterAndNotaNotNull(any(), any()))
                 .thenReturn(List.of(feedback("h1", 5), semNota));
 
-        AgregadoHospitalDocument agregado = service.recalcular("h1");
+        IndicadorHospitalDocument indicador = service.recalcular("h1");
         // A query já filtra nota != null; defensivamente o serviço também ignora sem nota.
-        assertThat(agregado.getNAvaliacoes()).isEqualTo(1);
-        assertThat(agregado.getNotaMedia()).isEqualTo(5.0);
+        assertThat(indicador.getNAvaliacoes()).isEqualTo(1);
+        assertThat(indicador.getNotaMedia()).isEqualTo(5.0);
     }
 
     // ------------------------------------------------ RN-16 (mediana do tempo) --------------------------------------
@@ -102,9 +104,9 @@ class AgregadoServiceImplTest {
                 eq("h1"), any(), any(), any(), any()))
                 .thenReturn(List.of(visitaFinalizada(30), visitaFinalizada(120), visitaFinalizada(60), visitaFinalizada(90)));
 
-        AgregadoHospitalDocument agregado = service.recalcular("h1");
-        assertThat(agregado.getTempoMedianoMinutos()).isEqualTo(75); // (60+90)/2
-        assertThat(agregado.getNVisitas()).isEqualTo(4);
+        IndicadorHospitalDocument indicador = service.recalcular("h1");
+        assertThat(indicador.getTempoMedianoMinutos()).isEqualTo(75); // (60+90)/2
+        assertThat(indicador.getNVisitas()).isEqualTo(4);
     }
 
     @Test
@@ -114,9 +116,9 @@ class AgregadoServiceImplTest {
                 eq("h1"), any(), any(), any(), any()))
                 .thenReturn(List.of(visitaFinalizada(60), visitaFinalizada(1500)));
 
-        AgregadoHospitalDocument agregado = service.recalcular("h1");
-        assertThat(agregado.getNVisitas()).isEqualTo(1);
-        assertThat(agregado.getTempoMedianoMinutos()).isEqualTo(60);
+        IndicadorHospitalDocument indicador = service.recalcular("h1");
+        assertThat(indicador.getNVisitas()).isEqualTo(1);
+        assertThat(indicador.getTempoMedianoMinutos()).isEqualTo(60);
     }
 
     @Test
@@ -126,9 +128,9 @@ class AgregadoServiceImplTest {
                 eq("h1"), any(), any(), any(), any()))
                 .thenReturn(List.of(visitaFinalizada(1), visitaFinalizada(2), visitaFinalizada(60)));
 
-        AgregadoHospitalDocument agregado = service.recalcular("h1");
-        assertThat(agregado.getNVisitas()).isEqualTo(2);
-        assertThat(agregado.getTempoMedianoMinutos()).isEqualTo(31); // mediana de (2, 60)
+        IndicadorHospitalDocument indicador = service.recalcular("h1");
+        assertThat(indicador.getNVisitas()).isEqualTo(2);
+        assertThat(indicador.getTempoMedianoMinutos()).isEqualTo(31); // mediana de (2, 60)
     }
 
     @Test
@@ -140,16 +142,16 @@ class AgregadoServiceImplTest {
                 eq("h1"), any(), any(), any(), any()))
                 .thenReturn(List.of(visitaFinalizada(45), semDuracao));
 
-        AgregadoHospitalDocument agregado = service.recalcular("h1");
-        assertThat(agregado.getNVisitas()).isEqualTo(1);
-        assertThat(agregado.getTempoMedianoMinutos()).isEqualTo(45);
+        IndicadorHospitalDocument indicador = service.recalcular("h1");
+        assertThat(indicador.getNVisitas()).isEqualTo(1);
+        assertThat(indicador.getTempoMedianoMinutos()).isEqualTo(45);
     }
 
     @Test
     void recalcularSemVisitasElegiveisDeixaTempoNulo() {
-        AgregadoHospitalDocument agregado = service.recalcular("h1");
-        assertThat(agregado.getTempoMedianoMinutos()).isNull();
-        assertThat(agregado.getNVisitas()).isZero();
+        IndicadorHospitalDocument indicador = service.recalcular("h1");
+        assertThat(indicador.getTempoMedianoMinutos()).isNull();
+        assertThat(indicador.getNVisitas()).isZero();
     }
 
     // ------------------------------------------------ RN-17 (cobertura GPS) ----------------------------------------
@@ -175,9 +177,9 @@ class AgregadoServiceImplTest {
                 eq("h1"), any(), any(), any(), any()))
                 .thenReturn(List.of(visitaGpsInterrompido(entrada, saida, posicao)));
 
-        AgregadoHospitalDocument agregado = service.recalcular("h1");
-        assertThat(agregado.getNVisitas()).isEqualTo(1);
-        assertThat(agregado.getTempoMedianoMinutos()).isEqualTo(60);
+        IndicadorHospitalDocument indicador = service.recalcular("h1");
+        assertThat(indicador.getNVisitas()).isEqualTo(1);
+        assertThat(indicador.getTempoMedianoMinutos()).isEqualTo(60);
     }
 
     @Test
@@ -189,18 +191,18 @@ class AgregadoServiceImplTest {
                 eq("h1"), any(), any(), any(), any()))
                 .thenReturn(List.of(visitaGpsInterrompido(entrada, saida, posicao)));
 
-        AgregadoHospitalDocument agregado = service.recalcular("h1");
-        assertThat(agregado.getNVisitas()).isZero();
-        assertThat(agregado.getTempoMedianoMinutos()).isNull();
+        IndicadorHospitalDocument indicador = service.recalcular("h1");
+        assertThat(indicador.getNVisitas()).isZero();
+        assertThat(indicador.getTempoMedianoMinutos()).isNull();
     }
 
     // ------------------------------------------------ RN-15 (exibição N ≥ 5) ----------------------------------------
 
     @Test
     void mapaIndicadoresOmiteValoresQuandoNAbaixoDe5() {
-        AgregadoHospitalDocument a = AgregadoHospitalDocument.builder()
+        IndicadorHospitalDocument a = IndicadorHospitalDocument.builder()
                 .hospitalId("h1").notaMedia(4.0).nAvaliacoes(3).tempoMedianoMinutos(60).build();
-        when(agregadoRepository.findByHospitalIdIn(List.of("h1", "h2")))
+        when(indicadorRepository.findByHospitalIdIn(List.of("h1", "h2")))
                 .thenReturn(List.of(a));
 
         List<IndicadoresResponse> mapa = service.mapaIndicadores(List.of("h1", "h2"));
@@ -210,15 +212,15 @@ class AgregadoServiceImplTest {
         assertThat(mapa.get(0).notaMedia()).isNull();
         assertThat(mapa.get(0).tempoMedianoMinutos()).isNull();
         assertThat(mapa.get(0).nAvaliacoes()).isEqualTo(3);
-        // h2 sem agregado → indisponível
+        // h2 sem indicador → indisponível
         assertThat(mapa.get(1).indicadoresDisponiveis()).isFalse();
     }
 
     @Test
     void mapaIndicadoresExibeValoresQuandoNMaiorIgual5() {
-        AgregadoHospitalDocument a = AgregadoHospitalDocument.builder()
+        IndicadorHospitalDocument a = IndicadorHospitalDocument.builder()
                 .hospitalId("h1").notaMedia(4.2).nAvaliacoes(12).tempoMedianoMinutos(95).build();
-        when(agregadoRepository.findByHospitalIdIn(List.of("h1"))).thenReturn(List.of(a));
+        when(indicadorRepository.findByHospitalIdIn(List.of("h1"))).thenReturn(List.of(a));
 
         IndicadoresResponse res = service.mapaIndicadores(List.of("h1")).getFirst();
         assertThat(res.indicadoresDisponiveis()).isTrue();
@@ -238,12 +240,12 @@ class AgregadoServiceImplTest {
     @Test
     void obterDetalheRetornaPeriodoEVisitas() {
         when(hospitalRepository.existsById("h1")).thenReturn(true);
-        AgregadoHospitalDocument a = AgregadoHospitalDocument.builder()
+        IndicadorHospitalDocument a = IndicadorHospitalDocument.builder()
                 .hospitalId("h1").notaMedia(4.0).nAvaliacoes(7).tempoMedianoMinutos(80).nVisitas(34)
                 .periodoInicio(Instant.parse("2026-05-10T00:00:00Z"))
                 .periodoFim(Instant.parse("2026-08-07T23:59:59Z"))
                 .build();
-        when(agregadoRepository.findByHospitalId("h1")).thenReturn(Optional.of(a));
+        when(indicadorRepository.findByHospitalId("h1")).thenReturn(Optional.of(a));
 
         var detalhe = service.obterDetalhe("h1");
         assertThat(detalhe.indicadoresDisponiveis()).isTrue();
@@ -269,7 +271,7 @@ class AgregadoServiceImplTest {
      */
     @Test
     void recalcularPendentesRecalculaSoQuemTeveAtividadeRecente() {
-        AgregadoServiceImpl spyService = spy((AgregadoServiceImpl) service);
+        IndicadorServiceImpl spyService = spy((IndicadorServiceImpl) service);
         doReturn(null).when(spyService).recalcular(anyString());
 
         when(feedbackRepository.findByCriadoEmAfter(any()))
@@ -292,12 +294,12 @@ class AgregadoServiceImplTest {
      * "atividade recente" faria o hospital poder nunca mais ser recalculado. Este teste
      * simula exatamente esse caso: uma visita com `saida` de dias atrás (fora de
      * qualquer janela razoável), mas que a consulta encontrou porque o *pré-filtro real*
-     * é por `processadoEm`, não por `saida` — `AgregadoServiceImpl` não deve refiltrar
+     * é por `processadoEm`, não por `saida` — `IndicadorServiceImpl` não deve refiltrar
      * por `saida` em memória.
      */
     @Test
     void recalcularPendentesRecalculaVisitaComSaidaAntigaSeProcessadoEmForRecente() {
-        AgregadoServiceImpl spyService = spy((AgregadoServiceImpl) service);
+        IndicadorServiceImpl spyService = spy((IndicadorServiceImpl) service);
         doReturn(null).when(spyService).recalcular(anyString());
 
         VisitaDocument gpsInterrompidaHaDias = VisitaDocument.builder()
@@ -317,7 +319,7 @@ class AgregadoServiceImplTest {
 
     @Test
     void recalcularPendentesNaoDuplicaQuandoMesmoHospitalTemFeedbackEVisita() {
-        AgregadoServiceImpl spyService = spy((AgregadoServiceImpl) service);
+        IndicadorServiceImpl spyService = spy((IndicadorServiceImpl) service);
         doReturn(null).when(spyService).recalcular(anyString());
 
         when(feedbackRepository.findByCriadoEmAfter(any()))
@@ -327,12 +329,12 @@ class AgregadoServiceImplTest {
 
         spyService.recalcularPendentes();
 
-        verify(spyService, org.mockito.Mockito.times(1)).recalcular("h1");
+        verify(spyService, times(1)).recalcular("h1");
     }
 
     @Test
     void recalcularPendentesSemAtividadeNaoRecalculaNinguem() {
-        AgregadoServiceImpl spyService = spy((AgregadoServiceImpl) service);
+        IndicadorServiceImpl spyService = spy((IndicadorServiceImpl) service);
         doReturn(null).when(spyService).recalcular(anyString());
 
         when(feedbackRepository.findByCriadoEmAfter(any())).thenReturn(List.of());
@@ -341,5 +343,21 @@ class AgregadoServiceImplTest {
         spyService.recalcularPendentes();
 
         verify(spyService, never()).recalcular(anyString());
+    }
+    /** Falha num hospital não interrompe o lote: os demais candidatos seguem sendo recalculados (RN-18). */
+    @Test
+    void recalcularPendentesSegueQuandoUmHospitalFalha() {
+        IndicadorServiceImpl spyService = spy((IndicadorServiceImpl) service);
+        doThrow(new IllegalStateException("Mongo fora")).when(spyService).recalcular("h1");
+        doReturn(null).when(spyService).recalcular("h2");
+
+        when(feedbackRepository.findByCriadoEmAfter(any()))
+                .thenReturn(List.of(feedback("h1", 4), feedback("h2", 5)));
+        when(visitaRepository.findByStatusInAndProcessadoEmAfter(any(), any())).thenReturn(List.of());
+
+        spyService.recalcularPendentes();
+
+        verify(spyService).recalcular("h1");
+        verify(spyService).recalcular("h2");
     }
 }

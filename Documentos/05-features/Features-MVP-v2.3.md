@@ -645,7 +645,7 @@ Fase 4 (polimento):  F-08                →  [sobre tudo; incremental ou sprint
 | **Heartbeat** | Sinal periódico (a cada 30 min) enviado pelo app enquanto a visita está ativa. Distingue "usuário esperando no hospital" de "GPS preso na região sem o usuário". Ausência por 24h expira a visita. |
 | **Visita** | Registro de uma permanência contínua do usuário dentro de um geofence hospitalar. Estados: `EM_ATENDIMENTO`, `SUSPEITA` (sem heartbeat por 2h), `FINALIZADA`, `EXPIRADA` (sem heartbeat por 24h), `GPS_INTERROMPIDO`. |
 | **Feedback** | Resposta do usuário ao formulário pós-saída (até 4 perguntas + comentário opcional). Anônimo por padrão; 1 por visita. Alimenta os indicadores públicos. |
-| **Agregado público** | Documento materializado com nota média, N e tempo mediano por hospital. Recalculado a cada novo feedback ou em batch a cada 15 min. Servido pelo endpoint público de leitura. |
+| **Indicador público** (antes "agregado público") | Documento materializado com nota média, N e tempo mediano por hospital. Recalculado a cada novo feedback ou em batch a cada 15 min. Servido pelo endpoint público de leitura. |
 | **Tempo médio de atendimento** | Mediana dos tempos de permanência das visitas finalizadas de pronto-atendimento (até 24h, excluindo `INTERNACAO`/`OBSERVACAO`). Mediana é robusta a outliers — uma espera de 14h não distorce o indicador como faria a média. |
 | **Nota média** | Média aritmética das notas 1–5 dos feedbacks dos últimos 90 dias. Exibida apenas com N ≥ 5. |
 | **N (amostra)** | Quantidade de avaliações no período. N ≥ 5 é o piso para exibição pública. |
@@ -862,7 +862,7 @@ Antes de declarar o MVP pronto para lançamento público, as seguintes validaç�
 | F-03 | `visita` | `visitas` | `POST /api/v2/visitas/entrada`, `POST /api/v2/visitas/{id}/saida`, `POST /api/v2/visitas/{id}/heartbeat`, `GET /api/v2/visitas/{id}` | ADR-002 (geofencing nativo), ADR-003 (2dsphere) |
 | F-04 | `visita` (extensão) | `visitas` (mesma coleção) | `POST /api/v2/visitas/entrada` (com `manual=true`), `POST /api/v2/visitas/{id}/tipo-permanencia` | — |
 | F-05 | `feedback` | `feedbacks` | `POST /api/v2/feedbacks`, `GET /api/v2/feedbacks/{id}` | — |
-| F-06 | `agregado` | `agregados_hospital` (materializada) | `GET /api/v2/hospitais/{id}/agregado`, `GET /api/v2/hospitais/ranking` | ADR-004 (sem Kafka — job in-process) |
+| F-06 | `indicador` (era `agregado` até 08/10/2026) | `agregados_hospitais` (materializada) | `GET /api/v2/hospitais/{id}/agregado`, `GET /api/v2/hospitais/ranking` | ADR-004 (sem Kafka — job in-process) |
 | F-07 | `hospital` | `hospitais`, `sugestoes_hospital` | `GET /api/v2/hospitais` (com `?nome=`, `?lat=`, `?lon=`, `?raio=`), `POST /api/v2/hospitais/sugestoes` | — |
 | F-08 | Cross-cutting | — | Sem endpoints novos — refatoração visual e de acessibilidade | — |
 | F-09 | `auth` (extensão), config | — | Rate limit via filtro; consentimento via `usuarios.consentimentos` | ADR-001 |

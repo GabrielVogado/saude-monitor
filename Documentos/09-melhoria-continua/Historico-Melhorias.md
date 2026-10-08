@@ -2321,7 +2321,7 @@ e Sonar; os outros só seriam medidos depois de reapontados para a `develop`.
 
 ## M-040 — Pacote `agregado` do backend passa a se chamar `indicador`
 
-**Data:** 08/10/2026 · **PR:** (este PR)
+**Data:** 08/10/2026 · **PR:** #194
 
 ### Como apareceu
 

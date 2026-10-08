@@ -24,9 +24,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -327,7 +329,7 @@ class IndicadorServiceImplTest {
 
         spyService.recalcularPendentes();
 
-        verify(spyService, org.mockito.Mockito.times(1)).recalcular("h1");
+        verify(spyService, times(1)).recalcular("h1");
     }
 
     @Test
@@ -346,7 +348,7 @@ class IndicadorServiceImplTest {
     @Test
     void recalcularPendentesSegueQuandoUmHospitalFalha() {
         IndicadorServiceImpl spyService = spy((IndicadorServiceImpl) service);
-        org.mockito.Mockito.doThrow(new IllegalStateException("Mongo fora")).when(spyService).recalcular("h1");
+        doThrow(new IllegalStateException("Mongo fora")).when(spyService).recalcular("h1");
         doReturn(null).when(spyService).recalcular("h2");
 
         when(feedbackRepository.findByCriadoEmAfter(any()))

@@ -170,7 +170,7 @@ salva, evitando abrir um formulário que vai falhar de antemão.
 produção) vs. `backend/.../indicador/service/impl/IndicadorServiceImpl.java:180-194` (o que roda de fato).
 **Cenário de falha:** se o limiar for alterado em um lugar e não no outro, os testes de
 `EstatisticaServiceTest` continuam "verdes" provando uma regra que já divergiu do comportamento real.
-**Correção:** `IndicadorServiceImpl.tempoConfiável` passa a chamar `EstatisticaService.coberturaGpsConfiável`
+**Correção:** `IndicadorServiceImpl.tempoConfiavel` passa a chamar `EstatisticaService.coberturaGpsConfiável`
 em vez de reimplementar o cálculo inline — uma única fonte de verdade, coberta pelo teste que já existe.
 
 ### P2.2 — Normalização de e-mail duplicada em 4 lugares

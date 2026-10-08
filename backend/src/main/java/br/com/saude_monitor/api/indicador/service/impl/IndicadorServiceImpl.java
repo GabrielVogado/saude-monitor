@@ -103,7 +103,7 @@ public class IndicadorServiceImpl implements IndicadorService {
                 .filter(v -> v.getDuracaoMinutos() != null)
                 .filter(v -> v.getDuracaoMinutos() >= DURACAO_MINIMA_MINUTOS)
                 .filter(v -> v.getDuracaoMinutos() <= TETO_DURACAO_MINUTOS)
-                .filter(IndicadorServiceImpl::tempoConfiável)
+                .filter(IndicadorServiceImpl::tempoConfiavel)
                 .map(VisitaDocument::getDuracaoMinutos)
                 .toList();
 
@@ -190,7 +190,7 @@ public class IndicadorServiceImpl implements IndicadorService {
      * Visitas FINALIZADA sempre entram (RN-03). Para {@code GPS_INTERROMPIDO} (RN-06),
      * a duração parcial só é confiável se a cobertura de GPS ≥ 90% do período (RN-17).
      */
-    private static boolean tempoConfiável(VisitaDocument visita) {
+    private static boolean tempoConfiavel(VisitaDocument visita) {
         if (visita.getStatus() == StatusVisita.FINALIZADA) {
             return true;
         }

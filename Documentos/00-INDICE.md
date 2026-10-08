@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 07/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 08/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 08/10/2026 — Plano de escala da infraestrutura para o DF
+
+**O que entrou:** o [`Plano-Escala-Infraestrutura-DF-v1.0.md`](./02-arquitetura-tecnica/Plano-Escala-Infraestrutura-DF-v1.0.md), que mede a estrutura atual (Cloud Run com uma instância, Atlas M0 compartilhado com o dev), lista as travas para escalar, dimensiona seis patamares de carga a partir de premissas ajustáveis (do lançamento a 80% do DF instalado e a um evento de crise) com custo estimado em cada um, e propõe a migração em cinco fases. Registrado como proposta no ADR-015.
+**Sem mudança de código.** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` sem mudança (é um plano, nada foi entregue ainda).
 
 ---
 
@@ -189,7 +196,8 @@ Documentos/
 ├── 02-arquitetura-tecnica/                   ← visão técnica e de engenharia
 │   ├── Arvore-Tecnologica-v2.1.md            ← stack atual vs. proposta, manter/refatorar, ADRs, roadmap
 │   ├── Especificacao-API-v2.4.md             ← contratos REST (OpenAPI), modelo de dados MongoDB, fluxos (+ §3.6 camadas)
-│   └── Plano-Tecnico-Painel-Administrativo-Web-v1.0.md  ← stack, estrutura de pastas e consumo de API do painel web (F-11)
+│   ├── Plano-Tecnico-Painel-Administrativo-Web-v1.0.md  ← stack, estrutura de pastas e consumo de API do painel web (F-11)
+│   └── Plano-Escala-Infraestrutura-DF-v1.0.md  ← patamares de carga, custo e migração da infraestrutura para o DF
 │
 ├── 03-ui-ux/                                 ← padrão de experiência e interface
 │   └── Padrao-UI-UX-v2.1.md                  ← princípios, personas, jornada, design system, acessibilidade, LGPD
@@ -250,6 +258,7 @@ Documentos/
 | 2 | [Árvore Tecnológica](./02-arquitetura-tecnica/Arvore-Tecnologica-v2.1.md) | **2.1** | ✅ Ativo | Mapa da stack atual (Spring Boot 4 + MongoDB + Expo 55 + **Mapbox v10**), decisões manter/refatorar/adicionar, matriz comparativa, ADRs e plano de evolução. **v2.1 (12/09/2026):** linhagem do mapa (`react-native-maps` → MapLibre → Mapbox) + contexto `regiao`. |
 | 3 | [Especificação da API](./02-arquitetura-tecnica/Especificacao-API-v2.4.md) | **2.4** | ✅ Ativo | Contratos REST de todos os endpoints (auth, hospitais, visitas, feedbacks, agregados, **camadas**), coleções MongoDB com índices/GeoJSON e fluxo geofence → API. **v2.4 (04/10/2026):** `GET /api/v1/contas/feedbacks/pendentes` e feedback aceito em visita `GPS_INTERROMPIDO` (M-029). **v2.2 (12/09/2026):** novo §3.6 `GET /api/v1/camadas/{tipo}` (F-11). v2.1 (06/09/2026) fechava CONT-01/CONT-02 (E8-14). |
 | 3b | [Plano Técnico — Painel Administrativo Web](./02-arquitetura-tecnica/Plano-Tecnico-Painel-Administrativo-Web-v1.0.md) | 1.0 | 🟡 Proposta | Stack (React + Vite + Leaflet), estrutura de pastas de `web-admin/` e estratégia de consumo da API existente para o painel administrativo (F-11). |
+| 3c | [Plano de Escala da Infraestrutura para o DF](./02-arquitetura-tecnica/Plano-Escala-Infraestrutura-DF-v1.0.md) | 1.0 | 🟡 Proposta | Estrutura atual medida, travas para escalar, patamares de carga com custo estimado (US$/mês) e migração em cinco fases. ADR-015. |
 | 4 | [Padrão UI/UX](./03-ui-ux/Padrao-UI-UX-v2.1.md) | **2.1** | ✅ Ativo | Princípios de UX, personas, jornada ponta a ponta, arquitetura de informação, design system completo (tokens, componentes), acessibilidade WCAG AA, LGPD por design e protótipos ASCII. |
 | 5 | [Backlog do MVP](./04-backlog/Backlog-MVP-v2.2.md) | **2.2** | ✅ Ativo | Backlog priorizado (Fase 0 + 8 épicos), decisões de priorização (§2.1), **Épico 8 — Estabilização e Desempenho**, sequência real S0–S8 + planejada S9–S12, DoD com situação real e regra de atualização documental. |
 | 6 | [Plano de Sprints](./06-sprints/Plano-Sprints-v2.2.md) | **2.2** | ✅ Ativo | S0–S6 e S8 concluídas, S7 adiada, **S9–S12 planejadas (§22)** com diagnóstico de desempenho medido, velocity, riscos, cerimônias e métricas. |

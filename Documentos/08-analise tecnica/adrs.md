@@ -1282,6 +1282,51 @@ o peso combinado dos 4 GeoJSON.
 
 ---
 
+## ADR-015: Estratégia de escala da infraestrutura para a população do DF
+
+**Data:** 2026-10-08
+**Status:** Proposto — aguarda as decisões D1–D5 do PO
+**Área:** Infraestrutura e Deploy do Backend
+**Plano completo:** [`02-arquitetura-tecnica/Plano-Escala-Infraestrutura-DF-v1.0.md`](../02-arquitetura-tecnica/Plano-Escala-Infraestrutura-DF-v1.0.md)
+
+### Contexto e Problema
+
+O PO pediu uma infraestrutura barata que aguente o acesso de quase toda a população do DF
+(~3 milhões). Hoje o backend roda numa única instância do Cloud Run (`--max-instances=1`,
+trava do seed, ADR-011) e o banco é o Atlas M0 compartilhado com o dev, que estrangula a
+100 op/s — ~250 usuários simultâneos pela jornada medida em 23/09/2026.
+
+### Opções Avaliadas
+
+**Opção 1 — Manter Cloud Run + Atlas e escalar por patamar, com cache na borda** ← Proposta
+- Custo cresce com o uso medido: ~US$ 45–105/mês no lançamento, ~US$ 500–680/mês com 80% do
+  DF instalado (sem o Mapbox).
+- Exige destravar a escala horizontal no código (seed fora do startup, jobs no Cloud
+  Scheduler, rate limit fora da memória da instância, catálogo cacheável).
+
+**Opção 2 — Kubernetes (GKE) com Redis e réplicas próprias**
+- Descartada: custo fixo de cluster e operação desproporcional ao volume (§4 do plano);
+  nada do que ela resolve deixa de ser resolvido pela Opção 1.
+
+**Opção 3 — Banco autogerenciado em VM**
+- Descartada: troca dezenas de dólares por backup, atualização e alta disponibilidade
+  feitos à mão.
+
+### Decisão proposta
+
+Opção 1, em cinco fases (higiene, destravar escala, borda e domínio, produção, prova de
+carga), com o banco subindo de plano (Flex → M10 → M20) só quando a medição pedir.
+
+### Consequências
+
+- Encerra a pendência de cold start do ADR-011 em produção (`min-instances=1`).
+- O app passa a apontar para um domínio próprio: trocar a infraestrutura atrás dele deixa
+  de exigir versão nova do APK.
+- O custo do Mapbox por usuário ativo vira a maior linha da conta a partir de ~300 mil
+  instalações; a escolha do mapa precisa ser revista antes disso.
+
+---
+
 ## Resumo de Status
 
 | ADR | Título | Prioridade | Esforço | Impacto |
@@ -1300,6 +1345,7 @@ o peso combinado dos 4 GeoJSON.
 | ADR-012 | Painel Admin em Angular 21 (SPA separada) | Média | Em andamento (24/09/2026) | Alto |
 | ADR-013 | Refresh token em cookie HttpOnly (Painel Web) | Alta | Pendente (dir. aceita 25/09/2026) | Alto |
 | ADR-014 | Leaflet para o mapa do Painel Admin | Média | Em andamento (25/09/2026) | Médio |
+| ADR-015 | Escala da infraestrutura para a população do DF | Alta | Proposto (08/10/2026) | Alto |
 
 > Os ADR-001 a ADR-010 continuam `Proposto`. **`Aceito`: ADR-011** (infraestrutura,
 > backend), **ADR-012** (frontend do painel admin), **ADR-013** (segurança de sessão do

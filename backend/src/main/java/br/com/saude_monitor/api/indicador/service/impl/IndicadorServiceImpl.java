@@ -1,10 +1,10 @@
-package br.com.saude_monitor.api.agregado.service.impl;
+package br.com.saude_monitor.api.indicador.service.impl;
 
-import br.com.saude_monitor.api.agregado.document.AgregadoHospitalDocument;
-import br.com.saude_monitor.api.agregado.dto.IndicadoresDetalheResponse;
-import br.com.saude_monitor.api.agregado.repository.AgregadoHospitalRepository;
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
-import br.com.saude_monitor.api.agregado.service.EstatisticaService;
+import br.com.saude_monitor.api.indicador.document.IndicadorHospitalDocument;
+import br.com.saude_monitor.api.indicador.dto.IndicadoresDetalheResponse;
+import br.com.saude_monitor.api.indicador.repository.IndicadorHospitalRepository;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
+import br.com.saude_monitor.api.indicador.service.EstatisticaService;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.feedback.repository.FeedbackRepository;
 import br.com.saude_monitor.api.hospital.dto.IndicadoresResponse;
@@ -55,7 +55,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AgregadoServiceImpl implements AgregadoService {
+public class IndicadorServiceImpl implements IndicadorService {
 
     /** Janela padrão do período dos indicadores (RN-14): últimos 90 dias. */
     static final Duration PERIODO_PADRAO = Duration.ofDays(90);
@@ -71,14 +71,14 @@ public class AgregadoServiceImpl implements AgregadoService {
             StatusVisita.FINALIZADA,
             StatusVisita.GPS_INTERROMPIDO);
 
-    private final AgregadoHospitalRepository agregadoRepository;
+    private final IndicadorHospitalRepository indicadorRepository;
     private final FeedbackRepository feedbackRepository;
     private final VisitaRepository visitaRepository;
     private final HospitalRepository hospitalRepository;
     private final MongoTemplate mongoTemplate;
 
     @Override
-    public AgregadoHospitalDocument recalcular(String hospitalId) {
+    public IndicadorHospitalDocument recalcular(String hospitalId) {
         Instant fim = Instant.now().truncatedTo(ChronoUnit.SECONDS);
         Instant inicio = fim.minus(PERIODO_PADRAO);
 
@@ -103,14 +103,14 @@ public class AgregadoServiceImpl implements AgregadoService {
                 .filter(v -> v.getDuracaoMinutos() != null)
                 .filter(v -> v.getDuracaoMinutos() >= DURACAO_MINIMA_MINUTOS)
                 .filter(v -> v.getDuracaoMinutos() <= TETO_DURACAO_MINUTOS)
-                .filter(AgregadoServiceImpl::tempoConfiável)
+                .filter(IndicadorServiceImpl::tempoConfiável)
                 .map(VisitaDocument::getDuracaoMinutos)
                 .toList();
 
         Integer tempoMediano = EstatisticaService.tempoMedianoMinutos(duracoes);
         int nVisitas = duracoes.size();
 
-        AgregadoHospitalDocument agregado = AgregadoHospitalDocument.builder()
+        IndicadorHospitalDocument indicador = IndicadorHospitalDocument.builder()
                 .hospitalId(hospitalId)
                 .notaMedia(notaMedia)
                 .nAvaliacoes(nAvaliacoes)
@@ -121,8 +121,8 @@ public class AgregadoServiceImpl implements AgregadoService {
                 .atualizadoEm(fim)
                 .build();
 
-        persistir(agregado);
-        return agregado;
+        persistir(indicador);
+        return indicador;
     }
 
     @Override
@@ -130,10 +130,10 @@ public class AgregadoServiceImpl implements AgregadoService {
         if (hospitalIds == null || hospitalIds.isEmpty()) {
             return List.of();
         }
-        Map<String, AgregadoHospitalDocument> porHospital = agregadoRepository
+        Map<String, IndicadorHospitalDocument> porHospital = indicadorRepository
                 .findByHospitalIdIn(hospitalIds)
                 .stream()
-                .collect(Collectors.toMap(AgregadoHospitalDocument::getHospitalId, a -> a));
+                .collect(Collectors.toMap(IndicadorHospitalDocument::getHospitalId, a -> a));
 
         return hospitalIds.stream()
                 .map(id -> porHospital.containsKey(id)
@@ -147,7 +147,7 @@ public class AgregadoServiceImpl implements AgregadoService {
         if (!hospitalRepository.existsById(hospitalId)) {
             return null;
         }
-        return agregadoRepository.findByHospitalId(hospitalId)
+        return indicadorRepository.findByHospitalId(hospitalId)
                 .map(this::toDetalheResponse)
                 .orElseGet(() -> IndicadoresDetalheResponse.indisponivel(hospitalId));
     }
@@ -177,7 +177,7 @@ public class AgregadoServiceImpl implements AgregadoService {
             try {
                 recalcular(hospitalId);
             } catch (Exception ex) {
-                log.warn("Falha ao recalcular agregado do hospital {}: {}", hospitalId, ex.getMessage());
+                log.warn("Falha ao recalcular indicador do hospital {}: {}", hospitalId, ex.getMessage());
             }
         }
     }
@@ -206,23 +206,23 @@ public class AgregadoServiceImpl implements AgregadoService {
         return fracao >= EstatisticaService.PERCENTUAL_MINIMO_COBERTURA_GPS;
     }
 
-    /** Persiste o agregado com upsert idempotente por {@code hospitalId}. */
-    private void persistir(AgregadoHospitalDocument agregado) {
-        Query query = Query.query(Criteria.where("hospitalId").is(agregado.getHospitalId()));
+    /** Persiste o indicador com upsert idempotente por {@code hospitalId}. */
+    private void persistir(IndicadorHospitalDocument indicador) {
+        Query query = Query.query(Criteria.where("hospitalId").is(indicador.getHospitalId()));
         Update update = new Update()
-                .set("notaMedia", agregado.getNotaMedia())
-                .set("nAvaliacoes", agregado.getNAvaliacoes())
-                .set("tempoMedianoMinutos", agregado.getTempoMedianoMinutos())
-                .set("nVisitas", agregado.getNVisitas())
-                .set("periodoInicio", agregado.getPeriodoInicio())
-                .set("periodoFim", agregado.getPeriodoFim())
-                .set("atualizadoEm", agregado.getAtualizadoEm());
+                .set("notaMedia", indicador.getNotaMedia())
+                .set("nAvaliacoes", indicador.getNAvaliacoes())
+                .set("tempoMedianoMinutos", indicador.getTempoMedianoMinutos())
+                .set("nVisitas", indicador.getNVisitas())
+                .set("periodoInicio", indicador.getPeriodoInicio())
+                .set("periodoFim", indicador.getPeriodoFim())
+                .set("atualizadoEm", indicador.getAtualizadoEm());
 
-        mongoTemplate.upsert(query, update, AgregadoHospitalDocument.class);
+        mongoTemplate.upsert(query, update, IndicadorHospitalDocument.class);
     }
 
     /** Indicadores embutidos compactos (listagem/detalhe) — omite valores se N < 5 (RN-15). */
-    private IndicadoresResponse toIndicadoresResponse(AgregadoHospitalDocument a) {
+    private IndicadoresResponse toIndicadoresResponse(IndicadorHospitalDocument a) {
         boolean disponivel = a.getNAvaliacoes() != null && a.getNAvaliacoes() >= 5;
         return new IndicadoresResponse(
                 disponivel,
@@ -233,7 +233,7 @@ public class AgregadoServiceImpl implements AgregadoService {
     }
 
     /** Indicadores enriquecidos do endpoint dedicado (§3.5). */
-    private IndicadoresDetalheResponse toDetalheResponse(AgregadoHospitalDocument a) {
+    private IndicadoresDetalheResponse toDetalheResponse(IndicadorHospitalDocument a) {
         boolean disponivel = a.getNAvaliacoes() != null && a.getNAvaliacoes() >= 5;
         var periodo = a.getPeriodoInicio() == null || a.getPeriodoFim() == null
                 ? null

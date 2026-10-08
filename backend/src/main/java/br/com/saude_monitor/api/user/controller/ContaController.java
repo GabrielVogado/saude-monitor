@@ -126,7 +126,7 @@ public class ContaController {
 
     /**
      * 🔒 Exclui a conta e os dados pessoais do usuário autenticado (F0-05/LGPD).
-     * Visitas e feedbacks são anonimizados; agregados públicos são preservados.
+     * Visitas e feedbacks são anonimizados; indicadores públicos são preservados.
      */
     @DeleteMapping("/exclusao")
     public ResponseEntity<Map<String, Object>> excluirConta() {

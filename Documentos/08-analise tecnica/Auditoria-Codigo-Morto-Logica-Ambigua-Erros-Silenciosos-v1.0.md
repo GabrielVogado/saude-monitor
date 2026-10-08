@@ -166,11 +166,11 @@ salva, evitando abrir um formulário que vai falhar de antemão.
 (F-11). A tela pública de sugestão (`SugerirHospitalScreen`, E1-05) não é afetada.
 
 ### P2.1 — Regra RN-17 (cobertura GPS ≥ 90%) duplicada
-**Arquivo:** `backend/.../agregado/service/EstatisticaService.java:74-90` (testado, nunca chamado em
-produção) vs. `backend/.../agregado/service/impl/AgregadoServiceImpl.java:180-194` (o que roda de fato).
+**Arquivo:** `backend/.../indicador/service/EstatisticaService.java:74-90` (testado, nunca chamado em
+produção) vs. `backend/.../indicador/service/impl/IndicadorServiceImpl.java:180-194` (o que roda de fato).
 **Cenário de falha:** se o limiar for alterado em um lugar e não no outro, os testes de
 `EstatisticaServiceTest` continuam "verdes" provando uma regra que já divergiu do comportamento real.
-**Correção:** `AgregadoServiceImpl.tempoConfiável` passa a chamar `EstatisticaService.coberturaGpsConfiável`
+**Correção:** `IndicadorServiceImpl.tempoConfiável` passa a chamar `EstatisticaService.coberturaGpsConfiável`
 em vez de reimplementar o cálculo inline — uma única fonte de verdade, coberta pelo teste que já existe.
 
 ### P2.2 — Normalização de e-mail duplicada em 4 lugares
@@ -210,7 +210,7 @@ Remoção direta, sem mudança de comportamento:
 
 - Backend: nenhum `catch` vazio sem log encontrado; regra de geofence (point-in-polygon) tem uma única
   implementação via `$geoIntersects`; critério de "avaliação suficiente" está centralizado em
-  `AgregadoServiceImpl` no backend (a divergência histórica dos PRs #94/#95 era só no frontend).
+  `IndicadorServiceImpl` no backend (a divergência histórica dos PRs #94/#95 era só no frontend).
 - Frontend: nenhum estado de `error`/`loading` computado e nunca exibido na UI; os padrões `catch {}`
   existentes nos services de rede são conscientes e documentados (fallback de JSON inválido, best-effort
   de logout, limitação já assumida da fila offline).

@@ -1,6 +1,6 @@
 package br.com.saude_monitor.api.user.service.impl;
 
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.auth.service.AuthService;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
@@ -45,28 +45,28 @@ import static org.mockito.Mockito.when;
 /**
  * Testes do serviço de usuários: cadastro com consentimento, exclusão de conta
  * LGPD (F0-05 — cascade de dados pessoais, anonimização de visitas/feedbacks e
- * recálculo de agregados) e gestão de consentimentos (E5-05 / art. 8º §5º).
+ * recálculo de indicadores) e gestão de consentimentos (E5-05 / art. 8º §5º).
  */
 class UserServiceImplTest {
 
     private UserServiceImpl userService;
     private UserRepository userRepository;
     private MongoTemplate mongoTemplate;
-    private AgregadoService agregadoService;
+    private IndicadorService indicadorService;
     private AuthService authService;
 
     @BeforeEach
     void setup() {
         userRepository = mock(UserRepository.class);
         mongoTemplate = mock(MongoTemplate.class);
-        agregadoService = mock(AgregadoService.class);
+        indicadorService = mock(IndicadorService.class);
         authService = mock(AuthService.class);
 
         userService = new UserServiceImpl(
                 userRepository,
                 new BCryptPasswordEncoder(),
                 mongoTemplate,
-                agregadoService,
+                indicadorService,
                 authService);
     }
 
@@ -230,7 +230,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    void deveRecalcularAgregadosDosHospitaisAfetados() {
+    void deveRecalcularIndicadoresDosHospitaisAfetados() {
         UserDocument user = usuario("u2");
         when(userRepository.findById("u2")).thenReturn(Optional.of(user));
 
@@ -243,7 +243,7 @@ class UserServiceImplTest {
 
         userService.excluirConta("u2");
 
-        verify(agregadoService).recalcular("h1");
-        verify(agregadoService).recalcular("h2");
+        verify(indicadorService).recalcular("h1");
+        verify(indicadorService).recalcular("h2");
     }
 }

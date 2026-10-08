@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 08/10/2026 — Pacote `agregado` passa a se chamar `indicador`
+
+**O que mudou:** no backend, o pacote que calcula a nota média, o número de avaliações e o tempo mediano de cada hospital passa de `agregado` para `indicador` (classes `Indicador*`), porque "agregado" confundia com o termo do DDD. Sem mudança de comportamento: endpoints, JSON e a coleção `agregados_hospitais` continuam iguais. Árvore Tecnológica, Especificação da API, Features MVP, ADRs e os documentos que citavam as classes foram atualizados. Registro em `Historico-Melhorias.md` (M-040).
+**Sem mudança:** status do `De-Para-Backlog-Features.md` (só o nome das classes citadas).
+
+---
+
 ## 📌 Revisão 08/10/2026 — Plano de escala da infraestrutura para o DF
 
 **O que entrou:** o [`Plano-Escala-Infraestrutura-DF-v1.0.md`](./02-arquitetura-tecnica/Plano-Escala-Infraestrutura-DF-v1.0.md), que mede a estrutura atual (Cloud Run com uma instância, Atlas M0 compartilhado com o dev), lista as travas para escalar, dimensiona seis patamares de carga a partir de premissas ajustáveis (do lançamento a 80% do DF instalado e a um evento de crise) com custo estimado em cada um, e propõe a migração em cinco fases. Registrado como proposta no ADR-015.

@@ -1,6 +1,6 @@
 package br.com.saude_monitor.api.integracao;
 
-import br.com.saude_monitor.api.agregado.document.AgregadoHospitalDocument;
+import br.com.saude_monitor.api.indicador.document.IndicadorHospitalDocument;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.feedback.seed.MassaAvaliacoesRunner;
 import br.com.saude_monitor.api.user.document.UserDocument;
@@ -67,12 +67,12 @@ class MassaAvaliacoesDevIntegracaoTest extends IntegracaoTestBase {
 
     /**
      * A carga roda em segundo plano depois do {@code ApplicationReadyEvent}: espera os
-     * agregados dos 50 hospitais da massa (o banco do container só tem os dela).
+     * indicadores dos 50 hospitais da massa (o banco do container só tem os dela).
      */
     @BeforeEach
     void aguardarCarga() {
         await().atMost(Duration.ofSeconds(60)).until(() ->
-                mongoTemplate.count(new Query(), AgregadoHospitalDocument.class) >= 50);
+                mongoTemplate.count(new Query(), IndicadorHospitalDocument.class) >= 50);
     }
 
     private JsonNode ranking(String ordem) throws Exception {

@@ -2319,6 +2319,43 @@ e Sonar; os outros só seriam medidos depois de reapontados para a `develop`.
 
 ---
 
+## M-040 — Pacote `agregado` do backend passa a se chamar `indicador`
+
+**Data:** 08/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Pergunta do PO: "na arquitetura do backend há um nome que me deixa confuso, Agregado, o
+que seria agregado dentro do sistema?". O pacote calcula e guarda o resumo público de cada
+hospital (nota média, número de avaliações, tempo mediano). "Agregado" vinha de agregação
+no sentido de banco de dados, mas em DDD a palavra quer dizer outra coisa (*aggregate*, um
+grupo de entidades com uma raiz), e o endpoint e os DTOs já falavam em indicadores.
+
+### O que mudou
+
+- Pacote `br.com.saude_monitor.api.agregado` passa a `br.com.saude_monitor.api.indicador`
+  (código e testes).
+- Classes: `AgregadoService` → `IndicadorService`, `AgregadoServiceImpl` →
+  `IndicadorServiceImpl`, `AgregadoHospitalJob` → `IndicadorHospitalJob`,
+  `AgregadoHospitalRepository` → `IndicadorHospitalRepository`, `AgregadoHospitalDocument`
+  → `IndicadorHospitalDocument`; teste `FeedbackEAgregacaoIntegracaoTest` →
+  `FeedbackEIndicadorIntegracaoTest`. Campos e comentários que chamavam o resumo de
+  "agregado" seguem o novo nome.
+- **Sem mudança de comportamento nem de contrato:** endpoints, JSON e a coleção
+  `agregados_hospitais` no MongoDB continuam iguais. Renomear a coleção exigiria migrar os
+  dados de cada ambiente sem ganho para quem lê o código.
+- Documentos vivos atualizados (Árvore Tecnológica v2.1, Especificação da API v2.4, Features
+  MVP v2.3, ADRs, De-Para, auditorias e planos que citavam as classes). Os arquivos de
+  `_historico/` ficam como estavam.
+
+### Verificação
+
+- Backend compilado e testes rodados com o JDK 25: 332 testes, todos os unitários
+  verdes (os 32 do pacote `indicador` inclusive). Os 13 que precisam de Docker
+  (Testcontainers) só rodam no CI.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

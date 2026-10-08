@@ -1059,7 +1059,7 @@ enquanto não há capacidade, com `--max-instances=1` e nenhuma instância viva.
   coleção vazia importariam o DBF/SHP duas vezes. Subir esse limite exige antes
   tornar o seed idempotente e mover o rate limit para armazenamento compartilhado.
 - **Jobs `@Scheduled` sob risco não medido.** O backend tem 4 jobs de 15 min
-  (`AgregadoHospitalJob`, `FeedbackSemRespostaJob`, `VisitaExpiracaoJob`,
+  (`IndicadorHospitalJob`, `FeedbackSemRespostaJob`, `VisitaExpiracaoJob`,
   `VisitaGpsInterrompidoJob`) e o Cloud Run estrangula CPU entre requisições por
   padrão. A revisão publicada **não** tem a anotação `run.googleapis.com/cpu-throttling`
   (verificado: 0 ocorrências), logo o padrão vale. **Não está medido se os jobs

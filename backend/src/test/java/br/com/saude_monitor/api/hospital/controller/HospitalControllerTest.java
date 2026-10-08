@@ -1,7 +1,7 @@
 package br.com.saude_monitor.api.hospital.controller;
 
 import br.com.saude_monitor.api.config.exception.GlobalExceptionHandler;
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.hospital.document.StatusSugestao;
 import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
 import br.com.saude_monitor.api.hospital.dto.GeoJsonPolygonDto;
@@ -58,7 +58,7 @@ class HospitalControllerTest {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 
-        mockMvc = MockMvcBuilders.standaloneSetup(new HospitalController(service, authHelper, mock(AgregadoService.class)))
+        mockMvc = MockMvcBuilders.standaloneSetup(new HospitalController(service, authHelper, mock(IndicadorService.class)))
                 .setValidator(validator)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();

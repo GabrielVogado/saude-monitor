@@ -1,4 +1,4 @@
-package br.com.saude_monitor.api.agregado.event;
+package br.com.saude_monitor.api.indicador.event;
 
 import br.com.saude_monitor.api.feedback.dto.FeedbackRequest;
 import br.com.saude_monitor.api.feedback.document.FoiAtendido;
@@ -21,7 +21,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Verifica que o {@link FeedbackServiceImpl} publica o {@link FeedbackSalvoEvent} após salvar
- * um feedback (Épico 04, RN-18) — disparando o recálculo assíncrono do agregado.
+ * um feedback (Épico 04, RN-18) — disparando o recálculo assíncrono do indicador.
  */
 class FeedbackSalvoEventTest {
 

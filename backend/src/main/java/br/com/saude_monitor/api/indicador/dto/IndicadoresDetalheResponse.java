@@ -1,4 +1,4 @@
-package br.com.saude_monitor.api.agregado.dto;
+package br.com.saude_monitor.api.indicador.dto;
 
 import java.time.Instant;
 
@@ -23,7 +23,7 @@ public record IndicadoresDetalheResponse(
         Instant atualizadoEm
 ) {
 
-    /** Fábrica padrão quando não há agregado materializado ainda (nenhum feedback/visita). */
+    /** Fábrica padrão quando não há indicador materializado ainda (nenhum feedback/visita). */
     public static IndicadoresDetalheResponse indisponivel(String hospitalId) {
         return new IndicadoresDetalheResponse(hospitalId, false, null, null, null, null, null, null);
     }

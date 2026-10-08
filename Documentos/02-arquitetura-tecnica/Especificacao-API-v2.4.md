@@ -189,6 +189,8 @@ A versão anterior (2.0) foi preservada em `_historico/Especificacao-API-v2.0.md
 
 ### 2.5 `agregados_hospitais` (materializado — leitura pública)
 
+> Gravada pelo pacote `indicador` do backend (`IndicadorHospitalDocument`). O pacote do backend chamava `agregado` até 08/10/2026 e passou a `indicador` (M-040), para não confundir com o *aggregate* do DDD; a coleção no MongoDB manteve o nome `agregados_hospitais`.
+
 ```json
 {
   "_id": "652c9f3e1a2b3c4d5e6f7084",
@@ -488,7 +490,7 @@ Vide §3.1 — exclui conta e anonimiza dados (LGPD art. 18/19), recomputando os
 
 ---
 
-### 3.5 Agregados (leitura pública)
+### 3.5 Indicadores (leitura pública)
 
 #### `GET /api/v1/hospitais/{id}/indicadores` 🔓
 **200**

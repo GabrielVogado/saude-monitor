@@ -6,7 +6,7 @@ import java.time.Instant;
  * Indicadores públicos do hospital (placeholder do Épico 01).
  *
  * <p>Os valores reais (nota média, tempo mediano, N) são calculados no Épico 04
- * (agregados). Até lá, a API retorna {@code indicadoresDisponiveis = false} para
+ * (pacote {@code indicador}). Até lá, a API retorna {@code indicadoresDisponiveis = false} para
  * manter o contrato estável.</p>
  */
 public record IndicadoresResponse(
@@ -17,7 +17,7 @@ public record IndicadoresResponse(
         Instant atualizadoEm
 ) {
 
-    /** Fábrica padrão enquanto os agregados (Épico 04) não estão disponíveis. */
+    /** Fábrica padrão enquanto os indicadores (Épico 04) não estão disponíveis. */
     public static IndicadoresResponse indisponivel() {
         return new IndicadoresResponse(false, null, null, null, null);
     }

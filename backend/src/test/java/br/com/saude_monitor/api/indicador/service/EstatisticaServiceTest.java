@@ -1,4 +1,4 @@
-package br.com.saude_monitor.api.agregado.service;
+package br.com.saude_monitor.api.indicador.service;
 
 import org.junit.jupiter.api.Test;
 

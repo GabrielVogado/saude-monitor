@@ -1,7 +1,7 @@
-package br.com.saude_monitor.api.agregado.service;
+package br.com.saude_monitor.api.indicador.service;
 
-import br.com.saude_monitor.api.agregado.dto.IndicadoresDetalheResponse;
-import br.com.saude_monitor.api.agregado.document.AgregadoHospitalDocument;
+import br.com.saude_monitor.api.indicador.dto.IndicadoresDetalheResponse;
+import br.com.saude_monitor.api.indicador.document.IndicadorHospitalDocument;
 import br.com.saude_monitor.api.hospital.dto.IndicadoresResponse;
 
 import java.util.Collection;
@@ -10,18 +10,18 @@ import java.util.List;
 /**
  * Contrato do serviço de agregação de indicadores públicos (Épico 04 / F-06).
  *
- * <p>Responsabilidades: calcular e persistir os agregados por hospital (RN-14..RN-17),
+ * <p>Responsabilidades: calcular e persistir os indicadores por hospital (RN-14..RN-17),
  * expor os indicadores na forma embutida da listagem/detalhe (compacta) e na forma
  * enriquecida do endpoint dedicado (§3.5), e suportar o recálculo por evento e por
  * job (RN-18).</p>
  */
-public interface AgregadoService {
+public interface IndicadorService {
 
     /**
-     * Recalcula e persiste (upsert) o agregado de um único hospital (RN-18 — evento
+     * Recalcula e persiste (upsert) o indicador de um único hospital (RN-18 — evento
      * disparado após novo feedback, e job de 15min).
      */
-    AgregadoHospitalDocument recalcular(String hospitalId);
+    IndicadorHospitalDocument recalcular(String hospitalId);
 
     /**
      * Indicadores embutidos (compactos) para a listagem/detalhe público de hospitais —
@@ -36,8 +36,8 @@ public interface AgregadoService {
     IndicadoresDetalheResponse obterDetalhe(String hospitalId);
 
     /**
-     * Recalcula agregados pendentes em lote (job de 15min, RN-18/@Scheduled):
-     * processa hospitais sem agregado (ainda não calculado) e os com feedback novo.
+     * Recalcula indicadores pendentes em lote (job de 15min, RN-18/@Scheduled):
+     * processa hospitais sem indicador (ainda não calculado) e os com feedback novo.
      */
     void recalcularPendentes();
 }

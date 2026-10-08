@@ -1,7 +1,7 @@
-package br.com.saude_monitor.api.agregado.service.impl;
+package br.com.saude_monitor.api.indicador.service.impl;
 
-import br.com.saude_monitor.api.agregado.event.FeedbackSalvoEvent;
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.indicador.event.FeedbackSalvoEvent;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -10,7 +10,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Ouvinte do {@link FeedbackSalvoEvent} (Épico 04): recalcula o agregado do hospital
+ * Ouvinte do {@link FeedbackSalvoEvent} (Épico 04): recalcula o indicador do hospital
  * afetado sempre que um feedback é salvo.
  *
  * <p>Usa {@code @Async} para não bloquear o request de criação do feedback e
@@ -23,16 +23,16 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class FeedbackSalvoEventListener {
 
-    private final AgregadoService agregadoService;
+    private final IndicadorService indicadorService;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void aoSalvarFeedback(FeedbackSalvoEvent evento) {
         try {
-            agregadoService.recalcular(evento.hospitalId());
+            indicadorService.recalcular(evento.hospitalId());
         } catch (Exception ex) {
-            // O job de 15min (AgregadoHospitalJob) cobre falhas eventuais; não derruba o request.
-            log.warn("Falha ao recalcular agregado após feedback (hospital {}): {}",
+            // O job de 15min (IndicadorHospitalJob) cobre falhas eventuais; não derruba o request.
+            log.warn("Falha ao recalcular indicador após feedback (hospital {}): {}",
                     evento.hospitalId(), ex.getMessage());
         }
     }

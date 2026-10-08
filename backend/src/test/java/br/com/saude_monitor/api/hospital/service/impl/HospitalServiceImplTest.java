@@ -127,4 +127,15 @@ class HospitalServiceImplTest {
         assertThat(result.page()).isEqualTo(0);
         assertThat(result.size()).isEqualTo(2);
     }
+    /** O detalhe de um hospital traz os indicadores dele, lidos do pacote indicador. */
+    @Test
+    void buscarPorIdTrazOsIndicadoresDoHospital() {
+        when(hospitalRepository.findById("h-nota5"))
+                .thenReturn(java.util.Optional.of(hospital("h-nota5", "Mais Nota", TipoEstabelecimento.PUBLICO)));
+
+        var resposta = service.buscarPorId("h-nota5");
+
+        assertThat(resposta.id()).isEqualTo("h-nota5");
+        assertThat(resposta.indicadores().notaMedia()).isEqualTo(5.0);
+    }
 }

@@ -2353,6 +2353,11 @@ grupo de entidades com uma raiz), e o endpoint e os DTOs já falavam em indicado
 - Backend compilado e testes rodados com o JDK 25: 332 testes, todos os unitários
   verdes (os 32 do pacote `indicador` inclusive). Os 13 que precisam de Docker
   (Testcontainers) só rodam no CI.
+- A trava de cobertura do CI (90% nas linhas alteradas) apontou quatro linhas renomeadas
+  sem teste, todas em caminhos de falha: o detalhe de um hospital com seus indicadores e o
+  recálculo que falha no ouvinte do feedback, no job em lote e na exclusão de conta. Cinco
+  testes novos cobrem esses caminhos (a falha num hospital não interrompe os outros nem a
+  exclusão de conta).
 
 ---
 

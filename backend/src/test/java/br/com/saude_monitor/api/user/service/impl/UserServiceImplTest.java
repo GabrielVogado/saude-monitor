@@ -246,4 +246,20 @@ class UserServiceImplTest {
         verify(indicadorService).recalcular("h1");
         verify(indicadorService).recalcular("h2");
     }
+    /** Exclusão de conta (LGPD) não pode falhar porque o recálculo de um hospital falhou. */
+    @Test
+    void excluiContaMesmoQuandoORecalculoDeUmHospitalFalha() {
+        UserDocument user = usuario("u3");
+        when(userRepository.findById("u3")).thenReturn(Optional.of(user));
+        when(mongoTemplate.find(any(Query.class), eq(VisitaDocument.class)))
+                .thenReturn(List.of(VisitaDocument.builder().hospitalId("h1").build()));
+        when(mongoTemplate.find(any(Query.class), eq(FeedbackDocument.class)))
+                .thenReturn(List.of(FeedbackDocument.builder().hospitalId("h2").build()));
+        when(indicadorService.recalcular("h1")).thenThrow(new IllegalStateException("Mongo fora"));
+
+        userService.excluirConta("u3");
+
+        verify(userRepository).delete(user);
+        verify(indicadorService).recalcular("h2");
+    }
 }

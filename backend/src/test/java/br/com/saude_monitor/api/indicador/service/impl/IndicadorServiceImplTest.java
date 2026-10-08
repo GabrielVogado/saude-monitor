@@ -342,4 +342,20 @@ class IndicadorServiceImplTest {
 
         verify(spyService, never()).recalcular(anyString());
     }
+    /** Falha num hospital não interrompe o lote: os demais candidatos seguem sendo recalculados (RN-18). */
+    @Test
+    void recalcularPendentesSegueQuandoUmHospitalFalha() {
+        IndicadorServiceImpl spyService = spy((IndicadorServiceImpl) service);
+        org.mockito.Mockito.doThrow(new IllegalStateException("Mongo fora")).when(spyService).recalcular("h1");
+        doReturn(null).when(spyService).recalcular("h2");
+
+        when(feedbackRepository.findByCriadoEmAfter(any()))
+                .thenReturn(List.of(feedback("h1", 4), feedback("h2", 5)));
+        when(visitaRepository.findByStatusInAndProcessadoEmAfter(any(), any())).thenReturn(List.of());
+
+        spyService.recalcularPendentes();
+
+        verify(spyService).recalcular("h1");
+        verify(spyService).recalcular("h2");
+    }
 }

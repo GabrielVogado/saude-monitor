@@ -80,7 +80,7 @@ export default function EsqueciSenhaScreen({navigation}) {
                 <ScrollView contentContainerStyle={styles.scrollContent}>
 
                     <View style={styles.header}>
-                        <Text style={styles.headerTitle}>Clinical Sanctuary</Text>
+                        <Text style={styles.headerTitle}>Radar Saúde</Text>
                     </View>
 
                     <View style={styles.card}>

@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 14/10/2026 — Exclusão de conta sem rastro do aparelho
+
+**O que mudou:** ao excluir a conta, as visitas perdem também o identificador do aparelho e os pontos de GPS, e os feedbacks perdem o comentário livre. Ficam só os dados que entram nos indicadores públicos. Pré-requisito para a política de privacidade da Play Store poder dizer que o que sobra é anônimo. Registro em `Historico-Melhorias.md` (M-041).
+**Sem mudança:** `De-Para-Backlog-Features.md` (F0-05 já estava entregue).
+
+---
+
 ## 📌 Revisão 14/10/2026 — Site público com política de privacidade, termos e exclusão de conta
 
 **O que entrou:** pasta `site/` com as páginas que a Play Store exige num endereço público: Política de Privacidade, Termos de Uso e o pedido de exclusão de conta sem o app, para `https://saudemonitor.dev`. Como publicar em [`site/README.md`](../site/README.md). Registro em `Historico-Melhorias.md` (M-042).

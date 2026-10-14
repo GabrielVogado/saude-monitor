@@ -12,6 +12,13 @@
 
 ---
 
+## 📌 Revisão 14/10/2026 — Textos legais do app alinhados à política publicada
+
+**O que mudou:** a tela Privacidade e Termos ganha controlador, contato e a base legal de dado sensível, e abre a Política e os Termos publicados em `saudemonitor.dev`. No cadastro e no login, os links de Termos e Política passam a abrir as páginas certas, o aceite cita o Radar Saúde e os selos deixam de prometer "criptografia ponta a ponta" e "dados anônimos". Registro em `Historico-Melhorias.md` (M-043).
+**De-Para:** descrição da E5-02 atualizada; nenhuma estória muda de status.
+
+---
+
 ## 📌 Revisão 14/10/2026 — Exclusão de conta sem rastro do aparelho
 
 **O que mudou:** ao excluir a conta, as visitas perdem também o identificador do aparelho e os pontos de GPS, e os feedbacks perdem o comentário livre. Ficam só os dados que entram nos indicadores públicos. Pré-requisito para a política de privacidade da Play Store poder dizer que o que sobra é anônimo. Registro em `Historico-Melhorias.md` (M-041).

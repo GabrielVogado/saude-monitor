@@ -10,9 +10,10 @@ import {
     View,
 } from "react-native";
 import {SafeAreaView} from "react-native-safe-area-context";
-import {HeartHandshake, Lock, Mail, ShieldCheck, Users} from "lucide-react-native";
+import {HeartHandshake, Lock, Mail} from "lucide-react-native";
 import LoginService from "../service/LoginService";
 import {colors} from "../../../theme";
+import CSRodapeLegal, {CSAvisoLgpd} from "../../../components/CSRodapeLegal";
 import styles from "./css/LoginStyle";
 
 export default function LoginScreen({navigation}) {
@@ -66,7 +67,7 @@ export default function LoginScreen({navigation}) {
 
                     {/* Header */}
                     <View style={styles.header}>
-                        <Text style={styles.headerTitle}>Clinical Sanctuary</Text>
+                        <Text style={styles.headerTitle}>Radar Saúde</Text>
                     </View>
 
                     {/* Main Card */}
@@ -163,42 +164,10 @@ export default function LoginScreen({navigation}) {
                             </Text>
                         </View>
 
-                        {/* Compliance Info */}
-                        <View style={styles.complianceBox}>
-                            <View style={styles.complianceIcon}>
-                                <ShieldCheck size={18} color={colors.primary} />
-                            </View>
-                            <Text style={styles.complianceText}>
-                                Suas avaliações são anônimas e agregadas por hospital, seguindo a{" "}
-                                <Text style={styles.complianceHighlight}>LGPD</Text>.
-                            </Text>
-                        </View>
+                        <CSAvisoLgpd />
                     </View>
 
-                    {/* Security Badges */}
-                    <View style={styles.securityBadges}>
-                        <View style={styles.badgeItem}>
-                            <ShieldCheck size={14} color={colors.onSurfaceVariant} />
-                            <Text style={styles.badgeText}>LGPD</Text>
-                        </View>
-                        <View style={styles.badgeItem}>
-                            <Lock size={14} color={colors.onSurfaceVariant} />
-                            <Text style={styles.badgeText}>Criptografia ponta a ponta</Text>
-                        </View>
-                        <View style={styles.badgeItem}>
-                            <Users size={14} color={colors.onSurfaceVariant} />
-                            <Text style={styles.badgeText}>Dados anônimos e agregados</Text>
-                        </View>
-                    </View>
-
-                    {/* Footer */}
-                    <View style={styles.simpleFooter}>
-                        <Text style={styles.simpleFooterLink}>Termos</Text>
-                        <View style={styles.dot} />
-                        <TouchableOpacity onPress={() => navigation.navigate?.("Privacidade")} accessibilityRole="link" accessibilityLabel="Política de Privacidade">
-                            <Text style={styles.link}>Privacidade</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <CSRodapeLegal onPrivacidade={() => navigation.navigate?.("Privacidade")} linkStyle={styles.link} />
 
                 </ScrollView>
             </KeyboardAvoidingView>

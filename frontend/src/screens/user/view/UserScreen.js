@@ -17,15 +17,16 @@ import {
     Lock,
     Mail,
     Phone,
-    ShieldCheck,
     User,
-    UserPlus,
-    Users
+    UserPlus
 } from 'lucide-react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import UserService from '../service/UserService';
 import {colors} from '../../../theme';
+import CSRodapeLegal, {CSAvisoLgpd} from '../../../components/CSRodapeLegal';
 import styles from './css/UserStyle';
+import {abrirLinkLegal, URL_POLITICA_PRIVACIDADE, URL_TERMOS_USO, VERSAO_TERMOS} from '../../../config/linksLegais';
+
 
 const HospitalRegisterScreen = ({navigation}) => {
     const [fullName, setFullName] = useState('');
@@ -55,7 +56,7 @@ const HospitalRegisterScreen = ({navigation}) => {
                 email,
                 phone,
                 password,
-                consentimento: { termosUso: true, versaoTermos: "1.0" },
+                consentimento: { termosUso: true, versaoTermos: VERSAO_TERMOS },
             });
 
             // Confirmação obrigatória de e-mail (10/09/2026): sem confirmar, o login é
@@ -195,18 +196,20 @@ const HospitalRegisterScreen = ({navigation}) => {
                                     Concordo com os{" "}
                                     <Text
                                         style={styles.linkText}
-                                        onPress={() => navigation?.navigate?.("Privacidade")}
+                                        onPress={() => abrirLinkLegal(URL_TERMOS_USO)}
+                                        accessibilityRole="link"
                                     >
                                         Termos de Uso
                                     </Text>{" "}
-                                    e{" "}
+                                    e a{" "}
                                     <Text
                                         style={styles.linkText}
-                                        onPress={() => navigation?.navigate?.("Privacidade")}
+                                        onPress={() => abrirLinkLegal(URL_POLITICA_PRIVACIDADE)}
+                                        accessibilityRole="link"
                                     >
                                         Política de Privacidade
                                     </Text>{" "}
-                                    do Clinical Sanctuary.
+                                    do Radar Saúde.
                                 </Text>
                             </View>
 
@@ -226,42 +229,10 @@ const HospitalRegisterScreen = ({navigation}) => {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Compliance Info */}
-                        <View style={styles.complianceBox}>
-                            <View style={styles.complianceIcon}>
-                                <ShieldCheck size={18} color={colors.primary} />
-                            </View>
-                            <Text style={styles.complianceText}>
-                                Suas avaliações são anônimas e agregadas por hospital, seguindo a{" "}
-                                <Text style={styles.complianceHighlight}>LGPD</Text>.
-                            </Text>
-                        </View>
+                        <CSAvisoLgpd />
                     </View>
 
-                    {/* Security Badges */}
-                    <View style={styles.securityBadges}>
-                        <View style={styles.badgeItem}>
-                            <ShieldCheck size={14} color={colors.onSurfaceVariant} />
-                            <Text style={styles.badgeText}>LGPD</Text>
-                        </View>
-                        <View style={styles.badgeItem}>
-                            <Lock size={14} color={colors.onSurfaceVariant} />
-                            <Text style={styles.badgeText}>Criptografia ponta a ponta</Text>
-                        </View>
-                        <View style={styles.badgeItem}>
-                            <Users size={14} color={colors.onSurfaceVariant} />
-                            <Text style={styles.badgeText}>Dados anônimos e agregados</Text>
-                        </View>
-                    </View>
-
-                    {/* Footer */}
-                    <View style={styles.simpleFooter}>
-                        <Text style={styles.simpleFooterLink}>Termos</Text>
-                        <View style={styles.dot} />
-                        <TouchableOpacity onPress={() => navigation?.navigate?.("Privacidade")} accessibilityRole="link" accessibilityLabel="Política de Privacidade">
-                            <Text style={styles.linkText}>Privacidade</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <CSRodapeLegal onPrivacidade={() => navigation?.navigate?.("Privacidade")} />
 
                 </ScrollView>
             </KeyboardAvoidingView>

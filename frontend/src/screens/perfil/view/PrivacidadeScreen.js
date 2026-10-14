@@ -3,6 +3,14 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ArrowLeft, ShieldCheck } from "lucide-react-native";
 import { colors, typography, spacing, radii } from "../../../theme";
+import {
+  abrirLinkLegal,
+  EMAIL_PRIVACIDADE,
+  URL_POLITICA_PRIVACIDADE,
+  URL_TERMOS_USO,
+  VERSAO_TERMOS,
+} from "../../../config/linksLegais";
+
 
 /**
  * Tela de Política de Privacidade / Termos de Uso (Épico 05 — E5-02).
@@ -34,43 +42,63 @@ export default function PrivacidadeScreen({ navigation }) {
           </Text>
         </View>
 
-        <Text style={styles.sectionTitle}>1. Quais dados tratamos</Text>
+        <Text style={styles.sectionTitle}>1. Quem cuida dos seus dados</Text>
         <Text style={styles.paragraph}>
-          Este aplicativo trata dados pessoais apenas para a finalidade de monitorar a
-          experiência hospitalar e construir estatísticas públicas de qualidade (nota e
-          tempo médio de atendimento). Esses dados incluem: localização (somente com seu
-          consentimento), visitas a hospitais e informações de cadastro (nome, e-mail,
-          telefone) quando você opta por criar uma conta.
+          O responsável (controlador) é Gabriel Vogado, desenvolvedor do Radar Saúde. Para
+          qualquer assunto sobre seus dados, escreva para {EMAIL_PRIVACIDADE}.
         </Text>
 
-        <Text style={styles.sectionTitle}>2. Base legal</Text>
+        <Text style={styles.sectionTitle}>2. Quais dados tratamos</Text>
         <Text style={styles.paragraph}>
-          O tratamento de localização depende do seu consentimento explícito (art. 7º, I,
-          LGPD). Você pode revogar esse consentimento a qualquer momento em
-          Perfil → Dados e Privacidade, sem perder acesso ao restante do aplicativo.
+          Localização do aparelho, com o app aberto e, se você permitir, também com o app
+          fechado ou fora de uso, para registrar sua chegada e saída de hospitais; as
+          visitas (hospital, horários e duração); as avaliações que você responder; e, se
+          criar uma conta, nome, e-mail e telefone. Não vendemos seus dados nem os usamos
+          para publicidade.
         </Text>
 
-        <Text style={styles.sectionTitle}>3. Dados públicos vs. pessoais</Text>
+        <Text style={styles.sectionTitle}>3. Dado de saúde e base legal</Text>
         <Text style={styles.paragraph}>
-          As estatísticas exibidas por hospital (nota média, tempo de atendimento) são
-          agregados públicos e não identificam você. Dados pessoais como nome, e-mail e
-          telefone são usados apenas para autenticação e nunca aparecem nessas estatísticas.
+          Saber que alguém esteve num hospital pode revelar informação de saúde, que a LGPD
+          trata como dado sensível. Por isso localização, visitas e avaliações só são
+          tratadas com o seu consentimento específico (art. 11, I), que você pode retirar a
+          qualquer momento em Perfil → Dados e Privacidade, sem perder o acesso ao restante
+          do aplicativo.
         </Text>
 
-        <Text style={styles.sectionTitle}>4. Seus direitos (LGPD)</Text>
+        <Text style={styles.sectionTitle}>4. O que é público</Text>
         <Text style={styles.paragraph}>
-          Você pode solicitar acesso, correção, anonimização ou exclusão dos seus dados
-          pessoais. A exclusão de conta está disponível em Perfil → Dados e Privacidade,
-          que remove seus dados pessoais e anonimiza os dados usados nas estatísticas.
+          A nota média e o tempo de atendimento de cada hospital são calculados com as
+          visitas e avaliações de todos e não identificam ninguém. Seu histórico e seus
+          comentários só aparecem para você.
         </Text>
 
-        <Text style={styles.sectionTitle}>5. Contato</Text>
+        <Text style={styles.sectionTitle}>5. Seus direitos</Text>
         <Text style={styles.paragraph}>
-          Para exercer seus direitos de titular, entre em contato pelo suporte do
-          aplicativo. Responderemos em até 15 dias úteis.
+          Você pode acessar, corrigir, exportar ou excluir seus dados. A exclusão de conta
+          fica em Perfil → Dados e Privacidade e apaga seus dados pessoais, o identificador
+          do aparelho, as posições de GPS das visitas e seus comentários. Respondemos pedidos
+          por e-mail em até 15 dias.
         </Text>
 
-        <Text style={styles.version}>Versão 1.0 — vigente a partir da data de aceite.</Text>
+        <TouchableOpacity
+          style={styles.link}
+          onPress={() => abrirLinkLegal(URL_POLITICA_PRIVACIDADE)}
+          accessibilityRole="link"
+          accessibilityLabel="Ler a Política de Privacidade completa"
+        >
+          <Text style={styles.linkText}>Ler a Política de Privacidade completa</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.link}
+          onPress={() => abrirLinkLegal(URL_TERMOS_USO)}
+          accessibilityRole="link"
+          accessibilityLabel="Ler os Termos de Uso"
+        >
+          <Text style={styles.linkText}>Ler os Termos de Uso</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.version}>Versão {VERSAO_TERMOS}, vigente desde 14/10/2026.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -117,5 +145,7 @@ const styles = StyleSheet.create({
     color: colors.onSurfaceVariant,
     marginBottom: spacing.s2,
   },
+  link: { minHeight: 48, justifyContent: "center", marginTop: spacing.s2 },
+  linkText: { ...typography.bodyMd, color: colors.primary, fontWeight: "600" },
   version: { fontSize: 12, color: colors.outline, marginTop: spacing.s5, textAlign: "center" },
 });

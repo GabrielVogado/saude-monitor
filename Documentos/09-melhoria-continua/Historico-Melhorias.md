@@ -2433,6 +2433,53 @@ sem identificar o controlador nem dar um contato; os Termos de Uso não existiam
 
 ---
 
+## M-043 — Textos legais do app alinhados à política publicada
+
+**Data:** 14/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Análise de prontidão para a Play Store (14/10/2026), bloqueador B3. Dentro do app:
+
+- a tela de privacidade citava só o art. 7º, I, sem tratar localização em hospital como
+  dado sensível, e não dizia quem é o controlador nem como falar com ele;
+- no cadastro, os links "Termos de Uso" e "Política de Privacidade" abriam a mesma tela, e
+  não existiam Termos;
+- o rodapé "Termos" do login e do cadastro não era clicável;
+- o aceite falava em "Clinical Sanctuary", nome do Design System, e não em "Radar Saúde";
+- os selos prometiam "Criptografia ponta a ponta", que o app não tem (a conexão é HTTPS),
+  e "Dados anônimos e agregados", quando a conta guarda nome e e-mail. A Play recusa app
+  com afirmação enganosa sobre dados.
+
+### O que mudou
+
+- `config/linksLegais.js` concentra os endereços publicados (M-042), a versão dos termos
+  (antes repetida em `PerfilService` e no cadastro) e `abrirLinkLegal`, que abre o link
+  no navegador sem quebrar a tela quando não há navegador.
+- `PrivacidadeScreen`: resumo novo com controlador, contato, dado de saúde (art. 11, I),
+  o que é público e o que a exclusão apaga (M-041), mais links para a Política completa e
+  os Termos.
+- Cadastro: "Termos de Uso" e "Política de Privacidade" abrem as páginas publicadas; o
+  aceite cita o Radar Saúde.
+- Login e cadastro: rodapé "Termos" vira link; os selos passam a "Conexão criptografada"
+  e "Estatísticas sem identificar você"; os cabeçalhos de login, confirmação de e-mail e
+  "esqueci a senha" mostram "Radar Saúde".
+- O aviso de LGPD, os selos e o rodapé, que eram o mesmo bloco copiado no login e no
+  cadastro, viram o componente `CSRodapeLegal` (com `CSAvisoLgpd`). O aviso dizia "Suas
+  avaliações são anônimas"; passa a dizer que a nota e o tempo de cada hospital são
+  calculados sem mostrar quem respondeu.
+
+### Verificação
+
+- 3 testes novos de `linksLegais`, 5 da `PrivacidadeScreen` (a tela não tinha teste), 4 do
+  `CSRodapeLegal`, 5 no cadastro (os links, o rodapé e a versão aceita) e 1 no login
+  (rodapé). Suíte completa do app verde: 55 suítes, 607 testes; 100% das linhas novas
+  cobertas.
+- A primeira versão deste PR reprovou no SonarQube Cloud por duplicação em código novo
+  (3,3%, limite 3%), justamente por causa do bloco copiado; o componente resolve.
+
+---
+
 ## M-044 — Aviso de localização em segundo plano no formato da Play Store
 
 **Data:** 14/10/2026 · **PR:** (este PR)

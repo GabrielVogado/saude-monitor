@@ -17,11 +17,13 @@ import br.com.saude_monitor.api.user.dto.UserRequest;
 import br.com.saude_monitor.api.user.dto.UserResponse;
 import br.com.saude_monitor.api.user.repository.UserRepository;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
+import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.UpdateDefinition;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.time.Instant;
@@ -32,6 +34,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -110,6 +113,48 @@ class UserServiceImplTest {
         verify(mongoTemplate).updateMulti(any(Query.class), any(),
                 eq(FeedbackDocument.class));
         verify(userRepository).delete(user);
+    }
+
+    @Test
+    void deveApagarDispositivoEPontosDeGpsDasVisitasNaExclusao() {
+        when(userRepository.findById("u1")).thenReturn(Optional.of(usuario("u1")));
+        when(mongoTemplate.find(any(Query.class), any())).thenReturn(List.of());
+
+        userService.excluirConta("u1");
+
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<UpdateDefinition> update = ArgumentCaptor.forClass(UpdateDefinition.class);
+        verify(mongoTemplate).updateMulti(query.capture(), update.capture(), eq(VisitaDocument.class));
+
+        assertEquals("u1", query.getValue().getQueryObject().get("usuarioId"));
+        Document set = (Document) update.getValue().getUpdateObject().get("$set");
+        Document unset = (Document) update.getValue().getUpdateObject().get("$unset");
+        assertTrue(set.containsKey("usuarioId"));
+        assertNull(set.get("usuarioId"));
+        assertTrue(unset.containsKey("dispositivoId"));
+        assertTrue(unset.containsKey("pontosAmostrais"));
+        // A duração e o hospital continuam: são a estatística de tempo.
+        assertFalse(unset.containsKey("duracaoMinutos"));
+        assertFalse(unset.containsKey("hospitalId"));
+    }
+
+    @Test
+    void deveApagarComentarioLivreDosFeedbacksNaExclusao() {
+        when(userRepository.findById("u1")).thenReturn(Optional.of(usuario("u1")));
+        when(mongoTemplate.find(any(Query.class), any())).thenReturn(List.of());
+
+        userService.excluirConta("u1");
+
+        ArgumentCaptor<UpdateDefinition> update = ArgumentCaptor.forClass(UpdateDefinition.class);
+        verify(mongoTemplate).updateMulti(any(Query.class), update.capture(), eq(FeedbackDocument.class));
+
+        Document set = (Document) update.getValue().getUpdateObject().get("$set");
+        Document unset = (Document) update.getValue().getUpdateObject().get("$unset");
+        assertEquals(Boolean.TRUE, set.get("anonimizado"));
+        assertNull(set.get("usuarioId"));
+        assertTrue(unset.containsKey("comentario"));
+        // A nota entra no indicador do hospital e fica.
+        assertFalse(unset.containsKey("nota"));
     }
 
     @Test

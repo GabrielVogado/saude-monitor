@@ -2361,6 +2361,36 @@ grupo de entidades com uma raiz), e o endpoint e os DTOs já falavam em indicado
 
 ---
 
+## M-041 — Exclusão de conta passa a apagar aparelho, GPS e comentário
+
+**Data:** 14/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Análise de prontidão para a Play Store (14/10/2026): para publicar, a política de
+privacidade precisa dizer o que acontece com os dados quando a pessoa exclui a conta. A
+exclusão zerava o `usuarioId` das visitas e dos feedbacks e chamava o resultado de
+"anonimizado", mas ficavam o `dispositivoId` (que liga as visitas do mesmo aparelho entre
+si), os pontos de GPS de cada visita e o comentário livre do feedback, que pode trazer nome,
+telefone ou o caso da pessoa. Com isso a afirmação "anonimizado" não se sustentava.
+
+### O que mudou
+
+- `UserServiceImpl.excluirConta`: nas visitas do usuário, além de zerar o `usuarioId`,
+  remove `dispositivoId` e `pontosAmostrais`; nos feedbacks, remove `comentario`.
+- Fica o que os indicadores usam: hospital, entrada, saída e duração da visita; notas e
+  respostas fechadas do feedback. Os indicadores públicos não mudam.
+- Visita ainda aberta no momento da exclusão perde o vínculo com o aparelho e é encerrada
+  pelo job de GPS interrompido (RN-06), como qualquer visita sem sinal.
+
+### Verificação
+
+- Dois testes novos em `UserServiceImplTest` leem o `$set` e o `$unset` enviados ao
+  MongoDB: as visitas perdem `dispositivoId` e `pontosAmostrais` e mantêm duração e
+  hospital; os feedbacks perdem o comentário e mantêm a nota.
+
+---
+
 ## M-042 — Site público com política de privacidade, termos e exclusão de conta
 
 **Data:** 14/10/2026 · **PR:** (este PR)

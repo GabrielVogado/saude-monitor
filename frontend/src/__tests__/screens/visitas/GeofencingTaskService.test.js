@@ -149,9 +149,26 @@ describe("regiões monitoradas", () => {
     await iniciarGeofencing();
 
     expect(alerta).toHaveBeenCalledTimes(1);
-    expect(alerta.mock.calls[0][1]).toMatch(/sem você abrir o app/);
+    expect(alerta.mock.calls[0][1]).toMatch(/mesmo quando o app está fechado ou não está em uso/);
     expect(Location.requestBackgroundPermissionsAsync).toHaveBeenCalledTimes(1);
     expect(Location.startGeofencingAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("a divulgação diz o que é coletado, para quê e que vale com o app fechado (política do Google Play)", () => {
+    const { textoDivulgacaoLocalizacao } = carregarServico();
+
+    const texto = textoDivulgacaoLocalizacao("android");
+
+    expect(texto).toMatch(/coleta a localização/);
+    expect(texto).toMatch(/registrar sua chegada e saída de hospitais/);
+    expect(texto).toMatch(/mesmo quando o app está fechado ou não está em uso/);
+    expect(texto).toMatch(/"Permitir o tempo todo"/);
+  });
+
+  it("no iOS a divulgação aponta a opção \"Sempre\"", () => {
+    const { textoDivulgacaoLocalizacao } = carregarServico();
+
+    expect(textoDivulgacaoLocalizacao("ios")).toMatch(/"Sempre" no próximo aviso/);
   });
 
   it("não pede de novo logo depois de o usuário dispensar a explicação", async () => {
@@ -825,6 +842,17 @@ describe("sinal da visita em segundo plano (RN-06)", () => {
         }),
       })
     );
+  });
+
+  it("a notificação da visita não diz que o hospital é avisado", async () => {
+    // O sinal vai só para o Radar Saúde; dizer que "o hospital" é avisado prometia um
+    // compartilhamento que não existe e que a política de privacidade não descreve.
+    const { sincronizarVisitaAtiva } = carregarServico();
+
+    await sincronizarVisitaAtiva("v1", null, "hospital-1");
+
+    const corpo = Location.startLocationUpdatesAsync.mock.calls.at(-1)[1].foregroundService.notificationBody;
+    expect(corpo).toBe("Visita em andamento. Registrando que você continua no hospital.");
   });
 
   it("chamar de novo com a mesma visita não religa o acompanhamento", async () => {

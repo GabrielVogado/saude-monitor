@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 08/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 14/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 14/10/2026 — Site público com política de privacidade, termos e exclusão de conta
+
+**O que entrou:** pasta `site/` com as páginas que a Play Store exige num endereço público: Política de Privacidade, Termos de Uso e o pedido de exclusão de conta sem o app, para `https://saudemonitor.dev`. Como publicar em [`site/README.md`](../site/README.md). Registro em `Historico-Melhorias.md` (M-042).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre a publicação na loja).
 
 ---
 

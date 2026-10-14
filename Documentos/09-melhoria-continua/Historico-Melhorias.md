@@ -2361,6 +2361,42 @@ grupo de entidades com uma raiz), e o endpoint e os DTOs já falavam em indicado
 
 ---
 
+## M-046 — AAB de produção para a Play Store
+
+**Data:** 14/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Análise de prontidão para a Play Store (14/10/2026), bloqueador B2: a Play Store só aceita
+AAB (Android App Bundle) para app novo, e o pipeline só gerava APK. Além disso, o push em
+`release/**` publicava apenas o backend; não existia build do app de produção. Ao revisar
+o fluxo apareceu um terceiro problema: o `release.yml` cria a branch `release/X.Y.Z` com o
+`GITHUB_TOKEN`, e push feito com esse token não dispara outros workflows (regra do GitHub
+contra recursão). O deploy de produção do backend, que depende desse push, nunca rodaria.
+Até aqui nenhuma `release/` tinha sido criada, então o defeito não tinha aparecido.
+
+### O que mudou
+
+- `cd-mobile-apk.yml`: entrada `formato` (`apk` ou `aab`, padrão `apk`). Com `aab`, roda
+  `bundleRelease` e publica o `.aab`; só aceita a variante release. A chave de release
+  passa a assinar também builds de `release/*`.
+- `cd-producao.yml` (novo): no push ou disparo de `release/X.Y.Z`, calcula o versionCode
+  (`X*1000000 + Y*10000 + Z*100`), gera o AAB do pacote de produção apontando para a URL
+  determinística do Cloud Run de produção e cria a GitHub Release `vX.Y.Z` com o AAB.
+- `release.yml`: depois de criar a branch, dispara por `workflow_dispatch` o
+  `cd-backend-google.yml` e o `cd-producao.yml` nela.
+- `MANUAL.md` §3.4 e §4.1 e `deploy/android/README.md` (Play App Signing com a chave de
+  release como chave de upload).
+
+### Verificação
+
+- `actionlint` nos workflows alterados: só o aviso que já existia sobre o secret opcional
+  `ANDROID_KEYSTORE_BASE64`.
+- O AAB só é gerado de verdade quando existir a primeira `release/`; o caminho de APK de
+  dev foi exercitado por um disparo manual do `cd-mobile-apk.yml` nesta branch.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

@@ -124,8 +124,9 @@ feature/* ──► develop ──► master ──► release/<tag>
 1. Valide em **homologação** (`master`, a última `vX.Y.Z-rc.N`) antes de fixar a versão.
 2. No GitHub: **Actions → Release - Gerar branch de produção → Run workflow**, informando a **rc validada** (ex.: `v1.0.0-rc.3`).
 3. O workflow cria a branch **`release/1.0.0`** a partir **dessa tag** — não da ponta da `master`, que pode já ter commits ainda não homologados.
-4. O push da branch `release/1.0.0` dispara o deploy do **ambiente prod**.
-5. Após validar em produção, faça merge de `release/1.0.0` de volta em `master` (e `develop`).
+4. O mesmo workflow **dispara** o deploy do backend de produção e o `cd-producao.yml`, que gera o **AAB** e o anexa à GitHub Release `v1.0.0`. (Disparo explícito desde 14/10/2026: um push feito com o `GITHUB_TOKEN` não aciona outros workflows, então o gatilho de `push` em `release/**` nunca rodava para a branch criada aqui.)
+5. Envie o `.aab` da Release na Play Console (*Produção* ou *Teste fechado* → *Criar nova versão*). Na primeira vez, ative o Play App Signing com a chave de release como chave de upload ([`deploy/android/README.md`](../../deploy/android/README.md)).
+6. Após validar em produção, faça merge de `release/1.0.0` de volta em `master` (e `develop`).
 
 ---
 
@@ -138,11 +139,12 @@ feature/* ──► develop ──► master ──► release/<tag>
 | `ci.yml` | push em `develop`/`master`; PR com base em `develop`, `master`, `feature/**` ou `bugfix/**` (as duas últimas desde 05/10/2026, para PR empilhado também rodar CI e Sonar — M-039) | Build + testes do backend, do frontend e do Painel Admin (`admin/`, desde 28/09/2026); análise no SonarQube Cloud quando há `SONAR_TOKEN`; em PR, **trava de contagem de testes** (§4.4, desde 04/10/2026) e **cobertura mínima de 90% no código novo** com o total sem cair (§4.4, M-031) |
 | `cd-backend-google.yml` | push em `develop`, `release/**` (caminho `backend/**`) + manual + `workflow_call` | Docker → Artifact Registry → deploy no **Cloud Run** + 3 smoke tests. **Falha com mensagem explícita** se o ambiente não tiver secrets |
 | `cd-homologacao.yml` | push em `master` + manual | **Homologação:** versão `vX.Y.Z-rc.N` → backend HML → APK HML → tag + GitHub Release (§3.3) |
-| `cd-mobile-apk.yml` | push em `develop` (caminho `frontend/**`) + manual + `workflow_call` | Build do APK com Gradle no próprio Actions. Artefato do run (30 dias). Pacote, nome e versão por ambiente |
+| `cd-mobile-apk.yml` | push em `develop` (caminho `frontend/**`) + manual + `workflow_call` | Build do APK (ou do AAB, com `formato: aab`) com Gradle no próprio Actions. Artefato do run (30 dias). Pacote, nome e versão por ambiente |
+| `cd-producao.yml` | push em `release/**` + manual (disparado pelo `release.yml` desde 14/10/2026) | **Produção:** AAB do pacote de produção, assinado com a chave de release, anexado à GitHub Release `vX.Y.Z` para envio à Play Console (§3.4) |
 | `cd-backend-render.yml` | só manual | Rollback para o Render (desativado desde 04/09/2026) |
 | `cd-mobile-eas.yml` | **só manual** (`workflow_dispatch`, a partir de `release/*`) | Build do **AAB de loja** no EAS |
 | `keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` para impedir a hibernação do Render (E8-01) |
-| `release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
+| `release.yml` | manual (workflow_dispatch) | Cria branch `release/<versão>` a partir da rc homologada e dispara o backend de produção (`cd-backend-google.yml`) e o AAB (`cd-producao.yml`) |
 
 > **Removidas em 03/09/2026** (PR de limpeza de esteiras mortas):
 >

@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 08/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 14/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 14/10/2026 — Aviso de localização em segundo plano no formato da Play Store
+
+**O que mudou:** o aviso mostrado antes do pedido de "Permitir o tempo todo" passa a dizer, como exige a política do Google Play, que a localização é coletada para registrar chegada e saída de hospitais mesmo com o app fechado ou fora de uso. A notificação da visita deixa de dizer que o hospital é avisado. Registro em `Historico-Melhorias.md` (M-044).
+**Sem mudança:** `De-Para-Backlog-Features.md` (E2-01/E2-02 já estavam entregues).
 
 ---
 

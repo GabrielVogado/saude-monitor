@@ -5,7 +5,7 @@
  * hardware back.
  */
 import React from "react";
-import { Alert } from "react-native";
+import { Alert, Linking } from "react-native";
 import { render, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import UserScreen from "../../../screens/user/view/UserScreen";
 import UserService from "../../../screens/user/service/UserService";
@@ -66,5 +66,43 @@ describe("UserScreen (cadastro)", () => {
       expect(Alert.alert).toHaveBeenCalledWith("Falha no cadastro", "Email já cadastrado.")
     );
     expect(navigation.navigate).not.toHaveBeenCalled();
+  });
+
+  test("o link Termos de Uso do aceite abre os Termos publicados", () => {
+    jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    render(<UserScreen navigation={{ navigate: jest.fn() }} />);
+
+    fireEvent.press(screen.getByText("Termos de Uso"));
+
+    expect(Linking.openURL).toHaveBeenCalledWith("https://saudemonitor.dev/termos");
+  });
+
+  test("o link Política de Privacidade do aceite abre a política publicada", () => {
+    jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    render(<UserScreen navigation={{ navigate: jest.fn() }} />);
+
+    fireEvent.press(screen.getByText("Política de Privacidade"));
+
+    expect(Linking.openURL).toHaveBeenCalledWith("https://saudemonitor.dev/privacidade");
+  });
+
+  test("o rodapé Termos abre os Termos publicados", () => {
+    jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    render(<UserScreen navigation={{ navigate: jest.fn() }} />);
+
+    fireEvent.press(screen.getByLabelText("Termos de Uso"));
+
+    expect(Linking.openURL).toHaveBeenCalledWith("https://saudemonitor.dev/termos");
+  });
+
+  test("o cadastro registra a versão vigente dos termos aceitos", async () => {
+    UserService.registro.mockResolvedValueOnce({ success: true });
+    render(<UserScreen navigation={{ goBack: jest.fn(), navigate: jest.fn() }} />);
+    preencherFormulario();
+
+    fireEvent.press(screen.getByLabelText("Criar conta"));
+
+    await waitFor(() => expect(UserService.registro).toHaveBeenCalledTimes(1));
+    expect(UserService.registro.mock.calls[0][0].consentimento).toEqual({ termosUso: true, versaoTermos: "1.0" });
   });
 });

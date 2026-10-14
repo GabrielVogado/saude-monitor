@@ -9,6 +9,7 @@ import { geracaoDaSessao } from "../../../config/sessao";
 import { apiRequest as request, renovarSessaoAposNaoAutorizado } from "../../../core/api/apiClient";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../auth/service/LoginService";
+import { VERSAO_TERMOS } from "../../../config/linksLegais";
 
 /**
  * O PDF de exportação LGPD é montado sob demanda no servidor, então recebe
@@ -20,8 +21,6 @@ const EXPORT_PDF_PATH = "/api/v1/contas/export/pdf";
 
 const CONSENTIMENTOS_PATH = "/api/v1/contas/consentimentos";
 
-/** Versão vigente do aviso de privacidade exibido ao titular (E5-02). */
-const VERSAO_TERMOS = "1.0";
 
 /**
  * Faz o download autenticado do PDF no cache do app, renovando o token uma única

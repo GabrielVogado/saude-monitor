@@ -26,6 +26,8 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import UserService from '../service/UserService';
 import {colors} from '../../../theme';
 import styles from './css/UserStyle';
+import {abrirLinkLegal, URL_POLITICA_PRIVACIDADE, URL_TERMOS_USO, VERSAO_TERMOS} from '../../../config/linksLegais';
+
 
 const HospitalRegisterScreen = ({navigation}) => {
     const [fullName, setFullName] = useState('');
@@ -55,7 +57,7 @@ const HospitalRegisterScreen = ({navigation}) => {
                 email,
                 phone,
                 password,
-                consentimento: { termosUso: true, versaoTermos: "1.0" },
+                consentimento: { termosUso: true, versaoTermos: VERSAO_TERMOS },
             });
 
             // Confirmação obrigatória de e-mail (10/09/2026): sem confirmar, o login é
@@ -195,18 +197,20 @@ const HospitalRegisterScreen = ({navigation}) => {
                                     Concordo com os{" "}
                                     <Text
                                         style={styles.linkText}
-                                        onPress={() => navigation?.navigate?.("Privacidade")}
+                                        onPress={() => abrirLinkLegal(URL_TERMOS_USO)}
+                                        accessibilityRole="link"
                                     >
                                         Termos de Uso
                                     </Text>{" "}
-                                    e{" "}
+                                    e a{" "}
                                     <Text
                                         style={styles.linkText}
-                                        onPress={() => navigation?.navigate?.("Privacidade")}
+                                        onPress={() => abrirLinkLegal(URL_POLITICA_PRIVACIDADE)}
+                                        accessibilityRole="link"
                                     >
                                         Política de Privacidade
                                     </Text>{" "}
-                                    do Clinical Sanctuary.
+                                    do Radar Saúde.
                                 </Text>
                             </View>
 
@@ -246,17 +250,19 @@ const HospitalRegisterScreen = ({navigation}) => {
                         </View>
                         <View style={styles.badgeItem}>
                             <Lock size={14} color={colors.onSurfaceVariant} />
-                            <Text style={styles.badgeText}>Criptografia ponta a ponta</Text>
+                            <Text style={styles.badgeText}>Conexão criptografada</Text>
                         </View>
                         <View style={styles.badgeItem}>
                             <Users size={14} color={colors.onSurfaceVariant} />
-                            <Text style={styles.badgeText}>Dados anônimos e agregados</Text>
+                            <Text style={styles.badgeText}>Estatísticas sem identificar você</Text>
                         </View>
                     </View>
 
                     {/* Footer */}
                     <View style={styles.simpleFooter}>
-                        <Text style={styles.simpleFooterLink}>Termos</Text>
+                        <TouchableOpacity onPress={() => abrirLinkLegal(URL_TERMOS_USO)} accessibilityRole="link" accessibilityLabel="Termos de Uso">
+                            <Text style={styles.linkText}>Termos</Text>
+                        </TouchableOpacity>
                         <View style={styles.dot} />
                         <TouchableOpacity onPress={() => navigation?.navigate?.("Privacidade")} accessibilityRole="link" accessibilityLabel="Política de Privacidade">
                             <Text style={styles.linkText}>Privacidade</Text>

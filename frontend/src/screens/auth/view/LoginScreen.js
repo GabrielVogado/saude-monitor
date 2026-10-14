@@ -14,6 +14,7 @@ import {HeartHandshake, Lock, Mail, ShieldCheck, Users} from "lucide-react-nativ
 import LoginService from "../service/LoginService";
 import {colors} from "../../../theme";
 import styles from "./css/LoginStyle";
+import {abrirLinkLegal, URL_TERMOS_USO} from "../../../config/linksLegais";
 
 export default function LoginScreen({navigation}) {
     const [email, setEmail] = useState("");
@@ -66,7 +67,7 @@ export default function LoginScreen({navigation}) {
 
                     {/* Header */}
                     <View style={styles.header}>
-                        <Text style={styles.headerTitle}>Clinical Sanctuary</Text>
+                        <Text style={styles.headerTitle}>Radar Saúde</Text>
                     </View>
 
                     {/* Main Card */}
@@ -183,17 +184,19 @@ export default function LoginScreen({navigation}) {
                         </View>
                         <View style={styles.badgeItem}>
                             <Lock size={14} color={colors.onSurfaceVariant} />
-                            <Text style={styles.badgeText}>Criptografia ponta a ponta</Text>
+                            <Text style={styles.badgeText}>Conexão criptografada</Text>
                         </View>
                         <View style={styles.badgeItem}>
                             <Users size={14} color={colors.onSurfaceVariant} />
-                            <Text style={styles.badgeText}>Dados anônimos e agregados</Text>
+                            <Text style={styles.badgeText}>Estatísticas sem identificar você</Text>
                         </View>
                     </View>
 
                     {/* Footer */}
                     <View style={styles.simpleFooter}>
-                        <Text style={styles.simpleFooterLink}>Termos</Text>
+                        <TouchableOpacity onPress={() => abrirLinkLegal(URL_TERMOS_USO)} accessibilityRole="link" accessibilityLabel="Termos de Uso">
+                            <Text style={styles.link}>Termos</Text>
+                        </TouchableOpacity>
                         <View style={styles.dot} />
                         <TouchableOpacity onPress={() => navigation.navigate?.("Privacidade")} accessibilityRole="link" accessibilityLabel="Política de Privacidade">
                             <Text style={styles.link}>Privacidade</Text>

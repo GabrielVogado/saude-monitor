@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 08/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 14/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 14/10/2026 — Textos legais do app alinhados à política publicada
+
+**O que mudou:** a tela Privacidade e Termos ganha controlador, contato e a base legal de dado sensível, e abre a Política e os Termos publicados em `saudemonitor.dev`. No cadastro e no login, os links de Termos e Política passam a abrir as páginas certas, o aceite cita o Radar Saúde e os selos deixam de prometer "criptografia ponta a ponta" e "dados anônimos". Registro em `Historico-Melhorias.md` (M-043).
+**De-Para:** descrição da E5-02 atualizada; nenhuma estória muda de status.
 
 ---
 

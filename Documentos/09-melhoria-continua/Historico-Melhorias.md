@@ -2480,6 +2480,37 @@ Análise de prontidão para a Play Store (14/10/2026), bloqueador B3. Dentro do 
 
 ---
 
+## M-044 — Aviso de localização em segundo plano no formato da Play Store
+
+**Data:** 14/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Análise de prontidão para a Play Store (14/10/2026), bloqueador B5. A política de
+localização em segundo plano do Google Play exige, antes do pedido de "Permitir o tempo
+todo", uma divulgação no app que diga que dado é coletado, para qual recurso e que a coleta
+acontece **mesmo com o app fechado ou fora de uso**. O aviso existente dizia "sem você
+abrir o app", formulação que o Google costuma recusar na revisão. Além disso, a notificação
+fixa durante a visita dizia "Avisaremos o hospital que você continua lá", mas nada é
+enviado ao hospital: o sinal vai só para o backend do Radar Saúde.
+
+### O que mudou
+
+- `GeofencingTaskService.textoDivulgacaoLocalizacao(plataforma)`: texto novo que diz
+  coleta, finalidade, "mesmo quando o app está fechado ou não está em uso", que a
+  localização só é enviada perto de hospitais e não é usada para publicidade, e qual opção
+  escolher no Android ou no iOS. O fluxo continua o mesmo: aviso com "Agora não" e
+  "Continuar", e só depois o pedido do sistema.
+- Notificação da visita: "Visita em andamento. Registrando que você continua no hospital."
+
+### Verificação
+
+- 3 testes novos no `GeofencingTaskService.test.js` (texto do Android, do iOS e da
+  notificação); o teste do aviso antes do pedido passa a exigir a frase da política.
+  Suíte do serviço: 56 testes verdes.
+
+---
+
 ## M-045 — Manifesto de release sem sobreposição de tela e sem HTTP aberto
 
 **Data:** 14/10/2026 · **PR:** (este PR)

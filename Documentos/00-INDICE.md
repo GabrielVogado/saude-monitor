@@ -12,6 +12,13 @@
 
 ---
 
+## 📌 Revisão 14/10/2026 — Aviso de localização em segundo plano no formato da Play Store
+
+**O que mudou:** o aviso mostrado antes do pedido de "Permitir o tempo todo" passa a dizer, como exige a política do Google Play, que a localização é coletada para registrar chegada e saída de hospitais mesmo com o app fechado ou fora de uso. A notificação da visita deixa de dizer que o hospital é avisado. Registro em `Historico-Melhorias.md` (M-044).
+**Sem mudança:** `De-Para-Backlog-Features.md` (E2-01/E2-02 já estavam entregues).
+
+---
+
 ## 📌 Revisão 14/10/2026 — Textos legais do app alinhados à política publicada
 
 **O que mudou:** a tela Privacidade e Termos ganha controlador, contato e a base legal de dado sensível, e abre a Política e os Termos publicados em `saudemonitor.dev`. No cadastro e no login, os links de Termos e Política passam a abrir as páginas certas, o aceite cita o Radar Saúde e os selos deixam de prometer "criptografia ponta a ponta" e "dados anônimos". Registro em `Historico-Melhorias.md` (M-043).

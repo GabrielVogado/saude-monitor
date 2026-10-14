@@ -147,61 +147,9 @@ const styles = StyleSheet.create({
     registerButtonIcon: {
         marginLeft: spacing.s2,
     },
-    complianceBox: {
-        flexDirection: 'row',
-        backgroundColor: colors.surfaceContainerHigh,
-        borderRadius: radii.lg,
-        padding: spacing.s4,
-        marginTop: spacing.s6,
-        gap: spacing.s3,
-    },
-    complianceIcon: {
-        marginTop: 2,
-    },
-    complianceText: {
-        flex: 1,
-        fontSize: 11,
-        color: colors.onSurfaceVariant,
-        lineHeight: 16,
-    },
-    complianceHighlight: {
-        fontWeight: '700',
-    },
-    securityBadges: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        rowGap: spacing.s2,
-        columnGap: spacing.s5,
-        marginTop: spacing.s8,
-        paddingHorizontal: spacing.s4,
-    },
-    badgeItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    badgeText: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: colors.onSurfaceVariant,
-    },
-    simpleFooter: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: spacing.s8,
-        gap: spacing.s3,
-    },
     simpleFooterLink: {
         fontSize: 12,
         color: colors.onSurfaceVariant,
-    },
-    dot: {
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: colors.outlineVariant,
     },
 });
 

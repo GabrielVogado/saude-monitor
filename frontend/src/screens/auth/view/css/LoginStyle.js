@@ -170,41 +170,9 @@ const styles = StyleSheet.create({
     complianceHighlight: {
         fontWeight: "700",
     },
-    securityBadges: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        justifyContent: "center",
-        rowGap: spacing.s2,
-        columnGap: spacing.s5,
-        marginTop: spacing.s8,
-        paddingHorizontal: spacing.s4,
-    },
-    badgeItem: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-    },
-    badgeText: {
-        fontSize: 11,
-        fontWeight: "600",
-        color: colors.onSurfaceVariant,
-    },
-    simpleFooter: {
-        flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "center",
-        marginTop: spacing.s8,
-        gap: spacing.s3,
-    },
     simpleFooterLink: {
         fontSize: 12,
         color: colors.onSurfaceVariant,
-    },
-    dot: {
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: colors.outlineVariant,
     },
 });
 

@@ -2361,6 +2361,48 @@ grupo de entidades com uma raiz), e o endpoint e os DTOs já falavam em indicado
 
 ---
 
+## M-042 — Site público com política de privacidade, termos e exclusão de conta
+
+**Data:** 14/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Análise de prontidão para a Play Store (14/10/2026), bloqueadores B3 e B4: a Play exige
+uma política de privacidade num endereço público e um link web onde a pessoa pede a
+exclusão da conta sem precisar do app. A política existia só dentro do app, com base legal
+incompleta (art. 7º, I, quando localização em hospital é dado sensível de saúde, art. 11),
+sem identificar o controlador nem dar um contato; os Termos de Uso não existiam.
+
+### O que mudou
+
+- Pasta nova `site/` com páginas estáticas para `https://saudemonitor.dev` (domínio do PO
+  no Cloudflare): `/privacidade`, `/termos`, `/exclusao-de-conta` e uma página inicial.
+  HTML puro, sem JavaScript nem cookies, com cabeçalhos de segurança em `_headers`.
+- Política v1.0: controlador e contato (`privacidade@saudemonitor.dev`), tabela de dados
+  com finalidade e momento da coleta (inclusive localização com o app fechado), dado de
+  saúde com consentimento específico (art. 11, I), operadores (Google Cloud, MongoDB
+  Atlas, Resend, provedor de mapas), retenção e o que a exclusão apaga (M-041), direitos
+  do art. 18 e prazo de 15 dias.
+- Termos v1.0: aviso de que não é serviço de saúde (SAMU 192), natureza estimada dos
+  números, regras de uso dos comentários e foro do domicílio do usuário.
+- `site/wrangler.jsonc` publica como Worker de arquivos estáticos com domínio próprio;
+  passo a passo em `site/README.md`.
+
+### Verificação
+
+- `wrangler deploy --dry-run` lê os arquivos de `public/` sem erro.
+- Os fatos da política foram conferidos no código: campos de `UserDocument`,
+  `VisitaDocument` e `FeedbackDocument`, intervalos do `GeofencingTaskService` e o que
+  `UserServiceImpl.excluirConta` apaga.
+
+### Pendente com o PO
+
+- Publicar (`npx wrangler deploy` em `site/`) e criar o encaminhamento de
+  `privacidade@saudemonitor.dev` no Email Routing do Cloudflare.
+- Revisão jurídica do texto, se quiser, antes do lançamento público.
+
+---
+
 ## M-046 — AAB de produção para a Play Store
 
 **Data:** 14/10/2026 · **PR:** (este PR)

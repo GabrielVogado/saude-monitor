@@ -95,6 +95,15 @@ describe("UserScreen (cadastro)", () => {
     expect(Linking.openURL).toHaveBeenCalledWith("https://saudemonitor.dev/termos");
   });
 
+  test("o rodapé Privacidade abre a tela de privacidade do app", () => {
+    const navigation = { navigate: jest.fn() };
+    render(<UserScreen navigation={navigation} />);
+
+    fireEvent.press(screen.getByLabelText("Política de Privacidade"));
+
+    expect(navigation.navigate).toHaveBeenCalledWith("Privacidade");
+  });
+
   test("o cadastro registra a versão vigente dos termos aceitos", async () => {
     UserService.registro.mockResolvedValueOnce({ success: true });
     render(<UserScreen navigation={{ goBack: jest.fn(), navigate: jest.fn() }} />);

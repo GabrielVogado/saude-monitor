@@ -2392,12 +2392,19 @@ Análise de prontidão para a Play Store (14/10/2026), bloqueador B3. Dentro do 
 - Login e cadastro: rodapé "Termos" vira link; os selos passam a "Conexão criptografada"
   e "Estatísticas sem identificar você"; os cabeçalhos de login, confirmação de e-mail e
   "esqueci a senha" mostram "Radar Saúde".
+- O aviso de LGPD, os selos e o rodapé, que eram o mesmo bloco copiado no login e no
+  cadastro, viram o componente `CSRodapeLegal` (com `CSAvisoLgpd`). O aviso dizia "Suas
+  avaliações são anônimas"; passa a dizer que a nota e o tempo de cada hospital são
+  calculados sem mostrar quem respondeu.
 
 ### Verificação
 
-- 3 testes novos de `linksLegais`, 5 da `PrivacidadeScreen` (a tela não tinha teste), 4 no
-  cadastro (os três links e a versão aceita) e 1 no login (rodapé). Suítes de auth, perfil,
-  cadastro e config verdes: 12 suítes, 124 testes.
+- 3 testes novos de `linksLegais`, 5 da `PrivacidadeScreen` (a tela não tinha teste), 4 do
+  `CSRodapeLegal`, 5 no cadastro (os links, o rodapé e a versão aceita) e 1 no login
+  (rodapé). Suíte completa do app verde: 55 suítes, 607 testes; 100% das linhas novas
+  cobertas.
+- A primeira versão deste PR reprovou no SonarQube Cloud por duplicação em código novo
+  (3,3%, limite 3%), justamente por causa do bloco copiado; o componente resolve.
 
 ---
 

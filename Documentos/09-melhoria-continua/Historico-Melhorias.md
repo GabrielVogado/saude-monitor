@@ -2377,7 +2377,8 @@ Até aqui nenhuma `release/` tinha sido criada, então o defeito não tinha apar
 
 ### O que mudou
 
-- `cd-mobile-apk.yml`: entrada `formato` (`apk` ou `aab`, padrão `apk`). Com `aab`, roda
+- `cd-mobile-apk.yml`: entrada `formato` (`apk` ou `aab`, padrão `apk`), também no disparo
+  manual. Com `aab`, roda
   `bundleRelease` e publica o `.aab`; só aceita a variante release. A chave de release
   passa a assinar também builds de `release/*`.
 - `cd-producao.yml` (novo): no push ou disparo de `release/X.Y.Z`, calcula o versionCode
@@ -2392,8 +2393,8 @@ Até aqui nenhuma `release/` tinha sido criada, então o defeito não tinha apar
 
 - `actionlint` nos workflows alterados: só o aviso que já existia sobre o secret opcional
   `ANDROID_KEYSTORE_BASE64`.
-- O AAB só é gerado de verdade quando existir a primeira `release/`; o caminho de APK de
-  dev foi exercitado por um disparo manual do `cd-mobile-apk.yml` nesta branch.
+- Disparo manual do `cd-mobile-apk.yml` nesta branch com `formato: aab` para exercitar o
+  `bundleRelease` (assinado com a chave de debug, porque a branch não é integrada).
 
 ---
 

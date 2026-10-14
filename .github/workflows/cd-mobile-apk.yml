@@ -56,6 +56,11 @@ on:
         type: choice
         options: [release, debug]
         default: release
+      formato:
+        description: APK (instalar no celular) ou AAB (Play Store)
+        type: choice
+        options: [apk, aab]
+        default: apk
 
   # Chamado pelo orquestrador de homologacao/producao, que ja sabe a versao (da tag) e
   # a URL do backend que acabou de publicar.

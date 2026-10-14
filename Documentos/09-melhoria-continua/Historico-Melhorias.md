@@ -2361,6 +2361,41 @@ grupo de entidades com uma raiz), e o endpoint e os DTOs já falavam em indicado
 
 ---
 
+## M-045 — Manifesto de release sem sobreposição de tela e sem HTTP aberto
+
+**Data:** 14/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Análise de prontidão para a Play Store (14/10/2026), itens A4 e A5. O
+`AndroidManifest.xml` principal, que vale também para o APK/AAB de release:
+
+- declarava `SYSTEM_ALERT_WINDOW` (desenhar sobre outros apps), que só o menu de
+  desenvolvimento do React Native usa e que o manifesto de `debug` já declara. Permissão
+  sensível sem uso no app é motivo comum de questionamento na revisão da Play;
+- apontava para um `network_security_config.xml` que liberava HTTP sem criptografia para
+  dois IPs da rede local do PC de desenvolvimento (`192.168.100.11` e `.20`), além de
+  emulador e localhost. Nenhum ambiente usa mais esses endereços: dev, homologação e
+  produção falam com o Cloud Run em HTTPS.
+
+### O que mudou
+
+- `SYSTEM_ALERT_WINDOW` sai do manifesto principal (continua nos manifestos de `debug` e
+  `debugOptimized`).
+- O `network_security_config.xml` e o atributo `android:networkSecurityConfig` são
+  removidos. O release passa a recusar HTTP em qualquer endereço, que é o padrão do
+  Android desde a API 28. Os builds de `debug` continuam com `usesCleartextTraffic=true`
+  nos próprios manifestos, para o Metro e um backend local.
+
+### Verificação
+
+- Build nativo do APK pelo `cd-mobile-apk.yml` disparado nesta branch (o CI de PR só
+  exporta a versão web).
+- Consequência aceita: um APK de **release** gerado localmente não fala mais com um
+  backend em `http://` na rede local; para isso, use o build de `debug`.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

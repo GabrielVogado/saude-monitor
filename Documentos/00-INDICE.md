@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 08/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 14/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 14/10/2026 — Manifesto de release limpo para a Play Store
+
+**O que mudou:** o app de release deixa de declarar a permissão de sobrepor outros apps (só o menu de desenvolvimento a usa) e de liberar HTTP sem criptografia para IPs da rede local do PC de desenvolvimento. Os builds de debug não mudam. Registro em `Historico-Melhorias.md` (M-045).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre o manifesto).
 
 ---
 

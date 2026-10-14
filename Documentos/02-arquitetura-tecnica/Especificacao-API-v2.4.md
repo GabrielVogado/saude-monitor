@@ -302,7 +302,7 @@ Revoga o refresh token na blacklist (`refresh_tokens_revogados`, TTL até a expi
 #### `DELETE /api/v1/contas/exclusao` 🔒
 Exclui conta e dados pessoais (LGPD). **200** com resumo do que foi removido/anonimizado.
 
-> ✅ **Situação atual (30/08/2026):** implementado (PR #25). Substitui o path anterior `DELETE /api/v1/usuarios/me` por clareza semântica. Cascade: remove `users`, anonimiza `visitas`/`feedbacks` (`usuarioId → null`, `anonimizado=true`) e **recalcula os agregados** afetados (job de 15min cobre falhas).
+> ✅ **Situação atual (30/08/2026):** implementado (PR #25). Substitui o path anterior `DELETE /api/v1/usuarios/me` por clareza semântica. Cascade: remove `users`, anonimiza `visitas`/`feedbacks` (`usuarioId → null`, `anonimizado=true`) e **recalcula os agregados** afetados (job de 15min cobre falhas). **Desde 14/10/2026 (M-041):** as visitas perdem também `dispositivoId` e `pontosAmostrais`, e os feedbacks perdem `comentario`; ficam só os campos que entram nos indicadores.
 >
 > ⚠️ **Correção (08/09/2026, auditoria de código morto):** a menção anterior a uma
 > coleção `auth_logins`/`AuthRepository.deleteByUser_Id` no cascade estava errada —

@@ -12,6 +12,13 @@
 
 ---
 
+## 📌 Revisão 14/10/2026 — Site público com política de privacidade, termos e exclusão de conta
+
+**O que entrou:** pasta `site/` com as páginas que a Play Store exige num endereço público: Política de Privacidade, Termos de Uso e o pedido de exclusão de conta sem o app, para `https://saudemonitor.dev`. Como publicar em [`site/README.md`](../site/README.md). Registro em `Historico-Melhorias.md` (M-042).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre a publicação na loja).
+
+---
+
 ## 📌 Revisão 08/10/2026 — Pacote `agregado` passa a se chamar `indicador`
 
 **O que mudou:** no backend, o pacote que calcula a nota média, o número de avaliações e o tempo mediano de cada hospital passa de `agregado` para `indicador` (classes `Indicador*`), porque "agregado" confundia com o termo do DDD. Sem mudança de comportamento: endpoints, JSON e a coleção `agregados_hospitais` continuam iguais. Árvore Tecnológica, Especificação da API, Features MVP, ADRs e os documentos que citavam as classes foram atualizados. Registro em `Historico-Melhorias.md` (M-040).

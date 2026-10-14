@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de Privacidade · Radar Saúde</title>
+<meta name="description" content="Como o Radar Saúde trata seus dados pessoais, de acordo com a LGPD.">
+<link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+<header><a class="marca" href="/">Radar Saúde</a></header>
+<main>
+<h1>Política de Privacidade</h1>
+<p class="vigencia">Versão 1.0 · vigente a partir de 14 de outubro de 2026</p>
+
+<p class="resumo"><strong>Em resumo:</strong> o Radar Saúde usa a sua localização para saber quando você entra e sai de um hospital, para calcular o tempo de atendimento de cada unidade e pedir a sua avaliação. A estatística que aparece no app é pública e não identifica ninguém. Seus dados não são vendidos nem usados para publicidade. Você pode excluir sua conta a qualquer momento.</p>
+
+<h2>1. Quem é o responsável pelos seus dados</h2>
+<p>O controlador dos dados é <strong>Gabriel Vogado</strong>, desenvolvedor responsável pelo aplicativo Radar Saúde. Para qualquer assunto sobre seus dados, inclusive para exercer os seus direitos, escreva para <a href="mailto:privacidade@saudemonitor.dev">privacidade@saudemonitor.dev</a>. Esse endereço também é o canal do encarregado pelo tratamento de dados pessoais (art. 41 da LGPD).</p>
+
+<h2>2. Quais dados tratamos e para quê</h2>
+<table>
+<thead><tr><th>Dado</th><th>Para que usamos</th><th>Quando é coletado</th></tr></thead>
+<tbody>
+<tr><td>Nome, e-mail e telefone (opcional)</td><td>Criar e proteger a sua conta, confirmar o e-mail e recuperar a senha.</td><td>Só se você criar uma conta.</td></tr>
+<tr><td>Senha</td><td>Entrar na conta. Guardamos apenas um resumo criptográfico (hash), nunca a senha em si.</td><td>No cadastro e na troca de senha.</td></tr>
+<tr><td>Localização do aparelho, com o app aberto</td><td>Mostrar os hospitais perto de você, o mapa e a distância.</td><td>Só com a sua permissão.</td></tr>
+<tr><td>Localização do aparelho, com o app fechado ou fora de uso</td><td>Registrar automaticamente a sua chegada e saída de um hospital e, durante a visita, confirmar a cada poucos minutos que você continua lá.</td><td>Só se você escolher "Permitir o tempo todo". Fora de uma visita, o app só é avisado pelo sistema quando você se aproxima de um hospital; o GPS fica desligado.</td></tr>
+<tr><td>Visitas</td><td>Hospital, horário de entrada e de saída, duração e as posições registradas durante a visita. Servem para calcular o tempo de atendimento de cada unidade.</td><td>Quando uma visita é registrada, automática ou manualmente.</td></tr>
+<tr><td>Avaliações</td><td>Respostas sobre o atendimento (se foi atendido, se passou por triagem, nota de 1 a 5) e um comentário opcional. Formam a nota pública do hospital.</td><td>Só quando você responde.</td></tr>
+<tr><td>Identificador aleatório do aparelho</td><td>Permitir usar o app sem conta e evitar visitas duplicadas. É um código gerado pelo próprio app, sem relação com o número do aparelho ou do chip.</td><td>Na primeira abertura.</td></tr>
+<tr><td>Registro dos seus consentimentos</td><td>Guardar quando você deu ou retirou cada permissão, junto da sua conta.</td><td>Sempre que você muda uma permissão.</td></tr>
+</tbody>
+</table>
+<p>Não coletamos contatos, fotos, arquivos, dados de outros apps nem informações de pagamento. Não usamos seus dados para publicidade e não os vendemos.</p>
+
+<h2>3. Dado de saúde</h2>
+<p>Saber que uma pessoa esteve num hospital, e como avaliou o atendimento, pode revelar informação sobre a saúde dela. A LGPD trata isso como <strong>dado pessoal sensível</strong>. Por isso, a localização e as visitas só são tratadas com o seu <strong>consentimento específico e destacado</strong> (art. 11, I), que você dá ao conceder a permissão de localização no app e pode retirar a qualquer momento em <em>Perfil → Dados e Privacidade</em>, sem perder o acesso ao restante do aplicativo.</p>
+
+<h2>4. Base legal</h2>
+<ul>
+<li><strong>Consentimento</strong> (art. 7º, I, e art. 11, I): localização, visitas e avaliações.</li>
+<li><strong>Execução do contrato</strong> com você (art. 7º, V): dados da conta, para que ela funcione.</li>
+</ul>
+
+<h2>5. O que é público</h2>
+<p>O app mostra, para cada hospital, a nota média, o número de avaliações e o tempo de atendimento, calculados a partir de todas as visitas e avaliações. Esses números são agregados: não mostram nome, e-mail, comentário nem a visita de ninguém em particular. O seu histórico de visitas e os seus comentários só aparecem para você.</p>
+
+<h2>6. Com quem compartilhamos</h2>
+<p>Não compartilhamos seus dados com outras empresas para fins próprios delas. Usamos estes prestadores de serviço, que tratam os dados só para executar o serviço contratado:</p>
+<ul>
+<li><strong>Google Cloud</strong>: hospedagem do servidor do app, em São Paulo.</li>
+<li><strong>MongoDB Atlas</strong>: banco de dados, em São Paulo.</li>
+<li><strong>Resend</strong>: envio do código de confirmação e de recuperação de senha. Recebe só o seu e-mail e o código. Fica nos Estados Unidos; a transferência internacional segue o art. 33 da LGPD.</li>
+<li><strong>Provedor de mapas</strong>: fornece as imagens do mapa. Recebe a área do mapa que está sendo exibida, não a sua identidade.</li>
+</ul>
+<p>Também podemos fornecer dados quando uma autoridade competente exigir por lei ou ordem judicial.</p>
+
+<h2>7. Por quanto tempo guardamos</h2>
+<ul>
+<li>Os dados da conta ficam enquanto a conta existir.</li>
+<li>Códigos de confirmação de e-mail expiram e são apagados automaticamente.</li>
+<li>Quando você exclui a conta, apagamos nome, e-mail, telefone, senha e o registro de consentimentos. Nas suas visitas apagamos o vínculo com você, o identificador do aparelho e as posições de GPS; nas suas avaliações apagamos o vínculo com você e o comentário. Ficam apenas hospital, horários, duração, notas e respostas fechadas, sem nada que permita chegar a você, porque continuam fazendo parte da estatística pública. Os detalhes estão em <a href="/exclusao-de-conta">Excluir sua conta</a>.</li>
+<li>Se você usa o app sem conta, as visitas ficam ligadas apenas ao identificador aleatório do aparelho, sem nome nem e-mail. Desinstalar o app apaga esse identificador do aparelho.</li>
+</ul>
+
+<h2>8. Seus direitos</h2>
+<p>Você pode, a qualquer momento: confirmar se tratamos seus dados; acessar e receber uma cópia (no app, em <em>Histórico → Exportar meus dados</em>); corrigir dados incompletos ou errados; pedir a anonimização ou exclusão; retirar o consentimento; e saber com quem compartilhamos. Peça pelo app ou por <a href="mailto:privacidade@saudemonitor.dev">privacidade@saudemonitor.dev</a>. Respondemos em até 15 dias. Você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).</p>
+
+<h2>9. Segurança</h2>
+<p>Toda comunicação entre o app e o servidor é criptografada (HTTPS). A senha é guardada só como hash. Os tokens de acesso ficam no armazenamento seguro do aparelho. O acesso ao banco de dados é restrito.</p>
+
+<h2>10. Crianças e adolescentes</h2>
+<p>O Radar Saúde é destinado a maiores de 18 anos. Não coletamos intencionalmente dados de menores de idade.</p>
+
+<h2>11. Mudanças nesta política</h2>
+<p>Se esta política mudar de forma relevante, avisaremos no app antes de a nova versão valer. A data de vigência fica no topo desta página.</p>
+
+<nav class="links">
+<a href="/termos">Termos de Uso</a>
+<a href="/exclusao-de-conta">Excluir sua conta</a>
+</nav>
+</main>
+<footer>Radar Saúde · Contato: <a href="mailto:privacidade@saudemonitor.dev">privacidade@saudemonitor.dev</a></footer>
+</body>
+</html>

@@ -107,7 +107,7 @@ const OPCOES_ACOMPANHAMENTO = {
     // visita no backend; a economia de bateria vem do intervalo de 5 min.
     accuracy: Location.Accuracy.Balanced,
     timeInterval: 5 * 60 * 1000,
-    notificationBody: "Visita em andamento. Avisaremos o hospital que você continua lá.",
+    notificationBody: "Visita em andamento. Registrando que você continua no hospital.",
   },
 };
 
@@ -637,6 +637,23 @@ async function explicacaoDispensadaRecentemente() {
 }
 
 /**
+ * Divulgação exigida pela política de localização em segundo plano do Google Play antes
+ * do pedido de "o tempo todo": diz que dado é coletado, para quê, e que a coleta acontece
+ * **mesmo com o app fechado ou fora de uso**, nessas palavras (sem elas o Google recusa a
+ * declaração). Também diz o que não é feito com o dado.
+ */
+export function textoDivulgacaoLocalizacao(plataforma) {
+  const opcao =
+    plataforma === "ios" ? '"Sempre" no próximo aviso' : '"Permitir o tempo todo" na próxima tela';
+  return (
+    "O Radar Saúde coleta a localização do aparelho para registrar sua chegada e saída de " +
+    "hospitais e confirmar que você continua lá durante a visita, mesmo quando o app está " +
+    "fechado ou não está em uso. A localização só é enviada perto de hospitais e não é " +
+    `usada para publicidade. Para ativar, escolha ${opcao}.`
+  );
+}
+
+/**
  * Permissões de localização. A "o tempo todo" (Android ACCESS_BACKGROUND_LOCATION / iOS
  * "Sempre") é a única que deixa o SO acordar o app na chegada ao hospital; antes de
  * pedi-la, o app explica para que serve (a política do Google Play exige essa
@@ -664,13 +681,7 @@ async function garantirPermissoes(interativo) {
 
   const aceitou = await perguntar(
     "Check-in automático",
-    Platform.OS === "ios"
-      ? "Para registrar sua chegada e saída do hospital sem você abrir o app, escolha " +
-          "\"Sempre\" no próximo aviso. A localização só é usada perto de hospitais, para " +
-          "confirmar a visita."
-      : "Para registrar sua chegada e saída do hospital sem você abrir o app, escolha " +
-          "\"Permitir o tempo todo\" na próxima tela. A localização só é usada perto de " +
-          "hospitais, para confirmar a visita.",
+    textoDivulgacaoLocalizacao(Platform.OS),
     "Continuar"
   );
   if (!aceitou) {

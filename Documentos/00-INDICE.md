@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 14/10/2026 — AAB de produção para a Play Store
+
+**O que entrou:** a branch `release/X.Y.Z` passa a gerar o AAB que a Play Store exige, anexado à GitHub Release `vX.Y.Z`, e o `release.yml` passa a disparar o backend de produção e esse build (antes o deploy de produção nunca rodaria, porque a branch é criada com o `GITHUB_TOKEN`). Fluxo em `10-git-flow/MANUAL.md` §3.4 e Play App Signing em `deploy/android/README.md`. Registro em `Historico-Melhorias.md` (M-046).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre a esteira).
+
+---
+
 ## 📌 Revisão 14/10/2026 — Manifesto de release limpo para a Play Store
 
 **O que mudou:** o app de release deixa de declarar a permissão de sobrepor outros apps (só o menu de desenvolvimento a usa) e de liberar HTTP sem criptografia para IPs da rede local do PC de desenvolvimento. Os builds de debug não mudam. Registro em `Historico-Melhorias.md` (M-045).

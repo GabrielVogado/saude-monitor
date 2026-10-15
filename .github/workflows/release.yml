@@ -18,6 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # Para disparar os deploys da branch nova (passo final).
+      actions: write
     steps:
       - name: Validar a rc
         id: rc
@@ -62,3 +64,18 @@ jobs:
           git checkout -b "release/$VERSAO"
           git push origin "release/$VERSAO"
           echo "🚀 \`release/$VERSAO\` criada a partir de \`${{ inputs.rc }}\`." >> "$GITHUB_STEP_SUMMARY"
+
+      # Push feito com o GITHUB_TOKEN nao dispara outros workflows (regra do GitHub contra
+      # recursao): o `push` em `release/**` do cd-backend-google.yml e do cd-producao.yml
+      # nunca rodaria para a branch que este job acabou de criar. `workflow_dispatch` e a
+      # excecao que o GITHUB_TOKEN pode acionar. Achado em 14/10/2026 (analise da Play
+      # Store); antes disso nenhuma release/ tinha sido criada.
+      - name: Disparar backend e AAB de produção
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSAO: ${{ steps.rc.outputs.versao }}
+        run: |
+          set -euo pipefail
+          gh workflow run cd-backend-google.yml -R "$GITHUB_REPOSITORY" --ref "release/$VERSAO"
+          gh workflow run cd-producao.yml -R "$GITHUB_REPOSITORY" --ref "release/$VERSAO"
+          echo "🚚 Disparados: backend de produção e AAB da \`release/$VERSAO\`." >> "$GITHUB_STEP_SUMMARY"

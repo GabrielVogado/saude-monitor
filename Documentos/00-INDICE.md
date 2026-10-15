@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 14/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 15/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 15/10/2026 — Homologação v1.0.0-rc.5
+
+**O que entrou:** registro da rc que leva a `develop` de 15/10/2026 para a homologação, candidata à `release/1.0.0` da Play Store: o que entrou desde a rc.4 (PRs #136 a #200, M-020 a M-046), o que fica de fora, rollback e o roteiro de teste no aparelho. Em [`10-git-flow/homologacoes/v1.0.0-rc.5.md`](./10-git-flow/homologacoes/v1.0.0-rc.5.md). `10-git-flow/MANUAL.md` §3.3 passa a pedir um registro desses para cada rc.
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
 
 ---
 

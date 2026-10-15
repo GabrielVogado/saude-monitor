@@ -113,6 +113,10 @@ feature/* ──► develop ──► master ──► release/<tag>
    intermediário pode ficar sem rc própria — o seguinte o contém.
 5. Testadores baixam o APK na página **Releases** do repositório. Quem já tem o HML
    instalado só instala por cima.
+6. Cada rc tem um registro em [`homologacoes/`](./homologacoes/) com o que entrou desde a
+   anterior, o roteiro de teste e o resultado. Ele é escrito num PR `doc/` para a
+   `develop` antes da promoção, e o resultado é preenchido depois da validação.
+   Primeiro registro: [`v1.0.0-rc.5`](./homologacoes/v1.0.0-rc.5.md) (15/10/2026).
 
 > ⚠️ **Pré-requisitos (uma vez):** a chave de release do APK
 > ([`deploy/android/README.md`](../../deploy/android/README.md)), o banco/usuário

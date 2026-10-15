@@ -1,7 +1,7 @@
 package br.com.saude_monitor.api.hospital.controller;
 
-import br.com.saude_monitor.api.agregado.dto.IndicadoresDetalheResponse;
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.indicador.dto.IndicadoresDetalheResponse;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
 import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
 import br.com.saude_monitor.api.hospital.document.StatusSugestao;
@@ -20,6 +20,8 @@ import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalResponse;
 import br.com.saude_monitor.api.hospital.service.HospitalService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -52,15 +54,20 @@ public class HospitalController {
 
     private final HospitalService hospitalService;
     private final AutenticacaoHelper autenticacaoHelper;
-    private final AgregadoService agregadoService;
+    private final IndicadorService indicadorService;
 
     /** 🔓 Lista hospitais ativos, com filtro geoespacial (raio), tipo e busca textual. */
     @GetMapping
     @SecurityRequirements
     public ResponseEntity<PageResponse<HospitalResumoResponse>> listar(
-            @RequestParam(required = false) Double latitude,
-            @RequestParam(required = false) Double longitude,
-            @RequestParam(required = false) Double raioKm,
+            @RequestParam(required = false) @DecimalMin("-90") @DecimalMax("90") Double latitude,
+            @RequestParam(required = false) @DecimalMin("-180") @DecimalMax("180") Double longitude,
+            // raioKm > 0: um valor negativo virava `maxDistance` negativa no MongoDB e a
+            // exceção subia como 500. Bean Validation ignora `null` (o filtro por raio é
+            // opcional), então só valida quando o parâmetro é enviado. Teto de 1000 km
+            // cobre o território nacional e barra valores absurdos.
+            @RequestParam(required = false) @DecimalMin(value = "0", inclusive = false)
+                    @DecimalMax("1000") Double raioKm,
             @RequestParam(required = false) TipoEstabelecimento tipo,
             @RequestParam(required = false) String busca,
             @RequestParam(defaultValue = "0") @Min(0) int page,
@@ -104,7 +111,7 @@ public class HospitalController {
     @GetMapping("/{id}/indicadores")
     @SecurityRequirements
     public ResponseEntity<IndicadoresDetalheResponse> buscarIndicadores(@PathVariable String id) {
-        IndicadoresDetalheResponse detalhe = agregadoService.obterDetalhe(id);
+        IndicadoresDetalheResponse detalhe = indicadorService.obterDetalhe(id);
         if (detalhe == null) {
             return ResponseEntity.notFound().build();
         }

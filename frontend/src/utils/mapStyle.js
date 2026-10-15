@@ -19,7 +19,13 @@
 import Mapbox from "@rnmapbox/maps";
 
 // Token público gerado no painel da Mapbox (https://account.mapbox.com).
-Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN || "");
+// Em `@rnmapbox/maps` v10 a chamada devolve uma Promise: sem o `.catch`, uma falha
+// do módulo nativo virava rejeição não tratada. O mapa só fica sem tiles, então basta
+// registrar.
+Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN || "").catch((erro) => {
+  // eslint-disable-next-line no-console
+  console.warn("mapStyle: falha ao configurar o token do Mapbox", erro?.message);
+});
 
 export const MAPBOX_STYLE = Mapbox.StyleURL.Street;
 

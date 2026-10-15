@@ -1,7 +1,7 @@
 package br.com.saude_monitor.api.hospital.controller;
 
 import br.com.saude_monitor.api.config.exception.GlobalExceptionHandler;
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.hospital.document.StatusSugestao;
 import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
 import br.com.saude_monitor.api.hospital.dto.GeoJsonPolygonDto;
@@ -11,6 +11,7 @@ import br.com.saude_monitor.api.hospital.dto.HospitalResponse;
 import br.com.saude_monitor.api.hospital.dto.IndicadoresResponse;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
 import br.com.saude_monitor.api.hospital.dto.OrdemRanking;
+import br.com.saude_monitor.api.hospital.dto.StatusHospital;
 import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
 import br.com.saude_monitor.api.hospital.dto.AprovarSugestaoRequest;
 import br.com.saude_monitor.api.hospital.dto.RejeitarSugestaoRequest;
@@ -57,7 +58,7 @@ class HospitalControllerTest {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 
-        mockMvc = MockMvcBuilders.standaloneSetup(new HospitalController(service, authHelper, mock(AgregadoService.class)))
+        mockMvc = MockMvcBuilders.standaloneSetup(new HospitalController(service, authHelper, mock(IndicadorService.class)))
                 .setValidator(validator)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -70,6 +71,11 @@ class HospitalControllerTest {
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
+
+    // A validação dos parâmetros de query (@DecimalMin/@DecimalMax em latitude/longitude/
+    // raioKm) depende do MethodValidationPostProcessor, que o MockMvc standalone não instala.
+    // Por isso o F-01 (raioKm negativo → 400) é coberto em HospitalListagemValidacaoIntegracaoTest,
+    // com o contexto completo do Spring, onde a validação de método de fato roda.
 
     @Test
     void deveCriarHospitalComSucesso() throws Exception {
@@ -172,7 +178,7 @@ class HospitalControllerTest {
             return new HospitalResponse("1", request.nome(), request.cnpj(), request.tipo(),
                     request.categoria(), null, null, null, null, null,
                     request.endereco(), request.contato(), request.geofence(),
-                    true, IndicadoresResponse.indisponivel(), Instant.now(), Instant.now());
+                    true, null, IndicadoresResponse.indisponivel(), Instant.now(), Instant.now());
         }
 
         @Override
@@ -198,6 +204,13 @@ class HospitalControllerTest {
 
         @Override
         public PageResponse<HospitalResumoResponse> ranking(OrdemRanking ordem, TipoEstabelecimento tipo, int page, int size) {
+            return PageResponse.of(List.of(), page, size, 0);
+        }
+
+        @Override
+        public PageResponse<HospitalResumoResponse> listarAdmin(StatusHospital status, TipoEstabelecimento tipo,
+                                                                String regiaoAdministrativa, String busca,
+                                                                int page, int size) {
             return PageResponse.of(List.of(), page, size, 0);
         }
 

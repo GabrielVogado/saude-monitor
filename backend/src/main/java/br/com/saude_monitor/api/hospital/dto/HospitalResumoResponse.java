@@ -16,6 +16,10 @@ import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
  * persistido e indexado) e {@code raioMetros} bastam para o cliente reconstruí-lo. O
  * polígono completo continua disponível em {@code GET /api/v1/hospitais/{id}} e em
  * {@code GET /api/v1/hospitais/{id}/geofence}.</p>
+ *
+ * <p>{@code regiaoAdministrativa} (E7-03, Painel Admin) é derivado das coordenadas por
+ * point-in-polygon, não um campo do cadastro — pode ser {@code null} (ver
+ * {@code HospitalDocument#regiaoAdministrativa}).</p>
  */
 public record HospitalResumoResponse(
         String id,
@@ -27,6 +31,7 @@ public record HospitalResumoResponse(
         LocalizacaoDto localizacao,
         Integer raioMetros,
         boolean ativo,
+        String regiaoAdministrativa,
         IndicadoresResponse indicadores
 ) {
 }

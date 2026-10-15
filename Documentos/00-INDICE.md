@@ -1,7 +1,160 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 22/09/2026 · Responsável: Gabriel Vogado
+> Última atualização: 15/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 15/10/2026 — Homologação v1.0.0-rc.5
+
+**O que entrou:** registro da rc que leva a `develop` de 15/10/2026 para a homologação, candidata à `release/1.0.0` da Play Store: o que entrou desde a rc.4 (PRs #136 a #200, M-020 a M-046), o que fica de fora, rollback e o roteiro de teste no aparelho. Em [`10-git-flow/homologacoes/v1.0.0-rc.5.md`](./10-git-flow/homologacoes/v1.0.0-rc.5.md). `10-git-flow/MANUAL.md` §3.3 passa a pedir um registro desses para cada rc.
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
+
+---
+
+## 📌 Revisão 14/10/2026 — AAB de produção para a Play Store
+
+**O que entrou:** a branch `release/X.Y.Z` passa a gerar o AAB que a Play Store exige, anexado à GitHub Release `vX.Y.Z`, e o `release.yml` passa a disparar o backend de produção e esse build (antes o deploy de produção nunca rodaria, porque a branch é criada com o `GITHUB_TOKEN`). Fluxo em `10-git-flow/MANUAL.md` §3.4 e Play App Signing em `deploy/android/README.md`. Registro em `Historico-Melhorias.md` (M-046).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre a esteira).
+
+---
+
+## 📌 Revisão 14/10/2026 — Manifesto de release limpo para a Play Store
+
+**O que mudou:** o app de release deixa de declarar a permissão de sobrepor outros apps (só o menu de desenvolvimento a usa) e de liberar HTTP sem criptografia para IPs da rede local do PC de desenvolvimento. Os builds de debug não mudam. Registro em `Historico-Melhorias.md` (M-045).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre o manifesto).
+
+---
+
+## 📌 Revisão 14/10/2026 — Aviso de localização em segundo plano no formato da Play Store
+
+**O que mudou:** o aviso mostrado antes do pedido de "Permitir o tempo todo" passa a dizer, como exige a política do Google Play, que a localização é coletada para registrar chegada e saída de hospitais mesmo com o app fechado ou fora de uso. A notificação da visita deixa de dizer que o hospital é avisado. Registro em `Historico-Melhorias.md` (M-044).
+**Sem mudança:** `De-Para-Backlog-Features.md` (E2-01/E2-02 já estavam entregues).
+
+---
+
+## 📌 Revisão 14/10/2026 — Textos legais do app alinhados à política publicada
+
+**O que mudou:** a tela Privacidade e Termos ganha controlador, contato e a base legal de dado sensível, e abre a Política e os Termos publicados em `saudemonitor.dev`. No cadastro e no login, os links de Termos e Política passam a abrir as páginas certas, o aceite cita o Radar Saúde e os selos deixam de prometer "criptografia ponta a ponta" e "dados anônimos". Registro em `Historico-Melhorias.md` (M-043).
+**De-Para:** descrição da E5-02 atualizada; nenhuma estória muda de status.
+
+---
+
+## 📌 Revisão 14/10/2026 — Exclusão de conta sem rastro do aparelho
+
+**O que mudou:** ao excluir a conta, as visitas perdem também o identificador do aparelho e os pontos de GPS, e os feedbacks perdem o comentário livre. Ficam só os dados que entram nos indicadores públicos. Pré-requisito para a política de privacidade da Play Store poder dizer que o que sobra é anônimo. Registro em `Historico-Melhorias.md` (M-041).
+**Sem mudança:** `De-Para-Backlog-Features.md` (F0-05 já estava entregue).
+
+---
+
+## 📌 Revisão 14/10/2026 — Site público com política de privacidade, termos e exclusão de conta
+
+**O que entrou:** pasta `site/` com as páginas que a Play Store exige num endereço público: Política de Privacidade, Termos de Uso e o pedido de exclusão de conta sem o app, para `https://saudemonitor.dev`. Como publicar em [`site/README.md`](../site/README.md). Registro em `Historico-Melhorias.md` (M-042).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre a publicação na loja).
+
+---
+
+## 📌 Revisão 08/10/2026 — Pacote `agregado` passa a se chamar `indicador`
+
+**O que mudou:** no backend, o pacote que calcula a nota média, o número de avaliações e o tempo mediano de cada hospital passa de `agregado` para `indicador` (classes `Indicador*`), porque "agregado" confundia com o termo do DDD. Sem mudança de comportamento: endpoints, JSON e a coleção `agregados_hospitais` continuam iguais. Árvore Tecnológica, Especificação da API, Features MVP, ADRs e os documentos que citavam as classes foram atualizados. Registro em `Historico-Melhorias.md` (M-040).
+**Sem mudança:** status do `De-Para-Backlog-Features.md` (só o nome das classes citadas).
+
+---
+
+## 📌 Revisão 08/10/2026 — Plano de escala da infraestrutura para o DF
+
+**O que entrou:** o [`Plano-Escala-Infraestrutura-DF-v1.0.md`](./02-arquitetura-tecnica/Plano-Escala-Infraestrutura-DF-v1.0.md), que mede a estrutura atual (Cloud Run com uma instância, Atlas M0 compartilhado com o dev), lista as travas para escalar, dimensiona seis patamares de carga a partir de premissas ajustáveis (do lançamento a 80% do DF instalado e a um evento de crise) com custo estimado em cada um, e propõe a migração em cinco fases. Registrado como proposta no ADR-015.
+**Sem mudança de código.** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` sem mudança (é um plano, nada foi entregue ainda).
+
+---
+
+## 📌 Revisão 07/10/2026 — Documentação da SDD conferida contra a `develop`
+
+**O que mudou:** os registros M-032 a M-039 do `Historico-Melhorias.md` ganharam o número do PR (antes "(este PR)") e M-035/M-036 voltaram à ordem numérica. A SDD de TanStack Query e Zustand passa a "Implementado". `De-Para-Backlog-Features.md` atualiza E2-05 (janela de 45 min, M-037) e E2-09 (sinal com o app fechado, M-038). O `MANUAL.md` do git-flow passa a listar as bases `feature/**` e `bugfix/**` do CI (M-039) e a Árvore Tecnológica registra TanStack Query e Zustand no app.
+**Sem mudança de código.**
+
+---
+
+## 📌 Revisão 05/10/2026 — CI também em PR empilhado
+
+**O que entrou:** o CI (e o SonarQube Cloud) passa a rodar em PR cuja base é uma branch `feature/**` ou `bugfix/**`, não só `develop` e `master`. Registro em `Historico-Melhorias.md` (M-039).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre a esteira).
+
+---
+
+## 📌 Revisão 05/10/2026 — Sinal da visita com o app fechado
+
+**O que entrou:** com uma visita aberta, o app manda o heartbeat com a posição a cada ~10 min também com o app fechado, para a visita não ser encerrada como `GPS_INTERROMPIDO` enquanto a pessoa segue no hospital. RN-23 em `Documento-Negocial-v2.1.md` e heartbeat em `Especificacao-API-v2.4.md` atualizados. Registro em `Historico-Melhorias.md` (M-038).
+**Sem mudança:** `De-Para-Backlog-Features.md` (E2-05 e E2-09 já estavam entregues).
+
+---
+
+## 📌 Revisão 05/10/2026 — Janela de GPS interrompido de 10 para 45 min
+
+**O que mudou:** a RN-06 (Documento Negocial v2.1) e a E2-05 (Backlog v2.2) passam de 10 para 45 min sem sinal antes de encerrar a visita como `GPS_INTERROMPIDO`. A janela antiga era menor que o heartbeat de 30 min (RN-23) e encerrava visitas longas com duração de poucos minutos. Registro em `Historico-Melhorias.md` (M-037). O sinal do app em segundo plano vem num PR separado.
+**Sem mudança:** `De-Para-Backlog-Features.md` (a E2-05 continua entregue; só o limite mudou).
+
+---
+
+## 📌 Revisão 05/10/2026 — Auditoria técnica v4.0, SDD de estado e cliente HTTP único
+
+**O que entrou:** a Auditoria Técnica v4.0 do app, a SDD de adoção de TanStack Query e Zustand e a conferência das duas contra o código, em `08-analise tecnica/`. A Fase 0 da SDD (cliente HTTP único, com renovação de token também na exclusão de conta) foi entregue e o ADR-001 passa a "Implementado". Registro em `Historico-Melhorias.md` (M-032).
+**Fase 1 (M-033):** sessão global com Zustand e cache de queries com TanStack Query; Perfil e Histórico reagem ao login e ao logout na hora. ADR-004 (Context API) passa a "Substituído".
+**Fase 2 (M-034):** heartbeat e geofencing passam a seguir a visita ativa em qualquer tela, não só no foco da aba Início (defeito da auditoria, §4.2.2).
+**Fase 3 (M-035):** Hospitais, Ranking, Detalhe e Mapa leem pelo TanStack Query, sem as refs manuais contra respostas fora de ordem.
+**Fase 4 (M-036):** check-in, checkout e envio de feedback por mutações do TanStack Query; Hospitais e Detalhe leem a visita ativa compartilhada.
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória muda de status).
+
+---
+
+## 📌 Revisão 04/10/2026 — Cobertura mínima de 90% na esteira
+
+**O que entrou:** o CI reprova o PR cujas linhas alteradas tenham menos de 90% de cobertura e o PR que faz a cobertura total de uma área cair. Regra em `10-git-flow/MANUAL.md` §4.4. Registro em `Historico-Melhorias.md` (M-031).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre a esteira de qualidade).
+
+---
+
+## 📌 Revisão 04/10/2026 — Trava de contagem de testes e SonarQube Cloud
+
+**O que entrou:** o CI passa a reprovar o PR que reduz a quantidade de testes de uma área ou que altera o código de produção de uma área sem acrescentar teste a ela; e cada área (backend, mobile, admin) ganha um projeto no SonarQube Cloud, analisado pelo próprio CI assim que o secret `SONAR_TOKEN` existir. Regra e passo a passo em `10-git-flow/MANUAL.md` §4.4. Registro em `Historico-Melhorias.md` (M-030).
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre a esteira de qualidade).
+
+---
+
+## 📌 Revisão 04/10/2026 — Avaliação pendente da visita
+
+**O que entrou:** a avaliação da visita deixa de depender da notificação. Cada visita encerrada fica como pendência no aparelho por 24h (RN-09) e aparece num card na Home; quem está logado também recebe do servidor as visitas que aguardam avaliação, inclusive a encerrada como `GPS_INTERROMPIDO` quando o celular descarregou dentro do hospital, que passa a aceitar feedback. Registro em `Historico-Melhorias.md` (M-029).
+**Documentos versionados:** `Especificacao-API` v2.3 → v2.4 (anterior preservada em `_historico/`).
+**De-Para:** descrição da E3-03 atualizada; nenhuma estória muda de status.
+
+---
+
+## 📌 Revisão 29/09/2026 — Massa de dados de avaliações (dev)
+
+**O que entrou:** carga de usuários de teste, visitas e avaliações para o ambiente de desenvolvimento, para testar indicadores e ranking sem visitas reais. Uso, travas contra homologação/produção e remoção em [`07-dados/Massa-Dados-Avaliacoes-Dev.md`](./07-dados/Massa-Dados-Avaliacoes-Dev.md). Registro em `Historico-Melhorias.md` (M-027).
+**Sem mudança:** `De-Para-Backlog-Features.md` (é ferramenta de teste, nenhuma estória muda de status).
+
+---
+
+## 📌 Revisão 28/09/2026 — Notificação de feedback: 1 min + piso de 2 min
+
+**O que entrou:** decisão do PO — a notificação de feedback pós-saída passa de "1 a 5 minutos" para **1 minuto** após a saída (RN-08); o piso de 2 min para convidar (RN-01/RN-07) passa a ser aplicado no cliente. Correções de código no PR #163 e registro em `Historico-Melhorias.md` (M-024).
+**Documentos versionados:** `Documento-Negocial` v2.0 → v2.1 · `Backlog-MVP` v2.1 → v2.2 · `Padrao-UI-UX` v2.0 → v2.1 · `Features-MVP` v2.2 → v2.3 · `Especificacao-API` v2.2 → v2.3 · `Plano-Sprints` v2.1 → v2.2 · `Relatorio-Aderencia` v3.8 → v3.9 (anteriores preservadas em `_historico/`). Ponteiros ativos atualizados; menções em notas de revisão datadas foram preservadas (não reescrevem o histórico).
+**Housekeeping:** removidas 3 duplicatas de versões antigas que estavam nas pastas ativas (`Features-MVP-v2.1.md`, `Especificacao-API-v2.1.md`, `Arvore-Tecnologica-v2.0.md`) — idênticas às cópias já existentes em `_historico/`.
+**Sem mudança de status:** nenhuma estória muda de status (E3-01 segue ✅); o `De-Para-Backlog-Features.md` teve só a descrição da E3-01 atualizada.
+
+---
+
+## 📌 Revisão 23/09/2026 — Plano de divulgação
+
+**O que entrou:** nova pasta `13-marketing/` com o [`Plano-Divulgacao-v1.0.md`](./13-marketing/Plano-Divulgacao-v1.0.md), um plano de 12 semanas para lançar o Radar Saúde no DF (preparação → beta fechado → lançamento local → crescimento), escrito para quem não tem experiência em marketing. Versão visual em [`Plano-Divulgacao-v1.0.html`](./13-marketing/Plano-Divulgacao-v1.0.html). O critério de saída do beta segue a V-09 do `Plano-Sprints-v2.1` §22.4.
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória cobre divulgação) e `Historico-Melhorias.md` (não é correção nem mudança de processo).
+
+---
+
+## 📌 Revisão 23/09/2026 — Pentest da homologação
+
+**O que entrou:** relatório do teste de segurança autorizado da homologação (`v1.0.0-rc.4`), só na camada de aplicação, em [`12-seguranca/Pentest-HML-2026-09-23.md`](./12-seguranca/Pentest-HML-2026-09-23.md). Sem achado alto/crítico; autenticação, autorização (BOLA/BFLA) e injeção (SQLi/NoSQLi/XSS/SSTI) sólidas. Três achados baixos/informativos — o F-01 (`raioKm` negativo → 500) corrigido no M-020.
 
 ---
 
@@ -81,7 +234,7 @@
 Este repositório de documentação segue uma estrutura versionada:
 
 - **`_historico/`** — documentos das fases anteriores, preservados como memória institucional (não editar).
-- **Documentos ativos** — a documentação vigente do produto, organizada por domínio. Após a revisão de 12/09/2026, as versões correntes são: Negocial v2.0 · Arquitetura v2.1 · UI/UX v2.0 · **Backlog v2.1** · **Features v2.2** · **Plano de Sprints v2.1** · **Aderência v3.7** · **Consolidação Técnica v1.1** · **API v2.2** (revisão de 02/09/2026 mantida no histórico abaixo).
+- **Documentos ativos** — a documentação vigente do produto, organizada por domínio. Após a revisão de 28/09/2026, as versões correntes são: **Negocial v2.1** · Arquitetura v2.1 · **UI/UX v2.1** · **Backlog v2.2** · **Features v2.3** · **Plano de Sprints v2.2** · **Aderência v3.9** · **Consolidação Técnica v1.1** · **API v2.3** (revisões anteriores mantidas no histórico abaixo).
 
 Regra de versionamento: toda alteração relevante de um documento ativo deve gerar uma **nova versão** (ex.: `v2.0` → `v2.1`) e o conteúdo antigo é movido para `_historico/`. Nunca sobrescreva o histórico.
 
@@ -94,35 +247,40 @@ Documentos/
 ├── 00-INDICE.md                              ← você está aqui
 │
 ├── 01-negocio/                               ← visão de negócio do produto
-│   └── Documento-Negocial-v2.0.md            ← problema, público, jornada, regras de negócio, LGPD, KPIs
+│   └── Documento-Negocial-v2.1.md            ← problema, público, jornada, regras de negócio, LGPD, KPIs
 │
 ├── 02-arquitetura-tecnica/                   ← visão técnica e de engenharia
 │   ├── Arvore-Tecnologica-v2.1.md            ← stack atual vs. proposta, manter/refatorar, ADRs, roadmap
-│   ├── Especificacao-API-v2.2.md             ← contratos REST (OpenAPI), modelo de dados MongoDB, fluxos (+ §3.6 camadas)
-│   └── Plano-Tecnico-Painel-Administrativo-Web-v1.0.md  ← stack, estrutura de pastas e consumo de API do painel web (F-11)
+│   ├── Especificacao-API-v2.4.md             ← contratos REST (OpenAPI), modelo de dados MongoDB, fluxos (+ §3.6 camadas)
+│   ├── Plano-Tecnico-Painel-Administrativo-Web-v1.0.md  ← stack, estrutura de pastas e consumo de API do painel web (F-11)
+│   └── Plano-Escala-Infraestrutura-DF-v1.0.md  ← patamares de carga, custo e migração da infraestrutura para o DF
 │
 ├── 03-ui-ux/                                 ← padrão de experiência e interface
-│   └── Padrao-UI-UX-v2.0.md                  ← princípios, personas, jornada, design system, acessibilidade, LGPD
+│   └── Padrao-UI-UX-v2.1.md                  ← princípios, personas, jornada, design system, acessibilidade, LGPD
 │
 ├── 04-backlog/                               ← planejamento de produto e entregas
-│   └── Backlog-MVP-v2.1.md                   ← épicos/estórias priorizadas (MoSCoW), critérios de aceite, Épico 8, sprints
+│   └── Backlog-MVP-v2.2.md                   ← épicos/estórias priorizadas (MoSCoW), critérios de aceite, Épico 8, sprints
 │
 ├── 05-features/                              ← features detalhadas + aderência ao código real
-│   ├── Features-MVP-v2.2.md                  ← 11 features com status real, estado operacional (§2.1), DoDs, rastreabilidade
+│   ├── Features-MVP-v2.3.md                  ← 11 features com status real, estado operacional (§2.1), DoDs, rastreabilidade
 │   ├── Relatorio-Aderencia-Codigo-vs-Features.md ← verificação arquivo a arquivo (v3.8) + aderência operacional (§1.1)
 │   ├── Pendencias-Epico-01.md                ← débitos do ETL CNES/DATASUS e divergências de contrato
 │   └── Registro-Correcao-Checkin-Manual-e-Performance-v1.0.md ← RN-03A (exclusividade de visita ativa)
 │
 ├── 06-sprints/                               ← planejamento de entregas ágeis
-│   └── Plano-Sprints-v2.1.md                 ← S0–S8 executadas, S7 adiada, S9–S12 planejadas (§22)
+│   └── Plano-Sprints-v2.2.md                 ← S0–S8 executadas, S7 adiada, S9–S12 planejadas (§22)
 │
 ├── 07-dados/                                 ← relatórios de importação e enriquecimento de dados
-│   └── (7 relatórios de ETL CNES/DATASUS, auditoria de campos, auditoria de duplicatas e validação do georreferenciamento 12/09/2026)
+│   ├── (7 relatórios de ETL CNES/DATASUS, auditoria de campos, auditoria de duplicatas e validação do georreferenciamento 12/09/2026)
+│   └── Massa-Dados-Avaliacoes-Dev.md         ← massa de avaliações do ambiente dev (usuários, visitas, avaliações, ranking): como injetar e remover
 │
 ├── 08-analise tecnica/                       ← auditoria técnica e consolidação de pendências
 │   ├── Consolidacao-Tecnica-e-Backlog-Pendente-v1.1.md ← fonte única do que está entregue, pendente e priorizado
 │   ├── relatorio_auditoria_tecnica.md        ← 11 problemas de arquitetura frontend (v3.1)
-│   └── adrs.md                               ← ADR-001..010, todos em status Proposto (v3.1)
+│   ├── Relatorio-Auditoria-Tecnica-v4.0.md   ← auditoria do app v4.0 (out/2026): estado de servidor e de sessão
+│   ├── SDD-TanStack-Query-Zustand-v1.0.md    ← desenho da adoção de TanStack Query v5 e Zustand v5
+│   ├── Conferencia-Auditoria-v4-e-SDD.md     ← o que procede, o que mudou e as correções aos trechos da SDD
+│   └── adrs.md                               ← ADR-001..014 (ADR-001 implementado e ADR-004 substituído em 05/10/2026)
 │
 ├── 09-melhoria-continua/                     ← melhorias de processo e de comportamento do agente
 │   ├── Historico-Melhorias.md                ← o que entrou, quando, por qual PR e com que efeito
@@ -152,16 +310,17 @@ Documentos/
 
 | # | Documento | Versão | Status | Resumo |
 |---|---|---|---|---|
-| 1 | [Documento Negocial](./01-negocio/Documento-Negocial-v2.0.md) | 2.0 | ✅ Ativo | Problema, proposta de valor, público, jornada do usuário, regras de negócio do geofence/feedback, modelo de dados conceitual, KPIs, roadmap e conformidade LGPD. |
+| 1 | [Documento Negocial](./01-negocio/Documento-Negocial-v2.1.md) | **2.1** | ✅ Ativo | Problema, proposta de valor, público, jornada do usuário, regras de negócio do geofence/feedback, modelo de dados conceitual, KPIs, roadmap e conformidade LGPD. |
 | 2 | [Árvore Tecnológica](./02-arquitetura-tecnica/Arvore-Tecnologica-v2.1.md) | **2.1** | ✅ Ativo | Mapa da stack atual (Spring Boot 4 + MongoDB + Expo 55 + **Mapbox v10**), decisões manter/refatorar/adicionar, matriz comparativa, ADRs e plano de evolução. **v2.1 (12/09/2026):** linhagem do mapa (`react-native-maps` → MapLibre → Mapbox) + contexto `regiao`. |
-| 3 | [Especificação da API](./02-arquitetura-tecnica/Especificacao-API-v2.2.md) | **2.2** | ✅ Ativo | Contratos REST de todos os endpoints (auth, hospitais, visitas, feedbacks, agregados, **camadas**), coleções MongoDB com índices/GeoJSON e fluxo geofence → API. **v2.2 (12/09/2026):** novo §3.6 `GET /api/v1/camadas/{tipo}` (F-11). v2.1 (06/09/2026) fechava CONT-01/CONT-02 (E8-14). |
+| 3 | [Especificação da API](./02-arquitetura-tecnica/Especificacao-API-v2.4.md) | **2.4** | ✅ Ativo | Contratos REST de todos os endpoints (auth, hospitais, visitas, feedbacks, agregados, **camadas**), coleções MongoDB com índices/GeoJSON e fluxo geofence → API. **v2.4 (04/10/2026):** `GET /api/v1/contas/feedbacks/pendentes` e feedback aceito em visita `GPS_INTERROMPIDO` (M-029). **v2.2 (12/09/2026):** novo §3.6 `GET /api/v1/camadas/{tipo}` (F-11). v2.1 (06/09/2026) fechava CONT-01/CONT-02 (E8-14). |
 | 3b | [Plano Técnico — Painel Administrativo Web](./02-arquitetura-tecnica/Plano-Tecnico-Painel-Administrativo-Web-v1.0.md) | 1.0 | 🟡 Proposta | Stack (React + Vite + Leaflet), estrutura de pastas de `web-admin/` e estratégia de consumo da API existente para o painel administrativo (F-11). |
-| 4 | [Padrão UI/UX](./03-ui-ux/Padrao-UI-UX-v2.0.md) | 2.0 | ✅ Ativo | Princípios de UX, personas, jornada ponta a ponta, arquitetura de informação, design system completo (tokens, componentes), acessibilidade WCAG AA, LGPD por design e protótipos ASCII. |
-| 5 | [Backlog do MVP](./04-backlog/Backlog-MVP-v2.1.md) | **2.1** | ✅ Ativo | Backlog priorizado (Fase 0 + 8 épicos), decisões de priorização (§2.1), **Épico 8 — Estabilização e Desempenho**, sequência real S0–S8 + planejada S9–S12, DoD com situação real e regra de atualização documental. |
-| 6 | [Plano de Sprints](./06-sprints/Plano-Sprints-v2.1.md) | **2.1** | ✅ Ativo | S0–S6 e S8 concluídas, S7 adiada, **S9–S12 planejadas (§22)** com diagnóstico de desempenho medido, velocity, riscos, cerimônias e métricas. |
+| 3c | [Plano de Escala da Infraestrutura para o DF](./02-arquitetura-tecnica/Plano-Escala-Infraestrutura-DF-v1.0.md) | 1.0 | 🟡 Proposta | Estrutura atual medida, travas para escalar, patamares de carga com custo estimado (US$/mês) e migração em cinco fases. ADR-015. |
+| 4 | [Padrão UI/UX](./03-ui-ux/Padrao-UI-UX-v2.1.md) | **2.1** | ✅ Ativo | Princípios de UX, personas, jornada ponta a ponta, arquitetura de informação, design system completo (tokens, componentes), acessibilidade WCAG AA, LGPD por design e protótipos ASCII. |
+| 5 | [Backlog do MVP](./04-backlog/Backlog-MVP-v2.2.md) | **2.2** | ✅ Ativo | Backlog priorizado (Fase 0 + 8 épicos), decisões de priorização (§2.1), **Épico 8 — Estabilização e Desempenho**, sequência real S0–S8 + planejada S9–S12, DoD com situação real e regra de atualização documental. |
+| 6 | [Plano de Sprints](./06-sprints/Plano-Sprints-v2.2.md) | **2.2** | ✅ Ativo | S0–S6 e S8 concluídas, S7 adiada, **S9–S12 planejadas (§22)** com diagnóstico de desempenho medido, velocity, riscos, cerimônias e métricas. |
 | 7 | [Registro de Correção - Check-in Manual e Performance](./05-features/Registro-Correcao-Checkin-Manual-e-Performance-v1.0.md) | 1.0 | ✅ Implementado | Exclusividade de visita ativa (RN-03A), correção da interação do card e da latência artificial na primeira carga da lista. A validação pendente nº 5 (*"medir login e primeira lista no ambiente de destino"*) foi executada em 02/09/2026 — resultado no `Features-MVP-v2.2.md` §2.1 (apontador atualizado na revisão de 12/09/2026; conteúdo inalterado). |
-| 8 | [Features do MVP](./05-features/Features-MVP-v2.2.md) | **2.2** | ✅ Ativo | As 11 features com status real por feature, **§2.1 — estado operacional** (implementado ≠ utilizável), DoD por feature, matriz de rastreabilidade e roteiro de validação V-01..V-12 com situação de cada uma. **v2.2 (12/09/2026):** F-07 Mapbox + BUG-10; F-11 com backend parcial. |
-| 9 | [Relatório de Aderência Código × Features](./05-features/Relatorio-Aderencia-Codigo-vs-Features.md) | **3.8** | ✅ Ativo | Verificação arquivo a arquivo das 9 features do escopo (100% cobertas) + **§1.1 aderência operacional**, que reprova o RNF-02 por medição. **v3.8 (20/09/2026):** §F-07 card do hospital sobre o mapa. **v3.7 (12/09/2026):** §F-07 Mapbox; parcial F-11 registrado sem mudar status. |
+| 8 | [Features do MVP](./05-features/Features-MVP-v2.3.md) | **2.3** | ✅ Ativo | As 11 features com status real por feature, **§2.1 — estado operacional** (implementado ≠ utilizável), DoD por feature, matriz de rastreabilidade e roteiro de validação V-01..V-12 com situação de cada uma. **v2.2 (12/09/2026):** F-07 Mapbox + BUG-10; F-11 com backend parcial. |
+| 9 | [Relatório de Aderência Código × Features](./05-features/Relatorio-Aderencia-Codigo-vs-Features.md) | **3.9** | ✅ Ativo | Verificação arquivo a arquivo das 9 features do escopo (100% cobertas) + **§1.1 aderência operacional**, que reprova o RNF-02 por medição. **v3.8 (20/09/2026):** §F-07 card do hospital sobre o mapa. **v3.7 (12/09/2026):** §F-07 Mapbox; parcial F-11 registrado sem mudar status. |
 | 10 | [De-Para Backlog × Features](./De-Para-Backlog-Features.md) | 02/09/2026 | ✅ Ativo | **Fonte de verdade do status de cada estória.** Placar: 42 de 43 estórias do app entregues; Épico 7 adiado; Épico 8 aberto. |
 | 11 | [Consolidação Técnica e Backlog Pendente](./08-analise%20tecnica/Consolidacao-Tecnica-e-Backlog-Pendente-v1.1.md) | **1.1** | ✅ Ativo | Fonte única do que está entregue, do que está pendente (48 itens + PERF) e da **ordem de execução em 6 ondas**, com as decisões do PO registradas literalmente. |
 | 12 | [Relatório de Auditoria Técnica](./08-analise%20tecnica/relatorio_auditoria_tecnica.md) | **3.1** | 🟡 Proposta | 11 problemas de arquitetura do frontend. A v3.1 declara o commit-base e **corrige 3 afirmações** que não se sustentaram na reverificação. |
@@ -188,12 +347,12 @@ Documentos/
 
 | Quem é você | Comece por |
 |---|---|
-| **Product Owner / Negócio** | `01-negocio/Documento-Negocial-v2.0.md` → `04-backlog/Backlog-MVP-v2.1.md` → `De-Para-Backlog-Features.md` (status real) |
-| **Arquiteto / Backend** | `02-arquitetura-tecnica/Arvore-Tecnologica-v2.0.md` (decisões, ADRs) → `02-arquitetura-tecnica/Especificacao-API-v2.1.md` (contratos) |
-| **Frontend / Mobile** | `03-ui-ux/Padrao-UI-UX-v2.0.md` → `02-arquitetura-tecnica/Especificacao-API-v2.1.md` (consumo) |
-| **Designer** | `03-ui-ux/Padrao-UI-UX-v2.0.md` → `_historico/v1.2-design-clinical-sanctuary/` (base da identidade) |
+| **Product Owner / Negócio** | `01-negocio/Documento-Negocial-v2.1.md` → `04-backlog/Backlog-MVP-v2.2.md` → `De-Para-Backlog-Features.md` (status real) |
+| **Arquiteto / Backend** | `02-arquitetura-tecnica/Arvore-Tecnologica-v2.1.md` (decisões, ADRs) → `02-arquitetura-tecnica/Especificacao-API-v2.4.md` (contratos) |
+| **Frontend / Mobile** | `03-ui-ux/Padrao-UI-UX-v2.1.md` → `02-arquitetura-tecnica/Especificacao-API-v2.4.md` (consumo) |
+| **Designer** | `03-ui-ux/Padrao-UI-UX-v2.1.md` → `_historico/v1.2-design-clinical-sanctuary/` (base da identidade) |
 | **QA / Testes** | Regras de negócio (Documento Negocial §6) + critérios de aceite (Backlog) + contratos (Especificação da API) |
-| **Scrum Master / Agile Coach** | `06-sprints/Plano-Sprints-v2.1.md` (§22 = próximas sprints) → `04-backlog/Backlog-MVP-v2.1.md` |
+| **Scrum Master / Agile Coach** | `06-sprints/Plano-Sprints-v2.2.md` (§22 = próximas sprints) → `04-backlog/Backlog-MVP-v2.2.md` |
 | **Quem vai retomar o desenvolvimento** | `08-analise tecnica/Consolidacao-Tecnica-e-Backlog-Pendente-v1.1.md` §0 — é a fonte da priorização vigente e diz, em uma página, o que fazer primeiro e por quê |
 | **Novo integrante** | `00-INDICE.md` → leia na ordem: 1 (negócio) → 4 (UI/UX) → 2 (arquitetura) → 3 (API) → 5 (backlog) |
 

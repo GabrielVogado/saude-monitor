@@ -9,7 +9,7 @@
  * credencial inválida, erro sem mensagem e sucesso — mais os dois `navigate` da tela.
  */
 import React from "react";
-import { Alert, KeyboardAvoidingView, TouchableOpacity } from "react-native";
+import { Alert, KeyboardAvoidingView, Linking, TouchableOpacity } from "react-native";
 import { render, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import LoginScreen from "../../../screens/auth/view/LoginScreen";
 import LoginService from "../../../screens/auth/service/LoginService";
@@ -232,6 +232,15 @@ describe("LoginScreen", () => {
     fireEvent.press(screen.getByLabelText("Política de Privacidade"));
 
     expect(NAVEGACAO.navigate).toHaveBeenCalledWith("Privacidade");
+  });
+
+  test("o link Termos abre os Termos de Uso publicados", () => {
+    jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    renderizar();
+
+    fireEvent.press(screen.getByLabelText("Termos de Uso"));
+
+    expect(Linking.openURL).toHaveBeenCalledWith("https://saudemonitor.dev/termos");
   });
 
   test("o link 'Esqueci minha senha' navega para EsqueciSenha (E8-05/BUG-03)", () => {

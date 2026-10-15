@@ -19,7 +19,7 @@ import java.time.Instant;
  * <p>Representa a avaliação curta do usuário sobre o atendimento pós-saída (RN-10).
  * Regras-chave: {@code visitaId} é único (RN-12 dedupe); {@code usuarioId} pode ser
  * nulo (feedback anônimo, RN-13); a nota é 1–5; feedbacks nunca são expostos
- * publicamente (RN-19) — apenas agregados. Ver §2.4 e §3.4 da Especificação da API.</p>
+ * publicamente (RN-19) — apenas indicadores. Ver §2.4 e §3.4 da Especificação da API.</p>
  */
 @Document(collection = "feedbacks")
 @Getter
@@ -78,7 +78,7 @@ public class FeedbackDocument {
      * Sem índice próprio até 09/09/2026: só participava do composto
      * {@code idx_hospital_criado} ({@code hospitalId}+{@code criadoEm}), que não serve
      * para filtrar por {@code criadoEm} sem igualdade em {@code hospitalId} — necessário
-     * para {@code AgregadoServiceImpl.recalcularPendentes} descobrir hospitais com
+     * para {@code IndicadorServiceImpl.recalcularPendentes} descobrir hospitais com
      * feedback recente sem recalcular todos os ativos a cada execução (RN-18).
      */
     @Indexed

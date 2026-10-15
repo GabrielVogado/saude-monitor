@@ -5,6 +5,8 @@
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../../screens/auth/service/LoginService";
+// Liga o cliente HTTP ao LoginService (mockado), como o index.js faz no app.
+import "../../../core/api/sessaoApi";
 import { reiniciarControleDeRenovacao } from "../../../config/sessao";
 import { ErroServidorIndisponivel } from "../../../config/http";
 
@@ -38,6 +40,28 @@ describe("HospitalService (Épico 01)", () => {
     expect(capturada.search).toContain("latitude=-15.79");
     expect(capturada.search).toContain("raioKm=5");
     expect(capturada.search).toContain("size=50");
+  });
+
+  test("leituras repassam o signal de cancelamento ao fetch (consultas do TanStack Query)", async () => {
+    const { signal } = new AbortController();
+
+    await HospitalService.listar({ size: 10, signal });
+    await HospitalService.ranking({ ordem: "TEMPO", signal });
+    await HospitalService.buscarPorId("h1", { signal });
+    await HospitalService.buscarIndicadores("h1", { signal });
+
+    expect(global.fetch).toHaveBeenCalledTimes(4);
+    global.fetch.mock.calls.forEach(([, config]) => expect(config.signal).toBeDefined());
+    expect(global.fetch.mock.calls[1][0]).toContain("/api/v1/hospitais/ranking?ordem=TEMPO&page=0&size=20");
+  });
+
+  test("leituras sem argumentos usam a primeira página e o ranking por nota", async () => {
+    await HospitalService.listar();
+    expect(capturada.search).toBe("?page=0&size=20");
+
+    await HospitalService.ranking();
+    expect(capturada.pathname).toBe("/api/v1/hospitais/ranking");
+    expect(capturada.search).toBe("?ordem=NOTA&page=0&size=20");
   });
 
   test("listar omite parâmetros vazios/undefined", async () => {
@@ -173,5 +197,14 @@ describe("HospitalService (Épico 01)", () => {
     await expect(HospitalService.buscarIndicadores("nao-existe")).rejects.toThrow(
       "Hospital não encontrado."
     );
+  });
+
+  test("erro da API traz status e corpo, como nos demais serviços (auditoria v4 §4.1)", async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "Hospital não encontrado." }, 404));
+
+    await expect(HospitalService.buscarPorId("x")).rejects.toMatchObject({
+      status: 404,
+      data: { message: "Hospital não encontrado." },
+    });
   });
 });

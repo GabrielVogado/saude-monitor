@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.visita.service.impl;
 
+import br.com.saude_monitor.api.config.exception.AcessoNegadoException;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
@@ -62,8 +63,14 @@ public class VisitaServiceImpl implements VisitaService {
     private static final Duration LIMITE_TIPO_PERMANENCIA = Duration.ofHours(12);
     /** Diferença de distância (m) abaixo da qual dois geofences sobrepostos são considerados empate (E2-04/RN-05). */
     private static final double LIMITE_EMPATE_METROS = 10.0;
-    /** Janela sem sinal de posição a partir da qual a visita é encerrada como GPS_INTERROMPIDO (RN-06/E2-05). */
-    private static final Duration LIMITE_GPS_INTERROMPIDO = Duration.ofMinutes(10);
+    /**
+     * Janela sem sinal (heartbeat ou posição) a partir da qual a visita é encerrada como
+     * GPS_INTERROMPIDO (RN-06/E2-05). Era 10 min, menor que o intervalo do heartbeat do app
+     * (30 min, RN-23): quase toda visita longa caía aqui com duração de poucos minutos
+     * (Auditoria Técnica v4.0, decisão do PO de 05/10/2026). 45 min cobre um heartbeat
+     * perdido e o ciclo de 15 min deste job.
+     */
+    private static final Duration LIMITE_GPS_INTERROMPIDO = Duration.ofMinutes(45);
     /**
      * Idade máxima aceita para o {@code ocorridoEm} informado pelo aplicativo (OPS-05).
      * É a mesma janela em que a visita expira por falta de sinal de vida (RN-04): um evento
@@ -376,8 +383,11 @@ public class VisitaServiceImpl implements VisitaService {
         VisitaDocument visita = visitaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Visita não encontrada para o id informado."));
 
+        // 403, não 401 (achado F-02 do pentest de 23/09/2026): quem chama já está
+        // autenticado (tem um JWT válido) — só não é dono desta visita (BOLA). 401
+        // significaria "não autenticado", o que não é o caso.
         if (visita.getUsuarioId() != null && !visita.getUsuarioId().equals(usuarioId)) {
-            throw new NaoAutorizadoException("Visita não pertence ao usuário autenticado.");
+            throw new AcessoNegadoException("Visita não pertence ao usuário autenticado.");
         }
         if (visita.getStatus() != StatusVisita.EM_ATENDIMENTO && visita.getStatus() != StatusVisita.SUSPEITA) {
             throw new ConflitoException("Visita já encerrada (status " + visita.getStatus() + ").");

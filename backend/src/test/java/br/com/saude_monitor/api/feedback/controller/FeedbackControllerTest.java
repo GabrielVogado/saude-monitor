@@ -2,6 +2,7 @@ package br.com.saude_monitor.api.feedback.controller;
 
 import br.com.saude_monitor.api.config.exception.GlobalExceptionHandler;
 import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
+import br.com.saude_monitor.api.feedback.dto.FeedbackPendenteResponse;
 import br.com.saude_monitor.api.feedback.dto.FeedbackRequest;
 import br.com.saude_monitor.api.feedback.dto.FeedbackResponse;
 import br.com.saude_monitor.api.feedback.service.FeedbackService;
@@ -52,6 +53,11 @@ class FeedbackControllerTest {
         @Override
         public PageResponse<FeedbackResponse> historico(String usuarioId, int page, int size) {
             return PageResponse.of(List.<FeedbackResponse>of(), page, size, 0);
+        }
+
+        @Override
+        public List<FeedbackPendenteResponse> pendentes(String usuarioId) {
+            return List.of();
         }
 
         @Override

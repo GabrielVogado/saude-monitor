@@ -95,7 +95,7 @@ public class VisitaDocument {
      * interrompido grava o último sinal real (até ~15min no passado, o ciclo do
      * próprio job), e um checkout sincronizado da fila offline (OPS-05) carrega
      * {@code ocorridoEm} de um evento que pode ter horas ou dias de atraso.
-     * {@code AgregadoServiceImpl.recalcularPendentes} depende deste campo para saber
+     * {@code IndicadorServiceImpl.recalcularPendentes} depende deste campo para saber
      * "isso mudou desde a última varredura" — usar {@link #saida} ali fazia o hospital
      * poder nunca mais ser recalculado (achado do code-review de 09/09/2026).
      */

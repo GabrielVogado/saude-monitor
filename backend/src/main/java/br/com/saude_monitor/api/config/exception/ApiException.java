@@ -10,6 +10,9 @@ import java.util.List;
  * <p>Carrega o HTTP status, o código estável de erro (para automação de testes) e a
  * mensagem amigável em pt-BR, além de detalhes de campo opcionais. É traduzida pelo
  * {@link GlobalExceptionHandler} no envelope padrão (§1.1 da Especificação da API).</p>
+ *
+ * <p>Os detalhes são guardados numa cópia imutável (e serializável), como exige uma
+ * exceção {@link java.io.Serializable}.</p>
  */
 public class ApiException extends RuntimeException {
 
@@ -25,7 +28,7 @@ public class ApiException extends RuntimeException {
         super(message);
         this.status = status;
         this.code = code;
-        this.details = details;
+        this.details = details == null ? List.of() : List.copyOf(details);
     }
 
     public HttpStatus getStatus() {

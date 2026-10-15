@@ -98,12 +98,21 @@ class EstabelecimentoNormalizadorTest {
 
     @Test
     void simNaoParaBoolConverteVariacoesTolerantes() {
-        assertThat(EstabelecimentoNormalizador.simNaoParaBool("SIM")).isTrue();
-        assertThat(EstabelecimentoNormalizador.simNaoParaBool("s")).isTrue();
-        assertThat(EstabelecimentoNormalizador.simNaoParaBool("NÃO")).isFalse();
-        assertThat(EstabelecimentoNormalizador.simNaoParaBool("n")).isFalse();
-        assertThat(EstabelecimentoNormalizador.simNaoParaBool("talvez")).isNull();
-        assertThat(EstabelecimentoNormalizador.simNaoParaBool(null)).isNull();
+        assertThat(EstabelecimentoNormalizador.simNaoParaBool("SIM")).contains(true);
+        assertThat(EstabelecimentoNormalizador.simNaoParaBool(" s ")).contains(true);
+        assertThat(EstabelecimentoNormalizador.simNaoParaBool("NÃO")).contains(false);
+        assertThat(EstabelecimentoNormalizador.simNaoParaBool("nao")).contains(false);
+        assertThat(EstabelecimentoNormalizador.simNaoParaBool("n")).contains(false);
+        assertThat(EstabelecimentoNormalizador.simNaoParaBool("No")).contains(false);
+    }
+
+    @Test
+    void simNaoParaBoolDevolveVazioQuandoAusenteOuAmbiguo() {
+        // Antes devolvia Boolean null: qualquer unboxing (if (simNaoParaBool(x))) estourava NPE.
+        assertThat(EstabelecimentoNormalizador.simNaoParaBool(null)).isEmpty();
+        assertThat(EstabelecimentoNormalizador.simNaoParaBool("talvez")).isEmpty();
+        assertThat(EstabelecimentoNormalizador.simNaoParaBool("")).isEmpty();
+        assertThat(EstabelecimentoNormalizador.simNaoParaBool("   ")).isEmpty();
     }
 
     @Test

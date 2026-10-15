@@ -1,6 +1,6 @@
 package br.com.saude_monitor.api.user.service.impl;
 
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.auth.service.AuthService;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
@@ -17,11 +17,13 @@ import br.com.saude_monitor.api.user.dto.UserRequest;
 import br.com.saude_monitor.api.user.dto.UserResponse;
 import br.com.saude_monitor.api.user.repository.UserRepository;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
+import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.UpdateDefinition;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.time.Instant;
@@ -32,6 +34,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,28 +48,28 @@ import static org.mockito.Mockito.when;
 /**
  * Testes do serviço de usuários: cadastro com consentimento, exclusão de conta
  * LGPD (F0-05 — cascade de dados pessoais, anonimização de visitas/feedbacks e
- * recálculo de agregados) e gestão de consentimentos (E5-05 / art. 8º §5º).
+ * recálculo de indicadores) e gestão de consentimentos (E5-05 / art. 8º §5º).
  */
 class UserServiceImplTest {
 
     private UserServiceImpl userService;
     private UserRepository userRepository;
     private MongoTemplate mongoTemplate;
-    private AgregadoService agregadoService;
+    private IndicadorService indicadorService;
     private AuthService authService;
 
     @BeforeEach
     void setup() {
         userRepository = mock(UserRepository.class);
         mongoTemplate = mock(MongoTemplate.class);
-        agregadoService = mock(AgregadoService.class);
+        indicadorService = mock(IndicadorService.class);
         authService = mock(AuthService.class);
 
         userService = new UserServiceImpl(
                 userRepository,
                 new BCryptPasswordEncoder(),
                 mongoTemplate,
-                agregadoService,
+                indicadorService,
                 authService);
     }
 
@@ -110,6 +113,48 @@ class UserServiceImplTest {
         verify(mongoTemplate).updateMulti(any(Query.class), any(),
                 eq(FeedbackDocument.class));
         verify(userRepository).delete(user);
+    }
+
+    @Test
+    void deveApagarDispositivoEPontosDeGpsDasVisitasNaExclusao() {
+        when(userRepository.findById("u1")).thenReturn(Optional.of(usuario("u1")));
+        when(mongoTemplate.find(any(Query.class), any())).thenReturn(List.of());
+
+        userService.excluirConta("u1");
+
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<UpdateDefinition> update = ArgumentCaptor.forClass(UpdateDefinition.class);
+        verify(mongoTemplate).updateMulti(query.capture(), update.capture(), eq(VisitaDocument.class));
+
+        assertEquals("u1", query.getValue().getQueryObject().get("usuarioId"));
+        Document set = (Document) update.getValue().getUpdateObject().get("$set");
+        Document unset = (Document) update.getValue().getUpdateObject().get("$unset");
+        assertTrue(set.containsKey("usuarioId"));
+        assertNull(set.get("usuarioId"));
+        assertTrue(unset.containsKey("dispositivoId"));
+        assertTrue(unset.containsKey("pontosAmostrais"));
+        // A duração e o hospital continuam: são a estatística de tempo.
+        assertFalse(unset.containsKey("duracaoMinutos"));
+        assertFalse(unset.containsKey("hospitalId"));
+    }
+
+    @Test
+    void deveApagarComentarioLivreDosFeedbacksNaExclusao() {
+        when(userRepository.findById("u1")).thenReturn(Optional.of(usuario("u1")));
+        when(mongoTemplate.find(any(Query.class), any())).thenReturn(List.of());
+
+        userService.excluirConta("u1");
+
+        ArgumentCaptor<UpdateDefinition> update = ArgumentCaptor.forClass(UpdateDefinition.class);
+        verify(mongoTemplate).updateMulti(any(Query.class), update.capture(), eq(FeedbackDocument.class));
+
+        Document set = (Document) update.getValue().getUpdateObject().get("$set");
+        Document unset = (Document) update.getValue().getUpdateObject().get("$unset");
+        assertEquals(Boolean.TRUE, set.get("anonimizado"));
+        assertNull(set.get("usuarioId"));
+        assertTrue(unset.containsKey("comentario"));
+        // A nota entra no indicador do hospital e fica.
+        assertFalse(unset.containsKey("nota"));
     }
 
     @Test
@@ -230,7 +275,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    void deveRecalcularAgregadosDosHospitaisAfetados() {
+    void deveRecalcularIndicadoresDosHospitaisAfetados() {
         UserDocument user = usuario("u2");
         when(userRepository.findById("u2")).thenReturn(Optional.of(user));
 
@@ -243,7 +288,23 @@ class UserServiceImplTest {
 
         userService.excluirConta("u2");
 
-        verify(agregadoService).recalcular("h1");
-        verify(agregadoService).recalcular("h2");
+        verify(indicadorService).recalcular("h1");
+        verify(indicadorService).recalcular("h2");
+    }
+    /** Exclusão de conta (LGPD) não pode falhar porque o recálculo de um hospital falhou. */
+    @Test
+    void excluiContaMesmoQuandoORecalculoDeUmHospitalFalha() {
+        UserDocument user = usuario("u3");
+        when(userRepository.findById("u3")).thenReturn(Optional.of(user));
+        when(mongoTemplate.find(any(Query.class), eq(VisitaDocument.class)))
+                .thenReturn(List.of(VisitaDocument.builder().hospitalId("h1").build()));
+        when(mongoTemplate.find(any(Query.class), eq(FeedbackDocument.class)))
+                .thenReturn(List.of(FeedbackDocument.builder().hospitalId("h2").build()));
+        when(indicadorService.recalcular("h1")).thenThrow(new IllegalStateException("Mongo fora"));
+
+        userService.excluirConta("u3");
+
+        verify(userRepository).delete(user);
+        verify(indicadorService).recalcular("h2");
     }
 }

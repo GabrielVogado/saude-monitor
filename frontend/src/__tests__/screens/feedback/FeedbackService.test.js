@@ -6,6 +6,8 @@
 import FeedbackService from "../../../screens/feedback/service/FeedbackService";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../../screens/auth/service/LoginService";
+// Liga o cliente HTTP ao LoginService (mockado), como o index.js faz no app.
+import "../../../core/api/sessaoApi";
 import * as httpModule from "../../../config/http";
 import { ErroServidorIndisponivel } from "../../../config/http";
 
@@ -59,6 +61,14 @@ describe("FeedbackService (Épico 03)", () => {
     const c = chamadas[0];
     expect(c.method).toBe("PUT");
     expect(c.url).toContain("/api/v1/feedbacks/fb1");
+  });
+
+  test("listarHistorico repassa o signal de cancelamento ao fetch", async () => {
+    const controle = new AbortController();
+    await FeedbackService.listarHistorico({ signal: controle.signal });
+    expect(global.fetch.mock.calls[0][1].signal).toBeDefined();
+    await FeedbackService.listarHistorico();
+    expect(chamadas[1].url).toContain("page=0&size=20");
   });
 
   test("listarHistorico faz GET em /api/v1/contas/feedbacks com paginação", async () => {

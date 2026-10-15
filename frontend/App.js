@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import {createNativeStackNavigator} from "@react-navigation/native-stack";
 import {createBottomTabNavigator} from "@react-navigation/bottom-tabs";
 import {NavigationContainer} from "@react-navigation/native";
@@ -23,15 +23,20 @@ import HistoricoScreen from "./src/screens/perfil/view/HistoricoScreen.js";
 import PrivacidadeScreen from "./src/screens/perfil/view/PrivacidadeScreen.js";
 import NotificacoesScreen from "./src/screens/perfil/view/NotificacoesScreen.js";
 import {colors} from "./src/theme";
-import { agendarLembrete, feedbackAvaliavel, pendenciaAtual } from "./src/screens/feedback/service/FeedbackNotificationService";
+import { agendarLembrete, pendenciaDaVisita } from "./src/screens/feedback/service/FeedbackNotificationService";
 import { sincronizar } from "./src/services/SincronizacaoOffline";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./src/core/query/queryClient";
+import { configurarQueryNoApp } from "./src/core/query/setupQueryClient";
+import { hidratarSessao } from "./src/core/stores/sessaoStore";
+import VisitaAtivaSync from "./src/screens/visitas/hooks/VisitaAtivaSync";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Stack da aba Início (E6-01): a Home é a âncora do geofencing/visita ativa (E2-07).
-// É uma tela de apresentação do app; o check-in manual agora vive na lista Hospitais
-// e o mapa é uma aba própria ("Mapa").
+// Stack da aba Início (E6-01): tela de apresentação do app; o check-in manual vive na
+// lista Hospitais e o mapa é uma aba própria ("Mapa"). A visita ativa (geofencing e
+// heartbeat) é acompanhada pelo `VisitaAtivaSync`, na raiz.
 function HomeStack() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -178,42 +183,71 @@ function Tabs() {
 
 export default function App() {
     const navigationRef = useRef(null);
+    // Cold start (bug: "Fechar tudo" → notificação → app abria na tela inicial): quando o
+    // toque na notificação INICIA o app do zero, a resposta chega antes de a árvore de
+    // navegação montar. Estes refs seguram o destino até o NavigationContainer ficar pronto.
+    const navegacaoPronta = useRef(false);
+    const feedbackPendente = useRef(null);
 
-    useEffect(() => {
-        // E3-01/E3-03: abre o formulário de feedback quando o usuário toca na
-        // notificação local de feedback pós-saída.
-        const tratarResposta = async (resposta) => {
+    const abrirFeedback = useCallback((params) => {
+        if (navegacaoPronta.current && navigationRef.current) {
+            navigationRef.current.navigate("Feedback", { screen: "FeedbackForm", params });
+        } else {
+            // Ainda montando (cold start): guarda para o onReady do container despachar.
+            feedbackPendente.current = params;
+        }
+    }, []);
+
+    const tratarResposta = useCallback(
+        async (resposta) => {
+            // E3-01/E3-03: abre o formulário de feedback quando o usuário toca na
+            // notificação local de feedback pós-saída.
             const data = resposta?.notification?.request?.content?.data;
             if (!data?.abrirFeedback || !data?.visitaId) {
                 return;
             }
-            // RN-09: a pendência guardada é sempre a mais recente (uma só por vez —
-            // ver o comentário de concluirFeedback em FeedbackNotificationService.js).
-            // Uma notificação antiga, de uma visita já substituída por outra mais
-            // recente, pode continuar parada na bandeja: feedbackAvaliavel() sozinho
-            // checaria a validade da pendência ATUAL, não da visita tocada, e abriria
-            // o formulário com dados de outra visita/hospital (achado do code-review
-            // no PR desta correção — 08/09/2026). Por isso o match de visitaId e a
-            // checagem de janela de 24h têm que valer para a MESMA pendência.
-            const pendencia = await pendenciaAtual();
-            const disponivel = pendencia?.visitaId === data.visitaId && (await feedbackAvaliavel());
-            if (!disponivel) {
+            // RN-09: cada visita encerrada tem a sua pendência, e a notificação tocada só
+            // abre o formulário se a pendência DESTA visita ainda estiver na janela de
+            // 24h — nunca com dados de outra visita/hospital (achado do code-review de
+            // 08/09/2026, quando havia uma única pendência guardada).
+            const pendencia = await pendenciaDaVisita(data.visitaId);
+            if (!pendencia) {
                 return;
             }
-            // Pedido de feedback visualizado: agenda o lembrete único (RN-09/E3-03)
-            // caso ele não responda de imediato.
-            await agendarLembrete({ visitaId: data.visitaId, hospitalNome: pendencia.hospitalNome });
-            navigationRef.current?.navigate("Feedback", {
-                screen: "FeedbackForm",
-                params: {
-                    visitaId: data.visitaId,
-                    hospitalNome: pendencia.hospitalNome,
-                },
-            });
-        };
+            // Navega PRIMEIRO — o toque é a ação crítica. O lembrete (RN-09/E3-03) é
+            // efeito colateral: se `agendarLembrete` falhar ou travar, não pode impedir
+            // a abertura do formulário. Antes ele era aguardado ANTES do navigate, então
+            // uma falha ali deixava o usuário na tela em que estava (bug relatado em
+            // foreground) sem nunca chegar ao feedback.
+            abrirFeedback({ visitaId: data.visitaId, hospitalNome: pendencia.hospitalNome });
+            agendarLembrete({ visitaId: data.visitaId, hospitalNome: pendencia.hospitalNome }).catch(
+                () => {}
+            );
+        },
+        [abrirFeedback]
+    );
 
+    useEffect(() => {
         const subscricao = Notifications.addNotificationResponseReceivedListener(tratarResposta);
+
+        // Cold start: a resposta que abriu o app do zero não passa pelo listener acima
+        // (ela ocorreu antes de o listener existir) — é entregue por
+        // getLastNotificationResponseAsync. Sem isto, tocar a notificação com o app
+        // fechado abria a tela inicial em vez do feedback (relatado após "Fechar tudo").
+        const ultima = Notifications.getLastNotificationResponseAsync?.();
+        if (ultima?.then) {
+            ultima.then((resposta) => resposta && tratarResposta(resposta)).catch(() => {});
+        }
+
         return () => subscricao.remove();
+    }, [tratarResposta]);
+
+    useEffect(() => {
+        // Sessão global (SDD de TanStack Query e Zustand): lê o usuário persistido uma vez
+        // e liga o cache de queries ao foco do app, à conexão e ao logout.
+        // Não rejeita: falha na leitura do armazenamento segue anônimo (`sessaoStore`).
+        void hidratarSessao();
+        return configurarQueryNoApp(queryClient);
     }, []);
 
     useEffect(() => {
@@ -246,13 +280,30 @@ export default function App() {
     }, []);
 
     return (
-        <SafeAreaProvider>
-            <NavigationContainer ref={navigationRef}>
-                <Stack.Navigator screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="Tabs" component={Tabs} />
-                    <Stack.Screen name="Feedback" component={FeedbackStack} />
-                </Stack.Navigator>
-            </NavigationContainer>
-        </SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+            {/* Heartbeat e geofencing seguem a visita ativa em qualquer tela (§4.2.2). */}
+            <VisitaAtivaSync />
+            <SafeAreaProvider>
+                <NavigationContainer
+                    ref={navigationRef}
+                    onReady={() => {
+                        navegacaoPronta.current = true;
+                        // Despacha o feedback que chegou por cold start antes de a navegação montar.
+                        if (feedbackPendente.current) {
+                            navigationRef.current?.navigate("Feedback", {
+                                screen: "FeedbackForm",
+                                params: feedbackPendente.current,
+                            });
+                            feedbackPendente.current = null;
+                        }
+                    }}
+                >
+                    <Stack.Navigator screenOptions={{ headerShown: false }}>
+                        <Stack.Screen name="Tabs" component={Tabs} />
+                        <Stack.Screen name="Feedback" component={FeedbackStack} />
+                    </Stack.Navigator>
+                </NavigationContainer>
+            </SafeAreaProvider>
+        </QueryClientProvider>
     );
 }

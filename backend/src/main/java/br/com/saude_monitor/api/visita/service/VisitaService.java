@@ -32,6 +32,6 @@ public interface VisitaService {
     /** Job periódico: marca SUSPEITA (2h sem heartbeat) e EXPIRADA (24h sem heartbeat) — E2-03/E2-09. */
     void processarExpiracoes();
 
-    /** Job periódico: encerra visitas ativas sem sinal de posição por 10min como GPS_INTERROMPIDO — E2-05/RN-06. */
+    /** Job periódico: encerra visitas ativas sem sinal de posição por 45min como GPS_INTERROMPIDO — E2-05/RN-06. */
     void processarGpsInterrompido();
 }

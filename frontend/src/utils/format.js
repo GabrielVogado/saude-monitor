@@ -2,6 +2,26 @@
  * Formatadores e validadores compartilhados (Épico 01 — Hospitais).
  */
 
+/**
+ * Duração em minutos inteiros desde `entradaIso` até agora, para o caminho OFFLINE de
+ * checkout (quando não há resposta do servidor com `duracaoMinutos`). Arredonda para casar
+ * com o inteiro que o backend calcula, evitando divergência na fronteira do piso de 2 min
+ * (RN-01/RN-07) entre o caminho offline-local e o online. Devolve `undefined` quando a
+ * entrada não é uma data válida, para o chamador cair no comportamento de "duração desconhecida".
+ */
+export function duracaoMinutosDesde(entradaIso) {
+  // `new Date(null)` vira epoch 0 (finito!) e `new Date(undefined)` vira Invalid Date;
+  // guardar o falsy explicitamente evita tratar "sem entrada" como uma visita de décadas.
+  if (!entradaIso) {
+    return undefined;
+  }
+  const entrada = Number(new Date(entradaIso).getTime());
+  if (!Number.isFinite(entrada)) {
+    return undefined;
+  }
+  return Math.round((Date.now() - entrada) / 60000);
+}
+
 /** Formata minutos como "2h05" (acima de 1h) ou "45min". */
 export function formatarDuracao(minutos) {
   if (minutos === null || minutos === undefined || Number.isNaN(Number(minutos))) {

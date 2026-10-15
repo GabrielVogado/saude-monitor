@@ -21,7 +21,7 @@
 ## ADR-001: Centralização do Cliente HTTP com Proteção contra Race Condition no Refresh de Token
 
 **Data:** 2026-08-31
-**Status:** Proposto — **não implementado** (reconfirmado em 02/09/2026 contra `develop@f26666e`)
+**Status:** Implementado em 05/10/2026 (M-032) — `frontend/src/core/api/apiClient.js`. Diferenças do desenho abaixo: a renovação usa a coordenação por geração de `config/sessao.js` (que já existia), o `LoginService` é injetado por `configurarSessao` em vez de import dinâmico, e o download binário do PDF reaproveita `renovarSessaoAposNaoAutorizado`. Ver [`Conferencia-Auditoria-v4-e-SDD.md`](./Conferencia-Auditoria-v4-e-SDD.md).
 **Área:** Camada de Comunicação com a API
 
 > ⚠️ **Complemento da revisão 3.1 (02/09/2026) — escopo incompleto.** O `apiClient` proposto assume que toda resposta é JSON. Desde a Sprint S8 existe um endpoint que **não é**: `GET /api/v1/contas/export/pdf` devolve `application/pdf` com `Content-Disposition: attachment` e é baixado no app via `expo-file-system` (`File.downloadFileAsync`), fora do `request()` atual. A implementação deste ADR precisa, portanto, prever um caminho para **download binário autenticado** — com o mesmo tratamento de refresh de token — ou o endpoint de exportação LGPD ficará de fora da centralização, recriando exatamente a duplicação que o ADR pretende eliminar.
@@ -284,7 +284,7 @@ export default React.memo(CSHospitalCard, (prev, next) =>
 ## ADR-004: Gerenciamento de Estado Global Reativo com React Context
 
 **Data:** 2026-08-31
-**Status:** Proposto
+**Status:** Substituído em 05/10/2026 pela [SDD de TanStack Query e Zustand](./SDD-TanStack-Query-Zustand-v1.0.md) (M-033). O critério que decidiu foi o próprio gatilho que este ADR previa ("surgir necessidade de estado fora do React"): a sessão é escrita pelo interceptor 401 e pela tarefa de geofencing, fora da árvore. A sessão virou um store do Zustand (`frontend/src/core/stores/sessaoStore.js`); a Context API segue para o GPS da tela de mapa.
 **Área:** Gerenciamento de Estado
 
 ---
@@ -1059,7 +1059,7 @@ enquanto não há capacidade, com `--max-instances=1` e nenhuma instância viva.
   coleção vazia importariam o DBF/SHP duas vezes. Subir esse limite exige antes
   tornar o seed idempotente e mover o rate limit para armazenamento compartilhado.
 - **Jobs `@Scheduled` sob risco não medido.** O backend tem 4 jobs de 15 min
-  (`AgregadoHospitalJob`, `FeedbackSemRespostaJob`, `VisitaExpiracaoJob`,
+  (`IndicadorHospitalJob`, `FeedbackSemRespostaJob`, `VisitaExpiracaoJob`,
   `VisitaGpsInterrompidoJob`) e o Cloud Run estrangula CPU entre requisições por
   padrão. A revisão publicada **não** tem a anotação `run.googleapis.com/cpu-throttling`
   (verificado: 0 ocorrências), logo o padrão vale. **Não está medido se os jobs
@@ -1072,6 +1072,258 @@ enquanto não há capacidade, com `--max-instances=1` e nenhuma instância viva.
 - **Keep-alive desligado** (04/09/2026). Ele combatia o *spin-down* do Render e
   apontava para lá; no Cloud Run, manter o serviço acordado por ping é pagar a
   instância ociosa sem que isso apareça na configuração.
+
+---
+
+## ADR-012: Painel Administrativo Web como SPA Angular separada (`admin/`)
+
+**Data:** 2026-09-24
+**Status:** Aceito — decisão do PO em 24/09/2026; scaffolding iniciado (Angular 21 em `admin/`)
+**Área:** Frontend do Painel Administrativo (F-11 / Épico 7)
+
+> Segundo ADR `Aceito` da lista e o primeiro do **frontend** fora de `Proposto`. Trata do
+> Painel Admin (F-11), que estava **adiado** por decisão do PO (D-01, 02/09/2026) e foi
+> **retomado** em 24/09/2026.
+
+---
+
+### Contexto e Problema
+
+O fluxo de moderação de sugestões (E1-06) e a gestão de hospitais (E7-*) dependem de um
+Painel Admin Web que **nunca foi construído** — as telas mobile de aprovação chegaram a
+existir e foram removidas em 08/09/2026 por serem inacessíveis (código morto). O app de
+campo é Expo/React Native com `react-native-web` (já serve web), mas o painel é outro
+produto: **desktop, denso em dados, CRUD, tabelas, fila de moderação e mapa** — ergonomia
+que o RN/RNW não entrega bem.
+
+A decisão do PO (24/09/2026) foi **retomar o F-11 agora** e construí-lo com **Angular**.
+
+---
+
+### Opções Avaliadas
+
+**Opção 1 — `react-native-web`, reusando o stack do app**
+- Descartada: o RNW é otimizado para paridade com o mobile; grids de dados, formulários
+  densos e atalhos de teclado de um admin ficam desconfortáveis. Reuso de componente seria
+  baixo (os `CS*` são mobile) e ainda exigiria build/deploy próprios — pouco ganho real.
+
+**Opção 2 — React web (Vite/Next + React)**
+- Viável e com alguma economia de modelo mental vindo do RN, mas **sem reuso de componente**
+  mesmo assim. Não escolhida — o PO preferiu Angular pela estrutura opinativa (DI, forms,
+  roteamento) que serve a um CRUD administrativo.
+
+**Opção 3 — Angular 21 (SPA) ← Decisão**
+- Forte para admin denso: DI, Reactive Forms, roteamento com guards, tabelas.
+- Suporte de skill oficial (`angular-developer`, de `angular/angular`).
+- **Restrição de ambiente medida (24/09/2026):** o Angular **22** exige Node ≥ 22.22; a
+  máquina roda **Node 20.19.3**. O Angular **21** roda em `^20.19.0`. Subir o Node global
+  arriscaria o toolchain do Expo (o app depende do Node 20 — ver `App.test.js`), então
+  fixou-se o **Angular 21**. Consequência: **Reactive Forms** (Signal Forms só são estáveis
+  no v22+).
+
+---
+
+### Decisão
+
+Painel Admin implementado como **SPA Angular 21** em `admin/`, dentro deste monorepo, ao
+lado de `frontend/` (app) e `backend/` (API). Consome a **mesma API Spring Boot**; o que se
+reusa é o **contrato**, não o código RN. Autenticação pelos endpoints JWT já existentes.
+CI/deploy próprios do painel ficam para etapa seguinte.
+
+O que **precisa ser reescrito em Angular** (não vem de graça do app): sessão/expiração
+(o 403 encerra sessão — `sessao.js`), cliente HTTP com timeout/retry/fila
+(`config/http.js`) e os design tokens. Registrado como dívida de partida do painel.
+
+---
+
+### Consequências
+
+- **Segundo stack de frontend** no repositório, com toolchain, testes (Vitest no Angular 21)
+  e CI próprios — custo de manutenção assumido conscientemente.
+- Nova linha na matriz de roteamento de skills (`.claude/skills-roteamento.md`): área
+  `admin/` → `angular-developer`; `security-review` no portão de auth/endpoint público.
+- **Épico 7 reaberto** no `De-Para-Backlog-Features.md` (de ⏸️ ADIADO para 🚧 em andamento).
+- **Upgrade de Node para 22** fica como decisão futura: destravaria Angular 22 + Signal
+  Forms, mas precisa ser validado contra o toolchain do Expo antes.
+- **Split futuro em repositórios separados (decisão do PO, 24/09/2026):** o plano é que
+  cada pasta vire um repositório próprio, com estes **nomes-alvo**:
+
+  | Pasta atual (monorepo) | Repositório futuro |
+  |---|---|
+  | `frontend/` (app Expo/RN) | **`radar-saude-mobile`** |
+  | `admin/` (Angular 21) | **`painel-admin-frontend`** |
+  | `backend/` (Spring Boot) | **`radar-saude-backend`** |
+
+  As pastas **não** são renomeadas agora — seguem `frontend/`/`admin/`/`backend/` até o
+  split. `admin/` já nasce **autocontido** (seu `package.json`, `angular.json`, `.gitignore`
+  e testes), então a extração é um `git subtree`/mover-pasta sem desacoplar nada — o único
+  vínculo com o monorepo é o **contrato de API**, que continua sendo do backend. Enquanto o
+  monorepo durar, manter cada pasta autocontida é o que preserva essa saída barata.
+
+---
+
+## ADR-013: Refresh token em cookie HttpOnly no Painel Admin Web
+
+**Data:** 2026-09-25
+**Status:** Aceito (direção, decisão do PO em 25/09/2026) — implementação **pendente** e sequenciada
+**Área:** Segurança / Autenticação do Painel Admin (frontend web + backend)
+
+---
+
+### Contexto e Problema
+
+O PO observou (25/09/2026) que, no DevTools do navegador, a requisição de login exibe
+`email`/`password` e a resposta exibe `accessToken`/`refreshToken`, e levantou isso como
+risco no painel e no app.
+
+**Esclarecimento técnico registrado (o que NÃO é vulnerabilidade):**
+- A visibilidade no DevTools é da **própria máquina que fez o login** — para quem já
+  digitou a senha. Não expõe a terceiros.
+- **Na rede o tráfego é cifrado por TLS** (backend em `https://…run.app`, com HSTS —
+  M-021/F-03); o DevTools mostra em claro só porque é o ponto final.
+- A senha no corpo e os tokens na resposta são **inerentes** ao login por HTTP. Hashear a
+  senha no cliente é antipadrão (o hash vira a senha efetiva e quebra a verificação BCrypt)
+  e nada esconde uma requisição do DevTools local. Verificado: **nenhum `console.*` loga
+  credenciais/token** no `admin/` nem no `frontend/`.
+
+**O risco real por trás da preocupação** é *onde o token fica guardado após o login*: hoje
+o painel usa `sessionStorage` (ADR-012), legível por XSS. O app mobile **já** usa
+`expo-secure-store` (ADR-005), o mecanismo adequado nativo — então esta decisão é do
+**web**.
+
+---
+
+### Decisão
+
+No Painel Admin Web, o **refresh token** passa a trafegar em **cookie
+`HttpOnly; Secure; SameSite`** emitido pelo backend; o JavaScript (e portanto DevTools/XSS)
+não consegue lê-lo. O **access token** de curta duração fica **apenas em memória** no SPA
+(não em `sessionStorage`/`localStorage`), renovado por chamada a `/auth/refresh` que envia
+o cookie automaticamente.
+
+- `POST /auth/login` e `/auth/refresh`: `Set-Cookie: refreshToken=…; HttpOnly; Secure; SameSite=…; Path=/api/v1/auth`.
+- `/auth/refresh`: lê o refresh do **cookie**, não do corpo. `/auth/logout`: expira o cookie.
+- Access token continua no corpo JSON (guardado só em memória pelo cliente).
+
+---
+
+### Restrição de arquitetura (decisiva para a implementação)
+
+Cookie de sessão entre **origens diferentes** (painel `…:4200`/`painel-admin-frontend` × API
+`…run.app`/`radar-saude-backend`) é **cross-site**: exige `SameSite=None; Secure` e esbarra
+no bloqueio de cookies de terceiros (Safari ITP, fim dos 3rd-party cookies no Chrome). Para
+o cookie HttpOnly funcionar de forma robusta, uma destas condições:
+1. **Mesmo site registrável** em produção (ex. `admin.radarsaude.app` + `api.radarsaude.app`)
+   → `SameSite=Lax/Strict`, sem problema de terceiros; **caminho recomendado**;
+2. ou um **BFF/proxy same-origin** (o SPA chama `/api` na própria origem, que repassa ao
+   backend);
+3. em **dev** (`localhost:4200` → `run.app`, cross-site), usar proxy do `ng serve`
+   (`proxy.conf`) para o SPA falar com origem própria.
+
+Implicações: **CORS com `allowCredentials=true`** e origens explícitas (nunca `*`); front
+envia `withCredentials`; **CSRF** — `SameSite` mitiga, e se algum dia precisar `SameSite=None`,
+adicionar defesa CSRF (double-submit token ou header custom exigido).
+
+---
+
+### Consequências / Sequenciamento
+
+- Muda **backend** (auth: emitir/ler/expirar cookie; CORS credentials) **e admin**
+  (access token em memória, `withCredentials`, refresh silencioso no carregamento).
+- **Mobile não muda** — `expo-secure-store` (ADR-005) já é a proteção at-rest adequada.
+- **Sequenciar depois** do PR de backend em curso (listagem admin de inativos) para **não
+  conflitar no `SecurityConfig`** — duas frentes editando auth ao mesmo tempo colidem.
+- Depende de definição de deploy (mesmo domínio registrável **ou** BFF/proxy) antes de valer
+  em produção; sem isso, cai no bloqueio de cookie cross-site.
+
+---
+
+## ADR-014: Leaflet para o mapa multi-camada do Painel Admin
+
+**Data:** 2026-09-25
+**Status:** Aceito
+**Área:** Frontend do Painel Administrativo (E7-04/E7-05, Épico 7)
+
+---
+
+### Contexto e Problema
+
+A E7-04 pede um mapa com as 4 camadas geográficas já servidas em
+`GET /api/v1/camadas/{tipo}` (Região Administrativa, RIDE, Região de Saúde,
+Macrorregião de Saúde) e os marcadores de hospital; a E7-05, navegar do marcador ao
+detalhe. O painel (Angular 21) precisa de uma lib de mapa web — nenhuma estava
+instalada em `admin/`.
+
+### Opções Avaliadas
+
+**Mapbox GL JS** — o app mobile já usa Mapbox (`@rnmapbox/maps`, token
+`EXPO_PUBLIC_MAPBOX_TOKEN`), mas esse token é escopado ao app mobile; usar Mapbox no
+painel exigiria um **token novo, escopado à web** e abre risco de custo por uso.
+
+**Leaflet (`leaflet` + `@types/leaflet`) ← Decisão** — biblioteca madura, sem token,
+tiles raster OSM (`tile.openstreetmap.org`) — mesma fonte de tiles que o app mobile já
+usa (`OSM_RASTER_STYLE`). Zero custo, zero credencial nova para gerenciar.
+
+### Decisão
+
+**Leaflet**, com `maxZoom: 19` explícito na tile layer — replica de propósito a lição
+do **BUG-06** (mobile, 05/09/2026): pedir zoom além do que o `tile.openstreetmap.org`
+publica gera 404 em massa contra um servidor gratuito. As 4 camadas são carregadas
+**sob demanda** (só ao marcar o toggle, uma vez, com cache em memória) — mitigação do
+risco T-W1 já previsto no `Plano-Tecnico-Painel-Administrativo-Web-v1.0.md` (§9) para
+o peso combinado dos 4 GeoJSON.
+
+### Consequências
+
+- Nova dependência de runtime (`leaflet`, sem custo/licença restritiva — BSD-2-Clause).
+- Sem overlap com o Mapbox do mobile: nenhum token/config compartilhado entre os dois
+  frontends.
+- Estilo de tile raster simples (sem 3D/vetorial); suficiente para polígonos + marcadores.
+
+---
+
+## ADR-015: Estratégia de escala da infraestrutura para a população do DF
+
+**Data:** 2026-10-08
+**Status:** Proposto — aguarda as decisões D1–D5 do PO
+**Área:** Infraestrutura e Deploy do Backend
+**Plano completo:** [`02-arquitetura-tecnica/Plano-Escala-Infraestrutura-DF-v1.0.md`](../02-arquitetura-tecnica/Plano-Escala-Infraestrutura-DF-v1.0.md)
+
+### Contexto e Problema
+
+O PO pediu uma infraestrutura barata que aguente o acesso de quase toda a população do DF
+(~3 milhões). Hoje o backend roda numa única instância do Cloud Run (`--max-instances=1`,
+trava do seed, ADR-011) e o banco é o Atlas M0 compartilhado com o dev, que estrangula a
+100 op/s — ~250 usuários simultâneos pela jornada medida em 23/09/2026.
+
+### Opções Avaliadas
+
+**Opção 1 — Manter Cloud Run + Atlas e escalar por patamar, com cache na borda** ← Proposta
+- Custo cresce com o uso medido: ~US$ 45–105/mês no lançamento, ~US$ 500–680/mês com 80% do
+  DF instalado (sem o Mapbox).
+- Exige destravar a escala horizontal no código (seed fora do startup, jobs no Cloud
+  Scheduler, rate limit fora da memória da instância, catálogo cacheável).
+
+**Opção 2 — Kubernetes (GKE) com Redis e réplicas próprias**
+- Descartada: custo fixo de cluster e operação desproporcional ao volume (§4 do plano);
+  nada do que ela resolve deixa de ser resolvido pela Opção 1.
+
+**Opção 3 — Banco autogerenciado em VM**
+- Descartada: troca dezenas de dólares por backup, atualização e alta disponibilidade
+  feitos à mão.
+
+### Decisão proposta
+
+Opção 1, em cinco fases (higiene, destravar escala, borda e domínio, produção, prova de
+carga), com o banco subindo de plano (Flex → M10 → M20) só quando a medição pedir.
+
+### Consequências
+
+- Encerra a pendência de cold start do ADR-011 em produção (`min-instances=1`).
+- O app passa a apontar para um domínio próprio: trocar a infraestrutura atrás dele deixa
+  de exigir versão nova do APK.
+- O custo do Mapbox por usuário ativo vira a maior linha da conta a partir de ~300 mil
+  instalações; a escolha do mapa precisa ser revista antes disso.
 
 ---
 
@@ -1090,7 +1342,12 @@ enquanto não há capacidade, com `--max-instances=1` e nenhuma instância viva.
 | ADR-009 | `HeartbeatService` com `AppState` | Média | Baixo (1–2h) | Médio |
 | ADR-010 | Migração Incremental para TypeScript | Alta | Alto (incremental) | Alto |
 | ADR-011 | Hospedagem do backend no Google Cloud Run | Crítica | Concluído em 04/09/2026 | Alto |
+| ADR-012 | Painel Admin em Angular 21 (SPA separada) | Média | Em andamento (24/09/2026) | Alto |
+| ADR-013 | Refresh token em cookie HttpOnly (Painel Web) | Alta | Pendente (dir. aceita 25/09/2026) | Alto |
+| ADR-014 | Leaflet para o mapa do Painel Admin | Média | Em andamento (25/09/2026) | Médio |
+| ADR-015 | Escala da infraestrutura para a população do DF | Alta | Proposto (08/10/2026) | Alto |
 
-> Os ADR-001 a ADR-010 continuam `Proposto`. O **ADR-011 é o único `Aceito`** — e é
-> o único de infraestrutura. Isso reflete a ordem de execução registrada na nota da
-> revisão 3.1: o gargalo medido estava no backend, não no frontend.
+> Os ADR-001 a ADR-010 continuam `Proposto`. **`Aceito`: ADR-011** (infraestrutura,
+> backend), **ADR-012** (frontend do painel admin), **ADR-013** (segurança de sessão do
+> painel web — direção aceita, implementação sequenciada após o backend de inativos) e
+> **ADR-014** (biblioteca de mapa do painel).

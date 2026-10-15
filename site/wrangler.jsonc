@@ -1,0 +1,13 @@
+// Site público do Radar Saúde (política de privacidade, termos e exclusão de conta),
+// servido como arquivos estáticos pelo Cloudflare Workers no domínio saudemonitor.dev.
+// Publicação: ver README.md desta pasta.
+{
+  "name": "radar-saude-site",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public"
+  },
+  "routes": [
+    { "pattern": "saudemonitor.dev", "custom_domain": true }
+  ]
+}

@@ -6,7 +6,7 @@ import CSChip from "../../../components/CSChip";
 import CSButton from "../../../components/CSButton";
 import CSTextField from "../../../components/CSTextField";
 import { colors, radii, spacing, typography } from "../../../theme/tokens";
-import FeedbackService from "../service/FeedbackService";
+import { useEnviarFeedback } from "../hooks/useEnviarFeedback";
 import { concluirFeedback } from "../service/FeedbackNotificationService";
 
 /**
@@ -64,6 +64,40 @@ function normalizar(texto) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 }
+
+/**
+ * Respostas do formulário. As de múltipla escolha guardam a CHAVE da opção (string,
+ * vinda de `OPCOES_SIM_NAO`/`rotulos`) ou `null` enquanto não respondidas; as
+ * estrelas guardam número.
+ *
+ * O tipo é declarado porque o estado nasce todo em `null` e só muda via `setCampo`
+ * (chave dinâmica): sem a anotação, a inferência de tipos vê `fezTriagem: null` para
+ * sempre e trata `form.fezTriagem === "SIM"` como comparação impossível.
+ *
+ * @typedef {object} FormFeedback
+ * @property {string | null} fezTriagem
+ * @property {string} especialidadeProcurada
+ * @property {string | null} foiAtendido
+ * @property {string | null} teveMedico
+ * @property {string | null} motivoNaoAtendido
+ * @property {string | null} medicacaoReceita
+ * @property {number | null} tratamentoEquipe
+ * @property {number | null} nota
+ * @property {string} comentario
+ */
+
+/** @type {FormFeedback} */
+const FORM_INICIAL = {
+  fezTriagem: null,
+  especialidadeProcurada: "",
+  foiAtendido: null,
+  teveMedico: null,
+  motivoNaoAtendido: null,
+  medicacaoReceita: null,
+  tratamentoEquipe: null,
+  nota: null,
+  comentario: "",
+};
 
 const ROTULOS_TRATAMENTO = ["Ruim", "Regular", "Bom", "Muito bom", "Excelente"];
 
@@ -144,22 +178,13 @@ export default function FeedbackFormScreen({ navigation, route }) {
 
   const [etapa, setEtapa] = useState(0);
   const [enviando, setEnviando] = useState(false);
+  const { mutateAsync: enviarFeedback } = useEnviarFeedback();
   const [enviado, setEnviado] = useState(false);
   const [erro, setErro] = useState(null);
   const [jaAvaliado, setJaAvaliado] = useState(false);
   const [naoInteragi, setNaoInteragi] = useState(false);
 
-  const [form, setForm] = useState({
-    fezTriagem: null,
-    especialidadeProcurada: "",
-    foiAtendido: null,
-    teveMedico: null,
-    motivoNaoAtendido: null,
-    medicacaoReceita: null,
-    tratamentoEquipe: null,
-    nota: null,
-    comentario: "",
-  });
+  const [form, setForm] = useState(FORM_INICIAL);
 
   // RN-11: a Tela 2 (especialidade + atendimento) só aparece quando triagem = Sim.
   // Sem triagem o fluxo vai direto da Tela 1 para a Tela 3.
@@ -194,7 +219,8 @@ export default function FeedbackFormScreen({ navigation, route }) {
       return;
     }
     if (ultimoPasso) {
-      enviar();
+      // `enviar` trata as próprias falhas (mostra o erro na tela): disparo intencional.
+      void enviar();
     } else {
       setEtapa((e) => e + 1);
     }
@@ -230,16 +256,16 @@ export default function FeedbackFormScreen({ navigation, route }) {
     };
 
     try {
-      if (feedbackId) {
-        await FeedbackService.atualizar(feedbackId, payload);
-      } else {
-        await FeedbackService.enviar(payload);
-      }
+      await enviarFeedback({ feedbackId, payload });
       await concluirFeedback(visitaId);
       setEnviado(true);
     } catch (e) {
-      // Já avaliado (dedupe RN-12): não deixa enviar de novo.
+      // Já avaliado (dedupe RN-12): a pendência desta visita não tem mais o que
+      // esperar, então sai da lista da Home. O 404 NÃO remove: ele também vem quando o
+      // checkout ainda está na fila offline (visita aberta no servidor), e a pendência
+      // vence sozinha em 24h (RN-09) se a visita de fato não puder mais ser avaliada.
       if (e.status === 409) {
+        concluirFeedback(visitaId).catch(() => {});
         setJaAvaliado(true);
       } else if (e.status === 404) {
         setErro("Esta visita não está mais disponível para avaliação.");

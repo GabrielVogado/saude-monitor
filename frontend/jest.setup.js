@@ -78,6 +78,7 @@ jest.mock("expo-location", () => {
     requestForegroundPermissionsAsync: jest.fn(),
     getForegroundPermissionsAsync: jest.fn(),
     requestBackgroundPermissionsAsync: jest.fn(),
+    getBackgroundPermissionsAsync: jest.fn(),
     getCurrentPositionAsync: jest.fn(),
     // BUG-08: o check-in por geofence passou a mandar a posição real do aparelho, e
     // cai nesta leitura em cache quando o GPS não responde no momento do disparo.
@@ -85,6 +86,11 @@ jest.mock("expo-location", () => {
     watchPositionAsync: jest.fn(),
     startGeofencingAsync: jest.fn(),
     stopGeofencingAsync: jest.fn(),
+    // Acompanhamento durante a tolerância de entrada/saída (geofencing em 2º plano).
+    startLocationUpdatesAsync: jest.fn(),
+    stopLocationUpdatesAsync: jest.fn(),
+    hasStartedLocationUpdatesAsync: jest.fn(async () => false),
+    ActivityType: { Other: 1 },
   };
 });
 
@@ -104,6 +110,9 @@ jest.mock("expo-notifications", () => {
     cancelScheduledNotificationAsync: jest.fn(),
     getAllScheduledNotificationsAsync: jest.fn(async () => []),
     addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+    // Cold start: por padrão não há resposta que tenha aberto o app (retorna null);
+    // testes que exercitam o caminho de "Fechar tudo" sobrescrevem este mock.
+    getLastNotificationResponseAsync: jest.fn(async () => null),
   };
 });
 
@@ -134,6 +143,7 @@ jest.mock("expo-network", () => ({
     isConnected: true,
     isInternetReachable: true,
   })),
+  addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
 }));
 
 // expo-sharing: menu de compartilhamento do sistema (E5-03).

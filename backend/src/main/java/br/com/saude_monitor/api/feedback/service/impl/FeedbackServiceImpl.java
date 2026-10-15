@@ -1,18 +1,21 @@
 package br.com.saude_monitor.api.feedback.service.impl;
 
-import br.com.saude_monitor.api.agregado.event.FeedbackSalvoEvent;
+import br.com.saude_monitor.api.indicador.event.FeedbackSalvoEvent;
+import br.com.saude_monitor.api.config.exception.AcessoNegadoException;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
-import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
 import br.com.saude_monitor.api.config.exception.ValidacaoNegocioException;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.feedback.document.FoiAtendido;
 import br.com.saude_monitor.api.feedback.document.MotivoNaoAtendido;
+import br.com.saude_monitor.api.feedback.dto.FeedbackPendenteResponse;
 import br.com.saude_monitor.api.feedback.dto.FeedbackRequest;
 import br.com.saude_monitor.api.feedback.dto.FeedbackResponse;
 import br.com.saude_monitor.api.feedback.repository.FeedbackRepository;
 import br.com.saude_monitor.api.feedback.service.FeedbackService;
+import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
+import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import br.com.saude_monitor.api.visita.document.StatusVisita;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
 import br.com.saude_monitor.api.visita.repository.VisitaRepository;
@@ -24,7 +27,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -34,7 +40,8 @@ import java.util.stream.Collectors;
  *
  * <p>Regras aplicadas: dedupe 1 feedback por visita (RN-12, via {@code visitaId} único);
  * feedback anônimo sem {@code usuarioId} (RN-13); a visita deve estar {@code FINALIZADA}
- * (não é possível avaliar visita em andamento); janela de 24h para edição (RN-09);
+ * ou {@code GPS_INTERROMPIDO} (não é possível avaliar visita em andamento); janela de 24h
+ * a partir da saída para responder e a partir da criação para editar (RN-09);
  * {@code motivoNaoAtendido} obrigatório quando {@code foiAtendido = NAO} (RN-10).</p>
  */
 @Service
@@ -47,13 +54,25 @@ public class FeedbackServiceImpl implements FeedbackService {
     /** Label amigável enviado pelo frontend (F-05); o backend normaliza para CLASSIFICACAO_RISCO. */
     private static final String LABEL_CASOS_MAIS_GRAVES = "CASOS_MAIS_GRAVES_PRIORIDADE";
 
+    /** Piso de duração para convidar ao feedback (RN-01/RN-07), o mesmo do app. */
+    private static final int DURACAO_MINIMA_FEEDBACK_MIN = 2;
+
+    /**
+     * Visitas encerradas que aceitam feedback. {@code GPS_INTERROMPIDO} entra porque é o
+     * que o backend registra quando o celular descarrega ou desliga dentro do hospital
+     * (RN-06): o usuário esteve lá e foi atendido, só o aparelho é que parou de responder.
+     */
+    private static final List<StatusVisita> STATUS_AVALIAVEIS =
+            List.of(StatusVisita.FINALIZADA, StatusVisita.GPS_INTERROMPIDO);
+
     private final FeedbackRepository feedbackRepository;
     private final VisitaRepository visitaRepository;
+    private final HospitalRepository hospitalRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public FeedbackResponse criar(FeedbackRequest request, String usuarioId) {
-        VisitaDocument visita = obterVisitaFinalizada(request.visitaId());
+        VisitaDocument visita = obterVisitaAvaliavel(request.visitaId());
 
         if (feedbackRepository.existsByVisitaId(request.visitaId())) {
             throw new ConflitoException("Você já avaliou esta visita.");
@@ -93,7 +112,7 @@ public class FeedbackServiceImpl implements FeedbackService {
             throw new ConflitoException("Você já avaliou esta visita.");
         }
 
-        // Dispara o recálculo assíncrono do agregado do hospital (Épico 04, RN-18).
+        // Dispara o recálculo assíncrono do indicador do hospital (Épico 04, RN-18).
         // AFTER_COMMIT no listener garante que só recalcula depois do commit desta transação.
         eventPublisher.publishEvent(new FeedbackSalvoEvent(salvo.getHospitalId()));
 
@@ -133,7 +152,7 @@ public class FeedbackServiceImpl implements FeedbackService {
 
         FeedbackDocument salvo = feedbackRepository.save(feedback);
 
-        // Edição dentro da janela de 24h pode alterar a nota — recalcula o agregado (RN-18).
+        // Edição dentro da janela de 24h pode alterar a nota — recalcula o indicador (RN-18).
         eventPublisher.publishEvent(new FeedbackSalvoEvent(salvo.getHospitalId()));
 
         return toResponse(salvo, true);
@@ -147,6 +166,46 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .map(f -> toResponse(f, true))
                 .toList();
         return PageResponse.of(content, page, size, resultado.getTotalElements());
+    }
+
+    @Override
+    public List<FeedbackPendenteResponse> pendentes(String usuarioId) {
+        List<VisitaDocument> candidatas = visitaRepository
+                .findByUsuarioIdAndStatusInAndSaidaAfterOrderBySaidaDesc(
+                        usuarioId, STATUS_AVALIAVEIS, Instant.now().minus(JANELA_RESPOSTA))
+                .stream()
+                .filter(v -> v.getDuracaoMinutos() == null
+                        || v.getDuracaoMinutos() >= DURACAO_MINIMA_FEEDBACK_MIN)
+                .toList();
+        if (candidatas.isEmpty()) {
+            return List.of();
+        }
+
+        // Em lote (sem N+1), como no job de SEM_FEEDBACK abaixo.
+        Set<String> comFeedback = feedbackRepository
+                .findByVisitaIdIn(candidatas.stream().map(VisitaDocument::getId).toList()).stream()
+                .map(FeedbackDocument::getVisitaId)
+                .collect(Collectors.toSet());
+        List<VisitaDocument> semFeedback = candidatas.stream()
+                .filter(v -> !comFeedback.contains(v.getId()))
+                .toList();
+
+        // Sem Collectors.toMap: ele lança NPE com valor nulo, e hospital importado pode
+        // vir sem nome — um cadastro incompleto não pode derrubar a lista inteira.
+        Map<String, String> nomes = new HashMap<>();
+        List<String> hospitalIds = semFeedback.stream()
+                .map(VisitaDocument::getHospitalId).filter(Objects::nonNull).distinct().toList();
+        if (!hospitalIds.isEmpty()) {
+            for (HospitalDocument hospital : hospitalRepository.findAllById(hospitalIds)) {
+                nomes.putIfAbsent(hospital.getId(), hospital.getNome());
+            }
+        }
+
+        return semFeedback.stream()
+                .map(v -> new FeedbackPendenteResponse(
+                        v.getId(), v.getHospitalId(), nomes.get(v.getHospitalId()),
+                        v.getSaida(), v.getSaida().plus(JANELA_RESPOSTA)))
+                .toList();
     }
 
     @Override
@@ -170,14 +229,26 @@ public class FeedbackServiceImpl implements FeedbackService {
         visitaRepository.saveAll(semFeedback);
     }
 
-    /** Busca a visita e garante que está {@code FINALIZADA} (não é possível avaliar visita em andamento/expirada). */
-    private VisitaDocument obterVisitaFinalizada(String visitaId) {
+    /**
+     * Busca a visita e garante que ela aceita feedback: encerrada ({@code FINALIZADA} ou
+     * {@code GPS_INTERROMPIDO}) e dentro da janela de 24h após a saída (RN-09). Fora disso
+     * responde 404, o mesmo que a visita já marcada {@code SEM_FEEDBACK} pelo job recebe,
+     * para o app tratar os dois casos como "não está mais disponível".
+     */
+    private VisitaDocument obterVisitaAvaliavel(String visitaId) {
         VisitaDocument visita = visitaRepository.findById(visitaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(
                         "Visita não encontrada para o id informado."));
-        if (visita.getStatus() != StatusVisita.FINALIZADA) {
+        if (!STATUS_AVALIAVEIS.contains(visita.getStatus())) {
             throw new RecursoNaoEncontradoException(
-                    "O feedback só pode ser enviado após a visita ser encerrada (status FINALIZADA).");
+                    "O feedback só pode ser enviado após a visita ser encerrada.");
+        }
+        // Sem este corte, entre o fim da janela e a próxima passada do job (15 min) — e
+        // sempre, para GPS_INTERROMPIDO, que o job não toca — a visita seguia avaliável.
+        if (visita.getSaida() != null
+                && Duration.between(visita.getSaida(), Instant.now()).compareTo(JANELA_RESPOSTA) > 0) {
+            throw new RecursoNaoEncontradoException(
+                    "A janela de 24 horas para avaliar esta visita já encerrou.");
         }
         return visita;
     }
@@ -189,9 +260,11 @@ public class FeedbackServiceImpl implements FeedbackService {
      * feedback tem {@code usuarioId} igual ao do usuário logado.
      */
     private void exigirDono(FeedbackDocument feedback, String usuarioId) {
+        // 403, não 401 (achado F-02 do pentest de 23/09/2026): quem chama já está
+        // autenticado (endpoints 🔒) — só não é dono deste feedback (BOLA).
         if (usuarioId == null || feedback.getUsuarioId() == null
                 || !feedback.getUsuarioId().equals(usuarioId)) {
-            throw new NaoAutorizadoException("Feedback não pertence ao usuário autenticado.");
+            throw new AcessoNegadoException("Feedback não pertence ao usuário autenticado.");
         }
     }
 

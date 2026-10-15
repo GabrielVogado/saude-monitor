@@ -7,7 +7,8 @@
  * e renderiza a posição pela ordem recebida.
  */
 import React from "react";
-import { render, fireEvent, screen, waitFor, act } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor, act } from "@testing-library/react-native";
+import { renderComProviders } from "../../helpers/renderComProviders";
 import RankingScreen from "../../../screens/hospitais/view/RankingScreen";
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
 
@@ -35,7 +36,7 @@ function pagina(content, { page = 0, totalPages = 1 } = {}) {
 }
 
 function renderizar() {
-  return render(<RankingScreen navigation={NAVEGACAO} />);
+  return renderComProviders(<RankingScreen navigation={NAVEGACAO} />);
 }
 
 describe("RankingScreen (E4-05)", () => {
@@ -53,6 +54,7 @@ describe("RankingScreen (E4-05)", () => {
       tipo: "",
       page: 0,
       size: 20,
+      signal: expect.anything(),
     });
     expect(screen.getByText("1º")).toBeTruthy();
     expect(screen.getByText("2º")).toBeTruthy();
@@ -70,6 +72,7 @@ describe("RankingScreen (E4-05)", () => {
         tipo: "",
         page: 0,
         size: 20,
+        signal: expect.anything(),
       });
     });
   });
@@ -87,6 +90,7 @@ describe("RankingScreen (E4-05)", () => {
         tipo: "PUBLICO",
         page: 0,
         size: 20,
+        signal: expect.anything(),
       });
     });
   });
@@ -196,6 +200,54 @@ describe("RankingScreen (E4-05)", () => {
     fireEvent.press(screen.getByText("Tentar novamente"));
 
     expect(await screen.findByText("Hospital Alfa")).toBeTruthy();
+  });
+
+  test("puxar para atualizar consulta o ranking de novo e mostra a resposta nova", async () => {
+    renderizar();
+    await screen.findByText("Hospital Alfa");
+
+    HospitalService.ranking.mockResolvedValue(pagina([HOSPITAL_SEGUNDO]));
+    const lista = screen.UNSAFE_getByType(require("react-native").FlatList);
+    await act(async () => {
+      await lista.props.refreshControl.props.onRefresh();
+    });
+
+    expect(await screen.findByText("Hospital Beta")).toBeTruthy();
+    expect(screen.queryByText("Hospital Alfa")).toBeNull();
+    expect(lista.props.refreshControl.props.refreshing).toBe(false);
+  });
+
+  test("mostra o indicador no rodapé enquanto a próxima página carrega", async () => {
+    let resolverPagina;
+    HospitalService.ranking.mockImplementation(({ page }) =>
+      page === 0
+        ? Promise.resolve(pagina([HOSPITAL_TOP], { page: 0, totalPages: 2 }))
+        : new Promise((resolve) => {
+            resolverPagina = resolve;
+          })
+    );
+
+    renderizar();
+    await screen.findByText("Hospital Alfa");
+
+    await act(async () => {
+      fireEvent(screen.UNSAFE_getByType(require("react-native").FlatList), "onEndReached");
+    });
+    expect(await screen.findByLabelText("Carregando mais hospitais")).toBeTruthy();
+
+    await act(async () => {
+      resolverPagina(pagina([HOSPITAL_SEGUNDO], { page: 1, totalPages: 2 }));
+    });
+    expect(await screen.findByText("Hospital Beta")).toBeTruthy();
+    expect(screen.queryByLabelText("Carregando mais hospitais")).toBeNull();
+  });
+
+  test("falha sem mensagem usa o texto padrão", async () => {
+    HospitalService.ranking.mockRejectedValueOnce(new Error(""));
+
+    renderizar();
+
+    expect(await screen.findByText("Não foi possível carregar o ranking.")).toBeTruthy();
   });
 
   test("tocar em um hospital abre o detalhe", async () => {

@@ -10,6 +10,8 @@ import { Alert, AppState, Linking } from "react-native";
 import { render, fireEvent, screen, waitFor, act } from "@testing-library/react-native";
 import PerfilScreen from "../../../screens/perfil/view/PerfilScreen";
 import PerfilService from "../../../screens/perfil/service/PerfilService";
+import LoginService from "../../../screens/auth/service/LoginService";
+import { definirUsuarioDaSessao, sessaoStore } from "../../../core/stores/sessaoStore";
 
 jest.mock("../../../screens/perfil/service/PerfilService");
 jest.mock("../../../screens/auth/service/LoginService");
@@ -45,7 +47,7 @@ describe("PerfilScreen (E5-05 — revogação nativa)", () => {
       return { remove: jest.fn() };
     });
 
-    PerfilService.usuarioLogado.mockResolvedValue({ nome: "Marina", email: "marina@email.com" });
+    definirUsuarioDaSessao({ id: "u1", nome: "Marina", email: "marina@email.com" });
     PerfilService.permissaoLocalizacao.mockResolvedValue("granted");
     PerfilService.atualizarConsentimento.mockResolvedValue({});
   });
@@ -67,6 +69,59 @@ describe("PerfilScreen (E5-05 — revogação nativa)", () => {
     // carregamento — logo, esperar por ele seria seguro —, e não é o cabeçalho.)
     await screen.findByText("Minha conta");
   }
+
+  test("antes de ler o usuário gravado, fica em carregamento em vez de mostrar o convite ao login", async () => {
+    sessaoStore.setState({ usuario: null, hidratada: false });
+    render(<PerfilScreen navigation={NAVEGACAO} />);
+    await waitFor(() => expect(PerfilService.permissaoLocalizacao).toHaveBeenCalled());
+
+    expect(screen.queryByText("Conta opcional")).toBeNull();
+
+    act(() => definirUsuarioDaSessao({ id: "u1", nome: "Marina" }));
+    expect(await screen.findByText("Marina")).toBeTruthy();
+  });
+
+  test("mostra a conta a partir da sessão global", async () => {
+    await renderizar();
+
+    expect(screen.getByText("Marina")).toBeTruthy();
+    expect(screen.getByText("marina@email.com")).toBeTruthy();
+  });
+
+  test("sessão encerrada fora da tela (interceptor 401) troca a conta pelo convite ao login na hora", async () => {
+    await renderizar();
+    expect(screen.getByText("Marina")).toBeTruthy();
+
+    act(() => definirUsuarioDaSessao(null));
+
+    expect(screen.queryByText("Marina")).toBeNull();
+    expect(screen.getByText("Conta opcional")).toBeTruthy();
+  });
+
+  test("Sair da conta delega o logout ao serviço, que atualiza a sessão", async () => {
+    PerfilService.deslogar.mockImplementation(async () => definirUsuarioDaSessao(null));
+    await renderizar();
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Sair da conta"));
+    });
+
+    expect(PerfilService.deslogar).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Conta opcional")).toBeTruthy();
+  });
+
+  test("excluir a conta chama o serviço e confirma ao usuário", async () => {
+    LoginService.excluirConta.mockImplementation(async () => definirUsuarioDaSessao(null));
+    await renderizar();
+
+    fireEvent.press(screen.getByLabelText("Excluir conta e dados pessoais"));
+    await act(async () => {
+      await confirmarNoAlerta("Excluir");
+    });
+
+    expect(LoginService.excluirConta).toHaveBeenCalledTimes(1);
+    expect(Alert.alert).toHaveBeenLastCalledWith("Conta excluída", expect.any(String));
+  });
 
   test("revoga: audita no backend e abre as configurações do sistema", async () => {
     await renderizar();

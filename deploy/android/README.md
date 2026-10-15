@@ -20,7 +20,7 @@ de `frontend/android/app/build.gradle`:
 |---|---|---|---|---|
 | dev | `com.gabrielvogado.saudemonitor.dev` | Radar Saúde DEV | `X.Y.Z-dev.<run>` | número da execução do workflow |
 | hom | `com.gabrielvogado.saudemonitor.hom` | Radar Saúde HML | `X.Y.Z-rc.N` | derivado da tag |
-| prod | `com.gabrielvogado.saudemonitor` | Radar Saúde | `X.Y.Z` | derivado da tag |
+| prod | `com.gabrielvogado.saudemonitor` | Radar Saúde | `X.Y.Z` | `X*1000000 + Y*10000 + Z*100`, do nome da `release/X.Y.Z` |
 
 Pacotes diferentes = apps diferentes: DEV e HML ficam instalados lado a lado.
 `X.Y.Z` é o `expo.version` de `frontend/app.json`. Build local sem as propriedades
@@ -63,3 +63,19 @@ Os dois últimos pedem o valor no terminal (a mesma senha, no formato PKCS12). N
 Os APKs antigos foram assinados com outras chaves e usam o pacote sem sufixo. Depois
 da chave de release, **desinstale uma última vez** o "Radar Saúde" antigo; dali em
 diante DEV e HML atualizam por cima.
+
+## Play Store (AAB de produção)
+
+Desde 14/10/2026 a branch `release/X.Y.Z` gera um **AAB** (`cd-producao.yml`), anexado à
+GitHub Release `vX.Y.Z`, porque a Play Store só aceita AAB para app novo. Ele é assinado
+com a mesma chave de release dos APKs.
+
+Na **primeira** versão enviada à Play Console, escolha o *Play App Signing* (assinatura
+pelo Google) e use esta chave como **chave de upload**: o Google assina o app entregue aos
+usuários com uma chave própria, e a sua passa a servir só para provar que o envio é seu.
+Se a chave de upload vazar ou se perder, o Google permite trocá-la; sem o Play App Signing,
+perder esta chave impediria qualquer atualização do app na loja.
+
+O envio é manual: Play Console → *Produção* (ou *Teste fechado*) → *Criar nova versão* →
+enviar o `.aab` da Release.
+

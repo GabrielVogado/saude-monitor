@@ -49,7 +49,8 @@ export default function NotificacoesScreen({ navigation }) {
 
   useFocusEffect(
     useCallback(() => {
-      carregar();
+      // `carregar` mostra a falha em `erro`: disparo intencional.
+      void carregar();
     }, [carregar])
   );
 
@@ -70,7 +71,8 @@ export default function NotificacoesScreen({ navigation }) {
   useEffect(() => {
     const inscricao = AppState.addEventListener("change", (estado) => {
       if (estado === "active") {
-        sincronizar();
+        // `sincronizar` tenta de novo na próxima volta ao app: disparo intencional.
+        void sincronizar();
       }
     });
     return () => inscricao?.remove?.();

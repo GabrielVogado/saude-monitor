@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { uuid } from "expo-modules-core";
 
 /**
  * Identificação anônima de dispositivo (modo anônimo — §3.3).
@@ -14,17 +15,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const CHAVE_DISPOSITIVO = "@saude_monitor:dispositivoId";
 
+/**
+ * O id é a única credencial de quem usa o app sem login: quem o adivinhar consegue
+ * agir sobre a visita ativa daquele aparelho. Por isso vem de um gerador
+ * criptográfico — o UUID v4 nativo do `expo-modules-core` (já embarcado pelo `expo`:
+ * `java.util.UUID.randomUUID()`/`SecureRandom` no Android, `UUID()` no iOS e
+ * `crypto.randomUUID()` na web) — e não de `Math.random`, cuja sequência é previsível.
+ */
 function gerarId() {
-  // UUID v4 aproximado (random puro): suficiente para identificação anônima não
-  // crítica; evita nova dependência nativa (expo-crypto/application) para o MVP.
-  const hex = () =>
-    Math.floor((1 + Math.random()) * 0x10000)
-      .toString(16)
-      .padStart(4, "0");
-  return (
-    `anon-${hex()}${hex()}-${hex()}-${hex()}-${hex()}-${hex()}${hex()}${hex()}` +
-    `-${Date.now().toString(36)}`
-  );
+  return `anon-${uuid.v4()}`;
 }
 
 class DispositivoId {

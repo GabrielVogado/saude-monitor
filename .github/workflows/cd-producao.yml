@@ -1,0 +1,136 @@
+# Producao: o push de uma branch `release/X.Y.Z` gera o AAB da Play Store.
+#
+# 14/10/2026 (analise de prontidao para a Play Store, bloqueador B2): a `release/**` so
+# publicava o backend (cd-backend-google.yml, que continua ouvindo este mesmo push). Nao
+# existia build do app de producao, e o cd-mobile-apk.yml so gerava APK, que a Play Store
+# nao aceita para app novo.
+#
+#   push em release/X.Y.Z   (criada pelo release.yml a partir de uma rc homologada)
+#     -> versao   X.Y.Z do nome da branch; versionCode X*1_000_000 + Y*10_000 + Z*100
+#     -> aab      AAB do pacote de producao (sem sufixo), assinado com a chave de release
+#     -> release  GitHub Release vX.Y.Z com o AAB anexado, para subir na Play Console
+#
+# O versionCode de producao e o da rc com N = 0, entao so cresce de uma versao para a
+# seguinte. Nao compete com as rcs: homologacao e outro pacote (`.hom`).
+#
+# O AAB vai para a Play Console A MAO (Producao -> Criar nova versao -> enviar o .aab).
+# Envio automatico pela API do Google Play exige uma conta de servico com acesso a Play
+# Console; fica para quando o PO decidir.
+name: CD - Produção (AAB)
+
+on:
+  push:
+    branches: ['release/**']
+  workflow_dispatch:
+
+concurrency:
+  group: producao-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # URL deterministica do servico de producao, mesmo padrao do de homologacao
+  # (cd-homologacao.yml): `https://<servico>-<numero do projeto>.<regiao>.run.app`.
+  API_URL_PROD: https://saude-monitor-backend-767615581088.southamerica-east1.run.app
+
+permissions:
+  contents: read
+
+jobs:
+  versao:
+    name: Calcular versão
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.calc.outputs.tag }}
+      version_name: ${{ steps.calc.outputs.version_name }}
+      version_code: ${{ steps.calc.outputs.version_code }}
+      api_url: ${{ steps.calc.outputs.api_url }}
+    steps:
+      - name: Calcular X.Y.Z da branch
+        id: calc
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$REF_NAME" =~ ^release/([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "ERRO: producao so sai de uma branch release/X.Y.Z (ref atual: $REF_NAME)."
+            exit 1
+          fi
+          X=${BASH_REMATCH[1]}; Y=${BASH_REMATCH[2]}; Z=${BASH_REMATCH[3]}
+          if [ "$Y" -gt 99 ] || [ "$Z" -gt 99 ] || [ "$X" -gt 2000 ]; then
+            echo "ERRO: $X.$Y.$Z fora do esquema de versionCode (Y e Z ate 99, X ate 2000)."
+            exit 1
+          fi
+          CODE=$(( 10#$X*1000000 + 10#$Y*10000 + 10#$Z*100 ))
+          {
+            echo "tag=v$X.$Y.$Z"
+            echo "version_name=$X.$Y.$Z"
+            echo "version_code=$CODE"
+            echo "api_url=$API_URL_PROD"
+          } >> "$GITHUB_OUTPUT"
+          echo "🏷️ \`v$X.$Y.$Z\` · versionCode \`$CODE\` · backend \`$API_URL_PROD\`" >> "$GITHUB_STEP_SUMMARY"
+
+  aab:
+    name: AAB de produção
+    needs: versao
+    uses: ./.github/workflows/cd-mobile-apk.yml
+    with:
+      ambiente: prod
+      formato: aab
+      api_url: ${{ needs.versao.outputs.api_url }}
+      version_name: ${{ needs.versao.outputs.version_name }}
+      version_code: ${{ needs.versao.outputs.version_code }}
+    secrets: inherit
+
+  # Como no cd-homologacao.yml, este job acha o arquivo pelo commit em vez de ler os
+  # outputs de `aab`: numa reexecucao so dos jobs que falharam, os outputs de um workflow
+  # reutilizavel nao reexecutado chegam vazios.
+  release:
+    name: GitHub Release com o AAB
+    needs: [versao, aab]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Baixar o AAB
+        uses: actions/download-artifact@v4
+        with:
+          pattern: aab-radar-saude-prod-*-${{ github.sha }}
+          merge-multiple: true
+          path: aab
+
+      - name: Criar ou atualizar a Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.versao.outputs.tag }}
+          VERSION_NAME: ${{ needs.versao.outputs.version_name }}
+          VERSION_CODE: ${{ needs.versao.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          mapfile -t AABS < <(find aab -maxdepth 1 -name 'radar-saude-prod-*.aab')
+          if [ "${#AABS[@]}" -ne 1 ]; then
+            echo "ERRO: esperado 1 AAB de producao deste commit, encontrados ${#AABS[@]}: ${AABS[*]:-nenhum}"
+            exit 1
+          fi
+          ARQUIVO="${AABS[0]}"
+
+          # Reexecucao: a Release ja existe, so troca o AAB.
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ARQUIVO" --clobber -R "$GITHUB_REPOSITORY"
+            echo "♻️ Release \`$TAG\` já existia — AAB substituído." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          {
+            echo "## Radar Saúde $VERSION_NAME"
+            echo ""
+            echo "- **Play Console:** Produção (ou o teste fechado) → Criar nova versão → enviar \`$(basename "$ARQUIVO")\`."
+            echo "- **Backend de produção:** $API_URL_PROD"
+            echo "- **versionCode:** $VERSION_CODE · commit \`${GITHUB_SHA:0:7}\`"
+          } > notas.md
+
+          gh release create "$TAG" "$ARQUIVO" \
+            -R "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Radar Saúde $VERSION_NAME" \
+            --notes-file notas.md
+          echo "📦 Release \`$TAG\` publicada com o AAB." >> "$GITHUB_STEP_SUMMARY"

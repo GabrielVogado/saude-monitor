@@ -11,7 +11,7 @@ import { getInitialViewState, MAPBOX_STYLE } from "../../utils/mapStyle";
 
 jest.mock("@rnmapbox/maps", () => ({
   __esModule: true,
-  default: { setAccessToken: jest.fn(), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
+  default: { setAccessToken: jest.fn(() => Promise.resolve(null)), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
   StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
 }));
 
@@ -25,6 +25,26 @@ describe("MAPBOX_STYLE", () => {
     // histórico antes de cada teste, inclusive a chamada feita no import acima —
     // afirmar `toHaveBeenCalled` aqui reprovaria sempre, com o código correto.
     expect(typeof Mapbox.setAccessToken).toBe("function");
+  });
+});
+
+describe("registro do token", () => {
+  test("falha do módulo nativo ao registrar o token é registrada, não vira rejeição solta", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.resetModules();
+    jest.doMock("@rnmapbox/maps", () => ({
+      __esModule: true,
+      default: {
+        setAccessToken: jest.fn(() => Promise.reject(new Error("módulo nativo ausente"))),
+        StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
+      },
+    }));
+    require("../../utils/mapStyle");
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(warn).toHaveBeenCalledWith("mapStyle: falha ao configurar o token do Mapbox", "módulo nativo ausente");
+    warn.mockRestore();
   });
 });
 

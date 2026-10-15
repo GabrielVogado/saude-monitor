@@ -1,8 +1,10 @@
-# 🔍 Relatório de Aderência — Features × Código Real (v3.8)
+# 🔍 Relatório de Aderência — Features × Código Real (v3.9)
 
 > **Verificação do que existe implementado vs. o que as Features propõem**
 >
-> Data: Atualizada — v3.8 (20/09/2026; card do hospital sobre o mapa)
+> Data: Atualizada — v3.9 (28/09/2026; notificação de feedback em 1 min + piso de 2 min)
+> Alterações da v3.9: §F-05 — a notificação de feedback pós-saída passou de "1–5 min" para **1 min** após a saída (decisão do PO, RN-08) e o piso de 2 min para convidar (RN-01/RN-07) passou a ser aplicado no cliente — antes o convite era disparado mesmo em visita curta. Ver [M-024](../09-melhoria-continua/Historico-Melhorias.md). Nenhum status de estória muda. Versão anterior (3.8) preservada em `_historico/Relatorio-Aderencia-Codigo-vs-Features-v3.8.md`.
+> Data anterior: v3.8 (20/09/2026; card do hospital sobre o mapa)
 > Alterações da v3.8: §F-07 — o toque num marcador do mapa **deixou de abrir o `HospitalDetalhe` direto**: agora seleciona o hospital (marcador destacado, mapa centraliza) e abre um card com as informações básicas; o toque no card é que navega ao detalhe. Isso cumpre o critério de aceite 3 da F-07, que o código não cumpria. Nenhum status de estória muda. Versão anterior (3.7) preservada em `_historico/Relatorio-Aderencia-Codigo-vs-Features-v3.7.md`.
 > Data anterior: v3.7 (12/09/2026; migração do mapa para Mapbox + backend das camadas F-11)
 > Alterações da v3.7: §F-07 realinhado ao código da branch `feature/mapbox-migration` (`@rnmapbox/maps` v10 no lugar de MapLibre; BUG-10 corrigido); registrada a entrega parcial de F-11 — `GET /api/v1/camadas/{tipo}` servindo as 4 camadas (UI do painel segue fora do escopo, sem mudar status). Versão anterior (3.6) preservada em `_historico/Relatorio-Aderencia-Codigo-vs-Features-v3.6.md`.
@@ -115,7 +117,7 @@
 
 | O que a feature precisa | O que existe |
 |---|---|
-| Notificação local 1–5min após saída | ✅ (E3-01) |
+| Notificação local 1min após saída (piso de 2 min, RN-01/RN-07) | ✅ (E3-01) |
 | Formulário < 45s com 4 perguntas | ✅ (E3-02 — RN-10/11 corrigidos no PR do bugfix: select searchable de especialidade, ramificação triagem=Sim→Tela 2, "Não interagi" zera `tratamentoEquipe`, opção `DESISTI` removida, motivo obrigatório quando não atendido) |
 | Janela de 24h + 1 lembrete único | ✅ (E3-03 — lembrete único em ~6h após a 1ª notificação, janela 24h/RN-09) |
 | Bloquear feedback duplicado (unique `visitaId`) | ✅ (E3-04) |
@@ -178,7 +180,7 @@
 
 1. **No escopo S0–S6, a `develop` está concluída e validada**: autenticação JWT/BCrypt, rate limiting (F0-04), exclusão de conta LGPD (`DELETE /api/v1/contas/exclusao`, F0-05), CRUD/geofence de hospitais + sugestões e moderação (backend), visitas com geofencing nativo + heartbeat, feedback pós-saída (backend + mobile), indicadores públicos por hospital + ranking (backend) e o frontend de Conta/Privacidade (E5-01/02/04) e de UX (E6-01..04).
 2. **Correções aplicadas (PR `bugfix/ajustes-rn-feedback-estatisticas`)** — os 3 desvios de estória da v3.1 foram implementados e testados:
-   - **RN-07 / E2-08:** filtro **< 2min na agregação** (`DURACAO_MINIMA_MINUTOS=2` no `AgregadoServiceImpl`) + teste;
+   - **RN-07 / E2-08:** filtro **< 2min na agregação** (`DURACAO_MINIMA_MINUTOS=2` no `IndicadorServiceImpl`) + teste;
    - **E3-02 / RN-10-11:** select searchable de especialidade, ramificação "triagem=Não → pula especialidade", "Não interagi" em `tratamentoEquipe`, remoção da opção `DESISTI` e motivo obrigatório quando não foi atendido (`FeedbackFormScreen`) + testes FE;
    - **E3-03 / RN-09:** lembrete único em **~6h** após a 1ª notificação (`FeedbackNotificationService`).
    Validação FE: 16 suítes/99 testes ✓ + `tsc --noEmit` ✓. (Testes unit do backend dependem de JDK 25/Docker — rodam no CI.)

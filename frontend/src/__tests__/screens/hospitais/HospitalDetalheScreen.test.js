@@ -14,7 +14,9 @@
  * paint), então qualquer regressão nas Regras de Hooks volta a quebrar estes testes.
  */
 import React from "react";
-import { render, fireEvent, screen, act } from "@testing-library/react-native";
+import { fireEvent, screen, act, waitFor } from "@testing-library/react-native";
+import { renderComProviders } from "../../helpers/renderComProviders";
+import { definirUsuarioDaSessao } from "../../../core/stores/sessaoStore";
 import HospitalDetalheScreen from "../../../screens/hospitais/view/HospitalDetalheScreen";
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
 import VisitaService from "../../../screens/visitas/service/VisitaService";
@@ -32,7 +34,7 @@ jest.mock("@rnmapbox/maps", () => {
   const stub = (props) => <View {...props} />;
   return {
     __esModule: true,
-    default: { setAccessToken: jest.fn(), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
+    default: { setAccessToken: jest.fn(() => Promise.resolve(null)), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
     StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
     MapView: stub,
     Camera: stub,
@@ -96,7 +98,15 @@ const NAVEGACAO = { goBack: jest.fn(), navigate: jest.fn() };
 
 function renderizar(id = "h1") {
   const route = { params: { id } };
-  return render(<HospitalDetalheScreen navigation={NAVEGACAO} route={route} />);
+  return renderComProviders(<HospitalDetalheScreen navigation={NAVEGACAO} route={route} />);
+}
+
+/** Checkout aceito: depois dele, o servidor passa a responder que não há visita ativa. */
+function checkoutComSucesso(resposta) {
+  VisitaService.checkout.mockImplementation(async () => {
+    VisitaService.buscarAtiva.mockResolvedValue({ visita: null });
+    return resposta;
+  });
 }
 
 /** Simula a tela ganhando foco de novo (ex.: voltar de outro app), sem remontar. */
@@ -109,9 +119,13 @@ async function refocarTela() {
 describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Sessão lida do aparelho (anônima): a visita ativa só é consultada depois disso.
+    definirUsuarioDaSessao(null);
     HospitalService.buscarPorId.mockResolvedValue(HOSPITAL);
     HospitalService.buscarIndicadores.mockResolvedValue(INDICADORES);
     VisitaService.buscarAtiva.mockResolvedValue({ visita: null });
+    // Assíncrona como a real: a tela encadeia `.catch` no retorno.
+    agendarFeedback.mockResolvedValue(null);
   });
 
   test("sai de carregando para os dados prontos sem quebrar (Regras de Hooks)", async () => {
@@ -162,11 +176,12 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     expect(screen.queryByText("Check-in manual ativo")).toBeNull();
   });
 
-  test("'Não estou aqui' finaliza o check-out e agenda o feedback", async () => {
+  test("'Não estou aqui' finaliza o check-out e repassa a duração ao feedback (RN-01/RN-07)", async () => {
     VisitaService.buscarAtiva.mockResolvedValue({
       visita: { id: "v1", origem: "MANUAL", hospitalId: "h1", entrada: new Date().toISOString() },
     });
-    VisitaService.checkout.mockResolvedValue({ id: "v1", status: "FINALIZADA" });
+    // A duração vem da resposta do checkout; quem decide convidar ou não é agendarFeedback.
+    checkoutComSucesso({ id: "v1", status: "FINALIZADA", duracaoMinutos: 8 });
 
     renderizar();
     fireEvent.press(await screen.findByText("Não estou aqui"));
@@ -175,9 +190,51 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
 
     expect(VisitaService.checkout).toHaveBeenCalledWith("v1", { encerramentoManual: true });
     expect(agendarFeedback).toHaveBeenCalledWith(
-      expect.objectContaining({ visitaId: "v1", hospitalId: "h1", hospitalNome: "Hospital Central" })
+      expect.objectContaining({
+        visitaId: "v1",
+        hospitalId: "h1",
+        hospitalNome: "Hospital Central",
+        duracaoMinutos: 8,
+      })
     );
-    expect(screen.queryByText("Check-in manual ativo")).toBeNull();
+    await waitFor(() => expect(screen.queryByText("Check-in manual ativo")).toBeNull());
+  });
+
+  test("check-out de visita curta (<2 min) repassa a duração — não convida para feedback (RN-01/RN-07)", async () => {
+    // Bug relatado: check-in seguido de checkout imediato ainda disparava a pesquisa. A
+    // duração curta é repassada e o gate de 2 min em agendarFeedback (testado em unidade)
+    // suprime a notificação.
+    VisitaService.buscarAtiva.mockResolvedValue({
+      visita: { id: "v1", origem: "MANUAL", hospitalId: "h1", entrada: new Date().toISOString() },
+    });
+    checkoutComSucesso({ id: "v1", status: "FINALIZADA", duracaoMinutos: 1 });
+
+    renderizar();
+    fireEvent.press(await screen.findByText("Não estou aqui"));
+
+    await act(async () => {});
+
+    expect(agendarFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({ visitaId: "v1", duracaoMinutos: 1 })
+    );
+  });
+
+  test("falha ao agendar o feedback é registrada e o cronômetro some mesmo assim", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    VisitaService.buscarAtiva.mockResolvedValue({
+      visita: { id: "v1", origem: "MANUAL", hospitalId: "h1", entrada: new Date().toISOString() },
+    });
+    checkoutComSucesso({ id: "v1", status: "FINALIZADA", duracaoMinutos: 8 });
+    agendarFeedback.mockRejectedValue(new Error("disco cheio"));
+
+    renderizar();
+    fireEvent.press(await screen.findByText("Não estou aqui"));
+
+    await act(async () => {});
+
+    expect(warn).toHaveBeenCalledWith("HospitalDetalheScreen: falha ao agendar o feedback", "disco cheio");
+    await waitFor(() => expect(screen.queryByText("Check-in manual ativo")).toBeNull());
+    warn.mockRestore();
   });
 
   test("erro no check-out mantém a visita ativa e mostra alerta", async () => {
@@ -221,11 +278,16 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     expect(agendarFeedback).toHaveBeenCalledWith(
       expect.objectContaining({ visitaId: "v1", hospitalId: "h1", hospitalNome: "Hospital Central" })
     );
-    expect(screen.queryByText("Check-in manual ativo")).toBeNull();
+    await waitFor(() => expect(screen.queryByText("Check-in manual ativo")).toBeNull());
     expect(AlertModule.alert).toHaveBeenCalledWith(
       "Sem conexão",
       "Sem conexão com a internet. O registro foi guardado e será enviado assim que a conexão voltar."
     );
+
+    // Voltar à tela ainda sem conexão não traz de volta o cronômetro da visita encerrada.
+    VisitaService.buscarAtiva.mockRejectedValue(new ErroSemInternet("http://exemplo"));
+    await refocarTela();
+    expect(screen.queryByText("Check-in manual ativo")).toBeNull();
   });
 
   test("um refoco sem internet não apaga o cronômetro de uma visita manual já carregada", async () => {
@@ -259,7 +321,7 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     VisitaService.buscarAtiva.mockRejectedValue(new Error("Sessão expirada. Faça login novamente."));
     await refocarTela();
 
-    expect(screen.queryByText("Check-in manual ativo")).toBeNull();
+    await waitFor(() => expect(screen.queryByText("Check-in manual ativo")).toBeNull());
   });
 
   test("indicadores insuficientes mostram a mensagem de transparência (RN-15)", async () => {
@@ -328,10 +390,41 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     expect(await screen.findByText("Hospital Central")).toBeTruthy();
   });
 
+  test("erro sem mensagem mostra o texto padrão", async () => {
+    HospitalService.buscarPorId.mockRejectedValueOnce(new Error(""));
+
+    renderizar();
+
+    expect(await screen.findByText("Não foi possível carregar o hospital.")).toBeTruthy();
+  });
+
+  test("uma atualização que falha com o hospital já na tela não troca a tela pelo erro", async () => {
+    const { queryClient } = renderizar();
+    await screen.findByText("Hospital Central");
+
+    HospitalService.buscarPorId.mockRejectedValueOnce(new Error("Sem conexão."));
+    await act(async () => {
+      await queryClient.refetchQueries();
+    });
+
+    expect(screen.getByText("Hospital Central")).toBeTruthy();
+    expect(screen.queryByText("Não foi possível carregar")).toBeNull();
+  });
+
   test("botão voltar aciona a navegação", async () => {
     renderizar();
     await screen.findByText("Hospital Central");
     fireEvent.press(screen.getByLabelText(/[Vv]oltar/));
     expect(NAVEGACAO.goBack).toHaveBeenCalled();
+  });
+
+  test("sem id na rota não consulta o hospital", async () => {
+    // A visita ativa é a consulta compartilhada do app (o observador global já a
+    // mantém), então só o hospital depende do id.
+    renderizar(null);
+    await act(async () => {});
+
+    expect(HospitalService.buscarPorId).not.toHaveBeenCalled();
+    expect(HospitalService.buscarIndicadores).not.toHaveBeenCalled();
   });
 });

@@ -1,0 +1,177 @@
+<div class="animate-[fadeInUp_0.4s_ease-out]">
+  @if (hospital(); as h) {
+    <a [routerLink]="['/hospitais', h.id]" class="text-sm font-semibold text-brand-500 hover:underline">← Voltar para o detalhe</a>
+  } @else {
+    <a routerLink="/hospitais" class="text-sm font-semibold text-brand-500 hover:underline">← Voltar para Hospitais</a>
+  }
+
+  @if (carregando()) {
+    <div class="mt-4 rounded-xl border border-outline-soft/50 bg-surface-card p-8 text-center text-sm text-ink-soft">
+      Carregando…
+    </div>
+  } @else if (erroCarga(); as mensagem) {
+    <div class="mt-4 rounded-xl border border-outline-soft/50 bg-surface-card p-8 text-center text-sm text-danger-700" role="alert">
+      {{ mensagem }}
+    </div>
+  } @else if (hospital(); as h) {
+    <form [formGroup]="form" (ngSubmit)="salvar()" novalidate class="mt-4 space-y-6">
+      <div class="rounded-xl border border-outline-soft/50 bg-surface-card p-6 shadow-sm">
+        <h1 class="text-2xl font-bold tracking-tight text-ink">Editar hospital</h1>
+        <p class="mt-1 text-sm text-ink-soft">
+          Dados cadastrais e área de detecção. Avaliações e indicadores não são editáveis.
+        </p>
+
+        <fieldset class="mt-6 grid gap-4 sm:grid-cols-2">
+          <legend class="sr-only">Identificação</legend>
+          <label class="block sm:col-span-2">
+            <span class="mb-1.5 block text-sm font-semibold text-ink">Nome</span>
+            <input type="text" formControlName="nome" class="w-full rounded-lg border border-outline-soft bg-white px-3 py-2.5 text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-100" [attr.aria-invalid]="form.controls.nome.touched && form.controls.nome.invalid" />
+            @if (form.controls.nome.touched && form.controls.nome.invalid) {
+              <span class="mt-1 block text-[0.8125rem] font-medium text-danger-500">Informe o nome (até 200 caracteres).</span>
+            }
+          </label>
+          <label class="block">
+            <span class="mb-1.5 block text-sm font-semibold text-ink">CNPJ <span class="font-normal text-ink-soft">(opcional)</span></span>
+            <input type="text" formControlName="cnpj" placeholder="00.000.000/0000-00" class="w-full rounded-lg border border-outline-soft bg-white px-3 py-2.5 text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-100" [attr.aria-invalid]="form.controls.cnpj.touched && form.controls.cnpj.invalid" />
+            @if (form.controls.cnpj.touched && form.controls.cnpj.invalid) {
+              <span class="mt-1 block text-[0.8125rem] font-medium text-danger-500">Use o formato 00.000.000/0000-00.</span>
+            }
+          </label>
+          <label class="block">
+            <span class="mb-1.5 block text-sm font-semibold text-ink">Tipo</span>
+            <select formControlName="tipo" class="w-full rounded-lg border border-outline-soft bg-white px-3 py-2.5 text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-100">
+              <option value="PUBLICO">Público</option>
+              <option value="PRIVADO">Privado</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="mb-1.5 block text-sm font-semibold text-ink">Categoria</span>
+            <select formControlName="categoria" class="w-full rounded-lg border border-outline-soft bg-white px-3 py-2.5 text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-100">
+              <option [ngValue]="null">Não informada</option>
+              @for (c of categorias; track c.valor) {
+                <option [ngValue]="c.valor">{{ c.rotulo }}</option>
+              }
+            </select>
+          </label>
+        </fieldset>
+      </div>
+
+      <fieldset formGroupName="endereco" class="rounded-xl border border-outline-soft/50 bg-surface-card p-6 shadow-sm">
+        <legend class="px-1 text-sm font-bold text-ink">Endereço</legend>
+        <div class="grid gap-4 sm:grid-cols-6">
+          <label class="block sm:col-span-4">
+            <span class="mb-1.5 block text-sm font-semibold text-ink">Logradouro</span>
+            <input type="text" formControlName="logradouro" class="w-full rounded-lg border border-outline-soft bg-white px-3 py-2.5 text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-100" [attr.aria-invalid]="form.controls.endereco.controls.logradouro.touched && form.controls.endereco.controls.logradouro.invalid" />
+            @if (form.controls.endereco.controls.logradouro.touched && form.controls.endereco.controls.logradouro.invalid) {
+              <span class="mt-1 block text-[0.8125rem] font-medium text-danger-500">Informe o logradouro.</span>
+            }
+          </label>
+          <label class="block sm:col-span-2">
+            <span class="mb-1.5 block text-sm font-semibold text-ink">Número</span>
+            <input type="text" formControlName="numero" class="w-full rounded-lg border border-outline-soft bg-white px-3 py-2.5 text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-100" />
+          </label>
+          <label class="block sm:col-span-3">
+            <span class="mb-1.5 block text-sm font-semibold text-ink">Complemento</span>
+            <input type="text" formControlName="complemento" class="w-full rounded-lg border border-outline-soft bg-white px-3 py-2.5 text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-100" />
+          </label>
+          <label class="block sm:col-span-3">
+            <span class="mb-1.5 block text-sm font-semibold text-ink">Bairro</span>
+            <input type="text" formControlName="bairro" class="w-full rounded-lg border border-outline-soft bg-white px-3 py-2.5 text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-100" />
+          </label>
+          <label class="block sm:col-span-3">
+            <span class="mb-1.5 block text-sm font-semibold text-ink">Cidade</span>
+            <input type="text" formControlName="cidade" class="w-full rounded-lg border border-outline-soft bg-white px-3 py-2.5 text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-100" [attr.aria-invalid]="form.controls.endereco.controls.cidade.touched && form.controls.endereco.controls.cidade.invalid" />
+            @if (form.controls.endereco.controls.cidade.touched && form.controls.endereco.controls.cidade.invalid) {
+              <span class="mt-1 block text-[0.8125rem] font-medium text-danger-500">Informe a cidade.</span>
+            }
+          </label>
+          <label class="block sm:col-span-1">
+            <span class="mb-1.5 block text-sm font-semibold text-ink">UF</span>
+            <input type="text" formControlName="uf" maxlength="2" class="w-full rounded-lg border border-outline-soft bg-white px-3 py-2.5 text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-100 uppercase" [attr.aria-invalid]="form.controls.endereco.controls.uf.touched && form.controls.endereco.controls.uf.invalid" />
+            @if (form.controls.endereco.controls.uf.touched && form.controls.endereco.controls.uf.invalid) {
+              <span class="mt-1 block text-[0.8125rem] font-medium text-danger-500">Duas letras (ex.: DF).</span>
+            }
+          </label>
+          <label class="block sm:col-span-2">
+            <span class="mb-1.5 block text-sm font-semibold text-ink">CEP</span>
+            <input type="text" formControlName="cep" class="w-full rounded-lg border border-outline-soft bg-white px-3 py-2.5 text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-100" />
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset formGroupName="contato" class="rounded-xl border border-outline-soft/50 bg-surface-card p-6 shadow-sm">
+        <legend class="px-1 text-sm font-bold text-ink">Contato</legend>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <label class="block">
+            <span class="mb-1.5 block text-sm font-semibold text-ink">Telefone</span>
+            <input type="tel" formControlName="telefone" class="w-full rounded-lg border border-outline-soft bg-white px-3 py-2.5 text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-100" [attr.aria-invalid]="form.controls.contato.controls.telefone.touched && form.controls.contato.controls.telefone.invalid" />
+            @if (form.controls.contato.controls.telefone.touched && form.controls.contato.controls.telefone.invalid) {
+              <span class="mt-1 block text-[0.8125rem] font-medium text-danger-500">Até 20 caracteres.</span>
+            }
+          </label>
+          <label class="block">
+            <span class="mb-1.5 block text-sm font-semibold text-ink">E-mail</span>
+            <input type="email" formControlName="email" class="w-full rounded-lg border border-outline-soft bg-white px-3 py-2.5 text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-100" [attr.aria-invalid]="form.controls.contato.controls.email.touched && form.controls.contato.controls.email.invalid" />
+            @if (form.controls.contato.controls.email.touched && form.controls.contato.controls.email.invalid) {
+              <span class="mt-1 block text-[0.8125rem] font-medium text-danger-500">Informe um e-mail válido.</span>
+            }
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="rounded-xl border border-outline-soft/50 bg-surface-card p-6 shadow-sm">
+        <legend class="px-1 text-sm font-bold text-ink">Área de detecção (geofence)</legend>
+        @if (centro()) {
+          <label class="block max-w-xs">
+            <span class="mb-1.5 block text-sm font-semibold text-ink">Raio (metros)</span>
+            <input type="number" formControlName="raioMetros" step="1" class="w-full rounded-lg border border-outline-soft bg-white px-3 py-2.5 text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-100" [attr.aria-invalid]="(form.controls.raioMetros.touched || form.controls.raioMetros.dirty) && form.controls.raioMetros.invalid" />
+            @if ((form.controls.raioMetros.touched || form.controls.raioMetros.dirty) && form.controls.raioMetros.invalid) {
+              <span class="mt-1 block text-[0.8125rem] font-medium text-danger-500">Entre {{ raioMinimo }} e {{ raioMaximo }} m.</span>
+            }
+          </label>
+          <p class="mt-2 text-sm text-ink-soft" data-testid="aviso-geofence">
+            @if (raioAlterado()) {
+              O contorno atual será substituído por um círculo de {{ form.controls.raioMetros.value }} m em volta do mesmo centro.
+            } @else if (form.controls.raioMetros.invalid) {
+              Enquanto o raio não for válido, a prévia mostra o contorno atual.
+            } @else if (raioSegueCategoria()) {
+              Este contorno é o círculo padrão gerado pelo sistema: com a nova categoria, o raio dele passa a
+              seguir o padrão da categoria na próxima reinicialização do servidor. Para fixar outro raio, altere-o acima.
+            } @else {
+              Sem mudar o raio, o contorno atual é mantido como está.
+            }
+          </p>
+          <div #mapaEl class="mt-4 h-64 w-full overflow-hidden rounded-lg border border-outline-soft/50" aria-label="Prévia da área de detecção"></div>
+        } @else {
+          <p class="text-sm text-danger-700" role="alert">
+            Este hospital não tem geofence cadastrado, então não pode ser salvo por esta tela.
+          </p>
+        }
+      </fieldset>
+
+      @if (erroEnvio(); as mensagem) {
+        <div class="rounded-lg border border-danger-100 bg-danger-100/40 px-3 py-2.5 text-sm font-medium text-danger-700" role="alert">
+          {{ mensagem }}
+          @if (detalhesErro().length) {
+            <ul class="mt-1 list-disc pl-5 font-normal">
+              @for (d of detalhesErro(); track $index) {
+                <li>{{ d }}</li>
+              }
+            </ul>
+          }
+        </div>
+      }
+
+      <div class="flex justify-end gap-3">
+        <a [routerLink]="['/hospitais', h.id]" class="rounded-lg border border-outline-soft px-4 py-2.5 text-sm font-semibold text-ink hover:bg-surface-muted">Cancelar</a>
+        <button
+          type="submit"
+          [disabled]="salvando() || !centro()"
+          class="rounded-lg bg-gradient-to-r from-brand-500 to-brand-400 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {{ salvando() ? 'Salvando…' : 'Salvar alterações' }}
+        </button>
+      </div>
+    </form>
+  }
+</div>

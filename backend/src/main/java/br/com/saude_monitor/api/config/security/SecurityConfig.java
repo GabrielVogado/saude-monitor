@@ -11,10 +11,13 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.HstsHeaderWriter;
+import org.springframework.security.web.util.matcher.AnyRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Configuration
 @EnableWebSecurity
@@ -25,17 +28,41 @@ public class SecurityConfig {
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
     private final RateLimitFilter rateLimitFilter;
+    private final CorsProperties corsProperties;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /** Um ano, mesmo teto usado pelo HSTS preload list do Chrome/Firefox. */
+    private static final long HSTS_MAX_AGE_SEGUNDOS = TimeUnit.DAYS.toSeconds(365);
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                // CSRF desligado de propósito (Sonar java:S4502 revisado como "Safe"): nenhuma
+                // credencial vai sozinha do navegador. A autenticação é só o Bearer no cabeçalho
+                // Authorization (JwtAuthenticationFilter) — o app guarda o token no SecureStore e
+                // o Painel Admin no sessionStorage, anexado pelo interceptor; o refresh vai no
+                // corpo JSON. Sessão STATELESS (sem JSESSIONID), sem formLogin/httpBasic/cookie e
+                // CORS sem credenciais. Um site terceiro não consegue pôr o cabeçalho num POST de
+                // formulário, logo não há o que forjar. Se o ADR-013 (refresh em cookie HttpOnly)
+                // for implementado, as rotas que lerem o cookie passam a exigir defesa CSRF.
+                // Guarda: SecurityConfigCsrfTest.
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                // HSTS (achado F-03 do pentest de 23/09/2026): o writer padrão do Spring
+                // Security só emite o cabeçalho quando `request.isSecure()` é verdadeiro, e no
+                // Cloud Run o TLS termina no front-end do Google — a aplicação recebe a
+                // conexão como HTTP simples, então `isSecure()` é sempre falso e o cabeçalho
+                // nunca saía. `AnyRequestMatcher` emite sempre, sem depender do esquema visto
+                // pelo contêiner. Não usar `server.forward-headers-strategy=framework` para
+                // isso: o `ForwardedHeaderFilter` do Spring confiaria cegamente no primeiro
+                // endereço de `X-Forwarded-For`, reabrindo o contorno de rate limit do M-018
+                // por um caminho diferente do `RateLimitFilter`.
+                .headers(headers -> headers.addHeaderWriter(
+                        new HstsHeaderWriter(AnyRequestMatcher.INSTANCE, HSTS_MAX_AGE_SEGUNDOS, true)))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(eh -> eh
                         .authenticationEntryPoint(authenticationEntryPoint)
@@ -54,9 +81,20 @@ public class SecurityConfig {
                         // Feedback pós-saída (Épico 03 / F-05): criação é pública (anônimo, RN-20).
                         // GET/PUT exigem autenticação do dono (🔒) — cobertos por anyRequest().
                         .requestMatchers(HttpMethod.POST, "/api/v1/feedbacks").permitAll()
+                        // E7-08: edição de feedback é só do papel USER. O dono já é exigido no
+                        // serviço (RN-09), mas uma conta ADMIN pode ter visita e feedback próprios;
+                        // sem esta linha o papel ADMIN ainda alcançaria uma escrita de feedback.
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/feedbacks/**").hasRole("USER")
                         // Moderação de sugestões (E1-06): endpoints admin específicos.
                         .requestMatchers(HttpMethod.GET, "/api/v1/hospitais/sugestoes", "/api/v1/hospitais/sugestoes/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/hospitais/sugestoes/**").hasRole("ADMIN")
+                        // Listagem administrativa (E7-02/E7-07): namespace dedicado /api/v1/admin/**,
+                        // fora do contrato público /api/v1/hospitais (só-ativos). Único caminho que
+                        // pode devolver hospitais inativos — restrito a ADMIN. Precede a regra genérica
+                        // GET permitAll abaixo por clareza (paths distintos não se sobrepõem, mas o
+                        // grupo admin fica junto). Sem esta linha, cairia em anyRequest().authenticated()
+                        // e qualquer USER autenticado enxergaria os inativos.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/hospitais").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/hospitais/**").permitAll()
                         // Camadas geográficas (F-11, §5): divisão administrativa/de saúde é
                         // dado público — mesmo regime dos GET de hospitais.
@@ -82,13 +120,18 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "http://localhost:8081",
-                "http://localhost:3000",
-                "http://localhost:19006"
-        ));
+        // Origens configuráveis por ambiente (CORS-01, Épico 7): dev cobre localhost
+        // (inclui o Painel Admin em :4200); produção sobrescreve por APP_CORS_ALLOWED_ORIGINS.
+        // Origens exatas, nunca "*": credenciais à parte, um curinga abriria a API a qualquer site.
+        config.setAllowedOrigins(corsProperties.allowedOrigins());
+        // PATCH permanece porque a API o expõe de fato (edição de hospital pelo ADMIN,
+        // /api/v1/hospitais/** acima); sem ele o navegador barraria essa chamada no preflight.
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
+        // Só os cabeçalhos que o navegador realmente envia: Bearer/JWT vai em Authorization e o
+        // corpo JSON em Content-Type. Sem "*" — não há cabeçalho customizado no contrato.
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        // Autenticação é por Bearer/JWT no header Authorization, não por cookie/sessão: não há
+        // credencial de navegador a compartilhar entre origens, então credenciais ficam desligadas.
         config.setAllowCredentials(false);
         config.setMaxAge(3600L);
 

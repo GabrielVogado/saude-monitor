@@ -7,6 +7,8 @@ import * as Network from "expo-network";
 import VisitaService from "../../../screens/visitas/service/VisitaService";
 import TokenStorage from "../../../services/TokenStorage";
 import LoginService from "../../../screens/auth/service/LoginService";
+// Liga o cliente HTTP ao LoginService (mockado), como o index.js faz no app.
+import "../../../core/api/sessaoApi";
 import { itensDaFila, limparFila } from "../../../config/filaOffline";
 import { ErroServidorIndisponivel } from "../../../config/http";
 
@@ -93,6 +95,14 @@ describe("VisitaService (Épico 02)", () => {
     const url = chamadas[0].url;
     expect(url).toContain("dispositivoId=");
     expect(url).toContain("anon-");
+  });
+
+  test("listarHistorico repassa o signal de cancelamento ao fetch", async () => {
+    const controle = new AbortController();
+    await VisitaService.listarHistorico({ signal: controle.signal });
+    expect(global.fetch.mock.calls[0][1].signal).toBeDefined();
+    await VisitaService.listarHistorico();
+    expect(chamadas[1].url).toContain("page=0");
   });
 
   test("listarHistorico usa /contas/visitas com paginação", async () => {

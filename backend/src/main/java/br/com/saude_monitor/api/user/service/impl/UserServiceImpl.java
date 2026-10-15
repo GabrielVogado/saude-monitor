@@ -1,6 +1,6 @@
 package br.com.saude_monitor.api.user.service.impl;
 
-import br.com.saude_monitor.api.agregado.service.AgregadoService;
+import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.auth.service.AuthService;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
@@ -45,8 +45,10 @@ import java.util.Set;
  * <p>Na exclusão de conta (F0-05), o dado pessoal identificável é removido
  * (documento de usuário — a senha vive apenas como hash nesse mesmo documento, não há
  * coleção de autenticação separada) e os dados usados nas estatísticas
- * (visitas e feedbacks) são anonimizados — {@code usuarioId} zerado — preservando os
- * agregados públicos (nota/tempo), que nunca referenciam identidade.</p>
+ * (visitas e feedbacks) são anonimizados — {@code usuarioId} zerado, e saem também o
+ * {@code dispositivoId} e os pontos de GPS das visitas e o comentário dos feedbacks —
+ * preservando os
+ * indicadores públicos (nota/tempo), que nunca referenciam identidade.</p>
  */
 @Slf4j
 @Service
@@ -58,7 +60,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final MongoTemplate mongoTemplate;
-    private final AgregadoService agregadoService;
+    private final IndicadorService indicadorService;
     private final AuthService authService;
 
     @Override
@@ -186,7 +188,7 @@ public class UserServiceImpl implements UserService {
         UserDocument user = userRepository.findById(usuarioId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado."));
 
-        // Coleta os hospitais afetados ANTES de anonimizar, para recalcular os agregados
+        // Coleta os hospitais afetados ANTES de anonimizar, para recalcular os indicadores
         // e refletir a exclusão imediatamente (os dados permanecem, então os valores não
         // mudam, mas o job de 15min não precisa esperar).
         Set<String> hospitalIds = hospitaisAfetados(usuarioId);
@@ -202,12 +204,12 @@ public class UserServiceImpl implements UserService {
         log.info("Conta do usuário {} excluída (LGPD). Dados pessoais removidos; visitas/feedbacks anonimizados.",
                 usuarioId);
 
-        // Recalcula agregados dos hospitais afetados (best-effort).
+        // Recalcula indicadores dos hospitais afetados (best-effort).
         for (String hospitalId : hospitalIds) {
             try {
-                agregadoService.recalcular(hospitalId);
+                indicadorService.recalcular(hospitalId);
             } catch (Exception ex) {
-                log.warn("Falha ao recalcular agregado do hospital {} após exclusão de conta: {}",
+                log.warn("Falha ao recalcular indicador do hospital {} após exclusão de conta: {}",
                         hospitalId, ex.getMessage());
             }
         }
@@ -225,17 +227,29 @@ public class UserServiceImpl implements UserService {
         return ids;
     }
 
-    /** Desvincula o usuário das visitas (mantém a estatística de tempo). */
+    /**
+     * Desvincula o usuário das visitas e apaga o que ainda o identificaria: o
+     * {@code dispositivoId} (o mesmo aparelho liga as visitas entre si e a uma pessoa) e os
+     * pontos de GPS da visita. Ficam hospital, entrada, saída e duração, que é o que a
+     * estatística de tempo usa.
+     */
     private void anonimizarVisitas(String usuarioId) {
         Query query = Query.query(Criteria.where("usuarioId").is(usuarioId));
-        Update update = new Update().set("usuarioId", null);
+        Update update = new Update().set("usuarioId", null)
+                .unset("dispositivoId")
+                .unset("pontosAmostrais");
         mongoTemplate.updateMulti(query, update, VisitaDocument.class);
     }
 
-    /** Desvincula o usuário dos feedbacks e marca como anonimizado (preserva a nota). */
+    /**
+     * Desvincula o usuário dos feedbacks e marca como anonimizado. O comentário é texto
+     * livre e pode trazer nome, telefone ou o caso da pessoa, então sai junto; as respostas
+     * fechadas e as notas, que entram nos indicadores, ficam.
+     */
     private void anonimizarFeedbacks(String usuarioId) {
         Query query = Query.query(Criteria.where("usuarioId").is(usuarioId));
-        Update update = new Update().set("usuarioId", null).set("anonimizado", true);
+        Update update = new Update().set("usuarioId", null).set("anonimizado", true)
+                .unset("comentario");
         mongoTemplate.updateMulti(query, update, FeedbackDocument.class);
     }
 

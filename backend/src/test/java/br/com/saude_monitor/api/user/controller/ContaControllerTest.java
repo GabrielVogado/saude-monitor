@@ -2,6 +2,7 @@ package br.com.saude_monitor.api.user.controller;
 
 import br.com.saude_monitor.api.config.exception.GlobalExceptionHandler;
 import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
+import br.com.saude_monitor.api.feedback.dto.FeedbackPendenteResponse;
 import br.com.saude_monitor.api.feedback.dto.FeedbackResponse;
 import br.com.saude_monitor.api.feedback.service.FeedbackService;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
@@ -92,6 +93,10 @@ class ContaControllerTest {
         FeedbackService feedbackService = mock(FeedbackService.class);
         when(feedbackService.historico("u1", 0, 20))
                 .thenReturn(PageResponse.of(List.<FeedbackResponse>of(), 0, 20, 0));
+        when(feedbackService.pendentes("u1")).thenReturn(List.of(new FeedbackPendenteResponse(
+                "v1", "h1", "HRAN",
+                java.time.Instant.parse("2026-10-04T10:00:00Z"),
+                java.time.Instant.parse("2026-10-05T10:00:00Z"))));
 
         // O conteúdo do documento é coberto em ExportacaoPdfServiceImplTest;
         // aqui interessa apenas o contrato HTTP do endpoint.
@@ -131,6 +136,15 @@ class ContaControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.content").isArray());
+    }
+
+    @Test
+    void deveListarFeedbacksPendentesDoUsuario() throws Exception {
+        mockMvc.perform(get("/api/v1/contas/feedbacks/pendentes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].visitaId").value("v1"))
+                .andExpect(jsonPath("$[0].hospitalNome").value("HRAN"))
+                .andExpect(jsonPath("$[0].prazo").exists());
     }
 
     @Test

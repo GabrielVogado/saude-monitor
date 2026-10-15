@@ -20,7 +20,7 @@ jest.mock("@rnmapbox/maps", () => {
   const stub = (props) => <View {...props} />;
   return {
     __esModule: true,
-    default: { setAccessToken: jest.fn(), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
+    default: { setAccessToken: jest.fn(() => Promise.resolve(null)), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
     StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
     MapView: stub,
     Camera: stub,
@@ -180,8 +180,7 @@ describe("App — abrir formulário a partir da notificação de feedback (RN-09
   }
 
   test("pendência dentro da janela de 24h abre o formulário de feedback", async () => {
-    jest.spyOn(FeedbackNotificationService, "feedbackAvaliavel").mockResolvedValue(true);
-    jest.spyOn(FeedbackNotificationService, "pendenciaAtual").mockResolvedValue({
+    jest.spyOn(FeedbackNotificationService, "pendenciaDaVisita").mockResolvedValue({
       visitaId: "v1",
       hospitalNome: "Hospital Central",
     });
@@ -201,11 +200,8 @@ describe("App — abrir formulário a partir da notificação de feedback (RN-09
     // Achado da auditoria de código morto (08/09/2026): a notificação pode ficar
     // parada na bandeja além da janela de 24h; antes desta correção, tocá-la ainda
     // abria o formulário, que só falhava ao enviar (backend responde 404).
-    jest.spyOn(FeedbackNotificationService, "pendenciaAtual").mockResolvedValue({
-      visitaId: "v1",
-      hospitalNome: "Hospital Central",
-    });
-    jest.spyOn(FeedbackNotificationService, "feedbackAvaliavel").mockResolvedValue(false);
+    // pendenciaDaVisita devolve null para a pendência vencida (ou já respondida).
+    jest.spyOn(FeedbackNotificationService, "pendenciaDaVisita").mockResolvedValue(null);
     const agendarLembreteSpy = jest.spyOn(FeedbackNotificationService, "agendarLembrete");
 
     render(<App />);
@@ -220,20 +216,14 @@ describe("App — abrir formulário a partir da notificação de feedback (RN-09
     expect(agendarLembreteSpy).not.toHaveBeenCalled();
   });
 
-  test("notificação de uma visita já substituída por outra não abre o formulário", async () => {
-    // Achado do code-review (08/09/2026): só existe uma pendência guardada por vez
-    // (concluirFeedback). Se o usuário visitar outro hospital antes de responder,
-    // a notificação antiga (visitaId diferente) ainda pode estar na bandeja.
-    // feedbackAvaliavel() sozinho checaria a validade da pendência ATUAL (da visita
-    // nova, ainda dentro da janela) e abriria o formulário com o hospital errado.
-    jest.spyOn(FeedbackNotificationService, "pendenciaAtual").mockResolvedValue({
-      visitaId: "v2-mais-recente",
-      hospitalNome: "Hospital Novo",
-    });
-    const feedbackAvaliavelSpy = jest
-      .spyOn(FeedbackNotificationService, "feedbackAvaliavel")
-      .mockResolvedValue(true);
-    const agendarLembreteSpy = jest.spyOn(FeedbackNotificationService, "agendarLembrete");
+  test("a notificação tocada consulta a pendência da PRÓPRIA visita", async () => {
+    // Achado do code-review (08/09/2026): com uma pendência só, uma notificação antiga
+    // abria o formulário com o hospital da visita mais recente. Agora cada visita tem a
+    // sua pendência e a busca é pelo visitaId da notificação.
+    const pendenciaDaVisitaSpy = jest
+      .spyOn(FeedbackNotificationService, "pendenciaDaVisita")
+      .mockResolvedValue({ visitaId: "v1-antiga", hospitalNome: "Hospital Antigo" });
+    jest.spyOn(FeedbackNotificationService, "agendarLembrete").mockResolvedValue(undefined);
 
     render(<App />);
     const tratarResposta = callbackDeResposta();
@@ -244,10 +234,50 @@ describe("App — abrir formulário a partir da notificação de feedback (RN-09
       );
     });
 
-    expect(screen.queryByText("Você passou pela triagem?")).toBeNull();
-    expect(screen.getByText("Início")).toBeOnTheScreen();
-    expect(agendarLembreteSpy).not.toHaveBeenCalled();
-    // curto-circuito: nem chega a checar a janela de 24h da pendência errada
-    expect(feedbackAvaliavelSpy).not.toHaveBeenCalled();
+    expect(pendenciaDaVisitaSpy).toHaveBeenCalledWith("v1-antiga");
+    expect(await screen.findByText("Hospital Antigo")).toBeOnTheScreen();
+  });
+
+  test("abre o formulário mesmo se o agendamento do lembrete falhar (bug de foreground)", async () => {
+    // Bug relatado: com o app aberto numa tela qualquer, tocar a notificação não
+    // redirecionava. A causa era `await agendarLembrete(...)` ANTES do navigate — se o
+    // agendamento falhasse, o navigate nunca rodava. Agora a navegação vem primeiro e o
+    // lembrete é efeito colateral tolerante a falha.
+    jest.spyOn(FeedbackNotificationService, "pendenciaDaVisita").mockResolvedValue({
+      visitaId: "v1",
+      hospitalNome: "Hospital Central",
+    });
+    jest
+      .spyOn(FeedbackNotificationService, "agendarLembrete")
+      .mockRejectedValue(new Error("falha ao agendar lembrete"));
+
+    render(<App />);
+    const tratarResposta = callbackDeResposta();
+
+    await act(async () => {
+      await tratarResposta(respostaDeNotificacao({ abrirFeedback: true, visitaId: "v1" }));
+    });
+
+    expect(await screen.findByText("Você passou pela triagem?")).toBeOnTheScreen();
+  });
+
+  test("cold start: a notificação que abriu o app do zero leva ao feedback (bug 'Fechar tudo')", async () => {
+    // Bug relatado: após "Fechar tudo", tocar a notificação abria a tela inicial. O
+    // listener ao vivo não recebe a resposta que INICIA o app — ela vem por
+    // getLastNotificationResponseAsync, tratada no mount.
+    jest.spyOn(FeedbackNotificationService, "pendenciaDaVisita").mockResolvedValue({
+      visitaId: "v1",
+      hospitalNome: "Hospital Central",
+    });
+    jest.spyOn(FeedbackNotificationService, "agendarLembrete").mockResolvedValue(undefined);
+    Notifications.getLastNotificationResponseAsync.mockResolvedValueOnce(
+      respostaDeNotificacao({ abrirFeedback: true, visitaId: "v1" })
+    );
+
+    render(<App />);
+
+    // O caminho de cold start é assíncrono (getLastNotificationResponseAsync no mount);
+    // findByText aguarda a navegação despachar o formulário.
+    expect(await screen.findByText("Você passou pela triagem?")).toBeOnTheScreen();
   });
 });

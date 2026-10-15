@@ -6,7 +6,7 @@ package br.com.saude_monitor.api.visita.document;
  * <p>Transições: {@code EM_ATENDIMENTO} → {@code SUSPEITA} (2h sem heartbeat, RN-23) →
  * volta a {@code EM_ATENDIMENTO} (heartbeat) ou {@code EXPIRADA} (24h sem heartbeat, RN-04).
  * {@code EM_ATENDIMENTO}/{@code SUSPEITA} → {@code FINALIZADA} (checkout normal, RN-03) ou
- * {@code GPS_INTERROMPIDO} (checkout sem sinal de GPS por 10min, RN-06/E2-05).</p>
+ * {@code GPS_INTERROMPIDO} (visita sem sinal de GPS por 45min, RN-06/E2-05).</p>
  */
 public enum StatusVisita {
     EM_ATENDIMENTO,

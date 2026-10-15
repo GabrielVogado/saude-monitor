@@ -1353,6 +1353,1236 @@ dimensionada em ~50 op/s de pico, com início espalhado em 120 s.
 
 ---
 
+## M-020 — `raioKm` negativo derrubava a listagem com HTTP 500 (achado do pentest)
+
+**Data:** 23/09/2026 · **PR:** #136
+
+### Como apareceu
+
+Pentest autorizado da homologação (F-01, `Documentos/12-seguranca/Pentest-HML-2026-09-23.md`):
+`GET /api/v1/hospitais?latitude=-15.8&longitude=-47.9&raioKm=-5` respondia **HTTP 500**.
+
+### Causa
+
+`HospitalServiceImpl.buscarProximos` passava o parâmetro direto para
+`maxDistance(raioKm * METROS_POR_KM)`. Com `raioKm` negativo, o MongoDB recusa a
+`maxDistance` negativa e a exceção não tratada virava 500 (erro genérico), em vez de um
+400 de validação. `latitude`/`longitude` fora de faixa iam pelo mesmo caminho.
+
+### O que mudou
+
+- `HospitalController.listar`: `@DecimalMin(value="0", inclusive=false)` + `@DecimalMax("1000")`
+  em `raioKm`; `@DecimalMin/@DecimalMax` de faixa em `latitude` (-90..90) e `longitude`
+  (-180..180). Bean Validation ignora `null`, então o filtro por raio segue opcional.
+- Teste em `HospitalListagemValidacaoIntegracaoTest` (contexto completo — o MockMvc
+  standalone não instala o `MethodValidationPostProcessor`, então validaria com o bug
+  presente). 6 casos; mutação confirmada (sem a constraint, 3 caem com 500/200).
+
+### Verificação
+
+- `raioKm=-5|0|5000` e `latitude=120` → 400 `CAMPOS_INVALIDOS`; `raioKm=5` e sem filtro → 200.
+- Suíte do backend: 278 testes, 0 falhas.
+
+---
+
+## M-021 — F-02/F-03 do pentest: 401 vs 403 e HSTS ausente
+
+**Data:** 23/09/2026 · **PR:** #138
+
+### Como apareceu
+
+Achados F-02 e F-03 do pentest de 23/09/2026
+(`Documentos/12-seguranca/Pentest-HML-2026-09-23.md`), ambos informativos — o F-01
+(`raioKm`, mesma sessão) já tinha sido corrigido no M-020.
+
+### F-02 — 401 em vez de 403 para dono divergente
+
+`NaoAutorizadoException` (401) era usada tanto para "não autenticado" quanto para "está
+autenticado, mas o recurso é de outro usuário" (BOLA em visita e feedback) — os dois
+casos misturados na mesma classe, apesar de terem semântica HTTP diferente: 401 significa
+"sem credencial"; aqui a credencial existe e é válida.
+
+### O que mudou (F-02)
+
+- Nova `AcessoNegadoException` (403, código `ACESSO_NEGADO`) — o mesmo código que
+  `RestAccessDeniedHandler` já usa para BFLA (papel insuficiente via Spring Security);
+  agora BOLA (dono divergente, decidido em serviço) usa o mesmo código.
+- `VisitaServiceImpl.obterAtivaOu409` e `FeedbackServiceImpl.exigirDono` passam a lançar
+  `AcessoNegadoException` em vez de `NaoAutorizadoException`. Os demais usos de
+  `NaoAutorizadoException` (login, refresh, "usuário não autenticado") ficaram como
+  estavam — são 401 de verdade.
+- Frontend conferido: o interceptor de refresh de token só age em `status === 401`; o
+  tratamento de fila offline trata 400–499 igual. A troca não quebra nenhum fluxo do app.
+
+### F-03 — sem HSTS
+
+Sem `Strict-Transport-Security` nas respostas. Causa: o writer padrão do Spring Security
+só emite o cabeçalho quando `request.isSecure()` é verdadeiro — e no Cloud Run o TLS
+termina no front-end do Google, a aplicação recebe a conexão como HTTP simples, então
+`isSecure()` é sempre falso.
+
+### O que mudou (F-03)
+
+- `SecurityConfig` registra um `HstsHeaderWriter` com `AnyRequestMatcher.INSTANCE`, que
+  emite o cabeçalho sempre, sem depender do esquema visto pelo contêiner.
+- **Decisão que ficou registrada:** não usar `server.forward-headers-strategy=framework`
+  para isso (resolveria o `isSecure()` de forma mais "correta", mas o
+  `ForwardedHeaderFilter` do Spring confia cegamente no primeiro endereço de
+  `X-Forwarded-For` — reabriria por outro caminho o contorno de rate limit que o M-018
+  fechou no `RateLimitFilter`).
+
+### Verificação
+
+- Testes novos: `VisitaServiceImplTest` e `FeedbackServiceImplTest` (dono divergente →
+  403), `HospitalListagemValidacaoIntegracaoTest` (cabeçalho HSTS presente numa conexão
+  não seguera simulada pelo MockMvc — o mesmo cenário do Cloud Run real).
+- 3 mutações, 3 mortas (voltar cada troca ao estado anterior derruba o teste
+  correspondente).
+- Suíte do backend: 281 testes, 0 falhas. `code-review`: sem achados.
+
+---
+
+## M-022 — Re-medição do Épico 8 (E8-01, E8-02, E8-08): documento alinhado ao número real
+
+**Data:** 24/09/2026 · **PR:** #141
+
+### Como apareceu
+
+Pedido do PO para confirmar o estado real de itens do Épico 8 em vez de repetir o
+`De-Para-Backlog-Features.md`, cuja última verificação era de **02/09/2026** — antes da
+migração para o Cloud Run e das ondas de teste. Régua da casa: **proibido afirmar um
+estado sem medi-lo**. Nada abaixo veio do documento; cada número saiu de uma execução de
+24/09/2026.
+
+### E8-01 — cold start: continua **não resolvido** (confirmado pela via autoritativa)
+
+- `gcloud run services describe saude-monitor-backend-hom --region=southamerica-east1`:
+  annotation `autoscaling.knative.dev/minScale` **ausente** (⇒ `--min-instances=0`, default
+  do Cloud Run) e `maxScale='1'`. O piso que eliminaria o cold start nunca foi aplicado.
+- A primeira requisição da sessão veio 200 em 0,23 s — **medida de instância quente**, por
+  tráfego recente dentro da janela de ociosidade, **não** por instância mínima; não avalia
+  esta estória, exatamente como o próprio E8-01 já registrava.
+- Achado lateral: `maxScale=1` é um teto de **uma** instância — irrelevante para o cold
+  start, registrado no E8-01 por ser um limite de escala real.
+- **Tentativa de reproduzir o cold start:** após **16 min sem tráfego** (da minha parte), a
+  primeira requisição voltou 200 em **0,656 s** (a segunda, 0,188 s) — **sem 503 e sem os
+  ~14 s do JVM**. A instância ainda estava viva: a janela até escalar a zero é maior que 16
+  min, ou tráfego real da homologação resetou o relógio. Resultado empírico **inconclusivo**.
+- **Logs do Cloud Run (48 h), fonte autoritativa:** 503 reais em `/actuator/health` existem
+  (23/09 12:32, 06:22, 02:43 UTC), mas os do período **coincidem com `DEPLOYMENT_ROLLOUT`**
+  nos mesmos instantes — arranque por deploy, não por ociosidade; latência baixa
+  (0,007–0,587 s), o 503 falha rápido por falta de capacidade. **Nenhum 503 em 24/09.** O
+  cold start segue possível (`min=0`), mas o exemplar limpo por ociosidade continua sendo o
+  de 05/09 (14,778 s) — não reproduzido hoje.
+
+### E8-02 — latência quente: os GET **cumprem** o orçamento; o **login não**
+
+12 amostras por endpoint, ponta-a-ponta da máquina local até o Cloud Run (São Paulo),
+serviço quente (meta RNF-02: p95 ≤ 300 ms):
+
+| Endpoint | p50 | p95 | max |
+|---|---|---|---|
+| `GET /actuator/health` | 182 ms | 209 ms | 209 ms |
+| `GET /api/v1/hospitais?page=0&size=1` (find) | 226 ms | 242 ms | 263 ms |
+| `GET /api/v1/hospitais?...&raioKm=5` (geo, F-07) | 175 ms | **196 ms** | 210 ms |
+| `POST /api/v1/auth/login` (conta ADMIN de carga) | 318 ms | **1074 ms** | 4263 ms |
+
+Os GET batem com o k6 do `perf/` (p95 157 ms com 100 usuários, M-019). Os "1,9–4,9 s" do
+De-Para eram estado frio/Render antigo, nunca re-medido sobre o Cloud Run quente. **O
+login estoura o orçamento** (p50 já em 318 ms, p95 1074 ms), pior que os 310 ms do k6: é o
+caminho do **BCrypt**, CPU-bound por desenho, e o `maxScale=1` (uma vCPU) explica a cauda
+longa (max 4263 ms). Os usuários de carga `perf-N` foram limpos (login 401); usei a conta
+ADMIN coletora, que passa pelo mesmo caminho de autenticação. **Ressalvas:** (a) fechar o
+E8-02 exige trazer o login ao orçamento **ou** aceitá-lo como exceção justificada do
+BCrypt; (b) 12 amostras de um cliente **não** são teste de carga; (c) o `maxScale=1` limita
+sob concorrência acima de uma instância; (d) o cold start (E8-01) segue como o pior caso.
+
+### E8-08 — cobertura: subiu nas duas pontas; frontend ainda **abaixo** dos 90% do PO
+
+Suítes completas rodadas em 24/09/2026, 0 falhas.
+
+- **Frontend** (`jest --coverage`, 411 testes / 42 suítes), lido do `text-summary` da run
+  (o `coverage-summary.json` do repositório estava desatualizado, de uma run anterior):
+  **84,32%** statements · **73,49%** branches · **80,14%** functions · **85,29%** lines.
+  Régua do PO é 90% nas quatro — **nenhuma atinge**; *branches* é a mais distante (−16,5pp).
+  Ainda assim, subiu em tudo sobre o último snapshot do De-Para (79,71/67,72/77,67/80,22).
+- **Backend** (`gradlew test jacocoTestReport`), lido do `jacocoTestReport.xml`:
+  **80,15%** instruções · **65,92%** branches · **79,24%** linhas (piso próprio 65%/50%,
+  cumprido). Muito acima do documento (67,49% / 51,78%).
+
+### Decisão do PO (24/09/2026)
+
+Diante dos números acima, o PO decidiu:
+
+- **E8-02 — fechar com exceção documentada.** Os caminhos **GET** cumprem o orçamento do
+  RNF-02 sob carga (k6 M-019: 100 usuários, p95 157 ms) e no spot check quente de hoje. O
+  **login** é aceito como **exceção justificada**: o BCrypt é lento por segurança, por
+  desenho, e trazê-lo abaixo de 300 ms significaria enfraquecer o custo do hash. Estória
+  marcada ✅ **com exceção**; placar do Épico 8 vai a 8/15. Se a exceção precisar ser revista,
+  o ponto de ataque é o `maxScale=1` (cauda sob concorrência), não o BCrypt em si.
+- **E8-01 — só medir, não decidir agora.** A troca para `--min-instances=1` (que eliminaria
+  o cold start ao custo de uma instância ociosa cobrada 24/7) **não** foi feita nesta sessão;
+  fica para decisão do time. Os números e a config ficam registrados. Estória segue 🟡.
+
+### O que mudou
+
+- `De-Para-Backlog-Features.md`: nota de verificação do cabeçalho, correção do parêntese
+  "1–5 s por requisição com o serviço quente" no aviso do Placar (contradito pela medição),
+  e apêndice de 24/09/2026 nas linhas **E8-01** (config + sonda de ociosidade + logs),
+  **E8-02** (🔴 → ✅ com exceção, GET + login) e **E8-08**. **Placar do Épico 8: 7 → 8 de 15
+  (47% → 53%)**, pela decisão do PO abaixo.
+- **Armadilha de medição corrigida (PR #142, `fix(testes)`):** o `jest.config.js` ganhou o
+  reporter `json-summary`, para o `coverage-summary.json` regenerar a cada run e não mais
+  enganar como enganou aqui (mostrava a "Onda 1" sobre uma run de 411 testes). Verificado:
+  mtime regenerado e `total` idêntico ao `text-summary`.
+- Fora essa correção de test-infra, nenhuma mudança de código: esta entrada é medição e
+  alinhamento documental.
+
+### Verificação
+
+- Reprodutível: `gcloud run services describe`, `gcloud logging read` (503/`Starting new
+  instance`), `curl -w "%{time_total}"` em laço (GET e `POST /auth/login`), sonda de cold
+  start com 16 min de ociosidade, `jest --coverage`, `gradlew jacocoTestReport`. Números
+  acima são a saída dessas execuções.
+
+---
+
+## M-023 — Painel Administrativo Web (F-11/Épico 7) retomado: fundação + primeiras estórias
+
+**Data:** 24–25/09/2026 · **PRs:** #143, #144, #145, #147, #148, #150, #151 · **ADRs:** ADR-012, ADR-013
+
+> Registro consolidado da frente do painel (backfill de conformidade — o `CLAUDE.md`
+> pede registrar melhorias reais no Historico, e esta frente vinha só em ADRs + De-Para).
+
+### O que apareceu
+
+O Épico 7 (Painel Admin Web), adiado desde 02/09 (D-01), foi **retomado por decisão do PO
+em 24/09/2026**. O fluxo de moderação (E1-06) e a gestão de hospitais dependem dele.
+
+### O que mudou
+
+- **Stack e fundação (ADR-012, #143):** SPA **Angular 21** em `admin/` (Node 20.19 não roda
+  o v22), autocontida para o split futuro em repos (`radar-saude-mobile`/`painel-admin-frontend`/
+  `radar-saude-backend`).
+- **CORS (#144):** o backend não liberava a origem do painel (browser); `SecurityConfig` +
+  `CorsProperties` passaram a permitir as origens do painel por ambiente. Sem isso, nenhuma
+  chamada do painel funcionava (achado na verificação E2E do login).
+- **Layout da marca (#145):** Tailwind v4 com tokens da paleta "Clinical Sanctuary" em
+  `@theme`, logo do sistema, fontes Manrope/Inter; login e shell interativos.
+- **E7-01 login (#145):** enforce **ADMIN-only** (o painel só aceita `papel === ADMIN`,
+  inverso do app), guard de rota, interceptor JWT, `TokenStorage`. Verificado E2E pelo PO.
+- **E7-09 (parcial) shell (#147):** topbar + navegação lateral com rotas filhas sob o guard.
+- **E7-02 listar (#147 + #150 + #151):** página com tabela, busca, paginação; passou a
+  consumir o endpoint admin `GET /api/v1/admin/hospitais` (namespace ADMIN, #150) que lista
+  inativos. Verificado E2E (TODOS 340 · INATIVOS 0 · sem token 401).
+- **E7-03 (parcial) filtros (#148 + #151):** nome, tipo e status; falta região.
+
+### Segurança de sessão (ADR-013)
+
+O PO levantou (25/09) a visibilidade de senha/token no DevTools. Registrado que **não é
+vazamento** (DevTools da própria máquina; TLS+HSTS na rede; nada logado — verificado), e
+decidida a direção de endurecimento: **refresh token em cookie HttpOnly** + access token só
+em memória, sequenciada e a detalhar deploy (mesmo domínio ou BFF/proxy).
+
+### Verificação
+
+- Frontend: **23 testes (Vitest) verdes**, `ng build` limpo, telas conferidas no preview.
+- Backend (outras sessões): CORS e listagem admin cobertos por testes MockMvc/integração.
+- Revisão do diff antes do merge, com os achados baixos tratados.
+
+---
+
+## M-024 — Feedback pós-saída: piso de 2 min, pedido em 1 min e deep-link da notificação
+
+**Data:** 28/09/2026 · **PR:** #163
+
+### Como apareceu
+
+Relato do PO com quatro comportamentos do fluxo de feedback após check-in/checkout
+(manual e por geolocalização, em estados anônimo e logado):
+
+1. A pesquisa era enviada mesmo para quem ficou **menos de 2 min** na unidade.
+2. A notificação demorava **~5 min** (percebido como 5–10 min), não os 1–5 previstos.
+3. Após "Fechar tudo", tocar a notificação abria a **tela inicial** em vez do feedback.
+4. Com o app aberto numa tela qualquer, tocar a notificação **não redirecionava**.
+
+### Causa
+
+1. `agendarFeedback` não olhava a duração da visita — RN-01/RN-07 (visita < 2 min não
+   convida, mesmo corte da agregação do backend) não era aplicado no cliente.
+2. O atraso usava `visitaId.length % 5`; como o ObjectId do Mongo tem sempre 24
+   caracteres, `24 % 5` dava 4 para toda visita e travava o atraso no teto de 5 min.
+3. `addNotificationResponseReceivedListener` não recebe a resposta que **inicia** o app
+   do zero — ela chega por `getLastNotificationResponseAsync`, que não era lido.
+4. O handler fazia `await agendarLembrete(...)` **antes** do `navigate`: uma falha no
+   agendamento impedia a navegação.
+
+### O que mudou
+
+- **Piso de 2 min:** `agendarFeedback` recebe a duração e não agenda abaixo do piso;
+  online vem da resposta do checkout (`duracaoMinutos`), offline é calculada da entrada
+  (util `duracaoMinutosDesde`, arredondado para casar com o inteiro do backend). Vale
+  para `HospitalDetalheScreen` (manual) e `GeofencingTaskService` (geofence).
+- **Pedido em 1 min:** por decisão do PO (28/09/2026), o convite passou de 1–5 min para
+  **1 min fixo** após a saída; o espalhamento por id foi removido (sem propósito com valor
+  fixo, e a idempotência do reagendamento se mantém).
+- **Cold start:** `App.js` trata `getLastNotificationResponseAsync` no mount e despacha a
+  navegação no `onReady` do `NavigationContainer`.
+- **Foreground:** a navegação passa a vir **antes** do lembrete, que vira efeito colateral
+  tolerante a falha.
+- Reidratação: `HomeScreen` passa a `entrada` ao `sincronizarVisitaAtiva`, para o checkout
+  offline por geofence ter a duração após reinício do app.
+
+### Verificação
+
+- **420 testes (Jest) verdes**, com casos novos para cada correção; lint no teto (16
+  warnings pré-existentes, 0 erros).
+- Revisão do diff antes do PR, com os achados tratados (util compartilhado, wire da
+  entrada, arredondamento) ou justificados.
+- Ressalva: a confirmação do fix 4 em aparelho físico (toque com o app aberto) depende de
+  dispositivo/emulador; os demais são cobertos por teste.
+
+---
+
+## M-025 — Edição de geofence no painel (E7-06) e o reconciliador que a desfaria
+
+**Data:** 28/09/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Ao desenhar a edição do raio do geofence na E7-06, a primeira ideia foi gerar o círculo
+novo exatamente como o backend gera (32 lados). Lendo o `ReconciliacaoRaioGeofenceRunner`
+(BUG-08), ficou claro que isso não sobreviveria: ele roda **a cada startup**
+(`app.geofence.reconciliacao.enabled=true` em todos os ambientes) e regrava todo círculo
+regular de 32 lados cujo raio difere do raio da categoria. No Cloud Run, startup = cold
+start, então o raio escolhido pelo administrador voltaria sozinho ao padrão pouco depois
+de salvo, sem erro nem log visível para quem editou.
+
+### O que mudou
+
+- O painel gera o círculo com **48 lados** (`LADOS_CIRCULO_ADMIN`): o reconciliador o trata
+  como polígono próprio e o preserva, que é exatamente a regra já documentada nele
+  ("contorno do administrador vale mais que o círculo da categoria").
+- Sem mudar o raio, o polígono atual é reenviado intacto; um contorno desenhado à mão não é
+  trocado por círculo só porque o nome foi editado.
+- Quando o admin troca só a categoria de um hospital com o círculo padrão, a tela avisa que
+  o raio passa a seguir o padrão da nova categoria no próximo startup (comportamento do
+  reconciliador, agora explícito para quem edita).
+
+### Achados do code-review aplicados no mesmo PR
+
+- Raio medido fora da faixa 30–1000 m (contorno à mão) travava o formulário inteiro; a faixa
+  passou a valer só para um raio **novo**. Causa extra: `[min]`/`[max]` no `<input
+  type="number">` ativam os validadores de diretiva do Angular por conta própria.
+- CNPJ gravado só com dígitos (importação CNES) reprovava a máscara e impedia salvar; agora
+  é aceito e enviado mascarado.
+- Resposta do PUT que chegasse após sair da tela (cold start de ~15 s) arrastava o usuário
+  de volta ao detalhe; a assinatura passou a morrer com o componente.
+- A prévia do mapa não se reenquadrava e cortava tiles dentro da animação de entrada; o
+  setup do Leaflet (tiles OSM, z19, `ResizeObserver`) virou `criarMapaBase`, compartilhado
+  com a página do mapa.
+
+### Verificação
+
+- 72 testes (Vitest) verdes e `ng build` limpo. Mutações conferidas: voltar para 32 lados,
+  retirar o `takeUntilDestroyed` do PUT e reaplicar a faixa ao raio original fazem os
+  testes correspondentes falharem.
+- Pendente: verificação E2E com login ADMIN real contra o backend de dev.
+
+---
+
+## M-026 — Mapa do painel vazio após 15 min e divisões pouco legíveis
+
+**Data:** 28/09/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+No E2E local do Épico 7, o PO abriu o mapa do painel e não viu nenhum hospital, nem
+uma divisão clara entre as regiões. A aba de rede mostrou a causa dos hospitais sumidos:
+`GET /api/v1/admin/hospitais` → **401**. O access token vive 15 min e o painel nunca o
+renovava; passado esse tempo, o guard seguia deixando entrar (havia token guardado), toda
+chamada voltava 401 em silêncio e as telas ficavam vazias (o dashboard mostrava "—").
+
+### O que mudou
+
+- **Sessão:** o `authInterceptor` trata o 401 da API renovando o par com
+  `POST /api/v1/auth/refresh` (já existia no backend, com rotação) e repete a chamada uma
+  vez. Chamadas que recebem 401 juntas compartilham uma única renovação: como o backend
+  revoga o refresh anterior na rotação, um segundo `/refresh` com ele derrubaria a sessão
+  recém-renovada. Se o refresh for recusado (401/403), a sessão é encerrada e o login abre
+  com "Sua sessão expirou"; falha de rede ou 5xx (ex.: 503 do cold start) não desloga.
+- **Mapa:** os estabelecimentos passam a ser coloridos por **categoria**, na mesma divisão
+  das camadas de pontos da base `multiplas_camadas_saude_14` que gerou o seed (Hospitais,
+  UPA, UBS, Policlínicas, CAPS, Centros especializados, Outras unidades), cada uma com
+  toggle e contagem; inativos em cinza. As divisões abrem com a **Região Administrativa
+  ligada**, cada área com preenchimento próprio, contorno mais forte e nome ao passar o
+  mouse (fixo nas camadas de poucas áreas: Região e Macrorregião de Saúde). Os marcadores
+  ganharam um pane acima das áreas: antes, uma camada ligada depois deles era desenhada
+  por cima e tomava o clique.
+
+### Verificação
+
+- 100 testes (Vitest) verdes e `ng build` limpo. Seis mutações mortas: sem a renovação
+  compartilhada, sem a exceção das rotas de auth (laço de refresh), sem o logout na recusa,
+  com logout em 503, sem o fallback de categoria e com o toggle de categoria que não remove.
+- Na tela (backend local contra o banco de dev): sessão vencida → `POST /auth/refresh` 200 →
+  chamada repetida 200 e os 340 estabelecimentos no mapa; refresh inválido → login com o
+  aviso de sessão expirada.
+- Teste de regressão `sessao-vencida.spec.ts`, pedido pelo PO: sobe os providers reais do
+  `appConfig` (não dublês) e cobre token vencido → refresh → chamada repetida, as 4 páginas do
+  mapa vencendo juntas com um único refresh, refresh recusado, 503 no refresh e ausência de
+  laço. Com o interceptor anterior (o código do bug) ou sem o interceptor no `appConfig`, os
+  5 casos falham. Suíte: 105 testes verdes.
+- A cobertura do `admin/` não foi medida: `@vitest/coverage-v8` não está instalado no painel.
+
+---
+
+## M-027 — Massa de dados de avaliações para o ambiente de desenvolvimento
+
+**Data:** 29/09/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Pedido do PO: testar avaliações de hospitais, a visualização das avaliações e o ranking
+no ambiente de desenvolvimento. O banco de dev não tinha visitas nem avaliações
+suficientes — todo hospital aparecia com "indicadores indisponíveis" (RN-15 exige 5
+avaliações) e o ranking era só a lista em ordem alfabética.
+
+### O que mudou
+
+- Novo `MassaAvaliacoesRunner` (backend): 30 usuários de teste, ~890 visitas e ~850
+  avaliações em 50 hospitais, com perfis de qualidade (excelente, bom, regular, ruim e
+  poucas avaliações) para o ranking ter diferenças claras por nota e por tempo, e os
+  demais hospitais sem avaliação. Os agregados são recalculados ao final da carga.
+- Três travas contra homologação/produção: perfil Spring `dev`, flag
+  `app.massa-avaliacoes.enabled` (padrão `false`) e nome do banco (precisa conter `dev` ou
+  `test` e não conter `hom`/`prod`). Idempotente pelo prefixo `massa-dev-` nos `_id`; a
+  cada boot recalcula os agregados, e a massa se regera sozinha com mais de 30 dias. Falha
+  na carga não derruba a aplicação.
+- `cd-backend-google.yml` liga o perfil `dev` e a flag só no serviço de dev.
+- Como usar, senha dos usuários de teste e remoção:
+  [`07-dados/Massa-Dados-Avaliacoes-Dev.md`](../07-dados/Massa-Dados-Avaliacoes-Dev.md).
+
+### Verificação
+
+- 26 testes unitários novos (gerador e runner): distribuição dos perfis, médias em ordem,
+  regras do formulário (RN-10), vínculo avaliação → visita finalizada, janela de 90 dias,
+  travas de banco, idempotência, validade de 30 dias, carga interrompida, `recriar`, senha
+  aplicada e retirada depois da carga, e falha do banco sem derrubar a aplicação.
+- Teste de integração com Mongo real (Testcontainers, roda no CI): ranking por nota e por
+  tempo ordenado com hospitais sem indicadores no fim, login de usuário de teste com
+  histórico de avaliações e segunda execução sem duplicar nada.
+
+### Correção pós-merge (29/09/2026)
+
+O primeiro deploy do dev com a massa (#171) falhou no smoke test: `/actuator/health`
+respondeu 503 (`OUT_OF_SERVICE`) nas 6 tentativas. A carga era um `ApplicationRunner`, e o
+readiness só fica pronto depois de todos eles; no Cloud Run a CPU fora de requisição é
+mínima depois que a porta abre, então a carga (inserções + recálculo de 50 agregados no
+Atlas) não terminava dentro da janela do smoke test. A carga passou a rodar em segundo
+plano (`@Async` no `ApplicationReadyEvent`), fora do caminho de startup; teste de
+regressão garante que ela não volte a ser `ApplicationRunner`.
+
+---
+
+## M-028 — Check-in e check-out automáticos com o app fechado
+
+**Data:** 04/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Teste de campo do PO no Hospital Regional de Ceilândia (03/10/2026), mais de duas horas
+no hospital: a entrada na zona do hospital não foi registrada com o app fechado e só
+aconteceu quando o app foi aberto. O check-out tinha a mesma dependência.
+
+### Causas
+
+1. **O APK não podia pedir localização em segundo plano.** O APK é gerado pelo Gradle a
+   partir do `frontend/android/` versionado, sem `expo prebuild`. As permissões
+   `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE` e `FOREGROUND_SERVICE_LOCATION`
+   estavam só no `app.json` e nunca chegaram ao `AndroidManifest.xml`. Sem elas, o
+   Android nega o pedido da permissão "o tempo todo" na hora, e o geofencing nativo nem
+   chegava a ser ligado.
+2. **A tolerância de 2 min (RN-01) e de 5 min (RN-03) era um `setTimeout` em memória.** O
+   SO acorda o app no evento da região, mas o iOS o suspende em segundos e o Android
+   congela ou mata o processo bem antes dos 2 minutos. O timer só disparava quando o
+   usuário abria o app.
+3. **A visita ativa ficava só em memória.** Uma saída entregue a um processo novo não
+   encontrava a visita e não fazia o checkout.
+
+### O que mudou
+
+- `AndroidManifest.xml` com as três permissões. No `app.json`, o plugin do
+  `expo-location` passa a habilitar o modo de localização em segundo plano do iOS
+  (`UIBackgroundModes: location`) e o serviço em primeiro plano do Android.
+- Estado do geofencing (visita ativa e entradas/saídas aguardando a tolerância) salvo no
+  AsyncStorage, com gravações em série. Só ids e instantes: nenhuma coordenada fica em
+  disco.
+- Durante a tolerância, o app liga atualizações de localização em segundo plano. No
+  Android isso aparece como uma notificação fixa: "Confirmando sua chegada ou saída do
+  hospital". O acompanhamento é desligado assim que nada está pendente; fora dessas
+  janelas, quem vigia é o geofencing nativo, de baixo consumo. Cada leitura, cada evento
+  e a abertura do app confirmam o que já venceu.
+- Monitora os 19 hospitais mais próximos mais uma região de recálculo em volta do
+  usuário (o iOS aceita no máximo 20 regiões). Quando o usuário sai dela, a lista é
+  refeita em segundo plano.
+- Antes de pedir a permissão "o tempo todo", o app explica para que ela serve
+  (divulgação exigida pelo Google Play). Se o usuário recusar, o app não insiste por 3
+  dias.
+- Uma entrada sem sinal de GPS volta para a fila por até 30 min em vez de se perder. Uma
+  saída antiga de um hospital não encerra a visita de outro. Um checkout que recebe 404
+  ou 409 esquece a visita local. Um logout no meio de um check-in não regrava a visita.
+- A Home só sincroniza a visita com o geofencing a partir de uma resposta do servidor:
+  uma falha de rede não apaga mais a visita guardada.
+
+### Verificação
+
+- 29 testes novos no `GeofencingTaskService` (de 9 para 38), que agora tem 96% de cobertura de linhas.
+  Os cenários de segundo plano simulam a morte do processo: os timers somem, o módulo é
+  recarregado do zero e o tempo avança. Também foram adicionados testes da Home.
+- Exige um **build nativo novo** (APK do CD ou dev build). O Expo Go não roda tarefas de
+  localização em segundo plano. No aparelho, é preciso conceder a localização
+  "Permitir o tempo todo".
+
+---
+
+## M-029 — Avaliação da visita pendente até 24h (sem depender da notificação)
+
+**Data:** 04/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Pedido do PO: o feedback deveria ficar pendente para o usuário que não conseguiu responder
+na hora ou ficou com o celular descarregado.
+
+### Causas
+
+1. **A notificação era o único caminho até o formulário.** Quem dispensava ou não via a
+   notificação não tinha onde avaliar dentro do app.
+2. **Só existia uma pendência por vez.** Uma segunda visita no mesmo dia apagava a
+   pendência da primeira.
+3. **O lembrete único (E3-03) nunca chegava.** Ao gravar a pendência, o app cancelava o
+   lembrete que tinha acabado de agendar. Além disso, ele só era agendado quando o usuário
+   tocava no primeiro pedido, ou seja, quem não viu o pedido ficava sem lembrete.
+4. **Celular descarregado dentro do hospital perdia a avaliação.** Sem sinal por 10 min, o
+   backend encerra a visita como `GPS_INTERROMPIDO` (RN-06). O app nunca passava pelo
+   checkout, então não agendava nada, e o `POST /feedbacks` só aceitava `FINALIZADA`.
+
+### O que mudou
+
+- **App:** cada visita encerrada vira uma pendência gravada no AsyncStorage (sobrevive ao
+  app fechado e ao celular desligado) até ser respondida, dispensada ou completar 24h após
+  a saída (RN-09). A pendência é gravada antes de qualquer chamada de notificação, então
+  uma falha de permissão ou de agendamento não a apaga. A pendência antiga (chave única)
+  é migrada.
+- **Home:** card "Avaliação pendente" com o hospital, o prazo ("Responda até hoje às
+  14:30"), o botão "Avaliar" e "Agora não". Some quando não há pendência.
+- **Lembrete:** pedido (1 min) e lembrete único (+6h) agendados juntos na saída.
+- **Servidor:** novo `GET /api/v1/contas/feedbacks/pendentes` (logado) com as visitas que
+  ainda aceitam feedback. O app soma essas visitas à lista local, o que cobre o celular que
+  apagou dentro do hospital e o app reinstalado, e agenda o lembrete delas se a notificação
+  já estiver permitida.
+- **Regra:** `POST /feedbacks` aceita visita `GPS_INTERROMPIDO` e recusa (404) a visita com
+  a janela de 24h vencida. Antes, a visita seguia avaliável até a próxima passada do job
+  `SEM_FEEDBACK`.
+- **Privacidade:** logout e exclusão de conta apagam as pendências do aparelho, porque o
+  hospital visitado é dado de saúde (LGPD, art. 11).
+
+### Verificação
+
+- Backend: 6 testes novos no `FeedbackServiceImplTest` e 1 no `ContaControllerTest`.
+- Frontend: `FeedbackNotificationService.test.js` reescrito (24 testes), novo
+  `FeedbacksPendentesCard.test.js` (12) e testes de logout no `LoginService`. Suíte: 479
+  testes passando.
+- O `code-review` do diff apontou 10 achados, e 9 foram corrigidos neste PR: corrida do
+  logout com a sincronização, pendência perdida quando o agendamento falha, 404 da fila
+  offline apagando a pendência, NPE com hospital sem nome, notificação de visita
+  dispensada reabrindo o formulário, visita do servidor sem lembrete, nome genérico
+  migrado, prazo calculado em três lugares e consulta ao servidor a cada foco. Ficou de
+  fora só a duplicação da busca de nomes de hospital, que já existia no serviço de visitas.
+
+---
+
+## M-030 — Trava de contagem de testes e SonarQube Cloud na esteira
+
+**Data:** 04/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Pedido do PO: "a quantidade de testes não pode ser menor ou igual ao cenário de testes
+anterior, e isso a esteira deve avaliar", e configurar o Sonar gratuito no mobile, no admin
+e no backend.
+
+### O que mudou
+
+- **Trava de contagem de testes** (job `Trava de contagem de testes` do `ci.yml`, só em PR).
+  Cada job de área conta os testes **executados** no relatório real da execução (XML JUnit
+  no backend, `--json` do Jest no frontend, reporter `json` do Vitest no admin) e publica a
+  contagem como artefato. O job da trava compara com a contagem do CI de push do commit da
+  base contra o qual o PR rodou (o primeiro pai do merge commit do PR; se esse CI não
+  estiver verde, o ancestral verde mais próximo, com aviso). Comparar com o "último CI
+  verde" da branch, achado do `code-review`, misturaria código diferente num re-run.
+  Regra:
+  - área cujo código de produção o PR altera: a contagem precisa **subir**;
+  - demais áreas: a contagem **não pode cair** (PR só de documentação ou de workflow não
+    tem teste a acrescentar numa área que não tocou).
+  - Teste ignorado (`@Disabled`, `it.skip`, `it.todo`) não conta: trocar um teste por um
+    skip reprova.
+  - "Código de produção" segue o recorte da cobertura de cada área: `backend/src/main/java`,
+    `frontend/src` + `App.js` sem `__tests__`, `css` e `theme`, `admin/src/app` (`.ts` e
+    `.html`, sem `.spec.ts`) + `admin/src/main.ts`.
+  - Sem contagem na base (primeira execução, ou base sem CI verde há mais de 90 dias, a
+    retenção do artefato), a trava só registra e avisa.
+- **SonarQube Cloud** (plano gratuito; o repositório é público, então não há limite de
+  linhas). Três projetos, um por área, analisados no próprio `ci.yml` depois dos testes:
+  backend pelo plugin Gradle `org.sonarqube` com a cobertura do JaCoCo, frontend e admin
+  pela `sonarqube-scan-action` com o `lcov`. O admin passa a medir cobertura
+  (`@vitest/coverage-v8`; sem piso por enquanto, 92% de linhas na medição de hoje).
+  A análise só roda quando o secret `SONAR_TOKEN` existe: até o PO configurar, o passo
+  é pulado sem reprovar o CI. Passo a passo em `10-git-flow/MANUAL.md` §4.4.
+- `checkout` com histórico completo nos três jobs: o Sonar usa o blame para separar o
+  código novo do antigo.
+
+### Verificação
+
+- Regras da trava exercitadas localmente (área alterada com contagem igual reprova, sem
+  alteração e contagem igual passa, queda reprova, base ausente passa com aviso).
+- Contagem real: admin 105 testes no `vitest.json`; backend lida do XML JUnit.
+- `./gradlew help --task sonar` resolve o plugin; o `ng test` com cobertura e reporter
+  `json` gera `coverage/admin/lcov.info` e `test-results/vitest.json`.
+- A análise do Sonar não pôde ser executada fora do CI (a sessão não alcança o
+  sonarcloud.io): a primeira execução real acontece no CI depois de o secret existir.
+
+---
+
+## M-031 — Cobertura mínima de 90% no código novo e cobertura total que não cai
+
+**Data:** 04/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Pedido do PO: "os testes não devem ser aceitos como passed se o coverage estiver menos de
+90%". Escolha do PO entre as opções apresentadas: **os dois** — 90% no código que o PR
+altera e a cobertura total de cada área sem poder cair.
+
+Exigir 90% no total já travaria todo PR de backend (78,8% hoje) e de mobile (83,6%) até
+alguém escrever os testes que faltam no código antigo. Por isso o total funciona como
+catraca: só sobe, até chegar à meta.
+
+### O que mudou
+
+- **90% no código novo** (passo "Cobertura do código novo (mínimo 90%)" em cada job de
+  área do `ci.yml`, só em PR). O `diff-cover` cruza o relatório de cobertura da área
+  (JaCoCo XML no backend, `lcov` no frontend e no admin) com as linhas alteradas pelo PR
+  em relação à branch de destino e reprova abaixo de 90%. Área que o PR não altera passa
+  sem medir.
+- **Cobertura total que não cai** (job `Trava de contagem de testes`, agora "de contagem
+  de testes e de cobertura"). O `contagem_testes.py contar` grava também a cobertura de
+  linhas da área; o `comparar` reprova o PR que altera o código de produção da área e
+  deixa a cobertura dela abaixo da base, com folga de 0,1 ponto. Área que o PR não altera
+  só registra: achado do `code-review`, código dependente de tempo cobre uma linha a mais
+  ou a menos entre execuções e reprovaria um PR de documentação. Na área que já passou de 90%, o piso é a própria meta:
+  sem esse teto, código novo coberto a exatamente 90% baixaria um total de 95% e
+  reprovaria um PR que cumpre a regra do código novo. Base sem cobertura registrada (CI
+  anterior a esta mudança) só registra.
+- O resumo do job mostra, por área, testes e cobertura da base e do PR.
+
+### Verificação
+
+- `diff-cover` exercitado localmente com o JaCoCo do backend (`--src-roots
+  backend/src/main/java`) e com o `lcov` do frontend e do admin reescrito para caminhos
+  relativos à raiz do repositório.
+- Leitura da cobertura conferida nos três formatos (admin 92,33% no `lcov.info`).
+- Na primeira execução real, a base ainda não tem cobertura registrada: a catraca do total
+  só passa a valer depois do primeiro CI de push na `develop` com esta mudança.
+
+---
+
+## M-032 — Cliente HTTP único no app (Fase 0 da SDD de TanStack Query e Zustand)
+
+**Data:** 05/10/2026 · **PR:** #183
+
+### Como apareceu
+
+A Auditoria Técnica v4.0 do app e a SDD de adoção de TanStack Query e Zustand
+(`08-analise tecnica/`) puseram como pré-requisito unificar o cliente HTTP. Conferido
+contra a `develop` em `08-analise tecnica/Conferencia-Auditoria-v4-e-SDD.md`:
+
+1. **Cinco cópias do mesmo `request()`.** `HospitalService`, `VisitaService`,
+   `FeedbackService` e `PerfilService` tinham cada um o seu, e o `HospitalService` lançava
+   erro sem `status` nem `data`: um 404 era indistinguível de um 500 no domínio mais
+   consultado do app.
+2. **Exclusão de conta sem renovação do token (LGPD, F0-05).** `LoginService.excluirConta()`
+   tinha a quinta cópia, sem o tratamento de 401: com o access token vencido (15 min), a
+   exclusão falhava com "Sessão expirada" mesmo com refresh token válido.
+3. **Ciclo de import.** Os serviços importavam o `LoginService` para o interceptor 401, e o
+   `LoginService` importava o `GeofencingTaskService`, que importa `HospitalService` e
+   `VisitaService`.
+
+### O que mudou
+
+- `frontend/src/core/api/apiClient.js`: `apiRequest` com `Authorization`, timeout e retry
+  (`fetchComRetry`), renovação em 401 com a coordenação por geração de `config/sessao.js`,
+  `signal` para cancelamento e `idempotente`. Erros fora de 2xx viram `ApiError
+  { status, data, message }` (`core/api/apiError.js`).
+- Os quatro serviços e a exclusão de conta passam a usar o cliente único. O download do
+  PDF de exportação (binário) reaproveita a mesma renovação.
+- O `apiClient` não importa o `LoginService`: o refresh e o logout são registrados por
+  `core/api/sessaoApi.js`, carregado no `index.js` antes das tarefas de geofencing. O ciclo
+  de import acabou.
+- ADR-001 passa a "Implementado". A auditoria v4.0, a SDD e a conferência entram no
+  repositório em `08-analise tecnica/`.
+
+### Verificação
+
+- `apiClient.test.js` (16 testes): contrato do `ApiError`, `signal`, `idempotente`,
+  renovação, encerramento só quando o servidor rejeita o refresh, falha de rede
+  classificada.
+- `LoginService.test.js`: exclusão de conta com token vencido renova e conclui; com refresh
+  rejeitado, encerra a sessão. `HospitalService.test.js`: erro da API com `status`.
+- Suíte do app: 489 → 508 testes, todos passando. Linhas alteradas com 100% de cobertura
+  (`diff-cover`). Lint sem aviso novo (16).
+
+---
+
+## M-033 — Sessão global e cache de queries no app (Fase 1 da SDD de TanStack Query e Zustand)
+
+**Data:** 05/10/2026 · **PR:** #184
+
+### Como apareceu
+
+Auditoria Técnica v4.0, §4.2.2: o usuário logado era relido do AsyncStorage no foco de
+cada tela. Quando o interceptor 401 encerrava a sessão, nenhuma tela era avisada: o
+Perfil continuava mostrando a conta até o próximo foco. O Histórico refazia as duas
+consultas a cada foco, sem cache.
+
+### O que mudou
+
+- **Sessão global** (`core/stores/sessaoStore.js`, Zustand): o `LoginService` grava o
+  usuário a cada login, renovação, logout e exclusão de conta, e o app hidrata o store do
+  `TokenStorage` ao abrir. Perfil e Histórico leem dali e reagem na hora, inclusive ao
+  logout feito pelo interceptor 401. Sem persistência própria: o `TokenStorage` continua
+  sendo a única cópia no aparelho (correção à §6.4 da SDD, que gravava o usuário uma
+  segunda vez).
+- **TanStack Query** (`core/query/`): `QueryClient` com cache de 2 min, sem retry próprio
+  (o `apiClient` já repete com backoff; somar os dois chegaria a 9 requisições), ligado ao
+  foco do app (`AppState`) e à conexão (`expo-network`). Fábrica central de chaves.
+- **Logout limpa só o dado pessoal do cache** (`visitas` e `conta`); o catálogo público de
+  hospitais fica.
+- **Histórico** passa a usar `useQuery`, com a chave por usuário e recarga ao voltar à tela
+  (só com sessão: o `refetch` do TanStack Query ignora o `enabled`).
+- Perfil e Histórico esperam o app ler o usuário gravado antes de decidir que é anônimo,
+  para não piscar o convite ao login para quem já está logado.
+- ADR-004 (Context API) marcado como substituído.
+
+### Verificação
+
+- Testes novos: `sessaoStore` (7), `queryClient`/`queryKeys` (7), `setupQueryClient` (7),
+  `useRecarregarNoFoco` (2), Perfil (5: conta da sessão, sem piscar o convite ao login
+  antes de ler o usuário gravado, logout pelo interceptor, Sair, exclusão), Histórico (4:
+  logout com a tela aberta, sem consultar a API antes de ler o usuário, erro e nova
+  tentativa, erro sem mensagem), `LoginService` (sessão em dia no login, renovação e logout) e `signal` no
+  histórico dos dois serviços.
+- Suíte do app: 508 → 543 testes. Linhas alteradas com 98% de cobertura (`diff-cover`;
+  das 3 linhas sem cobertura, 2 são o `onReady` do `App.js`, só reindentado). Lint sem aviso
+  novo (16).
+
+---
+
+## M-034 — Heartbeat e geofencing seguem a visita ativa em qualquer tela (Fase 2 da SDD)
+
+**Data:** 05/10/2026 · **PR:** #185
+
+### Como apareceu
+
+Auditoria Técnica v4.0, §4.2.2, confirmada no código: quem alimentava o heartbeat
+(E2-09) e o `sincronizarVisitaAtiva` do geofencing era só a Home, e só quando a aba
+Início ganhava foco. Sequência real do defeito: abrir o app, ir para Hospitais, fazer
+check-in manual e seguir para o detalhe sem voltar ao Início. O heartbeat nunca
+começava, e o geofencing não conhecia a visita para o checkout automático. No caminho
+inverso, um checkout manual no detalhe deixava o heartbeat da visita encerrada rodando
+até o próximo foco da Home.
+
+### O que mudou
+
+- **`VisitaAtivaSync`** (`screens/visitas/hooks/`), montado na raiz do `App.js`: observa
+  a query compartilhada da visita ativa (`useVisitaAtiva`, chave por usuário, fresca por
+  30 s) e liga ou desliga o heartbeat e o `sincronizarVisitaAtiva` em qualquer tela. O
+  geofencing nativo também passa a ser iniciado ali.
+- Mantém as regras que a Home já seguia: só sincroniza com resposta do servidor (o dado
+  indefinido da abertura não apaga a visita guardada pelo geofencing), falha de rede não
+  para o heartbeat, e erro real do servidor para o heartbeat sem apagar a visita guardada.
+  Entrada e hospital continuam indo junto (a SDD repassava só o id).
+- Check-in manual na lista, checkout manual no detalhe, check-in e checkout automáticos do
+  geofencing com o app aberto e o envio da fila offline marcam a visita ativa como
+  desatualizada (`invalidarVisitaAtiva`), e o observador segue a visita nova na hora. A volta do app ao primeiro plano também recarrega a visita
+  (`refetchOnWindowFocus`).
+- A Home volta a ser só apresentação.
+- Fora do escopo: o polling de 60 s da visita ativa proposto na SDD (uma requisição por
+  minuto por usuário, sem ganho para um heartbeat de 30 min).
+
+### Verificação
+
+- `VisitaAtivaSync.test.js` (8 testes), incluindo o cenário do defeito (check-in em outra
+  aba liga o heartbeat) e o checkout manual parando o heartbeat. Os 4 testes de visita da
+  Home migraram para lá; a Home ficou com 1 teste de apresentação. No
+  `GeofencingTaskService.test.js`, check-in e checkout automáticos avisam o observador.
+- Suíte do app: 543 → 549 testes. Linhas alteradas com 100% de cobertura (`diff-cover`).
+
+---
+
+## M-035 — Leituras de hospitais com TanStack Query (Fase 3 da SDD)
+
+**Data:** 05/10/2026 · **PR:** #186 (entrou na `develop` pelo #191)
+
+### Como apareceu
+
+Auditoria Técnica v4.0 e SDD (§2, item 2): Hospitais, Ranking e Mapa controlavam a
+paginação e as corridas entre respostas com refs manuais (`geracaoRef`,
+`buscandoMaisRef`, `cargaEmAndamentoRef`), e o Detalhe buscava hospital e indicadores
+em sequência, sem cache. Voltar a uma tela já vista refazia todas as chamadas.
+
+### O que mudou
+
+- **`screens/hospitais/hooks/useHospitais.js`**: `useHospitaisLista` e
+  `useRankingHospitais` (`useInfiniteQuery`), `useHospital` e `useIndicadoresHospital`
+  (`useQuery`) e `useHospitaisMapa`. Cada busca, filtro, ordem ou raio é uma chave
+  própria: a resposta de um critério antigo é descartada pela biblioteca e a requisição
+  é cancelada pelo `signal`, o que elimina as três refs.
+- `HospitalService.listar`, `ranking`, `buscarPorId` e `buscarIndicadores` aceitam
+  `signal`.
+- **Hospitais:** a busca vai à consulta 400 ms depois da última tecla, normalizada e
+  filtrada de novo no cliente, como antes. O destaque do check-in ativo usa a mesma
+  chave do Detalhe, então abrir o detalhe desse hospital não repete a chamada.
+- **Ranking e Hospitais:** `fetchNextPage` com `cancelRefetch: false`, para que dois
+  `onEndReached` seguidos não peçam a mesma página duas vezes.
+- **Detalhe:** hospital e indicadores em paralelo; se os indicadores dedicados falharem,
+  continua valendo o fallback embutido. Uma atualização que falha com o hospital já na
+  tela não troca a tela pelo erro.
+- **Mapa:** o catálogo continua vindo em lotes de 100, agora pelas páginas da consulta.
+  Uma falha no meio mantém os lotes já carregados, mostra o aviso e não repete sem fim.
+  A posição do recorte por raio é fixada ao escolher o raio, como antes.
+- Ficam para a Fase 4: a visita ativa que Hospitais e Detalhe ainda consultam por conta
+  própria e as mutações de check-in, checkout e feedback.
+
+### Verificação
+
+- Os testes de corrida que protegiam as refs (refresh com página em voo, troca de
+  filtro com página antiga chegando depois, dois `onEndReached` seguidos) continuam
+  passando sem as refs. O de `onEndReached` pegou o `cancelRefetch` padrão.
+- Novos: `useHospitais.test.js`, `signal` no `HospitalService`, refresh e rodapé do
+  Ranking, erro e busca normalizada em Hospitais, atualização com falha no Detalhe e
+  página do meio com falha no Mapa.
+- Suíte do app: 549 → 564 testes. Linhas alteradas com 100% de cobertura (`diff-cover`).
+
+---
+
+## M-036 — Check-in, checkout e feedback com mutações (Fase 4 da SDD)
+
+**Data:** 05/10/2026 · **PR:** #187 (entrou na `develop` pelo #191)
+
+### Como apareceu
+
+Depois da Fase 3, Hospitais e Detalhe ainda consultavam a visita ativa por conta própria
+a cada foco (três consultas da mesma visita com o `VisitaAtivaSync`), guardavam cópias
+locais dela e chamavam o `VisitaService` direto para check-in e checkout. O envio do
+feedback também não avisava o cache, e o histórico da conta podia mostrar a lista sem a
+avaliação recém-enviada.
+
+### O que mudou
+
+- **`useCheckinManual` e `useCheckoutManual`** (`screens/visitas/hooks/useMutacoesVisita.js`):
+  ao confirmar, gravam a visita só na chave da visita ativa do usuário e pedem a
+  confirmação ao servidor. Nada é escrito em `visitas.all` (defeito 5 da conferência).
+  O `VisitaAtivaSync` reage na hora: liga ou desliga o heartbeat e avisa o geofencing.
+- **`useVisitaAtivaDaTela`**: Hospitais e Detalhe leem a mesma query do observador
+  global, recarregada ao voltar para a tela. Mantém as regras de antes: sem conexão
+  fica a última visita conhecida, erro real do servidor mostra "sem visita", e um
+  check-in ou checkout guardado na fila offline vale na tela até a próxima resposta do
+  servidor. Esse estado otimista fica na tela, fora do cache, para o observador não
+  parar o heartbeat por causa de uma visita sem id.
+- **`useEnviarFeedback`**: POST na criação e PUT na edição. Depois de gravar, o
+  histórico da conta é marcado como desatualizado.
+- Não entrou: a troca de `FlatList` por `FlashList` citada na SDD. É uma dependência
+  nova de renderização de lista, sem relação com o estado do app, que pede validação de
+  desempenho no aparelho; fica para um PR próprio.
+
+### Verificação
+
+- `useMutacoesVisita.test.js` (6 testes): chave certa no check-in sem tocar outra query
+  do domínio, checkout, falha sem efeito no cache, estado otimista até a próxima
+  resposta, nada antes de ler a sessão e o feedback com POST/PUT.
+- Detalhe: voltar à tela sem conexão depois de um checkout enfileirado não traz o
+  cronômetro de volta.
+- Testes de tela ajustados ao servidor real: depois do check-in ou checkout, a próxima
+  consulta da visita ativa responde com o estado novo.
+- Suíte do app: 564 → 570 testes. Linhas alteradas com 100% de cobertura (`diff-cover`).
+
+---
+
+## M-037 — Visitas longas deixam de cair como GPS_INTERROMPIDO entre dois heartbeats
+
+**Data:** 05/10/2026 · **PR:** #188
+
+### Como apareceu
+
+Conferência da Auditoria Técnica v4.0 (`08-analise tecnica/Conferencia-Auditoria-v4-e-SDD.md`,
+§2): o `VisitaGpsInterrompidoJob` encerrava como `GPS_INTERROMPIDO` toda visita sem sinal
+há mais de 10 min (RN-06), mas o app só manda heartbeat a cada 30 min (RN-23), e só com
+o app aberto. Toda visita que passava de 10 a 25 min sem checkout de geofence era
+encerrada com `saida` no check-in e duração de poucos minutos, distorcendo o tempo
+mediano (RN-15). As duas regras se contradiziam no Documento Negocial.
+
+### Decisão do PO (05/10/2026)
+
+"As duas": janela de 45 min agora, e o app mandando sinal em segundo plano num PR
+separado.
+
+### O que mudou
+
+- `VisitaServiceImpl.LIMITE_GPS_INTERROMPIDO`: 10 → 45 min. Cobre um heartbeat perdido
+  e o ciclo de 15 min do job. O último sinal continua sendo o mais recente entre
+  heartbeat e posição, e a saída continua sendo esse último sinal.
+- RN-06 (Documento Negocial v2.1) e E2-05 (Backlog v2.2) atualizadas.
+
+### Verificação
+
+- `VisitaServiceImplTest`: visita 31 min sem sinal (entre dois heartbeats) continua
+  ativa, e o corte consultado no Mongo é agora menos 45 min. Os dois testes que usavam
+  15 min sem sinal passaram para 50 min.
+
+---
+
+## M-038 — Sinal da visita com o app fechado
+
+**Data:** 05/10/2026 · **PR:** #189
+
+### Como apareceu
+
+Na conferência da Auditoria v4 apareceu que o heartbeat do app (`HeartbeatService`) só
+roda com o app aberto, a cada 30 min, enquanto o `VisitaGpsInterrompidoJob` encerrava a
+visita como `GPS_INTERROMPIDO` após 10 min sem posição. Com o app fechado nada chegava, e
+quem continuava no hospital tinha a visita cortada. Escolha do PO: **as duas** correções,
+em PRs separados. A janela de 45 min no backend é a primeira (M-037); esta é a segunda.
+
+### O que mudou
+
+- Com visita aberta e nenhuma entrada ou saída pendente, a tarefa de acompanhamento do
+  `GeofencingTaskService` continua ligada num **modo de visita**: leitura a cada 5 min (a
+  economia de bateria vem do intervalo) e notificação fixa "Visita em andamento". A cada leitura,
+  se o último sinal tem 9 min ou mais, manda `POST /visitas/{id}/heartbeat` com a posição
+  da própria leitura. Na prática, um sinal a cada ~10 min.
+- Entrada ou saída pendente continua no modo de 30 s, que tem prioridade. A troca de modo
+  chama `startLocationUpdatesAsync` de novo com a tarefa ligada, o que só troca as opções:
+  desligar e religar deixaria um intervalo sem serviço em primeiro plano, e o Android 12+
+  recusa iniciar outro com o app em segundo plano. O modo ligado fica salvo no estado.
+- A vez do sinal é reservada no estado antes do envio, para leituras simultâneas não
+  duplicarem o heartbeat. Falha de rede desfaz a reserva (a próxima leitura tenta de
+  novo); 404 ou 409 esquecem a visita e desligam o acompanhamento.
+- RN-23 e o heartbeat na especificação da API passam a descrever os dois intervalos.
+
+### Verificação
+
+- 13 testes novos em `GeofencingTaskService.test.js` (modo de visita, intervalo, leitura
+  em processo novo, corrida, falha de rede, visita fechada, troca de modo, estado antigo).
+- Pendente em campo: APK novo com "Permitir o tempo todo", visita de mais de 45 min com o
+  app fechado, conferir no painel que a visita segue `EM_ATENDIMENTO` e que a notificação
+  fixa some no checkout.
+
+---
+
+## M-039 — CI e Sonar também em PR empilhado
+
+**Data:** 05/10/2026 · **PR:** #190
+
+### Como apareceu
+
+Observação do PO: "aparentemente o sonar não rodou em todas as branches". Os PRs da SDD
+de TanStack Query e Zustand estão empilhados (cada um com base na branch do anterior), e
+o `ci.yml` só disparava em PR para `develop` ou `master`. Só o primeiro da pilha tinha CI
+e Sonar; os outros só seriam medidos depois de reapontados para a `develop`.
+
+### O que mudou
+
+- `pull_request` do `ci.yml` passa a aceitar também bases `feature/**` e `bugfix/**`.
+- Nesses PRs, o `diff-cover` mede só as linhas do próprio PR (compara com a branch de
+  base). A trava de contagem e de cobertura total compara com o ancestral verde mais
+  próximo da base, que é um commit da `develop`, porque branch de trabalho não tem CI de
+  push. Na prática a régua é a da `develop`, e os testes das fases anteriores da pilha
+  contam a favor.
+
+### Verificação
+
+- Gatilho conferido com o YAML carregado (`develop`, `master`, `feature/**`, `bugfix/**`).
+- A primeira execução real acontece nos PRs empilhados ao serem atualizados depois do
+  merge deste.
+
+---
+
+## M-040 — Pacote `agregado` do backend passa a se chamar `indicador`
+
+**Data:** 08/10/2026 · **PR:** #194
+
+### Como apareceu
+
+Pergunta do PO: "na arquitetura do backend há um nome que me deixa confuso, Agregado, o
+que seria agregado dentro do sistema?". O pacote calcula e guarda o resumo público de cada
+hospital (nota média, número de avaliações, tempo mediano). "Agregado" vinha de agregação
+no sentido de banco de dados, mas em DDD a palavra quer dizer outra coisa (*aggregate*, um
+grupo de entidades com uma raiz), e o endpoint e os DTOs já falavam em indicadores.
+
+### O que mudou
+
+- Pacote `br.com.saude_monitor.api.agregado` passa a `br.com.saude_monitor.api.indicador`
+  (código e testes).
+- Classes: `AgregadoService` → `IndicadorService`, `AgregadoServiceImpl` →
+  `IndicadorServiceImpl`, `AgregadoHospitalJob` → `IndicadorHospitalJob`,
+  `AgregadoHospitalRepository` → `IndicadorHospitalRepository`, `AgregadoHospitalDocument`
+  → `IndicadorHospitalDocument`; teste `FeedbackEAgregacaoIntegracaoTest` →
+  `FeedbackEIndicadorIntegracaoTest`. Campos e comentários que chamavam o resumo de
+  "agregado" seguem o novo nome.
+- **Sem mudança de comportamento nem de contrato:** endpoints, JSON e a coleção
+  `agregados_hospitais` no MongoDB continuam iguais. Renomear a coleção exigiria migrar os
+  dados de cada ambiente sem ganho para quem lê o código.
+- Documentos vivos atualizados (Árvore Tecnológica v2.1, Especificação da API v2.4, Features
+  MVP v2.3, ADRs, De-Para, auditorias e planos que citavam as classes). Os arquivos de
+  `_historico/` ficam como estavam.
+
+### Verificação
+
+- Backend compilado e testes rodados com o JDK 25: 332 testes, todos os unitários
+  verdes (os 32 do pacote `indicador` inclusive). Os 13 que precisam de Docker
+  (Testcontainers) só rodam no CI.
+- A trava de cobertura do CI (90% nas linhas alteradas) apontou quatro linhas renomeadas
+  sem teste, todas em caminhos de falha: o detalhe de um hospital com seus indicadores e o
+  recálculo que falha no ouvinte do feedback, no job em lote e na exclusão de conta. Cinco
+  testes novos cobrem esses caminhos (a falha num hospital não interrompe os outros nem a
+  exclusão de conta).
+
+---
+
+## M-041 — Exclusão de conta passa a apagar aparelho, GPS e comentário
+
+**Data:** 14/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Análise de prontidão para a Play Store (14/10/2026): para publicar, a política de
+privacidade precisa dizer o que acontece com os dados quando a pessoa exclui a conta. A
+exclusão zerava o `usuarioId` das visitas e dos feedbacks e chamava o resultado de
+"anonimizado", mas ficavam o `dispositivoId` (que liga as visitas do mesmo aparelho entre
+si), os pontos de GPS de cada visita e o comentário livre do feedback, que pode trazer nome,
+telefone ou o caso da pessoa. Com isso a afirmação "anonimizado" não se sustentava.
+
+### O que mudou
+
+- `UserServiceImpl.excluirConta`: nas visitas do usuário, além de zerar o `usuarioId`,
+  remove `dispositivoId` e `pontosAmostrais`; nos feedbacks, remove `comentario`.
+- Fica o que os indicadores usam: hospital, entrada, saída e duração da visita; notas e
+  respostas fechadas do feedback. Os indicadores públicos não mudam.
+- Visita ainda aberta no momento da exclusão perde o vínculo com o aparelho e é encerrada
+  pelo job de GPS interrompido (RN-06), como qualquer visita sem sinal.
+
+### Verificação
+
+- Dois testes novos em `UserServiceImplTest` leem o `$set` e o `$unset` enviados ao
+  MongoDB: as visitas perdem `dispositivoId` e `pontosAmostrais` e mantêm duração e
+  hospital; os feedbacks perdem o comentário e mantêm a nota.
+
+---
+
+## M-042 — Site público com política de privacidade, termos e exclusão de conta
+
+**Data:** 14/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Análise de prontidão para a Play Store (14/10/2026), bloqueadores B3 e B4: a Play exige
+uma política de privacidade num endereço público e um link web onde a pessoa pede a
+exclusão da conta sem precisar do app. A política existia só dentro do app, com base legal
+incompleta (art. 7º, I, quando localização em hospital é dado sensível de saúde, art. 11),
+sem identificar o controlador nem dar um contato; os Termos de Uso não existiam.
+
+### O que mudou
+
+- Pasta nova `site/` com páginas estáticas para `https://saudemonitor.dev` (domínio do PO
+  no Cloudflare): `/privacidade`, `/termos`, `/exclusao-de-conta` e uma página inicial.
+  HTML puro, sem JavaScript nem cookies, com cabeçalhos de segurança em `_headers`.
+- Política v1.0: controlador e contato (`privacidade@saudemonitor.dev`), tabela de dados
+  com finalidade e momento da coleta (inclusive localização com o app fechado), dado de
+  saúde com consentimento específico (art. 11, I), operadores (Google Cloud, MongoDB
+  Atlas, Resend, provedor de mapas), retenção e o que a exclusão apaga (M-041), direitos
+  do art. 18 e prazo de 15 dias.
+- Termos v1.0: aviso de que não é serviço de saúde (SAMU 192), natureza estimada dos
+  números, regras de uso dos comentários e foro do domicílio do usuário.
+- `site/wrangler.jsonc` publica como Worker de arquivos estáticos com domínio próprio;
+  passo a passo em `site/README.md`.
+
+### Verificação
+
+- `wrangler deploy --dry-run` lê os arquivos de `public/` sem erro.
+- Os fatos da política foram conferidos no código: campos de `UserDocument`,
+  `VisitaDocument` e `FeedbackDocument`, intervalos do `GeofencingTaskService` e o que
+  `UserServiceImpl.excluirConta` apaga.
+
+### Pendente com o PO
+
+- Publicar (`npx wrangler deploy` em `site/`) e criar o encaminhamento de
+  `privacidade@saudemonitor.dev` no Email Routing do Cloudflare.
+- Revisão jurídica do texto, se quiser, antes do lançamento público.
+
+---
+
+## M-043 — Textos legais do app alinhados à política publicada
+
+**Data:** 14/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Análise de prontidão para a Play Store (14/10/2026), bloqueador B3. Dentro do app:
+
+- a tela de privacidade citava só o art. 7º, I, sem tratar localização em hospital como
+  dado sensível, e não dizia quem é o controlador nem como falar com ele;
+- no cadastro, os links "Termos de Uso" e "Política de Privacidade" abriam a mesma tela, e
+  não existiam Termos;
+- o rodapé "Termos" do login e do cadastro não era clicável;
+- o aceite falava em "Clinical Sanctuary", nome do Design System, e não em "Radar Saúde";
+- os selos prometiam "Criptografia ponta a ponta", que o app não tem (a conexão é HTTPS),
+  e "Dados anônimos e agregados", quando a conta guarda nome e e-mail. A Play recusa app
+  com afirmação enganosa sobre dados.
+
+### O que mudou
+
+- `config/linksLegais.js` concentra os endereços publicados (M-042), a versão dos termos
+  (antes repetida em `PerfilService` e no cadastro) e `abrirLinkLegal`, que abre o link
+  no navegador sem quebrar a tela quando não há navegador.
+- `PrivacidadeScreen`: resumo novo com controlador, contato, dado de saúde (art. 11, I),
+  o que é público e o que a exclusão apaga (M-041), mais links para a Política completa e
+  os Termos.
+- Cadastro: "Termos de Uso" e "Política de Privacidade" abrem as páginas publicadas; o
+  aceite cita o Radar Saúde.
+- Login e cadastro: rodapé "Termos" vira link; os selos passam a "Conexão criptografada"
+  e "Estatísticas sem identificar você"; os cabeçalhos de login, confirmação de e-mail e
+  "esqueci a senha" mostram "Radar Saúde".
+- O aviso de LGPD, os selos e o rodapé, que eram o mesmo bloco copiado no login e no
+  cadastro, viram o componente `CSRodapeLegal` (com `CSAvisoLgpd`). O aviso dizia "Suas
+  avaliações são anônimas"; passa a dizer que a nota e o tempo de cada hospital são
+  calculados sem mostrar quem respondeu.
+
+### Verificação
+
+- 3 testes novos de `linksLegais`, 5 da `PrivacidadeScreen` (a tela não tinha teste), 4 do
+  `CSRodapeLegal`, 5 no cadastro (os links, o rodapé e a versão aceita) e 1 no login
+  (rodapé). Suíte completa do app verde: 55 suítes, 607 testes; 100% das linhas novas
+  cobertas.
+- A primeira versão deste PR reprovou no SonarQube Cloud por duplicação em código novo
+  (3,3%, limite 3%), justamente por causa do bloco copiado; o componente resolve.
+
+---
+
+## M-044 — Aviso de localização em segundo plano no formato da Play Store
+
+**Data:** 14/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Análise de prontidão para a Play Store (14/10/2026), bloqueador B5. A política de
+localização em segundo plano do Google Play exige, antes do pedido de "Permitir o tempo
+todo", uma divulgação no app que diga que dado é coletado, para qual recurso e que a coleta
+acontece **mesmo com o app fechado ou fora de uso**. O aviso existente dizia "sem você
+abrir o app", formulação que o Google costuma recusar na revisão. Além disso, a notificação
+fixa durante a visita dizia "Avisaremos o hospital que você continua lá", mas nada é
+enviado ao hospital: o sinal vai só para o backend do Radar Saúde.
+
+### O que mudou
+
+- `GeofencingTaskService.textoDivulgacaoLocalizacao(plataforma)`: texto novo que diz
+  coleta, finalidade, "mesmo quando o app está fechado ou não está em uso", que a
+  localização só é enviada perto de hospitais e não é usada para publicidade, e qual opção
+  escolher no Android ou no iOS. O fluxo continua o mesmo: aviso com "Agora não" e
+  "Continuar", e só depois o pedido do sistema.
+- Notificação da visita: "Visita em andamento. Registrando que você continua no hospital."
+
+### Verificação
+
+- 3 testes novos no `GeofencingTaskService.test.js` (texto do Android, do iOS e da
+  notificação); o teste do aviso antes do pedido passa a exigir a frase da política.
+  Suíte do serviço: 56 testes verdes.
+
+---
+
+## M-045 — Manifesto de release sem sobreposição de tela e sem HTTP aberto
+
+**Data:** 14/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Análise de prontidão para a Play Store (14/10/2026), itens A4 e A5. O
+`AndroidManifest.xml` principal, que vale também para o APK/AAB de release:
+
+- declarava `SYSTEM_ALERT_WINDOW` (desenhar sobre outros apps), que só o menu de
+  desenvolvimento do React Native usa e que o manifesto de `debug` já declara. Permissão
+  sensível sem uso no app é motivo comum de questionamento na revisão da Play;
+- apontava para um `network_security_config.xml` que liberava HTTP sem criptografia para
+  dois IPs da rede local do PC de desenvolvimento (`192.168.100.11` e `.20`), além de
+  emulador e localhost. Nenhum ambiente usa mais esses endereços: dev, homologação e
+  produção falam com o Cloud Run em HTTPS.
+
+### O que mudou
+
+- `SYSTEM_ALERT_WINDOW` sai do manifesto principal (continua nos manifestos de `debug` e
+  `debugOptimized`).
+- O `network_security_config.xml` e o atributo `android:networkSecurityConfig` são
+  removidos. O release passa a recusar HTTP em qualquer endereço, que é o padrão do
+  Android desde a API 28. Os builds de `debug` continuam com `usesCleartextTraffic=true`
+  nos próprios manifestos, para o Metro e um backend local.
+
+### Verificação
+
+- Build nativo do APK pelo `cd-mobile-apk.yml` disparado nesta branch (o CI de PR só
+  exporta a versão web).
+- Consequência aceita: um APK de **release** gerado localmente não fala mais com um
+  backend em `http://` na rede local; para isso, use o build de `debug`.
+
+---
+
+## M-046 — AAB de produção para a Play Store
+
+**Data:** 14/10/2026 · **PR:** (este PR)
+
+### Como apareceu
+
+Análise de prontidão para a Play Store (14/10/2026), bloqueador B2: a Play Store só aceita
+AAB (Android App Bundle) para app novo, e o pipeline só gerava APK. Além disso, o push em
+`release/**` publicava apenas o backend; não existia build do app de produção. Ao revisar
+o fluxo apareceu um terceiro problema: o `release.yml` cria a branch `release/X.Y.Z` com o
+`GITHUB_TOKEN`, e push feito com esse token não dispara outros workflows (regra do GitHub
+contra recursão). O deploy de produção do backend, que depende desse push, nunca rodaria.
+Até aqui nenhuma `release/` tinha sido criada, então o defeito não tinha aparecido.
+
+### O que mudou
+
+- `cd-mobile-apk.yml`: entrada `formato` (`apk` ou `aab`, padrão `apk`), também no disparo
+  manual. Com `aab`, roda
+  `bundleRelease` e publica o `.aab`; só aceita a variante release. A chave de release
+  passa a assinar também builds de `release/*`.
+- `cd-producao.yml` (novo): no push ou disparo de `release/X.Y.Z`, calcula o versionCode
+  (`X*1000000 + Y*10000 + Z*100`), gera o AAB do pacote de produção apontando para a URL
+  determinística do Cloud Run de produção e cria a GitHub Release `vX.Y.Z` com o AAB.
+- `release.yml`: depois de criar a branch, dispara por `workflow_dispatch` o
+  `cd-backend-google.yml` e o `cd-producao.yml` nela.
+- `MANUAL.md` §3.4 e §4.1 e `deploy/android/README.md` (Play App Signing com a chave de
+  release como chave de upload).
+
+### Verificação
+
+- `actionlint` nos workflows alterados: só o aviso que já existia sobre o secret opcional
+  `ANDROID_KEYSTORE_BASE64`.
+- Disparo manual do `cd-mobile-apk.yml` nesta branch com `formato: aab` para exercitar o
+  `bundleRelease` (assinado com a chave de debug, porque a branch não é integrada).
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

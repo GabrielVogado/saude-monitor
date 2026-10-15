@@ -3,6 +3,7 @@
  * Fontes: Documentos/01-negocio, Documentos/04-desenvolvimento; Padrao-UI-UX §2 (categorias) .
  */
 import {
+  duracaoMinutosDesde,
   formatarDuracao,
   formatarNota,
   formatarData,
@@ -13,6 +14,23 @@ import {
   mascararCnpj,
   mascararCep,
 } from "../../utils/format";
+
+describe("utils/format — duracaoMinutosDesde", () => {
+  test("devolve minutos inteiros (arredondados) desde a entrada", () => {
+    const agora = Date.now();
+    jest.spyOn(Date, "now").mockReturnValue(agora);
+    // 8min30s → arredonda para 9 (casa com o inteiro do backend, evita divergência no piso)
+    const entrada = new Date(agora - (8 * 60 + 30) * 1000).toISOString();
+    expect(duracaoMinutosDesde(entrada)).toBe(9);
+    Date.now.mockRestore();
+  });
+
+  test("devolve undefined para entrada inválida", () => {
+    expect(duracaoMinutosDesde(undefined)).toBeUndefined();
+    expect(duracaoMinutosDesde("data-invalida")).toBeUndefined();
+    expect(duracaoMinutosDesde(null)).toBeUndefined();
+  });
+});
 
 describe("utils/format — formatarDuracao", () => {
   test("formata de 0 a 59min como 'Nmin'", () => {

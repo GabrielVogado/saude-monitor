@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.visita.service.impl;
 
+import br.com.saude_monitor.api.config.exception.AcessoNegadoException;
 import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
 import br.com.saude_monitor.api.config.exception.ValidacaoNegocioException;
@@ -18,6 +19,7 @@ import br.com.saude_monitor.api.visita.dto.VisitaResponse;
 import br.com.saude_monitor.api.visita.repository.VisitaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -28,6 +30,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -195,6 +198,24 @@ class VisitaServiceImplTest {
     }
 
     @Test
+    void checkoutDeVisitaDeOutroUsuarioLancaAcessoNegado() {
+        // Achado F-02 do pentest de 23/09/2026: o chamador está autenticado (tem um token
+        // válido) — só não é dono desta visita. 403 (ACESSO_NEGADO), não 401.
+        VisitaDocument visitaDeOutro = VisitaDocument.builder()
+                .id("v9")
+                .usuarioId("dono-legitimo")
+                .hospitalId("h1")
+                .entrada(Instant.now())
+                .status(StatusVisita.EM_ATENDIMENTO)
+                .build();
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaDeOutro));
+
+        assertThrows(AcessoNegadoException.class,
+                () -> visitaService.checkout("v9", new CheckoutRequest(null, null, null, null), "invasor"));
+        verify(visitaRepository, never()).save(any(VisitaDocument.class));
+    }
+
+    @Test
     void checkoutNaoAceitaSaidaAnteriorAEntrada() {
         Instant entrada = Instant.now().minus(Duration.ofHours(1));
         VisitaDocument visita = VisitaDocument.builder()
@@ -294,7 +315,7 @@ class VisitaServiceImplTest {
     @Test
     void processarGpsInterrompidoNaoMarcaQuandoPosicaoRecenteMesmoComHeartbeatAntigo() {
         Instant agora = Instant.now();
-        VisitaDocument comPosicaoRecente = visitaComSinal(agora.minus(Duration.ofMinutes(15)), agora.minus(Duration.ofMinutes(1)));
+        VisitaDocument comPosicaoRecente = visitaComSinal(agora.minus(Duration.ofMinutes(50)), agora.minus(Duration.ofMinutes(1)));
         when(visitaRepository.findByStatusAndUltimoHeartbeatBefore(any(), any()))
                 .thenReturn(List.of(comPosicaoRecente));
 
@@ -307,7 +328,7 @@ class VisitaServiceImplTest {
     @Test
     void processarGpsInterrompidoMarcaQuandoHeartbeatAntigoSemPosicao() {
         Instant agora = Instant.now();
-        VisitaDocument semPosicao = visitaComSinal(agora.minus(Duration.ofMinutes(15)), null);
+        VisitaDocument semPosicao = visitaComSinal(agora.minus(Duration.ofMinutes(50)), null);
         when(visitaRepository.findByStatusAndUltimoHeartbeatBefore(any(), any()))
                 .thenReturn(List.of(semPosicao));
 
@@ -324,5 +345,37 @@ class VisitaServiceImplTest {
         visitaService.processarGpsInterrompido();
 
         verify(visitaRepository).findByStatusAndUltimoHeartbeatBefore(org.mockito.ArgumentMatchers.eq(StatusVisita.EM_ATENDIMENTO), any());
+    }
+
+    /**
+     * Decisão do PO de 05/10/2026 (Auditoria Técnica v4.0): o app manda heartbeat a cada
+     * 30 min (RN-23). Com a janela antiga de 10 min, uma visita com o app aberto e sem
+     * nenhum problema de GPS era encerrada entre dois heartbeats.
+     */
+    @Test
+    void processarGpsInterrompidoNaoEncerraVisitaEntreDoisHeartbeats() {
+        Instant agora = Instant.now();
+        VisitaDocument entreHeartbeats = visitaComSinal(agora.minus(Duration.ofMinutes(31)), null);
+        when(visitaRepository.findByStatusAndUltimoHeartbeatBefore(any(), any()))
+                .thenReturn(List.of(entreHeartbeats));
+
+        visitaService.processarGpsInterrompido();
+
+        verify(visitaRepository).saveAll(List.of());
+        assertEquals(StatusVisita.EM_ATENDIMENTO, entreHeartbeats.getStatus());
+    }
+
+    @Test
+    void processarGpsInterrompidoUsaCorteDe45MinutosNoMongo() {
+        when(visitaRepository.findByStatusAndUltimoHeartbeatBefore(any(), any())).thenReturn(List.of());
+        Instant antes = Instant.now();
+
+        visitaService.processarGpsInterrompido();
+
+        ArgumentCaptor<Instant> corte = ArgumentCaptor.forClass(Instant.class);
+        verify(visitaRepository).findByStatusAndUltimoHeartbeatBefore(any(), corte.capture());
+        Instant esperado = antes.minus(Duration.ofMinutes(45));
+        assertFalse(corte.getValue().isBefore(esperado.minusSeconds(5)));
+        assertFalse(corte.getValue().isAfter(esperado.plusSeconds(5)));
     }
 }

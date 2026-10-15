@@ -8,10 +8,18 @@ import * as Network from "expo-network";
 import LoginService from "../../../screens/auth/service/LoginService";
 import TokenStorage from "../../../services/TokenStorage";
 import { pararGeofencing } from "../../../screens/visitas/service/GeofencingTaskService";
+import { limparPendencias } from "../../../screens/feedback/service/FeedbackNotificationService";
 import * as httpModule from "../../../config/http";
+// Liga o cliente HTTP ao LoginService real, como o index.js faz no app.
+import "../../../core/api/sessaoApi";
+import { sessaoStore } from "../../../core/stores/sessaoStore";
+import { reiniciarControleDeRenovacao } from "../../../config/sessao";
 
 jest.mock("../../../screens/visitas/service/GeofencingTaskService", () => ({
   pararGeofencing: jest.fn(),
+}));
+jest.mock("../../../screens/feedback/service/FeedbackNotificationService", () => ({
+  limparPendencias: jest.fn(),
 }));
 
 function jsonResponse(body, status = 200) {
@@ -83,6 +91,19 @@ describe("LoginService (Fase 0)", () => {
     // achado da auditoria (08/09/2026): o geofencing nativo não era parado no
     // logout e continuava monitorando regiões após a sessão encerrar
     expect(pararGeofencing).toHaveBeenCalledTimes(1);
+    // avaliações pendentes carregam o hospital visitado (dado de saúde): não ficam
+    // para a próxima pessoa que usar o aparelho
+    expect(limparPendencias).toHaveBeenCalledTimes(1);
+  });
+
+  test("logout é best-effort: falha ao apagar as avaliações pendentes ainda limpa a sessão", async () => {
+    await TokenStorage.salvarTokens({ accessToken: "A", refreshToken: "R", usuario: { id: "u1" } });
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ success: true }));
+    limparPendencias.mockRejectedValueOnce(new Error("disco"));
+
+    await LoginService.logout();
+
+    expect(await TokenStorage.getAccessToken()).toBeNull();
   });
 
   test("logout é best-effort: falha de rede ainda limpa a sessão local", async () => {
@@ -145,6 +166,7 @@ describe("LoginService (Fase 0)", () => {
     // após a exclusão a sessão local é removida (logout)
     expect(await TokenStorage.getAccessToken()).toBeNull();
     expect(pararGeofencing).toHaveBeenCalledTimes(1);
+    expect(limparPendencias).toHaveBeenCalledTimes(1);
   });
 
   test("excluirConta sem sessão lança erro", async () => {
@@ -155,6 +177,66 @@ describe("LoginService (Fase 0)", () => {
     await TokenStorage.salvarTokens({ accessToken: "TOK" });
     global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "Falha ao excluir a conta: erro interno" }, 500));
     await expect(LoginService.excluirConta()).rejects.toThrow("Falha ao excluir a conta");
+  });
+
+  test("excluirConta com access token vencido renova a sessão e conclui a exclusão (auditoria v4 §4.1)", async () => {
+    reiniciarControleDeRenovacao();
+    await TokenStorage.salvarTokens({ accessToken: "OLD", refreshToken: "RT", usuario: { id: "u1" } });
+    global.fetch = jest.fn(async (url, config) => {
+      if (url.endsWith("/auth/refresh")) {
+        return jsonResponse({ accessToken: "NEW", refreshToken: "RT2", usuario: { id: "u1" } });
+      }
+      return config.headers.Authorization === "Bearer NEW"
+        ? jsonResponse({ success: true })
+        : jsonResponse({ message: "Token expirado" }, 401);
+    });
+
+    const resp = await LoginService.excluirConta();
+
+    expect(resp.success).toBe(true);
+    const exclusoes = global.fetch.mock.calls.filter(([url]) => url.endsWith("/contas/exclusao"));
+    expect(exclusoes).toHaveLength(2);
+    expect(await TokenStorage.getAccessToken()).toBeNull();
+  });
+
+  test("excluirConta com refresh rejeitado encerra a sessão e não exclui", async () => {
+    reiniciarControleDeRenovacao();
+    await TokenStorage.salvarTokens({ accessToken: "OLD", refreshToken: "RT" });
+    global.fetch = jest.fn(async (url) =>
+      url.endsWith("/contas/exclusao") || url.endsWith("/auth/refresh")
+        ? jsonResponse({ message: "Token inválido" }, 401)
+        : jsonResponse({})
+    );
+
+    await expect(LoginService.excluirConta()).rejects.toMatchObject({
+      status: 401,
+      message: "Sessão expirada. Faça login novamente.",
+    });
+    expect(await TokenStorage.getRefreshToken()).toBeNull();
+    expect(pararGeofencing).toHaveBeenCalledTimes(1);
+  });
+
+  test("login, renovação e logout mantêm a sessão global em dia (SDD §6.4)", async () => {
+    reiniciarControleDeRenovacao();
+    global.fetch = jest.fn(async (url) => {
+      if (url.endsWith("/auth/login")) {
+        return jsonResponse({ accessToken: "A", refreshToken: "R", usuario: { id: "u1", nome: "Marina" } });
+      }
+      if (url.endsWith("/auth/refresh")) {
+        return jsonResponse({ accessToken: "A2", refreshToken: "R2" });
+      }
+      return jsonResponse({});
+    });
+
+    await LoginService.login({ email: "m@x.com", password: "s" });
+    expect(sessaoStore.getState().usuario).toEqual({ id: "u1", nome: "Marina" });
+
+    // Renovação sem `usuario` na resposta preserva o usuário já gravado.
+    await LoginService.refresh();
+    expect(sessaoStore.getState().usuario).toEqual({ id: "u1", nome: "Marina" });
+
+    await LoginService.logout();
+    expect(sessaoStore.getState().usuario).toBeNull();
   });
 
   // ------------------------------------------------ Esqueci minha senha (E8-05/BUG-03) ---

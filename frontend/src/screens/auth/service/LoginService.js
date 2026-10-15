@@ -1,15 +1,10 @@
 import { buildApiUrl } from "../../../config/api";
-import { classificarErroDeRede, fetchComRetry, fetchComTimeout } from "../../../config/http";
+import { classificarErroDeRede, fetchComRetry } from "../../../config/http";
+import { apiRequest } from "../../../core/api/apiClient";
 import TokenStorage from "../../../services/TokenStorage";
-// Import circular consciente: GeofencingTaskService importa HospitalService e
-// VisitaService, que por sua vez importam este módulo (LoginService) para o
-// interceptor 401. Seguro porque nenhum dos quatro módulos lê o binding importado
-// no topo do arquivo — só dentro de corpos de função, chamados depois que o grafo
-// inteiro já carregou. Tentativa de quebrar o ciclo com `import()` dinâmico foi
-// descartada: introduzia uma dependência real e frágil da interop do Jest com
-// `jest.mock` em import dinâmico (sem `__esModule: true` no mock, o binding vinha
-// undefined) — trocava um risco teórico por um problema demonstrado.
+import { definirUsuarioDaSessao } from "../../../core/stores/sessaoStore";
 import { pararGeofencing } from "../../visitas/service/GeofencingTaskService";
+import { limparPendencias } from "../../feedback/service/FeedbackNotificationService";
 
 const BASE_PATH = "/api/v1/auth";
 
@@ -71,6 +66,18 @@ async function pararGeofencingBestEffort() {
   }
 }
 
+/**
+ * Apaga as avaliações pendentes guardadas no aparelho (hospital visitado é dado de
+ * saúde). Best-effort pelo mesmo motivo do geofencing acima.
+ */
+async function limparPendenciasBestEffort() {
+  try {
+    await limparPendencias();
+  } catch {
+    // best-effort
+  }
+}
+
 class LoginService {
   /**
    * Autentica credenciais e persiste os tokens + usuário no dispositivo.
@@ -103,13 +110,14 @@ class LoginService {
       refreshToken: response.refreshToken,
       usuario: response.usuario,
     });
+    definirUsuarioDaSessao(response.usuario);
 
     return response;
   }
 
   /**
    * Renova o access token a partir do refresh token persistido (rotação).
-   * Reutilizado pelo interceptor 401 do HospitalService.
+   * Registrado no cliente HTTP (`core/api/sessaoApi.js`) para o interceptor 401.
    */
   static async refresh() {
     const refreshToken = await TokenStorage.getRefreshToken();
@@ -120,11 +128,13 @@ class LoginService {
 
     const response = await post(`${BASE_PATH}/refresh`, { refreshToken });
 
+    const usuario = response.usuario ?? (await TokenStorage.getUsuario());
     await TokenStorage.salvarTokens({
       accessToken: response.accessToken,
       refreshToken: response.refreshToken,
-      usuario: response.usuario ?? (await TokenStorage.getUsuario()),
+      usuario,
     });
+    definirUsuarioDaSessao(usuario);
 
     return response;
   }
@@ -148,7 +158,10 @@ class LoginService {
     }
 
     await pararGeofencingBestEffort();
+    await limparPendenciasBestEffort();
     await TokenStorage.limparTokens();
+    // Avisa as telas (e limpa o cache de dados pessoais, ver `setupQueryClient`).
+    definirUsuarioDaSessao(null);
   }
 
   /**
@@ -207,8 +220,8 @@ class LoginService {
   /**
    * Exclui a conta do usuário autenticado (F0-05/LGPD).
    *
-   * Envia `DELETE /api/v1/contas/exclusao` com o access token e, em caso de
-   * sucesso, remove a sessão local (logout) já que a conta deixou de existir.
+   * Envia `DELETE /api/v1/contas/exclusao` com o access token (renovado em 401) e,
+   * em caso de sucesso, remove a sessão local (logout) já que a conta deixou de existir.
    */
   static async excluirConta() {
     const accessToken = await TokenStorage.getAccessToken();
@@ -217,37 +230,16 @@ class LoginService {
       throw new Error("Sessão expirada. Faça login novamente.");
     }
 
-    const url = buildApiUrl("/api/v1/contas/exclusao");
-
-    let response;
-    try {
-      response = await fetchComTimeout(url, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-    } catch (error) {
-      throw await classificarErroDeRede(error, url);
-    }
-
-    let data = null;
-    try {
-      data = await response.json();
-    } catch {
-      data = null;
-    }
-
-    if (!response.ok) {
-      const message =
-        data?.message ||
-        `Falha ao excluir a conta (HTTP ${response.status}).`;
-      throw new Error(message);
-    }
+    // Pelo cliente único: com o access token vencido (15 min), a exclusão renova a
+    // sessão e repete, em vez de falhar com "Sessão expirada" tendo refresh token
+    // válido (auditoria técnica v4, §4.1).
+    const data = await apiRequest("/api/v1/contas/exclusao", { method: "DELETE" });
 
     await pararGeofencingBestEffort();
+    await limparPendenciasBestEffort();
     await TokenStorage.limparTokens();
+    // Avisa as telas (e limpa o cache de dados pessoais, ver `setupQueryClient`).
+    definirUsuarioDaSessao(null);
     return data;
   }
 }

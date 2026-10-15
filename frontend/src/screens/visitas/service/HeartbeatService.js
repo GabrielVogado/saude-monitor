@@ -6,11 +6,11 @@ import VisitaService from "./VisitaService";
  * ainda está no hospital, evitando a expiração automática (`VisitaExpiracaoJob`) e
  * renovando o sinal de posição usado para detectar `GPS_INTERROMPIDO` (RN-06).
  *
- * Limitação conhecida (MVP): este serviço usa `setInterval`, que só executa com o app em
- * foreground — heartbeat em background nativo está fora do escopo deste commit. Enquanto
- * o app estiver em background, quem cobre a ausência de sinal é o job do backend
- * (`VisitaGpsInterrompidoJob`, marca `GPS_INTERROMPIDO` após 10min sem sinal) e o próprio
- * geofencing (`GeofencingTaskService`), que confirma o checkout ao detectar a saída.
+ * Este serviço usa `setInterval`, que só executa com o app em primeiro plano. Com o app
+ * fechado, o sinal sai da tarefa de acompanhamento do `GeofencingTaskService`, que manda
+ * o heartbeat com posição a cada ~10 min enquanto houver visita aberta (exige a permissão
+ * "o tempo todo"). Sem nenhum sinal por 45 min, o `VisitaGpsInterrompidoJob` do backend
+ * encerra a visita como `GPS_INTERROMPIDO` (RN-06).
  */
 const INTERVALO_HEARTBEAT_MS = 30 * 60 * 1000; // RN-23: heartbeat a cada 30 minutos
 
@@ -38,8 +38,8 @@ async function enviarHeartbeat() {
   try {
     await VisitaService.heartbeat(visitaIdAtual, posicao);
   } catch {
-    // Falha de rede não interrompe o ciclo; a próxima tentativa ocorre em 30min e, se o
-    // backend não receber nenhum sinal por 10min, a visita é encerrada como GPS_INTERROMPIDO.
+    // Falha de rede não interrompe o ciclo; a próxima tentativa ocorre em 30 min. Com o
+    // app em segundo plano, quem manda o sinal é o `GeofencingTaskService`.
   }
 }
 

@@ -113,6 +113,10 @@ feature/* ──► develop ──► master ──► release/<tag>
    intermediário pode ficar sem rc própria — o seguinte o contém.
 5. Testadores baixam o APK na página **Releases** do repositório. Quem já tem o HML
    instalado só instala por cima.
+6. Cada rc tem um registro em [`homologacoes/`](./homologacoes/) com o que entrou desde a
+   anterior, o roteiro de teste e o resultado. Ele é escrito num PR `doc/` para a
+   `develop` antes da promoção, e o resultado é preenchido depois da validação.
+   Primeiro registro: [`v1.0.0-rc.5`](./homologacoes/v1.0.0-rc.5.md) (15/10/2026).
 
 > ⚠️ **Pré-requisitos (uma vez):** a chave de release do APK
 > ([`deploy/android/README.md`](../../deploy/android/README.md)), o banco/usuário
@@ -124,8 +128,9 @@ feature/* ──► develop ──► master ──► release/<tag>
 1. Valide em **homologação** (`master`, a última `vX.Y.Z-rc.N`) antes de fixar a versão.
 2. No GitHub: **Actions → Release - Gerar branch de produção → Run workflow**, informando a **rc validada** (ex.: `v1.0.0-rc.3`).
 3. O workflow cria a branch **`release/1.0.0`** a partir **dessa tag** — não da ponta da `master`, que pode já ter commits ainda não homologados.
-4. O push da branch `release/1.0.0` dispara o deploy do **ambiente prod**.
-5. Após validar em produção, faça merge de `release/1.0.0` de volta em `master` (e `develop`).
+4. O mesmo workflow **dispara** o deploy do backend de produção e o `cd-producao.yml`, que gera o **AAB** e o anexa à GitHub Release `v1.0.0`. (Disparo explícito desde 14/10/2026: um push feito com o `GITHUB_TOKEN` não aciona outros workflows, então o gatilho de `push` em `release/**` nunca rodava para a branch criada aqui.)
+5. Envie o `.aab` da Release na Play Console (*Produção* ou *Teste fechado* → *Criar nova versão*). Na primeira vez, ative o Play App Signing com a chave de release como chave de upload ([`deploy/android/README.md`](../../deploy/android/README.md)).
+6. Após validar em produção, faça merge de `release/1.0.0` de volta em `master` (e `develop`).
 
 ---
 
@@ -135,14 +140,15 @@ feature/* ──► develop ──► master ──► release/<tag>
 
 | Workflow | Gatilho | Ação |
 |----------|---------|------|
-| `ci.yml` | push/PR em `develop`/`master` | Build + testes do backend e frontend |
+| `ci.yml` | push em `develop`/`master`; PR com base em `develop`, `master`, `feature/**` ou `bugfix/**` (as duas últimas desde 05/10/2026, para PR empilhado também rodar CI e Sonar — M-039) | Build + testes do backend, do frontend e do Painel Admin (`admin/`, desde 28/09/2026); análise no SonarQube Cloud quando há `SONAR_TOKEN`; em PR, **trava de contagem de testes** (§4.4, desde 04/10/2026) e **cobertura mínima de 90% no código novo** com o total sem cair (§4.4, M-031) |
 | `cd-backend-google.yml` | push em `develop`, `release/**` (caminho `backend/**`) + manual + `workflow_call` | Docker → Artifact Registry → deploy no **Cloud Run** + 3 smoke tests. **Falha com mensagem explícita** se o ambiente não tiver secrets |
 | `cd-homologacao.yml` | push em `master` + manual | **Homologação:** versão `vX.Y.Z-rc.N` → backend HML → APK HML → tag + GitHub Release (§3.3) |
-| `cd-mobile-apk.yml` | push em `develop` (caminho `frontend/**`) + manual + `workflow_call` | Build do APK com Gradle no próprio Actions. Artefato do run (30 dias). Pacote, nome e versão por ambiente |
+| `cd-mobile-apk.yml` | push em `develop` (caminho `frontend/**`) + manual + `workflow_call` | Build do APK (ou do AAB, com `formato: aab`) com Gradle no próprio Actions. Artefato do run (30 dias). Pacote, nome e versão por ambiente |
+| `cd-producao.yml` | push em `release/**` + manual (disparado pelo `release.yml` desde 14/10/2026) | **Produção:** AAB do pacote de produção, assinado com a chave de release, anexado à GitHub Release `vX.Y.Z` para envio à Play Console (§3.4) |
 | `cd-backend-render.yml` | só manual | Rollback para o Render (desativado desde 04/09/2026) |
 | `cd-mobile-eas.yml` | **só manual** (`workflow_dispatch`, a partir de `release/*`) | Build do **AAB de loja** no EAS |
 | `keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` para impedir a hibernação do Render (E8-01) |
-| `release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
+| `release.yml` | manual (workflow_dispatch) | Cria branch `release/<versão>` a partir da rc homologada e dispara o backend de produção (`cd-backend-google.yml`) e o AAB (`cd-producao.yml`) |
 
 > **Removidas em 03/09/2026** (PR de limpeza de esteiras mortas):
 >
@@ -221,6 +227,60 @@ Actions se autentica por Workload Identity Federation, sem chave. No GitHub:
 | `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_STORE_PASSWORD`, `ANDROID_RELEASE_KEY_ALIAS`, `ANDROID_RELEASE_KEY_PASSWORD` | Chave de release do APK. Obrigatórios para homologação — ver [`deploy/android/README.md`](../../deploy/android/README.md) |
 | `EXPO_PUBLIC_MAPBOX_TOKEN` | Token público do Mapbox embutido no APK |
 | `RENDER_API_KEY_DEV`, `RENDER_SERVICE_ID_DEV` | Só para o rollback manual do Render |
+| `SONAR_TOKEN` | Token do SonarQube Cloud (§4.4). Sem ele, a análise é pulada e o CI segue |
+
+### 4.4 Qualidade: trava de testes, cobertura e SonarQube Cloud
+
+**Trava de contagem de testes** (job `Trava de contagem de testes` do `ci.yml`, só em
+PR). Cada área conta os testes executados no relatório real da execução e compara com o
+CI de push do commit da base contra o qual o PR foi testado (se esse CI não
+estiver verde, o do ancestral verde mais próximo, com aviso no job):
+
+| O PR altera o código de produção da área? | Exigência |
+|---|---|
+| Sim | a contagem precisa **subir** |
+| Não (documentação, workflow, outra área) | a contagem **não pode cair** |
+
+Teste ignorado (`@Disabled`, `it.skip`, `it.todo`) não conta. O recorte de "código de
+produção" e a regra estão em `.github/scripts/contagem_testes.py`. O resumo do job mostra
+base, PR e resultado por área.
+
+**Cobertura** (M-031, decisão do PO: "os dois"). Duas exigências, só em PR:
+
+| Regra | Onde | Reprova quando |
+|---|---|---|
+| Código novo | passo "Cobertura do código novo (mínimo 90%)" de cada job de área (`diff-cover`) | as linhas que o PR altera na área têm menos de 90% de cobertura |
+| Total da área | job `Trava de contagem de testes` | o PR altera o código da área e a cobertura de linhas dela fica abaixo da base (ou abaixo de 90%, se a base já passava de 90%), com folga de 0,1 ponto |
+
+O total de hoje (backend 78,8%, mobile 83,6%, admin ~90%) não precisa estar em 90%: ele só
+não pode cair, e sobe a cada PR que testa mais do que altera. Depois de chegar a 90%, só
+não pode voltar para baixo da meta. Para conferir o código novo
+localmente, depois de rodar os testes com cobertura:
+`pip install diff-cover==10.6.0 && diff-cover <relatório> --compare-branch=origin/develop --fail-under=90`.
+
+**SonarQube Cloud** (gratuito para repositório público). Três projetos na organização
+`gabrielvogado`:
+
+| Área | Chave do projeto | Configuração |
+|---|---|---|
+| backend | `gabrielvogado_saude-monitor-backend` | bloco `sonar` em `backend/build.gradle` |
+| mobile | `gabrielvogado_saude-monitor-mobile` | `frontend/sonar-project.properties` |
+| admin | `gabrielvogado_saude-monitor-admin` | `admin/sonar-project.properties` |
+
+Configuração inicial (uma vez, pelo dono do repositório):
+
+1. Entrar em https://sonarcloud.io com a conta do GitHub e importar a organização
+   `GabrielVogado` (instala o app do SonarQube Cloud no repositório). A chave da
+   organização precisa ficar `gabrielvogado`; se ficar outra, trocar
+   `sonar.organization` nos três arquivos acima.
+2. Escolher **Import a monorepo**, selecionar `saude-monitor` e criar os três projetos com
+   as chaves da tabela.
+3. Em cada projeto, **Administration → Analysis Method**: desligar a *Automatic Analysis*
+   (a análise vem do CI, que leva a cobertura).
+4. **My Account → Security**: gerar um token e cadastrá-lo no GitHub em
+   *Settings → Secrets and variables → Actions* como `SONAR_TOKEN`.
+5. Rodar o CI (push na `develop` ou novo PR): o passo "Análise SonarQube Cloud" de cada
+   job deixa de ser pulado.
 
 ---
 

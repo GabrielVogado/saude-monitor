@@ -56,6 +56,11 @@ on:
         type: choice
         options: [release, debug]
         default: release
+      formato:
+        description: APK (instalar no celular) ou AAB (Play Store)
+        type: choice
+        options: [apk, aab]
+        default: apk
 
   # Chamado pelo orquestrador de homologacao/producao, que ja sabe a versao (da tag) e
   # a URL do backend que acabou de publicar.
@@ -77,12 +82,19 @@ on:
         description: versionCode (inteiro crescente)
         type: string
         required: true
+      # 14/10/2026: a Play Store so aceita AAB (Android App Bundle) para app novo. O APK
+      # continua para homologacao (testador instala direto da Release); producao pede AAB.
+      formato:
+        description: apk | aab
+        type: string
+        required: false
+        default: apk
     outputs:
       artefato:
         description: Nome do artefato com o APK
         value: ${{ jobs.apk.outputs.artefato }}
       arquivo:
-        description: Nome do arquivo .apk dentro do artefato
+        description: Nome do arquivo (.apk ou .aab) dentro do artefato
         value: ${{ jobs.apk.outputs.arquivo }}
     # Declarados para o chamador nao poder esquecer um sem erro: sem `secrets: inherit`
     # nem repasse explicito, todos chegariam vazios -- a chave falharia alto, mas o token
@@ -132,6 +144,7 @@ jobs:
       # Push/dispatch = dev. So o `workflow_call` (orquestrador) pede hom/prod.
       AMBIENTE: ${{ inputs.ambiente || 'dev' }}
       VARIANTE: ${{ inputs.variante || 'release' }}
+      FORMATO: ${{ inputs.formato || 'apk' }}
 
     steps:
       - name: Checkout
@@ -225,11 +238,12 @@ jobs:
           REF: ${{ github.ref }}
         run: |
           set -euo pipefail
-          # A chave de release so assina o que esta em `develop` ou `master`. Um dispatch de
+          # A chave de release so assina o que esta em `develop`, `master` ou `release/*`
+          # (producao, que nasce de uma rc homologada -- ver release.yml). Um dispatch de
           # outra branch sairia com o mesmo certificado de producao e instalaria por cima
           # do APK de dev sem ninguem perceber que era codigo nao integrado.
           REF_INTEGRADA=nao
-          case "$REF" in refs/heads/develop|refs/heads/master) REF_INTEGRADA=sim ;; esac
+          case "$REF" in refs/heads/develop|refs/heads/master|refs/heads/release/*) REF_INTEGRADA=sim ;; esac
 
           if [ -n "${RELEASE_KEYSTORE_BASE64:-}" ] && [ "$VARIANTE" = "release" ] && [ "$REF_INTEGRADA" = "sim" ]; then
             # Os QUATRO secrets, e a chave aberta de verdade, antes dos ~20 min de Gradle:
@@ -289,7 +303,7 @@ jobs:
           echo "sufixo=-ASSINATURA-EFEMERA" >> "$GITHUB_OUTPUT"
           echo "⚠️ **Keystore gerada nesta execução** — este APK não atualiza por cima de outro; é preciso desinstalar antes. Crie os secrets \`ANDROID_RELEASE_*\` para resolver." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Build do APK
+      - name: Build do ${{ inputs.formato == 'aab' && 'AAB' || 'APK' }}
         env:
           # ESTA linha decide o destino do APK, nao o `frontend/app.json`:
           # `src/config/api.js` le `EXPO_PUBLIC_API_BASE_URL` PRIMEIRO. Hom/prod recebem a
@@ -310,13 +324,23 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x gradlew
-          if [ "$VARIANTE" = "debug" ]; then TAREFA=assembleDebug; else TAREFA=assembleRelease; fi
+          if [ "$FORMATO" != "apk" ] && [ "$FORMATO" != "aab" ]; then
+            echo "ERRO: formato '$FORMATO' invalido (apk ou aab)."
+            exit 1
+          fi
+          if [ "$FORMATO" = "aab" ] && [ "$VARIANTE" != "release" ]; then
+            echo "ERRO: AAB so sai da variante release (e o que vai para a Play Store)."
+            exit 1
+          fi
+          if [ "$FORMATO" = "aab" ]; then TAREFA=bundleRelease
+          elif [ "$VARIANTE" = "debug" ]; then TAREFA=assembleDebug
+          else TAREFA=assembleRelease; fi
           ./gradlew --no-daemon "$TAREFA" \
             -Pambiente="$AMBIENTE" \
             -PappVersionName="$VERSION_NAME" \
             -PappVersionCode="$VERSION_CODE"
 
-      - name: Localizar o APK
+      - name: Localizar o ${{ inputs.formato == 'aab' && 'AAB' || 'APK' }}
         id: apk
         env:
           VERSION_NAME: ${{ steps.versao.outputs.nome }}
@@ -328,9 +352,14 @@ jobs:
           # find morria com SIGPIPE. Escopado a variante e com `-newer`: o
           # android/.gitignore DES-ignora `app/build/outputs/apk/**`, e um APK versionado
           # no passado seria restaurado pelo checkout e poderia sair no lugar do novo.
-          CAMINHO=$(find "android/app/build/outputs/apk/$VARIANTE" -name "*.apk" -newer android/gradlew -print -quit 2>/dev/null || true)
+          if [ "$FORMATO" = "aab" ]; then
+            SAIDA="android/app/build/outputs/bundle/release"; EXT=aab
+          else
+            SAIDA="android/app/build/outputs/apk/$VARIANTE"; EXT=apk
+          fi
+          CAMINHO=$(find "$SAIDA" -name "*.$EXT" -newer android/gradlew -print -quit 2>/dev/null || true)
           if [ -z "$CAMINHO" ]; then
-            echo "ERRO: nenhum APK foi produzido pelo Gradle."
+            echo "ERRO: nenhum .$EXT foi produzido pelo Gradle."
             exit 1
           fi
 
@@ -342,18 +371,18 @@ jobs:
           # Dispatch de uma branch qualquer gera o MESMO pacote `.dev`: a branch no nome e o
           # que mostra ao testador que aquilo nao e o que esta na `develop`.
           SUFIXO_BRANCH=""
-          case "$REF_NAME" in develop|master) ;; *) SUFIXO_BRANCH="-${REF_NAME}" ;; esac
+          case "$REF_NAME" in develop|master|release/*) ;; *) SUFIXO_BRANCH="-${REF_NAME}" ;; esac
           BASE=$(printf '%s' "radar-saude-${AMBIENTE}-${VERSION_NAME}${SUFIXO_BRANCH}${SUFIXO_VARIANTE}${SUFIXO}" | tr -c 'A-Za-z0-9._-' '-')
-          ARQUIVO="${BASE}.apk"
+          ARQUIVO="${BASE}.${EXT}"
           mkdir -p "$RUNNER_TEMP/saida"
           cp "$CAMINHO" "$RUNNER_TEMP/saida/$ARQUIVO"
 
           echo "caminho=$RUNNER_TEMP/saida/$ARQUIVO" >> "$GITHUB_OUTPUT"
           echo "arquivo=$ARQUIVO" >> "$GITHUB_OUTPUT"
-          echo "artefato=apk-${BASE}-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "artefato=${EXT}-${BASE}-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "📦 \`$ARQUIVO\` — $(du -h "$CAMINHO" | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Publicar o APK
+      - name: Publicar o ${{ inputs.formato == 'aab' && 'AAB' || 'APK' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.apk.outputs.artefato }}

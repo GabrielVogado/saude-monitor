@@ -29,6 +29,13 @@ public interface VisitaRepository extends MongoRepository<VisitaDocument, String
     List<VisitaDocument> findByStatusAndSaidaBefore(StatusVisita status, Instant limite);
 
     /**
+     * Visitas encerradas do usuário com saída depois de {@code limite}: candidatas a feedback
+     * pendente (RN-09), do encerramento mais recente ao mais antigo.
+     */
+    List<VisitaDocument> findByUsuarioIdAndStatusInAndSaidaAfterOrderBySaidaDesc(
+            String usuarioId, List<StatusVisita> status, Instant limite);
+
+    /**
      * Visitas de um conjunto de status processadas (write time — ver
      * {@link VisitaDocument#getProcessadoEm()}) após {@code limite}, de qualquer
      * hospital — usado por {@code recalcularPendentes} para descobrir quais hospitais

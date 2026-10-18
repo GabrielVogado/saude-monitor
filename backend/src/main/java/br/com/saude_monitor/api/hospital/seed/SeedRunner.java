@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.hospital.seed;
 
+import br.com.saude_monitor.api.config.trava.TravaDistribuida;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -44,6 +46,12 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class SeedRunner implements ApplicationRunner {
 
+    /** Nome da trava desta tarefa ({@link TravaDistribuida}). */
+    static final String TRAVA = "seed-hospitais";
+
+    /** Folga para a tarefa terminar; se a instância morrer no meio, a trava vence e outra refaz. */
+    private static final Duration VALIDADE_TRAVA = Duration.ofMinutes(15);
+
     /**
      * Primeiro entre os runners de dados: semear o banco vazio precede reconciliar o que
      * já existe ({@link ReconciliacaoRaioGeofenceRunner#ORDEM}). Sem ordem explícita, o
@@ -59,6 +67,9 @@ public class SeedRunner implements ApplicationRunner {
     private final SeedProperties properties;
     private final HospitalPublicoComplementarLeitor hospitalPublicoComplementarLeitor;
 
+    /** Uma instância por vez (SOL-02): as outras pulam enquanto esta executa. */
+    private final TravaDistribuida trava;
+
     /**
      * Nome do arquivo JSON com hospitais PÚBLICOS do CNES ausentes da fonte InfoSaúde/GDF
      * (ver {@code backend/data/README.md}). Fonte exclusiva de hospitais públicos — ver
@@ -68,6 +79,10 @@ public class SeedRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        trava.executar(TRAVA, VALIDADE_TRAVA, this::executar);
+    }
+
+    private void executar() {
         Path diretorio = Path.of(properties.path());
         if (!Files.isDirectory(diretorio)) {
             log.warn("[Seed] Diretório de dados não encontrado: {} — seed ignorado.",

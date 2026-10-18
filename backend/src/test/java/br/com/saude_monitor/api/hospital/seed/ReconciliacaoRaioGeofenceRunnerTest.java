@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.hospital.seed;
 
+import br.com.saude_monitor.api.config.trava.TravasDeTeste;
 import br.com.saude_monitor.api.hospital.document.CategoriaEstabelecimento;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.dto.GeoJsonPolygonDto;
@@ -59,7 +60,7 @@ class ReconciliacaoRaioGeofenceRunnerTest {
             150.0, 100.0, 75.0, 100.0, 100.0, 100.0, 100.0);
 
     private final ReconciliacaoRaioGeofenceRunner runner =
-            new ReconciliacaoRaioGeofenceRunner(repository, factory, properties, mongoTemplate);
+            new ReconciliacaoRaioGeofenceRunner(repository, factory, properties, mongoTemplate, TravasDeTeste.livre());
 
     {
         when(mongoTemplate.bulkOps(eq(BulkOperations.BulkMode.UNORDERED), eq(HospitalDocument.class)))

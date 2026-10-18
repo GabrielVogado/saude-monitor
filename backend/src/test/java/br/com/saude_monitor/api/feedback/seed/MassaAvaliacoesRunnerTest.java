@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.feedback.seed;
 
+import br.com.saude_monitor.api.config.trava.TravasDeTeste;
 import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.hospital.document.CategoriaEstabelecimento;
@@ -64,7 +65,7 @@ class MassaAvaliacoesRunnerTest {
 
     private MassaAvaliacoesRunner runner(String modo, String senha) {
         return new MassaAvaliacoesRunner(mongoTemplate, passwordEncoder, indicadorService,
-                new MassaAvaliacoesProperties(true, modo, senha));
+                new MassaAvaliacoesProperties(true, modo, senha), TravasDeTeste.livre());
     }
 
     private void comHospitaisAtivos(int quantidade) {

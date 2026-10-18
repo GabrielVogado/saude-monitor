@@ -5,6 +5,12 @@
 
 ---
 
+## 📌 Revisão 18/10/2026 — Épico 9: seed e tarefas de inicialização com trava distribuída (SOL-02)
+
+**O que mudou:** seed de hospitais, reconciliações, importação CNES, seed do admin e massa do dev passam a rodar sob uma trava no MongoDB: com várias instâncias subindo juntas, só uma executa. É o pré-requisito de código para tirar o `--max-instances=1` do Cloud Run, que fica para a etapa de infraestrutura. `De-Para-Backlog-Features.md` (SOL-02 entregue) e `Historico-Melhorias.md` (M-050).
+
+---
+
 ## 📌 Revisão 18/10/2026 — Épico 9: só avaliação com prova de presença conta no indicador (SEG-01)
 
 **O que mudou:** o indicador público (nota e tempo) passa a contar só visitas cujo check-in trouxe posição dentro do geofence do hospital, recebido até 45 min depois da entrada, e os feedbacks delas. O check-in manual sem posição e o retroativo continuam aceitos, mas ficam fora do indicador. `Especificacao-API-v2.4.md` (check-in e indicadores), `De-Para-Backlog-Features.md` (SEG-01 parcial) e `Historico-Melhorias.md` (M-049).

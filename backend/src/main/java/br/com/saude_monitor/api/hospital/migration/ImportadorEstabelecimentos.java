@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.hospital.migration;
 
+import br.com.saude_monitor.api.config.trava.TravaDistribuida;
 import br.com.saude_monitor.api.hospital.document.ContatoDocument;
 import br.com.saude_monitor.api.hospital.document.EnderecoDocument;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
@@ -36,14 +38,27 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ImportadorEstabelecimentos implements ApplicationRunner {
 
+    /** Nome da trava desta tarefa ({@link TravaDistribuida}). */
+    static final String TRAVA = "importacao-estabelecimentos";
+
+    /** Folga para a tarefa terminar; se a instância morrer no meio, a trava vence e outra refaz. */
+    private static final Duration VALIDADE_TRAVA = Duration.ofMinutes(15);
+
     private final EstabelecimentoLeitor leitor;
     private final CategoriaMapper categoriaMapper;
     private final GeofenceFactory geofenceFactory;
     private final HospitalRepository hospitalRepository;
     private final ImportacaoProperties properties;
 
+    /** Uma instância por vez (SOL-02): as outras pulam enquanto esta executa. */
+    private final TravaDistribuida trava;
+
     @Override
     public void run(ApplicationArguments args) {
+        trava.executar(TRAVA, VALIDADE_TRAVA, this::executar);
+    }
+
+    private void executar() {
         Path arquivo = Path.of(properties.caminhoArquivo());
         if (!Files.exists(arquivo)) {
             log.warn("[Importacao] Arquivo não encontrado: {}. Importação ignorada.", arquivo.toAbsolutePath());

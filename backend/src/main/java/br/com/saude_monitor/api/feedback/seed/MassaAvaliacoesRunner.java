@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.feedback.seed;
 
+import br.com.saude_monitor.api.config.trava.TravaDistribuida;
 import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
@@ -69,6 +70,11 @@ public class MassaAvaliacoesRunner {
 
     static final int QUANTIDADE_USUARIOS = 30;
 
+    /** Nome da trava da carga ({@link TravaDistribuida}). */
+    static final String TRAVA = "massa-avaliacoes";
+
+    private static final Duration VALIDADE_TRAVA = Duration.ofMinutes(15);
+
     static final String DOMINIO_EMAIL = "radarsaude.invalid";
 
     /** Idade a partir da qual a massa é regerada sozinha: antes de sair da janela de 90 dias (RN-14). */
@@ -95,6 +101,9 @@ public class MassaAvaliacoesRunner {
     private final IndicadorService indicadorService;
     private final MassaAvaliacoesProperties properties;
 
+    /** Duas instâncias do dev subindo juntas não regeram a massa ao mesmo tempo (SOL-02). */
+    private final TravaDistribuida trava;
+
     /** Dispara a carga em segundo plano quando a aplicação está pronta. */
     @Async
     @EventListener(ApplicationReadyEvent.class)
@@ -108,7 +117,7 @@ public class MassaAvaliacoesRunner {
      */
     public void executarCarga() {
         try {
-            executar();
+            trava.executar(TRAVA, VALIDADE_TRAVA, this::executar);
         } catch (RuntimeException e) {
             log.error("[MassaAvaliacoes] Falha na carga da massa de avaliações; a aplicação segue sem ela.", e);
         }

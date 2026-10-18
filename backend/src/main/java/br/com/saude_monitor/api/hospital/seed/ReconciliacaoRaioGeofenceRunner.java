@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.hospital.seed;
 
+import br.com.saude_monitor.api.config.trava.TravaDistribuida;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import br.com.saude_monitor.api.hospital.service.GeofenceFactory;
@@ -22,6 +23,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -52,6 +54,12 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class ReconciliacaoRaioGeofenceRunner implements ApplicationRunner {
 
+    /** Nome da trava desta tarefa ({@link TravaDistribuida}). */
+    static final String TRAVA = "reconciliacao-raio-geofence";
+
+    /** Folga para a tarefa terminar; se a instância morrer no meio, a trava vence e outra refaz. */
+    private static final Duration VALIDADE_TRAVA = Duration.ofMinutes(10);
+
     /** Depois do seed ({@link SeedRunner#ORDEM}): reconcilia o que já existia, não o recém-semeado. */
     public static final int ORDEM = 20;
 
@@ -70,8 +78,15 @@ public class ReconciliacaoRaioGeofenceRunner implements ApplicationRunner {
     private final SeedProperties properties;
     private final MongoTemplate mongoTemplate;
 
+    /** Uma instância por vez (SOL-02): as outras pulam enquanto esta executa. */
+    private final TravaDistribuida trava;
+
     @Override
     public void run(ApplicationArguments args) {
+        trava.executar(TRAVA, VALIDADE_TRAVA, this::executar);
+    }
+
+    private void executar() {
         int ajustados = 0;
         int preservados = 0;
         int semGeometria = 0;

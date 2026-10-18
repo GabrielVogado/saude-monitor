@@ -34,6 +34,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -213,8 +214,8 @@ class VisitaServiceImplTest {
                 .build();
         when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaDeOutro));
 
-        assertThrows(AcessoNegadoException.class,
-                () -> visitaService.checkout("v9", new CheckoutRequest(null, null, null, null, null), "invasor"));
+        CheckoutRequest semAparelho = new CheckoutRequest(null, null, null, null, null);
+        assertThrows(AcessoNegadoException.class, () -> visitaService.checkout("v9", semAparelho, "invasor"));
         verify(visitaRepository, never()).save(any(VisitaDocument.class));
     }
 
@@ -268,7 +269,7 @@ class VisitaServiceImplTest {
         HeartbeatResponse resposta = visitaService.heartbeat("v9", "u-logou-depois", "anon-dono", null);
 
         assertEquals(StatusVisita.EM_ATENDIMENTO, resposta.status());
-        assertTrue(resposta.ultimoHeartbeat() != null);
+        assertNotNull(resposta.ultimoHeartbeat());
     }
 
     @Test
@@ -278,8 +279,8 @@ class VisitaServiceImplTest {
         when(visitaRepository.findById("v9")).thenReturn(Optional.of(visita));
         when(visitaRepository.save(any(VisitaDocument.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThrows(AcessoNegadoException.class,
-                () -> visitaService.checkout("v9", new CheckoutRequest(null, null, null, null, "anon-x"), null));
+        CheckoutRequest doIntruso = new CheckoutRequest(null, null, null, null, "anon-x");
+        assertThrows(AcessoNegadoException.class, () -> visitaService.checkout("v9", doIntruso, null));
 
         CheckoutResponse resposta =
                 visitaService.checkout("v9", new CheckoutRequest(null, null, null, null, "anon-dono"), null);
@@ -304,10 +305,12 @@ class VisitaServiceImplTest {
     void sinalizarTipoPermanenciaEmVisitaAnonimaAlheiaLancaAcessoNegado() {
         when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaAtivaAnonima("anon-dono")));
 
-        assertThrows(AcessoNegadoException.class, () -> visitaService.sinalizarTipoPermanencia(
-                "v9", new TipoPermanenciaRequest(TipoPermanencia.INTERNACAO, null), "u-qualquer"));
-        assertThrows(AcessoNegadoException.class, () -> visitaService.sinalizarTipoPermanencia(
-                "v9", new TipoPermanenciaRequest(TipoPermanencia.INTERNACAO, "anon-x"), "u-qualquer"));
+        TipoPermanenciaRequest semAparelho = new TipoPermanenciaRequest(TipoPermanencia.INTERNACAO, null);
+        TipoPermanenciaRequest doIntruso = new TipoPermanenciaRequest(TipoPermanencia.INTERNACAO, "anon-x");
+        assertThrows(AcessoNegadoException.class,
+                () -> visitaService.sinalizarTipoPermanencia("v9", semAparelho, "u-qualquer"));
+        assertThrows(AcessoNegadoException.class,
+                () -> visitaService.sinalizarTipoPermanencia("v9", doIntruso, "u-qualquer"));
     }
 
     @Test

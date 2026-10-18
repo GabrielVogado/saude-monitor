@@ -169,10 +169,9 @@ jobs:
             JWT_SECRET=JWT_SECRET${{ needs.resolve-env.outputs.secret_suffix }}:latest
             RESEND_API_KEY=RESEND_API_KEY${{ needs.resolve-env.outputs.secret_suffix }}:latest
           # O seed de admin fica DESLIGADO ate existirem os secrets ADMIN_EMAIL e
-          # ADMIN_SENHA. application.properties:70-71 cai em `admin@saude.com` /
-          # `admin123` quando eles faltam -- e este servico e publico
-          # (--allow-unauthenticated). Um admin com senha conhecida num endpoint
-          # aberto e pior do que nao ter admin nenhum.
+          # ADMIN_SENHA. Desde o SEG-07 nao ha mais senha padrao no codigo e o seed
+          # ligado sem os dois (ou com senha curta) derruba o boot; o `false` explicito
+          # fica como documentacao do estado de cada ambiente.
           # RESEND_FROM_EMAIL sem nome de exibicao (sem espacos/`<>`) de proposito:
           # o formato de env_vars desta action e sensivel a virgula/espaco/caracteres
           # especiais no valor -- um endereco puro elimina qualquer ambiguidade de parse.

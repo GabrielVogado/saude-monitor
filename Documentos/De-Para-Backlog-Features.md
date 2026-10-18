@@ -16,7 +16,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | Painel Administrativo Web (Épico 7) | 9 | 9 | 100% (✅ E7-01 a E7-09 entregues; E2E com login ADMIN pendente para E7-06 e E7-09) |
 | **Total do backlog** | **51** | **52** | **98%** |
 | Épico 8 — Estabilização e Desempenho (novo, v2.1) | 8 | 15 | 53% |
-| Épico 9 — Escala, Segurança e Privacidade (novo, 18/10/2026) | 12 | 19 | 63% |
+| Épico 9 — Escala, Segurança e Privacidade (novo, 18/10/2026) | 13 | 20 | 65% |
 
 > ⚠️ **Entregue ≠ utilizável.** As 42 estórias abaixo estão implementadas e cobertas por teste em CI, mas o sistema **não passou por validação em campo** e apresenta lentidão transversal de origem confirmada na infraestrutura — o **cold start** na primeira abertura após ociosidade (503 no Cloud Run, ver E8-01). O "1–5 s por requisição com o serviço quente" descrito aqui era o Render antigo: re-medido em 24/09/2026 sobre o Cloud Run quente, os GET ficam em **p95 ~195–245 ms** (ver E8-02). Ver `Features-MVP-v2.1.md` §2.1 e o **Épico 8** do `Backlog-MVP-v2.1.md`.
 
@@ -157,7 +157,8 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **ARQ-05** | Timeouts, 503 com `Retry-After` e modo evento | Cross | ✅ Entregue (18/10/2026) — teto de 80 requisições simultâneas por instância (acima disso, 503 `SERVICO_SOBRECARREGADO` na hora), falha passageira do banco vira 503 `BANCO_INDISPONIVEL` em vez de 500, os dois com `Retry-After`, e modo somente leitura (503 `MODO_SOMENTE_LEITURA` nas gravações, consultas seguem). Ver [M-055](09-melhoria-continua/Historico-Melhorias.md). |
 | **SOL-07** | Pool e timeouts do MongoDB explícitos | Cross | ✅ Entregue (18/10/2026) — até 20 conexões por instância (era 100), 2 s esperando conexão, 5 s escolhendo servidor, 30 s de leitura (era sem prazo) e conexão ociosa fechada em 60 s, configuráveis e por cima da `MONGO_URI`. Ver [M-055](09-melhoria-continua/Historico-Melhorias.md). |
 | **ARQ-09** | Flags simples no backend (modo evento, versão mínima) | Cross | ✅ Entregue (18/10/2026) — coleção `configuracao_remota` com modo somente leitura, versão mínima do app e mensagem; `GET /api/v1/configuracao` público para o app e `PUT /api/v1/admin/configuracao` para o ADMIN; cada instância relê a cada 30 s; `APP_SOMENTE_LEITURA_FORCADO` liga o modo sem o banco. Os jobs são pulados no modo somente leitura. O app passa a ler a configuração no APP-03. Ver [M-055](09-melhoria-continua/Historico-Melhorias.md). |
-| **SEG-07** | Swagger fora de produção e seed de admin sem senha padrão | Cross | 🔴 Pendente |
+| **SEG-07** | Swagger fora de produção e seed de admin sem senha padrão | Cross | ✅ Entregue (18/10/2026) — `/v3/api-docs` e Swagger UI desligados no perfil `prod` (`application-prod.properties`); seed de admin desligado por padrão, sem e-mail nem senha no código, e ligado sem credencial (ou com senha de menos de 12 caracteres) derruba o boot. Ver [M-056](09-melhoria-continua/Historico-Melhorias.md). |
+| **SEG-06** | Contêiner sem root e cadeia de suprimentos | Cross | 🟡 Parcial (18/10/2026) — a imagem roda como usuário sem privilégio (UID 10001) e perdeu o `curl`. Faltam base fixada por *digest*, varredura de imagem e de dependências (Trivy), Dependabot e SBOM na release, que mexem na esteira e ficam para a fase de infraestrutura. Ver [M-056](09-melhoria-continua/Historico-Melhorias.md). |
 | **APP-01** | Recálculo de geofence no aparelho com catálogo local | **F-04** | 🔴 Pendente |
 | **APP-03** | Versão mínima suportada com tela de atualização | Cross | 🔴 Pendente |
 

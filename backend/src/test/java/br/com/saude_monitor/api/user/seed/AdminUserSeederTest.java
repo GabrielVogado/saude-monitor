@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -18,8 +19,8 @@ import static org.mockito.Mockito.when;
 /**
  * Achado da auditoria de erros silenciosos (08/09/2026): com {@code email} configurado
  * mas {@code senha} ausente/vazio, o seed criava um admin com hash de senha vazia e
- * logava "criado com sucesso" — ninguém conseguia autenticar e não havia nenhum sinal
- * disso no boot. Estes testes cobrem o comportamento corrigido: abortar o seed.
+ * logava "criado com sucesso". Desde o SEG-07 (18/10/2026), seed ligado sem e-mail, sem
+ * senha ou com senha curta falha o boot, em vez de pular em silêncio.
  */
 class AdminUserSeederTest {
 
@@ -35,20 +36,39 @@ class AdminUserSeederTest {
         return new AdminUserSeeder(userRepository, new BCryptPasswordEncoder(), properties, TravasDeTeste.livre());
     }
 
-    @Test
-    void naoCriaAdminQuandoSenhaAusente() {
-        when(userRepository.existsByPapel(Papel.ADMIN)).thenReturn(false);
-        seeder = seederCom(new AdminSeedProperties(true, "admin@saude-monitor.com", null, "Admin"));
+    private void bootFalha(AdminSeedProperties properties) {
+        seeder = seederCom(properties);
 
-        seeder.run(mock(ApplicationArguments.class));
-
+        assertThatThrownBy(() -> seeder.run(mock(ApplicationArguments.class)))
+                .isInstanceOf(IllegalStateException.class);
         verify(userRepository, never()).save(any(UserDocument.class));
     }
 
     @Test
-    void naoCriaAdminQuandoSenhaEmBranco() {
-        when(userRepository.existsByPapel(Papel.ADMIN)).thenReturn(false);
-        seeder = seederCom(new AdminSeedProperties(true, "admin@saude-monitor.com", "   ", "Admin"));
+    void bootFalhaQuandoSenhaAusente() {
+        bootFalha(new AdminSeedProperties(true, "admin@saude-monitor.com", null, "Admin"));
+    }
+
+    @Test
+    void bootFalhaQuandoSenhaEmBranco() {
+        bootFalha(new AdminSeedProperties(true, "admin@saude-monitor.com", "   ", "Admin"));
+    }
+
+    @Test
+    void bootFalhaComASenhaPadraoAntiga() {
+        bootFalha(new AdminSeedProperties(true, "admin@saude.com", "admin123", "Admin"));
+    }
+
+    @Test
+    void bootFalhaSemEmail() {
+        bootFalha(new AdminSeedProperties(true, " ", "S3nh@Forte!2026", "Admin"));
+        bootFalha(new AdminSeedProperties(true, null, "S3nh@Forte!2026", "Admin"));
+    }
+
+    @Test
+    void naoDuplicaQuandoJaExisteAdmin() {
+        when(userRepository.existsByPapel(Papel.ADMIN)).thenReturn(true);
+        seeder = seederCom(new AdminSeedProperties(true, "admin@saude-monitor.com", "S3nh@Forte!2026", "Admin"));
 
         seeder.run(mock(ApplicationArguments.class));
 
@@ -58,7 +78,7 @@ class AdminUserSeederTest {
     @Test
     void criaAdminQuandoEmailESenhaConfigurados() {
         when(userRepository.existsByPapel(Papel.ADMIN)).thenReturn(false);
-        seeder = seederCom(new AdminSeedProperties(true, "admin@saude-monitor.com", "S3nh@Forte!", "Admin"));
+        seeder = seederCom(new AdminSeedProperties(true, "admin@saude-monitor.com", "S3nh@Forte!2026", "Admin"));
 
         seeder.run(mock(ApplicationArguments.class));
 
@@ -69,7 +89,7 @@ class AdminUserSeederTest {
     void naoFazNadaQuandoOutraInstanciaEstaSemeando() {
         // SOL-02: duas instâncias subindo juntas não criam dois admins.
         seeder = new AdminUserSeeder(userRepository, new BCryptPasswordEncoder(),
-                new AdminSeedProperties(true, "admin@saude-monitor.com", "S3nh@Forte!", "Admin"),
+                new AdminSeedProperties(true, "admin@saude-monitor.com", "S3nh@Forte!2026", "Admin"),
                 TravasDeTeste.ocupada());
 
         seeder.run(mock(ApplicationArguments.class));

@@ -12,11 +12,11 @@ RUN ./gradlew --no-daemon clean bootJar
 FROM eclipse-temurin:25-jre
 WORKDIR /app
 
-# curl serve ao healthcheck do container no deploy da Oracle Cloud
-# (deploy/oracle/docker-compose.yml) e a diagnostico dentro da VM.
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl \
- && rm -rf /var/lib/apt/lists/*
+# SEG-06: a aplicação roda com um usuário sem privilégio, e não como root. Uma falha de
+# execução remota numa biblioteca fica presa a esse usuário, sem escrita no sistema.
+# O curl que ficava aqui servia só ao deploy da Oracle Cloud, que não existe mais: saiu,
+# para não deixar ferramenta de rede à mão dentro do contêiner.
+RUN useradd --system --uid 10001 --user-group --no-create-home --shell /usr/sbin/nologin app
 
 COPY --from=builder /app/build/libs/*.jar app.jar
 
@@ -24,6 +24,8 @@ COPY --from=builder /app/build/libs/*.jar app.jar
 COPY data data
 
 EXPOSE 8080
+
+USER 10001:10001
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
 

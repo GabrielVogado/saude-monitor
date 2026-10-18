@@ -630,6 +630,9 @@ sequenceDiagram
 | **Validação** | Bean Validation em todos os DTOs; mensagens pt-BR |
 | **Logs** | Sem dados pessoais (nunca logar e-mail/senha/posição bruta); `traceId` em todas as respostas |
 | **Papéis** | `USER` (padrão) · `HOSPITAL_ADMIN` (futuro) · `ADMIN` (cadastro de hospitais) |
+| **Contrato OpenAPI** | `/v3/api-docs` e `/swagger-ui.html` públicos em desenvolvimento e homologação; desligados no perfil `prod` (SEG-07, 18/10/2026) |
+| **Admin inicial** | Seed desligado por padrão, sem e-mail nem senha no código. Ligado (`APP_SEEDADMIN_ENABLED=true`), exige `ADMIN_EMAIL` e `ADMIN_SENHA` com 12+ caracteres, ou a aplicação não sobe (SEG-07) |
+| **Contêiner** | Aplicação roda como usuário sem privilégio (UID 10001), sem `curl` na imagem final (SEG-06) |
 
 ---
 

@@ -10,6 +10,7 @@
 |---|---|
 | **Versão** | 1.0 |
 | **Data** | 17/10/2026 |
+| **Atualização** | 18/10/2026: Quarkus na §12.3 e §12.4, cache AOT do Java 25 no SOL-04 e novo gap SOL-09 (e-mail em `@Async`) |
 | **Status** | 🟡 Proposta — aguarda as respostas do §17 |
 | **Commit-base** | `develop@1d2e431` (homologação `v1.0.0-rc.5`) |
 | **Pedido do PO** | Sistema escalável e seguro, com o menor custo que entregue valor, para uso por 60–70% da população do DF |
@@ -71,7 +72,7 @@
 
 | Setor | Crítico | Alto | Médio | Baixo | Total |
 |---|:-:|:-:|:-:|:-:|:-:|
-| 1. Arquitetura de Soluções | 3 | 3 | 2 | – | 8 |
+| 1. Arquitetura de Soluções | 3 | 4 | 2 | – | 9 |
 | 2. Arquitetura de Software | 2 | 1 | 3 | 3 | 9 |
 | 3. Aplicativo móvel | 1 | 1 | 2 | – | 4 |
 | 4. Segurança da Informação | 1 | 1 | 5 | 1 | 8 |
@@ -79,7 +80,7 @@
 | 6. Desempenho e Capacidade | 1 | 1 | 1 | 1 | 4 |
 | 7. Operação e Observabilidade | – | 2 | 3 | – | 5 |
 | 8. Engenharia de Software | – | 2 | 2 | – | 4 |
-| **Total** | **8** | **13** | **19** | **5** | **45** |
+| **Total** | **8** | **14** | **19** | **5** | **46** |
 
 ### 1.3 Os dez gaps prioritários
 
@@ -263,19 +264,23 @@ O plano de 08/10/2026 dimensiona pela **sessão de uso** (12 requisições por j
 
 #### SOL-04 · Cold start devolvendo HTTP 503 <span class="sev h">Alto</span>
 
-**Evidência.** `--min-instances=0` (`cd-backend-google.yml:192`). Medido no ADR-011: **503 em ~14,8 s** na primeira requisição após ociosidade; boot do Spring em ~8,9 s.
+**Evidência.** `--min-instances=0` (`cd-backend-google.yml:192`). Medido no ADR-011: **503 em ~14,8 s** na primeira requisição após ociosidade; boot do Spring em ~8,9 s. O `backend/Dockerfile` roda `java -jar` com o jar inteiro, sem extração nem cache AOT, e o deploy não usa `--cpu-boost`: nenhuma das alavancas baratas de boot está em uso.
 
 **Impacto.** A primeira abertura do dia falha, em vez de só demorar. Num pico, cada instância nova que nasce repete o boot inteiro, com o seed incluído.
 
 **Soluções possíveis.**
 
-- **A — Produção com `min-instances=1`** (2 a partir de P3) e `--cpu-boost`. ~US$ 15–70/mês.
-- **B — Boot mais curto:** seed fora do startup (SOL-02), Class Data Sharing (AppCDS) ou Spring AOT. *Prós:* vale para todas as instâncias novas.
-- **C — Imagem nativa com GraalVM.** *Prós:* boot em décimos de segundo. *Contras:* build complexo e reflexão do Spring/Mongo a mapear. Não vale agora.
+- **A — Produção com `min-instances=1`** (2 a partir de P3). ~US$ 13/mês por instância ociosa na tabela Tier 1; São Paulo é Tier 2, mais cara (conferir na calculadora).
+- **B — Boot mais curto, sem trocar de framework:**
+  - `--cpu-boost`: 2 vCPU durante o boot e por mais 10 s; o Google cita até −50% no startup de apps Java;
+  - jar extraído (`-Djarmode=tools extract`, ~−15%) com o **cache AOT do Java 25** (JEPs 483, 514 e 515). O Spring Boot tem página oficial "AOT Cache"; no PetClinic do JEP 483 o boot caiu 42%;
+  - seed fora do startup (SOL-02).
+  - *Ressalvas:* no JDK 25 o cache AOT reduz a vazão durante o aquecimento (bug JDK-8386852; ~−7% com threads virtuais no benchmark do Quarkus), então é preciso medir p95 e vazão, não só o boot. O treino do cache exige as mesmas flags da produção e Mongo disponível, ou a criação de índices desligada durante o treino. Estimativa, sem medição: de ~8,9 s para 3–5 s.
+- **C — Imagem nativa** (GraalVM 25+ no Spring Boot 4) **ou CRaC.** *Contras:* o nativo congela no build as condições de bean (o projeto tem 6 `@ConditionalOnProperty` e 1 `@Profile`) e tem risco com `openpdf` e `jjwt`. O CRaC não tem suporte oficial no Cloud Run, exige build privilegiado e o snapshot guarda segredos. Não vale agora.
 
-**Recomendação.** **A + B.** Fecha a pendência E8-01 do ADR-011 (decisão D4 do plano).
+**Recomendação.** **B** primeiro, sem custo, e medir de novo; **A** na produção (decisão D4 do plano de escala). Fecha a pendência E8-01 do ADR-011. Trocar de framework não é necessário para isso (§12.4).
 
-<p class="meta">Fase 3 · Esforço baixo · Custo US$ 15–70/mês</p>
+<p class="meta">Fase 1 (B) e Fase 3 (A) · Esforço baixo · Custo ~US$ 13–70/mês (A)</p>
 
 </div>
 
@@ -283,7 +288,7 @@ O plano de 08/10/2026 dimensiona pela **sessão de uso** (12 requisições por j
 
 #### SOL-05 · Jobs agendados dentro da aplicação, sem garantia de disparo <span class="sev h">Alto</span>
 
-**Evidência.** Quatro `@Scheduled(fixedRate = 15 min)`: `IndicadorHospitalJob.java:22`, `VisitaExpiracaoJob.java:18`, `VisitaGpsInterrompidoJob.java:18` e `FeedbackSemRespostaJob.java:19`. O Cloud Run estrangula a CPU entre requisições e pode recolher a instância. Os jobs não emitem log (ADR-011).
+**Evidência.** Quatro `@Scheduled(fixedRate = 15 min)`: `IndicadorHospitalJob.java:22`, `VisitaExpiracaoJob.java:18`, `VisitaGpsInterrompidoJob.java:18` e `FeedbackSemRespostaJob.java:19`. O Cloud Run estrangula a CPU entre requisições e pode recolher a instância. O guia Java do Cloud Run confirma: na cobrança por requisição, `@Scheduled`, timers e `@Async` *"may not execute"*, e com pouco tráfego podem nunca rodar. Os jobs não emitem log (ADR-011).
 
 **Impacto.** Indicadores públicos parados, visitas que nunca expiram e pendências que nunca fecham, tudo em silêncio. Com N instâncias, cada job roda N vezes.
 
@@ -348,6 +353,27 @@ O plano de 08/10/2026 dimensiona pela **sessão de uso** (12 requisições por j
 **Recomendação.** **A** antes do lançamento, com alerta de 80% da cota; **C** avaliado como redução de atrito e de custo.
 
 <p class="meta">Fase 3 · Esforço baixo · Custo ~US$ 20–90/mês</p>
+
+</div>
+
+<div class="gap alto" markdown="1">
+
+#### SOL-09 · E-mail de confirmação e de senha enviado em `@Async`, sem CPU garantida <span class="sev h">Alto</span>
+
+**Evidência.** `ResendEmailService.java:42-49`: `enviarCodigoConfirmacaoEmail` e `enviarCodigoRedefinicaoSenha` são `@Async`, chamados por `AuthServiceImpl.java:291-292`. O `@Async` foi posto de propósito (code-review de 10/09/2026): sem ele, o tempo de resposta do "esqueci a senha" revelava se o e-mail existe. O deploy não define `--no-cpu-throttling` (`cd-backend-google.yml:186-194`), então vale a cobrança por requisição. Nesse modo, o guia Java do Cloud Run avisa que métodos `@Async` *"may not execute"*: a CPU só é garantida enquanto há uma requisição em andamento.
+
+**Impacto.** O código de confirmação pode atrasar ou não sair. A resposta volta antes do envio, a thread fica sem CPU e, se a instância for recolhida (`min-instances=0`), a tarefa se perde sem nem gerar log de falha. Quem não confirma o e-mail **não consegue entrar** (M-013), e o sintoma chega como "não recebi o código". Não foi medido no projeto; a confirmação vem do cruzamento dos envios no Resend com os cadastros.
+
+**Soluções possíveis.**
+
+- **A — Cloud Tasks para o envio.** A requisição sempre enfileira uma tarefa, inclusive para e-mail inexistente (quem decide é o handler). Isso mantém o tempo de resposta constante e fecha o canal lateral; a entrega ganha nova tentativa automática. A cota gratuita mensal cobre o volume (conferir).
+- **B — Envio síncrono com tempo mínimo de resposta.** Enviar dentro da requisição e responder sempre depois de um piso fixo (ex.: 1,5 s), exista ou não o e-mail. *Prós:* nenhuma peça nova. *Contras:* requisição mais lenta; o piso precisa cobrir a latência do Resend.
+- **C — CPU sempre alocada** (`--no-cpu-throttling`). *Contras:* paga a instância 24 h por dia e não evita a perda quando a instância é recolhida.
+- **D — *Outbox* no Mongo e Cloud Scheduler a cada minuto.** *Contras:* até 1 min de atraso no código.
+
+**Recomendação.** **A**, registrada como exceção no ADR-016 (o e-mail precisa de entrega em segundos, com nova tentativa); **B** se preferir não acrescentar peça agora. Antes, conferir nos logs do Resend se já há código não entregue.
+
+<p class="meta">Fase 1 · Esforço baixo a médio · Custo ~0 (cota gratuita)</p>
 
 </div>
 
@@ -1089,9 +1115,44 @@ O plano de 08/10/2026 dimensiona pela **sessão de uso** (12 requisições por j
 | Microsserviços | Monólito modular com 6 contextos claros; uma equipe pequena | Equipes independentes por contexto ou necessidade de escalar um contexto 10× mais que os outros |
 | Kafka / RabbitMQ | Volume de eventos baixo, sem múltiplos consumidores (ADR-004 da Árvore) | Mais de ~100 eventos/s ou um segundo serviço consumidor |
 | Redis / Upstash | A borda e o catálogo local fazem o que ele faria, de graça | Taxa de acerto da borda < 60% ou abuso distribuído que passe pela borda |
-| WebFlux | Threads virtuais já resolvem a espera de I/O sem reescrever | CPU da instância saturada com I/O como gargalo, medido |
+| WebFlux | Threads virtuais já resolvem a espera de I/O sem reescrever; posição oficial do Spring: aplicação MVC que funciona não precisa mudar | CPU da instância saturada com I/O como gargalo, medido |
+| Quarkus | Sobe mais rápido e usa menos memória, mas não tem compatibilidade com Spring Data MongoDB: 20–50 pessoa-dias de reescrita sem resolver nenhum gargalo medido além do boot (§12.4) | Boot acima de 4–5 s depois do SOL-04 B, ou CPU do framework como limitante medido (§12.4) |
 | PostGIS | `2dsphere` atende raio e polígono | Mapas de calor, isócronas ou séries temporais geográficas |
 | Multi-região | DF é uma região; a SLO de 99,5% cabe numa região | SLO acima de 99,9% ou expansão nacional |
+
+### 12.4 Por que não Quarkus
+
+O Quarkus não é a mesma pergunta do WebFlux. Ele aceita o código imperativo de hoje, com `@RunOnVirtualThread`, então a objeção ao modelo reativo não se aplica. A questão é o custo da migração contra o ganho. O levantamento abaixo foi feito em 17–18/10/2026 no código do commit-base e em fontes primárias, com checagem independente dos números (Anexo C).
+
+**O ganho.** Benchmark oficial do time Quarkus (02/06/2026, 4 núcleos, CRUD com PostgreSQL):
+
+| | Spring Boot 4 + threads virtuais | Quarkus JVM | Quarkus JVM + cache AOT | Quarkus nativo | Spring Boot 4 nativo |
+|---|---|---|---|---|---|
+| Até a 1ª resposta | 10,6 s | 4,3 s | 1,7 s | 0,57 s | 2,2 s |
+| Memória na 1ª requisição | 495 MiB | 277 MiB | – | 98 MiB | 303 MiB |
+| Vazão | 9.971 tps | 15.299 tps | – | 5.437 tps | 2.150 tps |
+
+No mesmo laboratório, o Spring com cache AOT ficou em 7,9 s. É o benchmark de quem defende o produto, em 4 núcleos e sem MongoDB; o Radar roda em 1 vCPU com Atlas, então a proporção não se transfere direto.
+
+**O custo.**
+
+- A camada de compatibilidade Spring do Quarkus **não tem Spring Data MongoDB** (conferido na LTS 3.40.1), e a de segurança só cobre `@Secured` e `@PreAuthorize`, que o projeto não usa.
+- Teriam de ser reescritos: 8 repositórios (29 métodos derivados), 32 chamadas de `MongoTemplate`, tipos GeoJSON do Spring em 9 arquivos, 25 índices criados por anotação, 21 regras de rota e os filtros de JWT e de rate limit. 83 dos 167 arquivos de `main` importam Spring.
+- Mais 225 testes reescritos (101 de contexto Spring ou MockMvc, 124 que simulam o `MongoTemplate`), sob os portões de 90% de cobertura e de contagem do CI.
+- Estimativa: **20 a 50 pessoa-dias**, o tamanho das Fases 1 e 2 do roteiro (§14).
+- O Quarkus 4.0 sai no fim de novembro de 2026: migrar para a 3.40 agora significa outra migração grande logo depois.
+- Imagem nativa: risco alto no `openpdf` (AWT e fontes, usado na exportação LGPD) e médio no `jjwt` e na resolução `mongodb+srv` do Atlas. O build pede 4 CPUs e 4–8 GB de RAM, e o runner padrão do GitHub para repositório privado tem 2 vCPUs. A vazão nativa fica em ~36% da JVM.
+
+**O que não resolve.** Banco gratuito, instância única do seed, rate limit por IP, leitura pública sem cache, consulta ao banco por requisição autenticada e BCrypt continuam iguais. No teste de carga a memória ficou em 28% no pico, e ela pesa ~9% do custo de uma instância do Cloud Run. Mesmo que a vazão 1,5× se confirmasse, a economia na meta seria de ~US$ 35–85/mês. O boot, único ganho real, tem caminho sem reescrita no SOL-04 B.
+
+**Quando reavaliar.** Depois das Fases 1 e 2 e com as alavancas do SOL-04 medidas em produção, se:
+
+- o boot continuar acima de 4–5 s e `min-instances=1` não for aceitável;
+- o Cloud Run passar de ~US$ 250/mês com CPU saturada e o profiler apontar o framework, não o BCrypt nem a espera do Mongo;
+- entrar na equipe alguém fluente em Quarkus, ou surgir um serviço novo fora do monólito;
+- o Quarkus passar a oferecer compatibilidade com Spring Data MongoDB.
+
+Antes de migrar, uma prova de conceito de 2–3 dias com o Quarkus 4 LTS: listagem por raio com `$nearSphere` e login com JWT compatível com os tokens atuais, no mesmo Cloud Run de 1 vCPU e contra o Atlas real. Migrar só com pelo menos 1,5× de req/s por instância ou boot de até 2 s sem `min-instances`.
 
 ---
 
@@ -1105,7 +1166,7 @@ Preços de lista de outubro/2026, a maioria herdada do `Plano-Escala` §5. **Con
 | MongoDB Atlas (produção, GCP SP) | Flex 8–15 | Flex 15–30 | M10–M20 105–260 | M30 por algumas horas: +10–25 |
 | Borda Cloudflare (Free; Worker pago se for o proxy) | 0–5 | 0–5 | 5–30 | 0 |
 | Tiles do mapa (PMTiles no R2) | ~0 | ~1–5 | ~10–40 | ~0 |
-| Cloud Scheduler, Logging, Monitoring | ~0 | ~0 | ~10–30 | – |
+| Cloud Scheduler, Cloud Tasks (e-mail), Logging, Monitoring | ~0 | ~0 | ~10–30 | – |
 | E-mail (Resend pago) | 20 | 20–35 | 35–90 | – |
 | Crashlytics, Analytics, Remote Config, Play Integrity | 0 | 0 | 0 ² | – |
 | Domínio, Apple Developer (rateado) | ~10 | ~10 | ~10 | – |
@@ -1126,7 +1187,7 @@ Cada item é um PR próprio para `develop`, com testes e o roteamento de qualida
 | Fase | Objetivo | Gaps | Saída (critério de pronto) |
 |---|---|---|---|
 | **0 — Decisões e guarda-corpos** (≈1 semana, custo 0) | Saber o que medir e ser avisado | ENG-01, ENG-02, PERF-02, OPS-01, OPS-05, OPS-02 (jobs) | RNFs v2.2 aprovados; ADR-016 decidido; alertas de 5xx, latência e orçamento ativos; jobs com log |
-| **1 — Destravar a escala e fechar a integridade** (≈3–4 semanas, código) | Tirar o estado da instância e as brechas de segurança | SOL-02, SOL-05, SOL-07, ARQ-02, ARQ-03, ARQ-04, ARQ-05, ARQ-07, ARQ-09, SEG-02, DAD-01, ENG-04, SEG-01 (prova de presença e atestação) | `--max-instances` > 1 sem corrida; rate limit por identidade; testes de BOLA verdes; pontos de GPS com retenção |
+| **1 — Destravar a escala e fechar a integridade** (≈3–4 semanas, código) | Tirar o estado da instância e as brechas de segurança | SOL-02, SOL-05, SOL-07, SOL-09, ARQ-02, ARQ-03, ARQ-04, ARQ-05, ARQ-07, ARQ-09, SEG-02, DAD-01, ENG-04, SEG-01 (prova de presença e atestação) | `--max-instances` > 1 sem corrida; rate limit por identidade; testes de BOLA verdes; pontos de GPS com retenção |
 | **2 — Borda, domínio e catálogo** (≈2–3 semanas, nova versão do app) | Tirar o público da origem | SOL-03, ARQ-01, APP-01, APP-02, APP-03, OPS-03, SEG-03, SEG-05 | `api.saudemonitor.dev` na borda; acerto de cache > 80%; recálculo de geofence sem requisição; mapa sem Mapbox; Crashlytics e versão mínima ativos |
 | **3 — Produção** (≈1–2 semanas) | Ambiente separado, recuperável e operável | SOL-01, SOL-04, SOL-06, SOL-08, DAD-02, DAD-03, SEG-04, SEG-06, SEG-07, SEG-08, OPS-04 | `release/**` publica produção com smoke verde; restauração testada; RIPD; 4 runbooks |
 | **4 — Prova de carga** (≈1 semana + análise) | Trocar hipótese por número | PERF-01, PERF-03 | Relatório em `11-desempenho/` com req/s por instância; §3 e §13 recalculados |
@@ -1180,7 +1241,7 @@ Seguindo a skill `performance-testing-skill`. **Só roda com autorização do PO
 
 **Decisão proposta.** Opção **A**. Redis e Cloud Tasks ficam registrados como alternativas, com os gatilhos do §12.3.
 
-**Consequências.** (+) Menos peças e menos custo; o app funciona offline com o catálogo. (–) Exige versão nova do app e compatibilidade no servidor para as antigas. (Revisitar) Taxa de acerto da borda < 60% ou atraso de indicador > 15 min.
+**Consequências.** (+) Menos peças e menos custo; o app funciona offline com o catálogo. (–) Exige versão nova do app e compatibilidade no servidor para as antigas. (Revisitar) Taxa de acerto da borda < 60% ou atraso de indicador > 15 min. (Exceção) O e-mail transacional usa Cloud Tasks (SOL-09), porque precisa de entrega em segundos com nova tentativa, o que o Cloud Scheduler não dá.
 
 **Ações.** (1) Registrar o ADR-016 no `adrs.md` após a decisão. (2) Marcar as Fases 3 e 4 do plano de Cache/Fila como substituídas. (3) Árvore Tecnológica v2.2.
 
@@ -1375,6 +1436,7 @@ I = impacto, R = risco, E = esforço (1 a 5). Prioridade = (I + R) × (6 − E).
 | SEG-02 | Feedback e visita anônima sem verificação de dono | <span class="sev h">Alto</span> | 4 | 4 | 2 | 32 | 1 |
 | DAD-01 | Localização em unidade de saúde sem prazo | <span class="sev h">Alto</span> | 3 | 5 | 2 | 32 | 1 |
 | OPS-04 | Produção inexistente e sem runbooks | <span class="sev h">Alto</span> | 4 | 4 | 2 | 32 | 3 |
+| SOL-09 | E-mail em `@Async` sem CPU garantida | <span class="sev h">Alto</span> | 4 | 4 | 2 | 32 | 1 |
 | SOL-02 | Escala horizontal travada em 1 instância | <span class="sev c">Crítico</span> | 5 | 5 | 3 | 30 | 1 |
 | SOL-07 | Pool e timeouts do Mongo não dimensionados | <span class="sev m">Médio</span> | 3 | 3 | 1 | 30 | 1 |
 | APP-01 | Recálculo de geofence em 2º plano | <span class="sev c">Crítico</span> | 5 | 5 | 3 | 30 | 2 |
@@ -1466,5 +1528,15 @@ I = impacto, R = risco, E = esforço (1 a 5). Prioridade = (I + R) × (6 − E).
 | `anthropic-skills:performance-testing-skill` | Cenários, limiares, aborto e autorização (§15, PERF-01/02) |
 | `anthropic-skills:secure-code-guardian` | Modelo de ameaças e controles (§7) |
 | `anthropic-skills:pdf` | Geração deste documento em PDF |
+| Workflow de 5 agentes (18/10/2026) | Inventário do código, pesquisa, defesa do Quarkus e checagem de fatos da §12.4 e do SOL-04 |
 
 **Preços consultados:** os do `Plano-Escala` §9 (MongoDB Atlas Flex e cobrança por região, Cloud Run, Mapbox, Resend), mais Cloudflare Workers e R2, Cloud Scheduler, Play Integrity e Apple Developer, todos por preço de lista e **sujeitos a conferência**.
+
+**Fontes da §12.4, do SOL-04 e do SOL-09** (consultadas em 17–18/10/2026 e conferidas por checagem independente):
+
+- benchmark oficial Quarkus × Spring (02/06/2026): `github.com/quarkusio/benchmarks`, arquivo `results/spring-quarkus-perf-comparison-latest-tuned.json`;
+- Quarkus 3.40 LTS e 4.0.0.Beta1: `quarkus.io/blog`; extensões `spring-*` na tag 3.40.1: `github.com/quarkusio/quarkus/tree/3.40.1/extensions`;
+- JEPs 483, 514 e 515: `openjdk.org/jeps`; página "AOT Cache" do Spring Boot: `docs.spring.io/spring-boot/reference/packaging/aot-cache.html`;
+- cache AOT no Spring e bug JDK-8386852: `quarkus.io/blog/when-the-jit-cant-keep-up`;
+- Cloud Run: startup CPU boost (`docs.cloud.google.com/run/docs/configuring/services/cpu`) e guia Java, com o aviso sobre `@Async` e `@Scheduled` na cobrança por requisição (`docs.cloud.google.com/run/docs/tips/java`);
+- posição do Spring sobre WebFlux × MVC: `docs.spring.io/spring-framework/reference/web/webflux/new-framework.html` e `spring.io/blog/2023/10/16/runtime-efficiency-with-spring`.

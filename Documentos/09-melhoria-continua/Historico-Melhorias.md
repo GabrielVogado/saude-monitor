@@ -2889,6 +2889,56 @@ ainda não foi publicado na loja, então não há versão antiga instalada a man
 
 ---
 
+## M-053 — Jobs periódicos disparáveis pelo Cloud Scheduler, com trava e log (SOL-05, ARQ-08)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0, **SOL-05 (Alto)**: os quatro jobs de
+15 min (indicadores, expiração de visitas, GPS interrompido e feedback sem resposta) e o de
+retenção diário rodavam em `@Scheduled`. No Cloud Run com cobrança por requisição, a CPU é
+estrangulada entre requisições e o próprio guia do Cloud Run avisa que timers podem não
+executar. Os jobs não deixavam log, então um job parado só aparecia nos dados, e com N
+instâncias cada um rodava N vezes. **ARQ-08 (Baixo)**: o recálculo do indicador em `@Async`
+depende desse job como rede de segurança.
+
+### O que mudou (comportamento)
+
+- **Novo `POST /internal/jobs/{nome}`**, fora do contrato público, para o Cloud Scheduler disparar
+  cada job. Só aceita o token OIDC que o Google emite para a conta de serviço configurada
+  (`APP_JOBS_CONTA_SERVICO`), com a audiência configurada (`APP_JOBS_AUDIENCIA`). Sem essas duas
+  variáveis, a rota recusa tudo com 403, que é o estado dos ambientes atuais.
+- **Uma execução por vez**: cada job roda sob a trava distribuída do SOL-02 (`job-<nome>`). Com
+  várias instâncias, ou com o disparo interno e o Cloud Scheduler ligados juntos, o job roda uma
+  vez e as outras chamadas respondem `PULADO`.
+- **Log** de início, de fim com a duração e de erro com a exceção, em cada execução.
+- **Falha** do job vira 500 para o Cloud Scheduler tentar de novo. No disparo interno, o erro
+  fica no log como antes.
+- **Disparo interno** (`@Scheduled`) continua ligado por padrão (`APP_JOBS_AGENDAMENTO_INTERNO`),
+  com os mesmos intervalos, agora passando pela trava.
+- **ARQ-08**: opção A da análise, sem mudança no `@Async`; o job `indicadores` confiável cobre a
+  perda de um recálculo.
+
+### Para ativar (etapa de infraestrutura, não feita aqui)
+
+1. Criar uma conta de serviço para o agendador, com permissão de invocar o serviço.
+2. Criar 5 agendamentos no Cloud Scheduler com destino HTTP `POST <url>/internal/jobs/<nome>`,
+   token OIDC dessa conta e audiência `<url>`: 4 a cada 15 min e `retencao-dados` às 03:30.
+3. Configurar `APP_JOBS_AUDIENCIA=<url>` e `APP_JOBS_CONTA_SERVICO=<e-mail da conta>` no serviço.
+4. Conferir no log os `[Job] … concluído` e então `APP_JOBS_AGENDAMENTO_INTERNO=false`.
+
+### Verificação
+
+- Executor: cada nome chama seu job sob a própria trava, trava ocupada pula sem executar, nome
+  desconhecido não toca na trava, falha do job sobe para quem disparou.
+- Segurança da rota com tokens assinados por chave local no lugar do Google: aceita a conta
+  configurada (com e sem `https://` no emissor), recusa sem token, outra conta, e-mail não
+  verificado, outra audiência, outro emissor, token vencido e outra chave; sem configuração,
+  recusa tudo com 403 sem chamar o executor.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

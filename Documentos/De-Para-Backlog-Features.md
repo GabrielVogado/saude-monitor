@@ -16,7 +16,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | Painel Administrativo Web (Épico 7) | 9 | 9 | 100% (✅ E7-01 a E7-09 entregues; E2E com login ADMIN pendente para E7-06 e E7-09) |
 | **Total do backlog** | **51** | **52** | **98%** |
 | Épico 8 — Estabilização e Desempenho (novo, v2.1) | 8 | 15 | 53% |
-| Épico 9 — Escala, Segurança e Privacidade (novo, 18/10/2026) | 6 | 19 | 32% |
+| Épico 9 — Escala, Segurança e Privacidade (novo, 18/10/2026) | 7 | 19 | 37% |
 
 > ⚠️ **Entregue ≠ utilizável.** As 42 estórias abaixo estão implementadas e cobertas por teste em CI, mas o sistema **não passou por validação em campo** e apresenta lentidão transversal de origem confirmada na infraestrutura — o **cold start** na primeira abertura após ociosidade (503 no Cloud Run, ver E8-01). O "1–5 s por requisição com o serviço quente" descrito aqui era o Render antigo: re-medido em 24/09/2026 sobre o Cloud Run quente, os GET ficam em **p95 ~195–245 ms** (ver E8-02). Ver `Features-MVP-v2.1.md` §2.1 e o **Épico 8** do `Backlog-MVP-v2.1.md`.
 
@@ -150,8 +150,8 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **ARQ-02** | Rate limit por identidade, renovação de token fora do limite por IP | **F-02** | ✅ Entregue (18/10/2026) — rotas públicas contam por usuário, depois pela instalação do app (`X-Cliente-Id`) e só então por IP; teto de abuso por IP de 600/min; login também limitado por conta e refresh só pelo próprio token, sem limite por IP. Contadores ainda por instância: teto global fica para a borda (SOL-03). Ver [M-051](09-melhoria-continua/Historico-Melhorias.md). |
 | **ARQ-01** | Catálogo público versionado com ETag e cache (lado servidor) | **F-01**, **F-07** | 🟡 Parcial (18/10/2026) — servidor pronto: `GET /api/v1/catalogo` com todos os ativos e indicadores, `ETag` pelo conteúdo, 304 com `If-None-Match`, `s-maxage=300`, montado no máximo a cada 5 min por instância (P8); ranking com `s-maxage=300`; gzip nas respostas JSON. Falta o app usar o catálogo (APP-01) e a borda (SOL-03). Ver [M-052](09-melhoria-continua/Historico-Melhorias.md). |
 | **ARQ-03** | Cache curto do usuário no filtro JWT | Cross | ✅ Entregue (18/10/2026) — a conta do access token fica 60 s na memória da instância (Caffeine, até 10 mil contas) em vez de uma leitura no Mongo por requisição; a exclusão da conta descarta a entrada na instância que a recebeu. Ver [M-052](09-melhoria-continua/Historico-Melhorias.md). |
-| **SOL-05** | Jobs como endpoints internos idempotentes, com log | Cross | 🔴 Pendente |
-| **ARQ-08** | Recálculo do indicador coberto pelo job confiável | **F-06** | 🔴 Pendente |
+| **SOL-05** | Jobs como endpoints internos idempotentes, com log | Cross | 🟡 Parcial (18/10/2026) — código pronto: os 5 jobs rodam por `POST /internal/jobs/{nome}` com token OIDC da conta de serviço do Cloud Scheduler (assinatura do Google, audiência e e-mail conferidos), sob trava distribuída (uma execução por vez entre instâncias), com log de início, fim e erro. O `@Scheduled` interno continua ligado por padrão. Falta a infraestrutura: criar os agendamentos no Cloud Scheduler e desligar o interno (`APP_JOBS_AGENDAMENTO_INTERNO=false`). Ver [M-053](09-melhoria-continua/Historico-Melhorias.md). |
+| **ARQ-08** | Recálculo do indicador coberto pelo job confiável | **F-06** | ✅ Entregue (18/10/2026) — opção A da análise: o recálculo em `@Async` continua, e a rede de segurança é o job `indicadores`, agora disparável de fora e com log (SOL-05). Cloud Tasks só se o atraso medido do indicador passar de 15 min. Ver [M-053](09-melhoria-continua/Historico-Melhorias.md). |
 | **SOL-09** | E-mail de confirmação e de senha sem depender de `@Async` | **F-02** | 🔴 Pendente |
 | **SEG-03** | Limite por e-mail de destino e login sem canal de tempo | **F-02** | 🔴 Pendente |
 | **ARQ-05** | Timeouts, 503 com `Retry-After` e modo evento | Cross | 🔴 Pendente |

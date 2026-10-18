@@ -5,6 +5,12 @@
 
 ---
 
+## 📌 Revisão 18/10/2026 — Épico 9: jobs disparáveis pelo Cloud Scheduler (SOL-05, ARQ-08)
+
+**O que mudou:** os 5 jobs periódicos ganham `POST /internal/jobs/{nome}`, aceito só com o token OIDC da conta de serviço do Cloud Scheduler, e passam a rodar uma vez por vez entre instâncias (trava distribuída), com log de início, fim e erro. O `@Scheduled` interno segue ligado até a infraestrutura criar os agendamentos. `Especificacao-API-v2.4.md` (§3.8), `De-Para-Backlog-Features.md` (SOL-05 parcial, ARQ-08 entregue) e `Historico-Melhorias.md` (M-053, com o passo a passo para ativar).
+
+---
+
 ## 📌 Revisão 18/10/2026 — Épico 9: catálogo público com cache e cache curto do usuário (ARQ-01, ARQ-03)
 
 **O que mudou:** novo `GET /api/v1/catalogo` com todos os estabelecimentos ativos e indicadores, `ETag` pelo conteúdo (304 quando o app já tem a versão) e `Cache-Control` público para a borda; montado no máximo a cada 5 min por instância. O ranking ganha `s-maxage=300`, as respostas JSON saem com gzip e a conta do token fica 60 s em memória em vez de uma leitura no banco por requisição. `Especificacao-API-v2.4.md` (§3.7), `De-Para-Backlog-Features.md` (ARQ-01 parcial, ARQ-03 entregue) e `Historico-Melhorias.md` (M-052).

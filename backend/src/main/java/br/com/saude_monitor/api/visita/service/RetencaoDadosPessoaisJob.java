@@ -3,7 +3,6 @@ package br.com.saude_monitor.api.visita.service;
 import br.com.saude_monitor.api.feedback.service.FeedbackService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.function.LongSupplier;
@@ -22,7 +21,6 @@ public class RetencaoDadosPessoaisJob {
     private final VisitaService visitaService;
     private final FeedbackService feedbackService;
 
-    @Scheduled(cron = "0 30 3 * * *", zone = "America/Sao_Paulo")
     public void executar() {
         // Cada passo isolado: a falha de um não pode deixar os outros sem rodar.
         etapa("pontos de GPS apagados de visitas encerradas", visitaService::apagarPontosDeVisitasEncerradas);

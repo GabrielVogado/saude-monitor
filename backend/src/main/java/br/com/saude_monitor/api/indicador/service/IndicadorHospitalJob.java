@@ -1,7 +1,6 @@
 package br.com.saude_monitor.api.indicador.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -19,7 +18,6 @@ public class IndicadorHospitalJob {
 
     private final IndicadorService indicadorService;
 
-    @Scheduled(fixedRate = 15 * 60 * 1000L)
     public void executar() {
         indicadorService.recalcularPendentes();
     }

@@ -560,6 +560,14 @@ Todos os estabelecimentos ativos, com indicadores, em ordem de nome. É o mesmo 
 **Compressão:** respostas JSON acima de 2 KB saem com gzip quando o cliente aceita (`server.compression`).
 
 **Ranking (`GET /api/v1/hospitais/ranking`):** desde o ARQ-01 responde com `Cache-Control: max-age=0, public, s-maxage=300`. A borda pode guardar por 5 min; o aparelho sempre confere.
+
+### 3.8 Jobs internos (SOL-05, 18/10/2026)
+
+#### `POST /internal/jobs/{nome}` 🔒 (só Cloud Scheduler, fora do OpenAPI)
+Dispara um job periódico. `nome` ∈ `indicadores` | `expiracao-visitas` | `gps-interrompido` | `feedback-sem-resposta` (a cada 15 min) | `retencao-dados` (diário, 03:30 de Brasília). Corpo vazio.
+**Autenticação:** `Authorization: Bearer <token OIDC>` emitido pelo Google para a conta de serviço configurada em `APP_JOBS_CONTA_SERVICO`, com `aud` igual a `APP_JOBS_AUDIENCIA` e `email_verified=true`. O access token do app não vale aqui. Sem as duas variáveis, a rota responde **403** a tudo.
+**Respostas:** `200 {"job":"indicadores","resultado":"EXECUTADO"}` · `200 … "PULADO"` (outra instância está executando o mesmo job; trava `job-<nome>` em `travas_execucao`, validade 14 min) · `404` nome desconhecido · `500` falha do job (o Cloud Scheduler tenta de novo). Todos os jobs são idempotentes.
+**Disparo interno:** `APP_JOBS_AGENDAMENTO_INTERNO` (padrão `true`) mantém o `@Scheduled` na aplicação, passando pela mesma trava. Com o Cloud Scheduler configurado, desligar.
 ---
 
 ## 4. Fluxo de Detecção (Geofence → API)

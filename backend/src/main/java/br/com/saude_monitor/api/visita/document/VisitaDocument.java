@@ -82,6 +82,14 @@ public class VisitaDocument {
 
     private OrigemVisita origem;
 
+    /**
+     * {@code true} quando o check-in trouxe posição dentro do geofence do hospital, recebida
+     * perto do momento da entrada (SEG-01). Só a visita comprovada, e o feedback dela, entram
+     * no indicador público. {@code null} nas visitas anteriores à regra: ver
+     * {@code PresencaVisita.comprovada}.
+     */
+    private Boolean presencaComprovada;
+
     @Builder.Default
     private List<PontoAmostralDocument> pontosAmostrais = new ArrayList<>();
 

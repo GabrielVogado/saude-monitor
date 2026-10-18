@@ -3,6 +3,7 @@ import { invalidarVisitaAtiva } from "../../../core/query/queryClient";
 import { queryKeys } from "../../../core/query/queryKeys";
 import { useSessao } from "../../../core/stores/sessaoStore";
 import VisitaService from "../service/VisitaService";
+import { posicaoParaCheckinManual } from "../service/PosicaoAparelho";
 
 /**
  * Grava a visita que o servidor acabou de confirmar só na chave da visita ativa deste
@@ -23,12 +24,16 @@ function useConfirmarVisitaAtiva() {
 /**
  * Check-in manual pelo card de Hospitais (E2-06). A tela trata os erros: o 409 de
  * geofences empatadas (E2-04) e o check-in guardado na fila offline (OPS-05).
+ *
+ * Leva a posição do aparelho quando a permissão já existe: sem ela a visita é aceita,
+ * mas não entra no indicador público (SEG-01).
  */
 export function useCheckinManual() {
   const confirmar = useConfirmarVisitaAtiva();
 
   return useMutation({
-    mutationFn: ({ hospitalId }) => VisitaService.checkin({ hospitalId, origem: "MANUAL" }),
+    mutationFn: async ({ hospitalId }) =>
+      VisitaService.checkin({ hospitalId, origem: "MANUAL", posicao: await posicaoParaCheckinManual() }),
     onSuccess: (resposta) => confirmar({ ...resposta, origem: "MANUAL" }),
   });
 }

@@ -26,6 +26,7 @@ import br.com.saude_monitor.api.visita.dto.VisitaAtivaResponse;
 import br.com.saude_monitor.api.visita.dto.VisitaResponse;
 import br.com.saude_monitor.api.visita.repository.VisitaRepository;
 import br.com.saude_monitor.api.visita.service.ConflitoGeofenceException;
+import br.com.saude_monitor.api.visita.service.PresencaVisita;
 import br.com.saude_monitor.api.visita.service.VisitaDono;
 import br.com.saude_monitor.api.visita.service.VisitaService;
 import lombok.RequiredArgsConstructor;
@@ -143,7 +144,12 @@ public class VisitaServiceImpl implements VisitaService {
                 .tipoPermanencia(TipoPermanencia.ATENDIMENTO)
                 .ultimoHeartbeat(agora)
                 .origem(request.origem())
-                .criadoEm(agora);
+                .criadoEm(agora)
+                // SEG-01: o GEOFENCE já validou a posição acima; o MANUAL continua aceito em
+                // qualquer lugar, mas só conta no indicador se a posição estiver no hospital.
+                .presencaComprovada(PresencaVisita.noCheckin(
+                        request.origem() == OrigemVisita.GEOFENCE || posicaoNoHospital(hospitalId, request.posicao()),
+                        entrada, agora));
 
         if (request.posicao() != null) {
             builder.pontosAmostrais(List.of(toPontoAmostral(request.posicao(), entrada)));
@@ -457,6 +463,24 @@ public class VisitaServiceImpl implements VisitaService {
         }
 
         return maisProximo.getId();
+    }
+
+    /** A posição está dentro do geofence deste hospital? Sem posição, não (SEG-01). */
+    private boolean posicaoNoHospital(String hospitalId, PosicaoDto posicao) {
+        if (posicao == null) {
+            return false;
+        }
+        double longitude = posicao.coordinates().getFirst();
+        double latitude = posicao.coordinates().get(1);
+        // Coordenada impossível faria o `$geoIntersects` falhar com 500; o check-in manual
+        // continua aceito, só sem prova de presença.
+        if (Math.abs(longitude) > 180 || Math.abs(latitude) > 90) {
+            return false;
+        }
+        GeoJsonPoint ponto = new GeoJsonPoint(longitude, latitude);
+        return mongoTemplate.exists(
+                new Query(Criteria.where("_id").is(hospitalId).and("geofence").intersects(ponto)),
+                HospitalDocument.class);
     }
 
     private String exigirHospitalAtivo(String hospitalId) {

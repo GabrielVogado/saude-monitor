@@ -2694,6 +2694,61 @@ indicadores públicos não mudam.
 
 ---
 
+## M-049 — Só avaliação com prova de presença conta no indicador público (SEG-01, parte de código)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0, **SEG-01 (Crítico)**: o check-in
+`MANUAL` aceitava qualquer `dispositivoId` sem conferir posição, e o `ocorridoEm` retroativo de
+até 24 h valia no check-in. Com check-in retroativo, checkout e feedback, três chamadas HTTP
+viravam uma avaliação com qualquer duração, e o mínimo de 5 avaliações para publicar a nota caía
+em segundos. É o ataque mais provável contra um produto de transparência pública.
+
+### O que mudou
+
+- Premissa P10 da análise (sem resposta do PO, vale a sugestão): a avaliação anônima continua
+  possível (RN-20), mas só conta no indicador público com prova de presença. Esta entrega é a
+  solução B da análise; a atestação do aparelho (A) depende do console da Play Store e a
+  quarentena de rajadas (C) vem depois.
+- A visita grava `presencaComprovada` no check-in. É `true` quando a posição enviada está dentro
+  do geofence do hospital (o `GEOFENCE` já validava; o `MANUAL` com posição passa por um
+  `$geoIntersects` no próprio hospital) e o check-in chegou até 45 min depois da entrada
+  informada, a mesma janela do GPS interrompido (RN-06). O check-in `MANUAL` continua aceito de
+  qualquer lugar.
+- O indicador (`IndicadorServiceImpl.recalcular`) conta nota e tempo só das visitas com prova de
+  presença, e dos feedbacks delas (as visitas são lidas em lote). Visitas anteriores à regra não
+  têm a marcação: para elas vale a origem `GEOFENCE` com até 45 min entre a entrada e o
+  recebimento, o que os campos guardados permitem conferir.
+- O app manda a posição do aparelho no check-in manual quando a permissão de localização já
+  existe (última leitura de até 2 min, ou leitura ao vivo com limite de 5 s). Nunca pede
+  permissão nesse caminho.
+- A massa de avaliações do dev é marcada como comprovada, para o indicador do dev não mudar.
+
+### Efeito para quem usa
+
+A nota e o tempo publicados passam a contar só visitas com prova de presença. Quem faz check-in
+manual longe do hospital, sem permissão de localização, ou com o check-in chegando mais de
+45 min depois (fila offline longa) continua com a visita e a avaliação registradas, mas elas não
+entram no indicador. Nos ambientes de dev e homologação, avaliações feitas por check-in manual
+de teste deixam de contar.
+
+### Limites conhecidos
+
+- A posição vem do aparelho e pode ser falsificada por quem escreve um script; a atestação do
+  aparelho é o que fecha isso.
+- A prova é só no check-in; heartbeats com posição fora do hospital ainda não retiram a prova.
+
+### Verificação
+
+- Backend: 420 testes, com integração em Mongo real (`FeedbackEIndicadorIntegracaoTest`: o
+  feedback de check-in manual de dentro do hospital entra no indicador; o de check-in anônimo
+  sem posição é aceito e fica fora). Cobertura das linhas alteradas: 100%.
+- App: testes da leitura de posição sem permissão, com cache, ao vivo e com GPS travado.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

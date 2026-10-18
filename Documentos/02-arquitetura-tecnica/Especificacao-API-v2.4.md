@@ -392,6 +392,8 @@ Registra entrada (automática via geofence ou manual).
 ```
 **Regras:** valida se ponto está dentro do geofence (`$geoIntersects`) quando `origem=GEOFENCE`; se já existe visita `EM_ATENDIMENTO` no mesmo hospital, retorna a existente (idempotente); `dispositivoId` permite visita anônima (sem login).
 
+> **Prova de presença (SEG-01 — 18/10/2026):** o check-in `MANUAL` continua aceito de qualquer lugar, mas a visita só entra no indicador público (nota e tempo) com prova de presença: a `posicao` enviada no check-in está dentro do geofence do hospital e o check-in chegou até 45 min depois de `ocorridoEm`. O check-in `GEOFENCE` já valida a posição. Fica de fora o check-in sem posição, com posição fora do hospital ou retroativo além de 45 min. A resposta não muda; o campo `presencaComprovada` fica só no banco.
+
 > **`ocorridoEm` (opcional, OPS-05 — 03/09/2026):** momento real da entrada, enviado quando o check-in foi detectado **sem internet** e ficou na fila offline do aplicativo. Sem ele, o evento reenviado registraria a hora em que a conexão voltou, e o tempo de permanência passaria a medir a rede do aparelho em vez da fila do hospital. O campo é opcional e **não é confiável** (o endpoint é público, OPS-03): o servidor só o aceita no passado recente — dentro da janela de 24h da RN-04, nunca no futuro além de 5 min de tolerância de relógio. Fora disso vale o relógio do servidor.
 
 #### `POST /api/v1/visitas/{id}/checkout` 🔒
@@ -512,6 +514,8 @@ Vide §3.1 — exclui conta e anonimiza dados (LGPD art. 18/19), recomputando os
 }
 ```
 Se `nAvaliacoes < 5`: `"indicadoresDisponiveis": false` e campos de média `null` (RN-15).
+
+> **Só avaliações verificadas (SEG-01 — 18/10/2026):** `nAvaliacoes`, `notaMedia`, `tempoMedianoMinutos` e `nVisitas` contam apenas visitas com prova de presença (ver `POST /visitas/checkin`) e os feedbacks dessas visitas. A avaliação de quem não comprovou presença continua aceita (RN-20), mas não entra no indicador.
 
 #### `GET /api/v1/hospitais/ranking` 🔓
 Ranking por `ordem=nota|tempo`. Query: `ordem`, `tipo`, `page`, `size`. Ordena pelos campos do agregado.

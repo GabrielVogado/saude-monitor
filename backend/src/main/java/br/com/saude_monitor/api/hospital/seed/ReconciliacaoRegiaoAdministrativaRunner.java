@@ -91,25 +91,12 @@ public class ReconciliacaoRegiaoAdministrativaRunner implements ApplicationRunne
 
             for (HospitalDocument hospital : page.getContent()) {
                 total++;
-                if (hospital.getRegiaoAdministrativa() != null && !hospital.getRegiaoAdministrativa().isBlank()) {
-                    continue; // já preenchido — não recalcula (ver Javadoc da classe)
+                switch (preencher(hospital, bulkOps)) {
+                    case PREENCHIDO -> naPagina++;
+                    case FORA_DE_TODA_REGIAO -> foraDeTodaRegiao++;
+                    case SEM_LOCALIZACAO -> semLocalizacao++;
+                    case JA_PREENCHIDO -> { /* não recalcula (ver Javadoc da classe) */ }
                 }
-                GeoJsonPoint centro = hospital.getLocalizacao();
-                if (centro == null) {
-                    semLocalizacao++;
-                    continue;
-                }
-
-                Optional<String> regiao = resolver.resolver(centro.getX(), centro.getY());
-                if (regiao.isEmpty()) {
-                    foraDeTodaRegiao++;
-                    continue;
-                }
-
-                bulkOps.updateOne(
-                        Query.query(Criteria.where("id").is(hospital.getId())),
-                        Update.update("regiaoAdministrativa", regiao.get()).set("atualizadoEm", Instant.now()));
-                naPagina++;
             }
 
             if (naPagina > 0) {
@@ -128,5 +115,29 @@ public class ReconciliacaoRegiaoAdministrativaRunner implements ApplicationRunne
                     + "{} fora de toda RA mapeada, {} sem localização.",
                     total, preenchidos, foraDeTodaRegiao, semLocalizacao);
         }
+    }
+
+    /** O que a reconciliação fez com um estabelecimento. */
+    private enum Situacao { PREENCHIDO, FORA_DE_TODA_REGIAO, SEM_LOCALIZACAO, JA_PREENCHIDO }
+
+    /** Decide o caso de um estabelecimento e, se for o caso, agenda a gravação da região. */
+    private Situacao preencher(HospitalDocument hospital, BulkOperations bulkOps) {
+        if (hospital.getRegiaoAdministrativa() != null && !hospital.getRegiaoAdministrativa().isBlank()) {
+            return Situacao.JA_PREENCHIDO;
+        }
+        GeoJsonPoint centro = hospital.getLocalizacao();
+        if (centro == null) {
+            return Situacao.SEM_LOCALIZACAO;
+        }
+
+        Optional<String> regiao = resolver.resolver(centro.getX(), centro.getY());
+        if (regiao.isEmpty()) {
+            return Situacao.FORA_DE_TODA_REGIAO;
+        }
+
+        bulkOps.updateOne(
+                Query.query(Criteria.where("id").is(hospital.getId())),
+                Update.update("regiaoAdministrativa", regiao.get()).set("atualizadoEm", Instant.now()));
+        return Situacao.PREENCHIDO;
     }
 }

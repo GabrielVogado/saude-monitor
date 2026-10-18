@@ -68,6 +68,28 @@ describe("apiClient", () => {
     expect(global.fetch.mock.calls[1][1].headers).toMatchObject({ Authorization: "Bearer TOK", "X-Extra": "1" });
   });
 
+  test("sem login, manda o id da instalação para o rate limit; com login, não (ARQ-02)", async () => {
+    global.fetch = jest.fn().mockResolvedValue(resposta({}));
+
+    await apiRequest("/a");
+    const semLogin = global.fetch.mock.calls[0][1].headers["X-Cliente-Id"];
+    expect(semLogin).toMatch(/^[0-9a-f-]{36}$/);
+
+    await TokenStorage.salvarTokens({ accessToken: "TOK", refreshToken: "R" });
+    await apiRequest("/a");
+    expect(global.fetch.mock.calls[1][1].headers["X-Cliente-Id"]).toBeUndefined();
+  });
+
+  test("sem login e sem armazenamento, segue sem o cabeçalho da instalação", async () => {
+    global.fetch = jest.fn().mockResolvedValue(resposta({}));
+    const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+    AsyncStorage.getItem.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error("disco cheio"));
+
+    await apiRequest("/a");
+
+    expect(global.fetch.mock.calls[0][1].headers["X-Cliente-Id"]).toBeUndefined();
+  });
+
   test("resposta fora de 2xx vira ApiError com status, data e a mensagem do servidor", async () => {
     global.fetch = jest.fn().mockResolvedValue(resposta({ message: "Hospital não encontrado." }, 404));
 

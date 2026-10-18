@@ -2792,6 +2792,52 @@ produção). O comentário do workflow que trava o limite em 1 deixa de ter moti
 
 ---
 
+## M-051 — Rate limit por identidade e renovação de sessão fora do limite por IP (ARQ-02)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0, **ARQ-02 (Crítico)**: o rate limit
+contava tudo por IP (60/min nas rotas públicas, 10/min em login e refresh). As operadoras móveis
+usam CGNAT, então centenas de celulares saem pelo mesmo IP. No pico, o check-in e o heartbeat de
+uns levavam 429 por causa dos outros, e a renovação de sessão (o refresh do access token de 15
+min) também, o que derruba quem tem sessão válida.
+
+### O que mudou (comportamento)
+
+- **Rotas públicas** passam a contar por pessoa: o usuário do access token válido, depois a
+  instalação do app (cabeçalho `X-Cliente-Id`) e só então o IP. O limite continua 60/min.
+- **Teto por IP**: todo o tráfego limitado que sai de um mesmo IP soma num teto de abuso,
+  600/min por padrão (`APP_RATELIMIT_IP_POR_MINUTO`), que nunca fica abaixo dos outros limites.
+  É o que segura quem troca de `X-Cliente-Id` a cada chamada.
+- **Login**: além dos 10/min por IP, 10/min por conta (e-mail normalizado). Tentar senha contra
+  uma conta deixa de escapar trocando de IP.
+- **Refresh**: deixa de ter limite por IP. Fica limitado a 10/min pelo próprio refresh token
+  (o contador guarda o SHA-256, não o token).
+- **App**: sem login, toda chamada leva `X-Cliente-Id`, um UUID aleatório gerado na primeira
+  execução e guardado no aparelho. É separado do `dispositivoId` de propósito: aquele é a prova
+  de dono da visita anônima (SEG-02) e não deve ir em todo cabeçalho; este não dá acesso a nada.
+- CORS aceita o cabeçalho `X-Cliente-Id`.
+- A resposta 429 continua no envelope padrão (`LIMITE_EXCEDIDO`), agora também vinda do
+  `AuthController` no login e no refresh. O log da primeira rejeição por janela não traz e-mail
+  nem id, só o tipo da chave ("usuário autenticado", "instalação do app") ou o IP.
+
+### O que fica para depois
+
+Os contadores continuam em memória, por instância: com N instâncias o limite efetivo é N vezes
+maior. Para limite por pessoa isso é aceitável; o teto global por IP fica para a borda (SOL-03).
+
+### Verificação
+
+- Backend: testes do filtro com usuários e instalações diferentes no mesmo IP, token inválido e
+  refresh token caindo no IP ou na instalação, rotas de autenticação por IP, teto por IP contra
+  troca de `X-Cliente-Id`, refresh sem limite por IP; login limitado por conta trocando de IP e
+  refresh limitado por token, no `AuthController`.
+- App: o cabeçalho vai sem login e não vai com login; falha do armazenamento não impede a chamada.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

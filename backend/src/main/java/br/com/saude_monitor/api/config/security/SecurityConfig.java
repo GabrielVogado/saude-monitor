@@ -129,7 +129,8 @@ public class SecurityConfig {
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         // Só os cabeçalhos que o navegador realmente envia: Bearer/JWT vai em Authorization e o
         // corpo JSON em Content-Type. Sem "*" — não há cabeçalho customizado no contrato.
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        // X-Cliente-Id: instalação do app sem login, chave do rate limit (ARQ-02).
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Cliente-Id"));
         // Autenticação é por Bearer/JWT no header Authorization, não por cookie/sessão: não há
         // credencial de navegador a compartilhar entre origens, então credenciais ficam desligadas.
         config.setAllowCredentials(false);

@@ -10,6 +10,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -90,6 +91,22 @@ public class JwtService {
                     && claims.getExpiration().after(new Date());
         } catch (RuntimeException ex) {
             return false;
+        }
+    }
+
+    /**
+     * Dono de um access token válido (assinatura, tipo e expiração), ou vazio. Usado pelo
+     * rate limit para contar por usuário em vez de por IP (ARQ-02); quem decide a
+     * autenticação continua sendo o {@code JwtAuthenticationFilter}.
+     */
+    public Optional<String> assuntoDoAccessToken(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            boolean valido = TYPE_ACCESS.equals(claims.get(CLAIM_TYPE, String.class))
+                    && claims.getExpiration().after(new Date());
+            return valido ? Optional.ofNullable(claims.getSubject()) : Optional.empty();
+        } catch (RuntimeException _) {
+            return Optional.empty();
         }
     }
 

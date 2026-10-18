@@ -5,6 +5,12 @@
 
 ---
 
+## 📌 Revisão 18/10/2026 — Épico 9: rate limit por identidade (ARQ-02)
+
+**O que mudou:** o rate limit das rotas públicas passa a contar por usuário ou pela instalação do app (`X-Cliente-Id`), não pelo IP que o CGNAT das operadoras faz centenas de celulares dividirem; o IP fica com um teto de abuso de 600/min. O login ganha limite por conta e o refresh sai do limite por IP, limitado só pelo próprio token. `Especificacao-API-v2.4.md` (limites e cabeçalho), `De-Para-Backlog-Features.md` (ARQ-02 entregue) e `Historico-Melhorias.md` (M-051).
+
+---
+
 ## 📌 Revisão 18/10/2026 — Épico 9: seed e tarefas de inicialização com trava distribuída (SOL-02)
 
 **O que mudou:** seed de hospitais, reconciliações, importação CNES, seed do admin e massa do dev passam a rodar sob uma trava no MongoDB: com várias instâncias subindo juntas, só uma executa. É o pré-requisito de código para tirar o `--max-instances=1` do Cloud Run, que fica para a etapa de infraestrutura. `De-Para-Backlog-Features.md` (SOL-02 entregue) e `Historico-Melhorias.md` (M-050).

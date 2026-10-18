@@ -5,6 +5,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -27,7 +28,7 @@ class ResendEmailServiceTest {
     void enviaOCodigoComOsCamposEsperados() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        ResendEmailService emailService = new ResendEmailService(builder, PROPERTIES);
+        ResendEmailService emailService = new ResendEmailService(builder, PROPERTIES, null);
 
         server.expect(requestTo("https://api.resend.com/emails"))
                 .andExpect(method(org.springframework.http.HttpMethod.POST))
@@ -50,13 +51,34 @@ class ResendEmailServiceTest {
         // resposta genérica — uma falha do provedor não pode virar exceção aqui.
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        ResendEmailService emailService = new ResendEmailService(builder, PROPERTIES);
+        ResendEmailService emailService = new ResendEmailService(builder, PROPERTIES, null);
 
         server.expect(requestTo("https://api.resend.com/emails"))
                 .andRespond(withServerError());
 
         emailService.enviarCodigoRedefinicaoSenha("marina@email.com", "123456");
 
+        server.verify();
+    }
+
+    @Test
+    void envioTemTetoAbaixoDoPisoDeResposta() {
+        // SOL-09: o envio é síncrono; conexão mais leitura precisam caber nos 2 s do piso.
+        assertThat(ResendEmailService.TIMEOUT_CONEXAO.plus(ResendEmailService.TIMEOUT_LEITURA))
+                .isLessThan(br.com.saude_monitor.api.auth.service.TempoMinimoResposta.PISO);
+        assertThat(ResendEmailService.fabricaComTeto()).isNotNull();
+    }
+
+    @Test
+    void construtorDaAplicacaoNaoAlteraOBuilderCompartilhado() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+
+        new ResendEmailService(builder, PROPERTIES);
+
+        // O builder original continua com o servidor simulado: o teto foi posto numa cópia.
+        server.expect(requestTo("https://exemplo.test/x")).andRespond(withSuccess());
+        builder.build().get().uri("https://exemplo.test/x").retrieve().toBodilessEntity();
         server.verify();
     }
 }

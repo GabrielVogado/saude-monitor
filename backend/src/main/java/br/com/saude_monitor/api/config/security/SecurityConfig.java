@@ -1,4 +1,6 @@
 package br.com.saude_monitor.api.config.security;
+import br.com.saude_monitor.api.config.contencao.LimiteConcorrenciaFilter;
+import br.com.saude_monitor.api.config.contencao.ModoSomenteLeituraFilter;
 import br.com.saude_monitor.api.config.ratelimit.RateLimitFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -28,6 +30,8 @@ public class SecurityConfig {
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
     private final RateLimitFilter rateLimitFilter;
+    private final LimiteConcorrenciaFilter limiteConcorrenciaFilter;
+    private final ModoSomenteLeituraFilter modoSomenteLeituraFilter;
     private final CorsProperties corsProperties;
 
     @Bean
@@ -101,6 +105,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/camadas/**").permitAll()
                         // Catálogo público de estabelecimentos (ARQ-01).
                         .requestMatchers(HttpMethod.GET, "/api/v1/catalogo").permitAll()
+                        // Configuração remota lida pelo app ao abrir (ARQ-09); alterá-la é ADMIN.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/configuracao").permitAll()
+                        .requestMatchers("/api/v1/admin/configuracao").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/hospitais/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/hospitais/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/hospitais/**").hasRole("ADMIN")
@@ -114,7 +121,12 @@ public class SecurityConfig {
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class);
+                .addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class)
+                // ARQ-05: o teto de requisições simultâneas vem antes de qualquer trabalho da
+                // requisição, e o modo somente leitura logo depois do rate limit. Ficam dentro
+                // da cadeia de segurança para o 503 sair com CORS e cabeçalhos de segurança.
+                .addFilterBefore(limiteConcorrenciaFilter, RateLimitFilter.class)
+                .addFilterAfter(modoSomenteLeituraFilter, RateLimitFilter.class);
 
         return http.build();
     }

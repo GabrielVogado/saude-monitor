@@ -5,6 +5,10 @@ import br.com.saude_monitor.api.visita.service.ConflitoGeofenceException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.mongodb.MongoTimeoutException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -30,6 +34,9 @@ import java.util.UUID;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    /** Espera sugerida ao app quando o banco falha de forma passageira (ARQ-05). */
+    static final int RETRY_AFTER_BANCO_SEGUNDOS = 5;
 
     /** Exceções de domínio já trazem status/código/mensagem/detalhes prontos. */
     @ExceptionHandler(ApiException.class)
@@ -91,6 +98,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleNoResource(NoResourceFoundException ex) {
         return build(HttpStatus.NOT_FOUND, "RECURSO_NAO_ENCONTRADO",
                 "Recurso não encontrado.", List.of());
+    }
+
+    /**
+     * Banco fora do ar, sem conexão livre no pool ou consulta acima do prazo (ARQ-05, SOL-07):
+     * falha passageira, então 503 com {@code Retry-After}, e não 500. O app repete sozinho
+     * depois da espera; um 500 dizia que o erro era da requisição.
+     */
+    @ExceptionHandler({DataAccessResourceFailureException.class, QueryTimeoutException.class,
+            MongoTimeoutException.class})
+    public ResponseEntity<ApiError> handleBancoIndisponivel(Exception ex) {
+        log.warn("Banco indisponível: {}", ex.getMessage());
+        ResponseEntity<ApiError> resposta = build(HttpStatus.SERVICE_UNAVAILABLE, "BANCO_INDISPONIVEL",
+                "Serviço temporariamente indisponível. Tente novamente em instantes.", List.of());
+        return ResponseEntity.status(resposta.getStatusCode())
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(RETRY_AFTER_BANCO_SEGUNDOS))
+                .body(resposta.getBody());
     }
 
     /** Fallback: qualquer erro não tratado vira 500 sem vazar detalhes internos. */

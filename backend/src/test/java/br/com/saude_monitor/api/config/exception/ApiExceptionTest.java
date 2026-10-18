@@ -50,6 +50,19 @@ class ApiExceptionTest {
     }
 
     @Test
+    void bancoIndisponivelVira503ComRetryAfter() {
+        ResponseEntity<ApiError> resposta = handler.handleBancoIndisponivel(
+                new org.springframework.dao.DataAccessResourceFailureException("Timed out waiting for a server"));
+
+        assertThat(resposta.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(resposta.getHeaders().getFirst("Retry-After"))
+                .isEqualTo(String.valueOf(GlobalExceptionHandler.RETRY_AFTER_BANCO_SEGUNDOS));
+        assertThat(resposta.getBody()).isNotNull();
+        assertThat(resposta.getBody().code()).isEqualTo("BANCO_INDISPONIVEL");
+        assertThat(resposta.getBody().message()).doesNotContain("Timed out");
+    }
+
+    @Test
     void detalhesNulosViramListaVazia() {
         ApiException ex = new ValidacaoNegocioException("Dados inválidos.", null);
 

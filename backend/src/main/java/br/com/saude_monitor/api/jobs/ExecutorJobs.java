@@ -1,6 +1,7 @@
 package br.com.saude_monitor.api.jobs;
 
 import br.com.saude_monitor.api.config.trava.TravaDistribuida;
+import br.com.saude_monitor.api.configuracao.service.ConfiguracaoRemotaService;
 import br.com.saude_monitor.api.feedback.service.FeedbackSemRespostaJob;
 import br.com.saude_monitor.api.indicador.service.IndicadorHospitalJob;
 import br.com.saude_monitor.api.visita.service.RetencaoDadosPessoaisJob;
@@ -25,6 +26,8 @@ import java.util.Set;
  * mexem no que ainda está na condição), então uma execução repetida depois da trava vencer
  * não muda o resultado.</p>
  *
+ * <p>No modo somente leitura (ARQ-09) os jobs são pulados: todos gravam no banco.</p>
+ *
  * <p>Cada execução deixa log de início e de fim com a duração, e de erro quando falha:
  * antes os jobs não deixavam rastro, e um job parado só aparecia nos dados.</p>
  */
@@ -42,15 +45,18 @@ public class ExecutorJobs {
     public enum Resultado { EXECUTADO, PULADO }
 
     private final TravaDistribuida trava;
+    private final ConfiguracaoRemotaService configuracaoRemota;
     private final Map<String, Runnable> jobs = new LinkedHashMap<>();
 
     public ExecutorJobs(TravaDistribuida trava,
+                        ConfiguracaoRemotaService configuracaoRemota,
                         IndicadorHospitalJob indicadores,
                         VisitaExpiracaoJob expiracaoVisitas,
                         VisitaGpsInterrompidoJob gpsInterrompido,
                         FeedbackSemRespostaJob feedbackSemResposta,
                         RetencaoDadosPessoaisJob retencaoDados) {
         this.trava = trava;
+        this.configuracaoRemota = configuracaoRemota;
         jobs.put(NomeJob.INDICADORES, indicadores::executar);
         jobs.put(NomeJob.EXPIRACAO_VISITAS, expiracaoVisitas::executar);
         jobs.put(NomeJob.GPS_INTERROMPIDO, gpsInterrompido::executar);
@@ -74,6 +80,10 @@ public class ExecutorJobs {
         Runnable job = jobs.get(nome);
         if (job == null) {
             return Optional.empty();
+        }
+        if (configuracaoRemota.modoSomenteLeitura()) {
+            log.info("[Job] {} pulado: modo somente leitura ligado.", nome);
+            return Optional.of(Resultado.PULADO);
         }
         boolean rodou = trava.executar(PREFIXO_TRAVA + nome, VALIDADE_TRAVA, () -> medir(nome, job));
         if (!rodou) {

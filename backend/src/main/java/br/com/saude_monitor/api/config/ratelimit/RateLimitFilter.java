@@ -163,6 +163,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if ("GET".equals(method) && "/api/v1/catalogo".equals(uri)) {
             return true;
         }
+        // Configuração remota lida pelo app ao abrir (ARQ-09).
+        if ("GET".equals(method) && "/api/v1/configuracao".equals(uri)) {
+            return true;
+        }
         // GET de camadas geográficas (F-11, §5): leitura pública de recurso estático.
         if ("GET".equals(method) && uri.startsWith("/api/v1/camadas")) {
             return true;

@@ -74,6 +74,9 @@ class RateLimitFilterTest {
                 .isEqualTo(RateLimitService.Grupo.PUBLICO);
         assertThat(filter.resolverGrupo("GET", "/api/v1/camadas/regiao-saude"))
                 .isEqualTo(RateLimitService.Grupo.PUBLICO);
+        assertThat(filter.resolverGrupo("GET", "/api/v1/configuracao"))
+                .isEqualTo(RateLimitService.Grupo.PUBLICO);
+        assertThat(filter.resolverGrupo("PUT", "/api/v1/configuracao")).isNull();
     }
 
     @Test

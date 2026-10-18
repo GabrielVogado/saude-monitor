@@ -2989,6 +2989,67 @@ código atrasado ou perdido (verificação aberta da análise).
 
 ---
 
+## M-055 — Contenção de falhas, pool do banco e configuração remota (ARQ-05, SOL-07, ARQ-09)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0. **ARQ-05 (Alto)**: com virtual
+threads o Tomcat não limita mais quantas requisições a instância atende ao mesmo tempo; num pico,
+todas disputam as conexões do banco, estouram o tempo juntas e a falha volta como 500, que o app
+trata como erro definitivo. Não havia como segurar as gravações numa manutenção sem tirar o app do
+ar. **SOL-07 (Médio)**: o driver do MongoDB usava os padrões de servidor dedicado (100 conexões
+por instância, 2 min esperando conexão, 30 s escolhendo servidor, leitura sem prazo); no Atlas
+compartilhado, com teto de 500 conexões no cluster, poucas instâncias esgotavam o banco.
+**ARQ-09 (Médio)**: modo evento e versão mínima do app só mudavam com novo deploy.
+
+### O que mudou (comportamento)
+
+- **Teto por instância**: no máximo 80 requisições ao mesmo tempo
+  (`APP_CONTENCAO_REQUISICOES_SIMULTANEAS`). Acima disso a requisição recebe na hora 503
+  `SERVICO_SOBRECARREGADO` com `Retry-After: 5`, sem esperar vaga. `/actuator/**` fica de fora,
+  para a verificação de saúde não cair por instância cheia. O 503 sai com CORS e cabeçalhos de
+  segurança (o filtro fica dentro da cadeia do Spring Security).
+- **Banco indisponível vira 503**: conexão do pool esgotada, servidor não encontrado ou consulta
+  acima do prazo respondem 503 `BANCO_INDISPONIVEL` com `Retry-After: 5`, em vez de 500
+  `ERRO_INTERNO`. O app já repete 503 respeitando o `Retry-After`.
+- **Pool do MongoDB**: até 20 conexões por instância (`APP_MONGO_POOL_MAXIMO`, era 100), 2 s
+  esperando conexão (era 2 min), 5 s escolhendo servidor (era 30 s), leitura de até 30 s (era sem
+  prazo) e conexão ociosa fechada em 60 s. Os valores valem mesmo que a `MONGO_URI` traga os seus.
+  Com 20 por instância, 20 instâncias ainda ficam abaixo das 500 conexões do Atlas compartilhado.
+- **Configuração remota** (coleção `configuracao_remota`, documento `atual`): modo somente leitura,
+  versão mínima do app e mensagem de manutenção. `GET /api/v1/configuracao` é público (cache de
+  1 min) e `PUT /api/v1/admin/configuracao` é só ADMIN. Cada instância relê a cada 30 s; se o banco
+  falhar, mantém o último valor lido. Sem documento, tudo liberado e sem versão mínima.
+- **Modo somente leitura**: com ele ligado, `POST`, `PUT`, `PATCH` e `DELETE` em `/api/**`
+  respondem 503 `MODO_SOMENTE_LEITURA` com `Retry-After: 300`; as consultas seguem. Login,
+  renovação e saída da sessão continuam aceitos, e o próprio `PUT` da configuração também, para o
+  ADMIN poder desligar o modo. Os jobs periódicos são pulados enquanto o modo estiver ligado.
+  `APP_SOMENTE_LEITURA_FORCADO=true` liga o modo por variável de ambiente, para quando o banco nem
+  pode ser lido.
+- **Contrato**: 2 endpoints novos (41 operações, 22 públicas no OpenAPI).
+
+### O que fica para depois
+
+O app passa a ler `GET /api/v1/configuracao` e a mostrar a tela de atualização e o aviso de
+manutenção no APP-03. O teto de 80 e o pool de 20 são estimativas até a prova de carga (PERF-01);
+ajustar por variável de ambiente sem novo build. Tela no Painel Admin para a configuração fica
+como item novo (hoje é pelo `PUT`).
+
+### Verificação
+
+- Teto: dentro dele atende e devolve a vaga; acima, 503 com `Retry-After` no envelope padrão; o
+  Actuator passa mesmo com a instância cheia; a vaga volta quando a requisição falha.
+- Modo somente leitura: gravação recusada com 503, mensagem configurada ou padrão; consultas,
+  sessão, configuração e jobs internos (`/internal/**`) passam; desligado, nada muda.
+- Configuração: lida uma vez por 30 s, mantém o último valor com o banco fora, cai no padrão sem
+  nada lido, variável de ambiente força o modo, alteração vale na hora na instância que a recebeu.
+- Pool: o customizador vence o `maxPoolSize` da URI. Banco indisponível vira 503 sem vazar a
+  mensagem do driver. Jobs pulados no modo somente leitura sem tocar a trava.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

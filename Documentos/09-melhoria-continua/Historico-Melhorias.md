@@ -3090,6 +3090,58 @@ release. Mexem na esteira e geram PRs automáticos, então ficam para a fase de 
 
 ---
 
+## M-057 — Catálogo local no geofencing e versão mínima do app (APP-01, APP-03)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0. **APP-01 (Crítico)**: a cada
+saída da região de recálculo, com o app fechado, o geofencing pedia ao servidor os hospitais num
+raio de 5 km da posição exata. Na meta de uso do DF, estimado em ~333 req/s só disso, mais que todo
+o resto do tráfego, e nada cacheável. **APP-03 (Médio)**: não havia versão mínima: uma correção
+de escala ou de segurança dependia de cada pessoa atualizar o app.
+
+### O que mudou (comportamento)
+
+- **Catálogo no aparelho** (`CatalogoLocal`): o app baixa `GET /api/v1/catalogo` (ARQ-01) e guarda
+  no armazenamento local, com a versão. Com o app aberto, a cópia mais velha que 5 min é conferida
+  com `If-None-Match` (304 sem corpo quando nada mudou); no recálculo em segundo plano, a cópia de
+  até um dia vale sem rede. Sem rede, vale a cópia guardada, por mais velha que seja.
+- **Geofencing**: a escolha dos 19 estabelecimentos monitorados (a até 5 km, mais próximos
+  primeiro) é feita no aparelho sobre o catálogo. O recálculo em segundo plano deixa de fazer
+  requisição quase sempre. Mesmo comportamento de antes quando não há catálogo nenhum (primeiro uso
+  sem internet): na abertura mantém as regiões registradas; em segundo plano registra só a região de
+  recálculo curta.
+- **Versão mínima**: ao abrir e ao voltar ao primeiro plano, o app lê `GET /api/v1/configuracao`
+  (ARQ-09). Se a versão instalada estiver abaixo de `versaoMinimaApp`, a navegação dá lugar à tela
+  "Atualize o Radar Saúde", com o botão para a Play Store (app da loja, ou a página web). O sufixo de
+  homologação não conta (`1.0.0-rc.5` vale como `1.0.0`). Sem rede, sem mínima ou com versão
+  ilegível, o app segue normal. O geofencing e a fila offline continuam rodando por baixo.
+- **Backend**: o CORS aceita o cabeçalho `If-None-Match`, para a versão web do app.
+
+### O que fica para depois
+
+As telas de lista, mapa e ranking continuam na listagem paginada: passá-las para o catálogo local é
+o próximo passo do ARQ-01. A borda (SOL-03) ainda não existe, então o 304 vem da origem. O aviso de
+manutenção do modo somente leitura aparece hoje só como a mensagem do 503 nas gravações; um aviso
+fixo na tela fica como item novo. Atualização OTA (EAS Update) não entrou.
+
+### Verificação
+
+- `CatalogoLocal`: baixa e guarda; cópia dentro da idade vale sem rede; cópia vencida conferida com
+  `If-None-Match`; 304 como erro ou como corpo vazio mantém a cópia; versão nova substitui; sem rede
+  vale a cópia; sem cópia e sem rede, falha; chamadas simultâneas fazem uma requisição.
+- Geofencing: só entra quem está a até 5 km; idade de 5 min no primeiro plano e de um dia no
+  recálculo em segundo plano; os testes de regiões, permissão e recálculo seguem verdes sobre o
+  catálogo.
+- Versão mínima: compara pelos três números; bloqueia só abaixo da mínima; botão abre a loja e cai
+  na página web; sem rede segue normal; confere de novo ao voltar ao primeiro plano.
+- App: 655 testes, lint com 11 avisos (teto 16), `tsc` limpo. Sonar local sem issue nas linhas
+  alteradas.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

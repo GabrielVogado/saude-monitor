@@ -5,6 +5,12 @@
 
 ---
 
+## 📌 Revisão 18/10/2026 — Épico 9: catálogo local no geofencing e versão mínima do app (APP-01, APP-03)
+
+**O que mudou:** o app guarda o catálogo de estabelecimentos e faz no aparelho a escolha dos hospitais monitorados pelo geofencing, sem pedir a lista ao servidor a cada deslocamento; e passa a ler a configuração remota, mostrando a tela "Atualize o Radar Saúde" abaixo da versão mínima. `Especificacao-API-v2.4.md` (§3.7 e §3.9), `De-Para-Backlog-Features.md` (APP-01 e APP-03 entregues, ARQ-01 atualizado) e `Historico-Melhorias.md` (M-057).
+
+---
+
 ## 📌 Revisão 18/10/2026 — Épico 9: Swagger fora de produção, admin sem senha padrão e contêiner sem root (SEG-07, SEG-06)
 
 **O que mudou:** o perfil `prod` deixa de servir `/v3/api-docs` e o Swagger UI; o seed de admin fica desligado por padrão, sem e-mail nem senha no código, e derruba o boot se ligado sem credencial forte; a imagem do backend roda como usuário sem privilégio e sem `curl`. `Especificacao-API-v2.4.md` (§5), `De-Para-Backlog-Features.md` (SEG-07 entregue, SEG-06 parcial), `deploy/google/README.md` e `Historico-Melhorias.md` (M-056).

@@ -30,6 +30,7 @@ import { queryClient } from "./src/core/query/queryClient";
 import { configurarQueryNoApp } from "./src/core/query/setupQueryClient";
 import { hidratarSessao } from "./src/core/stores/sessaoStore";
 import VisitaAtivaSync from "./src/screens/visitas/hooks/VisitaAtivaSync";
+import AtualizacaoObrigatoria from "./src/screens/atualizacao/AtualizacaoObrigatoria";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -284,25 +285,28 @@ export default function App() {
             {/* Heartbeat e geofencing seguem a visita ativa em qualquer tela (§4.2.2). */}
             <VisitaAtivaSync />
             <SafeAreaProvider>
-                <NavigationContainer
-                    ref={navigationRef}
-                    onReady={() => {
-                        navegacaoPronta.current = true;
-                        // Despacha o feedback que chegou por cold start antes de a navegação montar.
-                        if (feedbackPendente.current) {
-                            navigationRef.current?.navigate("Feedback", {
-                                screen: "FeedbackForm",
-                                params: feedbackPendente.current,
-                            });
-                            feedbackPendente.current = null;
-                        }
-                    }}
-                >
-                    <Stack.Navigator screenOptions={{ headerShown: false }}>
-                        <Stack.Screen name="Tabs" component={Tabs} />
-                        <Stack.Screen name="Feedback" component={FeedbackStack} />
-                    </Stack.Navigator>
-                </NavigationContainer>
+                {/* APP-03: abaixo da versão mínima, a navegação dá lugar à tela de atualização. */}
+                <AtualizacaoObrigatoria>
+                    <NavigationContainer
+                        ref={navigationRef}
+                        onReady={() => {
+                            navegacaoPronta.current = true;
+                            // Despacha o feedback que chegou por cold start antes de a navegação montar.
+                            if (feedbackPendente.current) {
+                                navigationRef.current?.navigate("Feedback", {
+                                    screen: "FeedbackForm",
+                                    params: feedbackPendente.current,
+                                });
+                                feedbackPendente.current = null;
+                            }
+                        }}
+                    >
+                        <Stack.Navigator screenOptions={{ headerShown: false }}>
+                            <Stack.Screen name="Tabs" component={Tabs} />
+                            <Stack.Screen name="Feedback" component={FeedbackStack} />
+                        </Stack.Navigator>
+                    </NavigationContainer>
+                </AtualizacaoObrigatoria>
             </SafeAreaProvider>
         </QueryClientProvider>
     );

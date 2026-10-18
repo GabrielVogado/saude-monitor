@@ -71,7 +71,7 @@ public class MassaAvaliacoesRunner {
     static final int QUANTIDADE_USUARIOS = 30;
 
     /** Nome da trava da carga ({@link TravaDistribuida}). */
-    static final String TRAVA = "massa-avaliacoes";
+    static final String NOME_TRAVA = "massa-avaliacoes";
 
     private static final Duration VALIDADE_TRAVA = Duration.ofMinutes(15);
 
@@ -117,7 +117,7 @@ public class MassaAvaliacoesRunner {
      */
     public void executarCarga() {
         try {
-            trava.executar(TRAVA, VALIDADE_TRAVA, this::executar);
+            trava.executar(NOME_TRAVA, VALIDADE_TRAVA, this::executar);
         } catch (RuntimeException e) {
             log.error("[MassaAvaliacoes] Falha na carga da massa de avaliações; a aplicação segue sem ela.", e);
         }

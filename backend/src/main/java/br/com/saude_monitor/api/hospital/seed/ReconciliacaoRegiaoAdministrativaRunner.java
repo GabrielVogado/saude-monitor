@@ -53,7 +53,7 @@ import java.util.Optional;
 public class ReconciliacaoRegiaoAdministrativaRunner implements ApplicationRunner {
 
     /** Nome da trava desta tarefa ({@link TravaDistribuida}). */
-    static final String TRAVA = "reconciliacao-regiao-administrativa";
+    static final String NOME_TRAVA = "reconciliacao-regiao-administrativa";
 
     /** Folga para a tarefa terminar; se a instância morrer no meio, a trava vence e outra refaz. */
     private static final Duration VALIDADE_TRAVA = Duration.ofMinutes(10);
@@ -72,7 +72,7 @@ public class ReconciliacaoRegiaoAdministrativaRunner implements ApplicationRunne
 
     @Override
     public void run(ApplicationArguments args) {
-        trava.executar(TRAVA, VALIDADE_TRAVA, this::executar);
+        trava.executar(NOME_TRAVA, VALIDADE_TRAVA, this::executar);
     }
 
     private void executar() {

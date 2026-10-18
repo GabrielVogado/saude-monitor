@@ -70,7 +70,7 @@ public class TravaDistribuida {
         try {
             mongoTemplate.upsert(livre, update, COLECAO);
             return true;
-        } catch (DuplicateKeyException e) {
+        } catch (DuplicateKeyException _) {
             return false;
         }
     }

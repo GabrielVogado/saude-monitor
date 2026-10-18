@@ -39,7 +39,7 @@ import java.util.List;
 public class ImportadorEstabelecimentos implements ApplicationRunner {
 
     /** Nome da trava desta tarefa ({@link TravaDistribuida}). */
-    static final String TRAVA = "importacao-estabelecimentos";
+    static final String NOME_TRAVA = "importacao-estabelecimentos";
 
     /** Folga para a tarefa terminar; se a instância morrer no meio, a trava vence e outra refaz. */
     private static final Duration VALIDADE_TRAVA = Duration.ofMinutes(15);
@@ -55,7 +55,7 @@ public class ImportadorEstabelecimentos implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        trava.executar(TRAVA, VALIDADE_TRAVA, this::executar);
+        trava.executar(NOME_TRAVA, VALIDADE_TRAVA, this::executar);
     }
 
     private void executar() {

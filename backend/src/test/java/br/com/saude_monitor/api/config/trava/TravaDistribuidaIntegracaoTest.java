@@ -151,7 +151,7 @@ class TravaDistribuidaIntegracaoTest {
     private static void aguardar(CountDownLatch sinal) {
         try {
             sinal.await();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         }
     }

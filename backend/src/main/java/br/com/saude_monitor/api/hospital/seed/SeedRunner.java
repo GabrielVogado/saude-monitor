@@ -47,7 +47,7 @@ import java.util.Set;
 public class SeedRunner implements ApplicationRunner {
 
     /** Nome da trava desta tarefa ({@link TravaDistribuida}). */
-    static final String TRAVA = "seed-hospitais";
+    static final String NOME_TRAVA = "seed-hospitais";
 
     /** Folga para a tarefa terminar; se a instância morrer no meio, a trava vence e outra refaz. */
     private static final Duration VALIDADE_TRAVA = Duration.ofMinutes(15);
@@ -79,7 +79,7 @@ public class SeedRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        trava.executar(TRAVA, VALIDADE_TRAVA, this::executar);
+        trava.executar(NOME_TRAVA, VALIDADE_TRAVA, this::executar);
     }
 
     private void executar() {

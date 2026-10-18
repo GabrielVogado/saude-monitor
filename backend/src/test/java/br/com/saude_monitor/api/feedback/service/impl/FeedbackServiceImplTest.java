@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -31,6 +32,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -43,8 +45,9 @@ class FeedbackServiceImplTest {
     private final VisitaRepository visitaRepository = mock(VisitaRepository.class);
     private final HospitalRepository hospitalRepository = mock(HospitalRepository.class);
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    private final MongoTemplate mongoTemplate = mock(MongoTemplate.class);
     private final FeedbackServiceImpl service =
-            new FeedbackServiceImpl(feedbackRepository, visitaRepository, hospitalRepository, eventPublisher);
+            new FeedbackServiceImpl(feedbackRepository, visitaRepository, hospitalRepository, eventPublisher, mongoTemplate);
 
     private VisitaDocument visitaFinalizada(String id) {
         return VisitaDocument.builder()
@@ -92,9 +95,18 @@ class FeedbackServiceImplTest {
 
         service.processarSemResposta();
 
-        assertThat(comFeedback.getStatus()).isEqualTo(StatusVisita.FINALIZADA);
-        assertThat(semFeedback.getStatus()).isEqualTo(StatusVisita.SEM_FEEDBACK);
-        verify(visitaRepository).saveAll(List.of(semFeedback));
+        // Só o status muda, por update condicionado (não regrava a visita lida, DAD-01).
+        org.mockito.ArgumentCaptor<org.springframework.data.mongodb.core.query.Query> query =
+                org.mockito.ArgumentCaptor.forClass(org.springframework.data.mongodb.core.query.Query.class);
+        org.mockito.ArgumentCaptor<org.springframework.data.mongodb.core.query.Update> update =
+                org.mockito.ArgumentCaptor.forClass(org.springframework.data.mongodb.core.query.Update.class);
+        verify(mongoTemplate).updateMulti(query.capture(), update.capture(), eq(VisitaDocument.class));
+        org.bson.Document filtro = query.getValue().getQueryObject();
+        assertThat(((org.bson.Document) filtro.get("_id")).get("$in")).isEqualTo(List.of("v2"));
+        assertThat(filtro.get("status")).isEqualTo(StatusVisita.FINALIZADA);
+        assertThat(((org.bson.Document) update.getValue().getUpdateObject().get("$set")).get("status"))
+                .isEqualTo(StatusVisita.SEM_FEEDBACK);
+        verify(visitaRepository, never()).saveAll(any());
         verify(feedbackRepository, never()).existsByVisitaId(anyString());
     }
 
@@ -103,7 +115,7 @@ class FeedbackServiceImplTest {
         service.processarSemResposta();
 
         verify(feedbackRepository).findByVisitaIdIn(List.of());
-        verify(visitaRepository).saveAll(List.of());
+        verifyNoInteractions(mongoTemplate);
     }
 
     // ------------------------------------------------ criar (achado do code-review, 09/09/2026) ------------------
@@ -130,6 +142,25 @@ class FeedbackServiceImplTest {
         assertThatThrownBy(() -> service.criar(pedido, "u1"))
                 .isInstanceOf(ConflitoException.class)
                 .hasMessageContaining("já avaliou");
+    }
+
+    @Test
+    void desvincularFeedbacksAntigosTiraAContaDepoisDe90DiasEMarcaAnonimizado() {
+        com.mongodb.client.result.UpdateResult resultado = mock(com.mongodb.client.result.UpdateResult.class);
+        when(resultado.getModifiedCount()).thenReturn(2L);
+        when(mongoTemplate.updateMulti(any(org.springframework.data.mongodb.core.query.Query.class),
+                any(org.springframework.data.mongodb.core.query.Update.class), eq(FeedbackDocument.class)))
+                .thenReturn(resultado);
+
+        assertThat(service.desvincularFeedbacksAntigos()).isEqualTo(2L);
+
+        org.mockito.ArgumentCaptor<org.springframework.data.mongodb.core.query.Update> update =
+                org.mockito.ArgumentCaptor.forClass(org.springframework.data.mongodb.core.query.Update.class);
+        verify(mongoTemplate).updateMulti(any(org.springframework.data.mongodb.core.query.Query.class),
+                update.capture(), eq(FeedbackDocument.class));
+        org.bson.Document set = (org.bson.Document) update.getValue().getUpdateObject().get("$set");
+        assertThat(set).containsEntry("usuarioId", null).containsEntry("anonimizado", true);
+        assertThat((org.bson.Document) update.getValue().getUpdateObject().get("$unset")).containsKey("comentario");
     }
 
     // ------------------------------------------------ dono da visita (SEG-02) ------------------

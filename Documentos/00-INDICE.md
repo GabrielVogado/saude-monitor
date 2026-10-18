@@ -5,6 +5,12 @@
 
 ---
 
+## 📌 Revisão 18/10/2026 — Épico 9: GPS apagado ao encerrar a visita e vínculo pessoal só por 90 dias (DAD-01, ARQ-04)
+
+**O que mudou:** os pontos de GPS de uma visita são apagados quando ela termina, e visitas e avaliações com mais de 90 dias perdem o vínculo com a conta e o aparelho, como promete o Documento Negocial §11. O heartbeat e o checkout viram update atômico, sem regravar a visita inteira nem desfazer um encerramento do job. `Especificacao-API-v2.4.md` e a política de privacidade (`site/`, versão 1.1) atualizadas. `De-Para-Backlog-Features.md` (DAD-01 e ARQ-04 entregues) e `Historico-Melhorias.md` (M-048).
+
+---
+
 ## 📌 Revisão 18/10/2026 — Épico 9: visita e feedback anônimos só para o dono (SEG-02)
 
 **O que mudou:** primeiro PR do Épico 9 (Escala, Segurança e Privacidade), que entra no `De-Para-Backlog-Features.md` com os gaps de código da análise de 17/10. Checkout, heartbeat e feedback de visita anônima passam a exigir o `dispositivoId` do aparelho que fez o check-in, e o feedback de visita logada exige o mesmo usuário (403 caso contrário). `Especificacao-API-v2.4.md` atualizada nos três endpoints. Registro em `Historico-Melhorias.md` (M-047).

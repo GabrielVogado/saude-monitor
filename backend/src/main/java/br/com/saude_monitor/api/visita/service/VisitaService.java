@@ -17,6 +17,13 @@ import br.com.saude_monitor.api.visita.dto.VisitaResponse;
  */
 public interface VisitaService {
 
+    /**
+     * Prazo em que visita e feedback ficam ligados a quem os fez (DAD-01 B). Depois dele
+     * perdem conta e aparelho, como promete o Documento Negocial v2.1 §11 ("dados de
+     * localização agregados sem vínculo pessoal após 90 dias").
+     */
+    java.time.Duration PRAZO_VINCULO_PESSOAL = java.time.Duration.ofDays(90);
+
     CheckinResponse checkin(CheckinRequest request, String usuarioId);
 
     CheckoutResponse checkout(String id, CheckoutRequest request, String usuarioId);
@@ -34,4 +41,16 @@ public interface VisitaService {
 
     /** Job periódico: encerra visitas ativas sem sinal de posição por 45min como GPS_INTERROMPIDO — E2-05/RN-06. */
     void processarGpsInterrompido();
+
+    /**
+     * Apaga os pontos de GPS que tenham sobrado em visitas já encerradas (DAD-01). Devolve
+     * quantas visitas mudaram.
+     */
+    long apagarPontosDeVisitasEncerradas();
+
+    /**
+     * Desvincula de conta e aparelho as visitas com mais de 90 dias e apaga os pontos de
+     * GPS que tenham sobrado (DAD-01). Devolve quantas visitas mudaram.
+     */
+    long desvincularVisitasAntigas();
 }

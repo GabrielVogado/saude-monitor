@@ -31,10 +31,12 @@ import br.com.saude_monitor.api.visita.service.VisitaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -80,6 +82,9 @@ public class VisitaServiceImpl implements VisitaService {
     private static final Duration LIMITE_EVENTO_OFFLINE = Duration.ofHours(24);
     /** Folga para relógio adiantado do aparelho antes de descartar um {@code ocorridoEm} futuro. */
     private static final Duration TOLERANCIA_RELOGIO = Duration.ofMinutes(5);
+
+    /** Máximo de pontos de GPS guardados numa visita aberta (ARQ-04); os mais antigos saem. */
+    static final int LIMITE_PONTOS_AMOSTRAIS = 50;
 
     private static final List<StatusVisita> STATUS_ATIVOS = List.of(StatusVisita.EM_ATENDIMENTO, StatusVisita.SUSPEITA);
 
@@ -153,41 +158,54 @@ public class VisitaServiceImpl implements VisitaService {
             saida = visita.getEntrada();
         }
 
-        visita.setSaida(saida);
-        visita.setDuracaoMinutos((int) Duration.between(visita.getEntrada(), saida).toMinutes());
-        visita.setStatus(gpsIndisponivel ? StatusVisita.GPS_INTERROMPIDO : StatusVisita.FINALIZADA);
-        // `agora` (write time), não `saida` (business time — pode ser retroativo via
-        // `ocorridoEm` da fila offline, OPS-05): é o que `recalcularPendentes` usa para
-        // saber "isso mudou desde a última varredura", achado do code-review de 09/09/2026.
-        visita.setProcessadoEm(agora);
+        Update update = new Update()
+                .set("saida", saida)
+                .set("duracaoMinutos", (int) Duration.between(visita.getEntrada(), saida).toMinutes())
+                .set("status", gpsIndisponivel ? StatusVisita.GPS_INTERROMPIDO : StatusVisita.FINALIZADA)
+                // `agora` (write time), não `saida` (business time — pode ser retroativo via
+                // `ocorridoEm` da fila offline, OPS-05): é o que `recalcularPendentes` usa para
+                // saber "isso mudou desde a última varredura", achado do code-review de 09/09/2026.
+                .set("processadoEm", agora);
         if (Boolean.TRUE.equals(request.encerramentoManual())) {
-            visita.setEncerramentoManual(true);
+            update.set("encerramentoManual", true);
         }
         if (request.posicao() != null) {
-            visita.getPontosAmostrais().add(toPontoAmostral(request.posicao(), saida));
-            visita.setUltimaPosicaoEm(saida);
+            update.set("ultimaPosicaoEm", saida);
         }
+        apagarPontos(update);
 
-        VisitaDocument salva = visitaRepository.save(visita);
+        VisitaDocument salva = atualizarSeAtiva(id, update);
         return new CheckoutResponse(salva.getId(), salva.getSaida(), salva.getDuracaoMinutos(),
                 salva.getStatus(), salva.isEncerramentoManual());
     }
 
     @Override
     public HeartbeatResponse heartbeat(String id, String usuarioId, String dispositivoId, PosicaoDto posicao) {
-        VisitaDocument visita = obterAtivaOu409(id, usuarioId, dispositivoId);
-
+        // Update atômico condicionado à visita estar ativa e ser de quem chama (ARQ-04): o `save()` do
+        // documento inteiro regravava todos os pontos a cada heartbeat e podia desfazer um
+        // encerramento feito pelo job no meio do caminho (mesmo padrão do M-007).
         Instant agora = Instant.now();
-        visita.setUltimoHeartbeat(agora);
+        Update update = new Update()
+                .set("ultimoHeartbeat", agora)
+                // SUSPEITA volta a EM_ATENDIMENTO com o sinal de vida (RN-23).
+                .set("status", StatusVisita.EM_ATENDIMENTO);
         if (posicao != null) {
-            visita.getPontosAmostrais().add(toPontoAmostral(posicao, agora));
-            visita.setUltimaPosicaoEm(agora);
-        }
-        if (visita.getStatus() == StatusVisita.SUSPEITA) {
-            visita.setStatus(StatusVisita.EM_ATENDIMENTO);
+            update.set("ultimaPosicaoEm", agora);
+            // `$push` com `$slice`: a lista guarda só os pontos mais recentes, e o documento
+            // deixa de crescer sem limite numa espera longa (~144 pontos em 24h).
+            update.push("pontosAmostrais").slice(-LIMITE_PONTOS_AMOSTRAIS).each(toPontoAmostral(posicao, agora));
         }
 
-        VisitaDocument salva = visitaRepository.save(visita);
+        // Um acesso ao banco no caminho feliz (o heartbeat é a rota mais frequente). Só quando
+        // nada é atualizado a visita é lida, para responder 404, 403 ou 409 como antes.
+        Criteria criteria = Criteria.where("_id").is(id).and("status").in(STATUS_ATIVOS)
+                .andOperator(criterioDeDono(usuarioId, dispositivoId));
+        VisitaDocument salva = mongoTemplate.findAndModify(new Query(criteria), update,
+                FindAndModifyOptions.options().returnNew(true), VisitaDocument.class);
+        if (salva == null) {
+            obterAtivaOu409(id, usuarioId, dispositivoId);
+            throw new ConflitoException("Visita já encerrada.");
+        }
         return new HeartbeatResponse(salva.getStatus(), salva.getUltimoHeartbeat());
     }
 
@@ -203,8 +221,9 @@ public class VisitaServiceImpl implements VisitaService {
                     "A sinalização de tipo de permanência só é permitida após 12h de visita ativa.");
         }
 
-        visita.setTipoPermanencia(request.tipoPermanencia());
-        VisitaDocument salva = visitaRepository.save(visita);
+        // Update atômico, como no heartbeat (ARQ-04): o `save()` do documento lido podia
+        // reabrir uma visita que o job acabou de encerrar e devolver os pontos já apagados.
+        VisitaDocument salva = atualizarSeAtiva(id, new Update().set("tipoPermanencia", request.tipoPermanencia()));
         return new TipoPermanenciaResponse(salva.getTipoPermanencia());
     }
 
@@ -245,19 +264,23 @@ public class VisitaServiceImpl implements VisitaService {
     public void processarExpiracoes() {
         Instant agora = Instant.now();
 
-        List<VisitaDocument> suspeitas = visitaRepository.findByStatusAndUltimoHeartbeatBefore(
-                StatusVisita.EM_ATENDIMENTO, agora.minus(LIMITE_SUSPEITA));
-        suspeitas.forEach(v -> v.setStatus(StatusVisita.SUSPEITA));
-        visitaRepository.saveAll(suspeitas);
+        // SUSPEITA em lote e atômico: a condição de tempo vai no próprio update, então um
+        // heartbeat que chegue entre a leitura e a escrita não é desfeito (ARQ-04).
+        mongoTemplate.updateMulti(
+                new Query(Criteria.where("status").is(StatusVisita.EM_ATENDIMENTO)
+                        .and("ultimoHeartbeat").lt(agora.minus(LIMITE_SUSPEITA))),
+                new Update().set("status", StatusVisita.SUSPEITA),
+                VisitaDocument.class);
 
         List<VisitaDocument> expiradas = visitaRepository.findByStatusInAndUltimoHeartbeatBefore(
                 STATUS_ATIVOS, agora.minus(LIMITE_EXPIRACAO));
         expiradas.forEach(v -> {
-            v.setStatus(StatusVisita.EXPIRADA);
-            v.setSaida(v.getUltimoHeartbeat());
-            v.setDuracaoMinutos((int) Duration.between(v.getEntrada(), v.getUltimoHeartbeat()).toMinutes());
+            Update update = new Update()
+                    .set("status", StatusVisita.EXPIRADA)
+                    .set("saida", v.getUltimoHeartbeat())
+                    .set("duracaoMinutos", (int) Duration.between(v.getEntrada(), v.getUltimoHeartbeat()).toMinutes());
+            encerrarSeSemSinalNovo(v, apagarPontos(update));
         });
-        visitaRepository.saveAll(expiradas);
     }
 
     @Override
@@ -281,14 +304,87 @@ public class VisitaServiceImpl implements VisitaService {
             // Preserva a duração parcial calculada a partir do último sinal (heartbeat ou posição),
             // e não do instante em que o job rodou (RN-06/E2-05).
             Instant ultimoSinal = ultimoSinalDe(v);
-            v.setStatus(StatusVisita.GPS_INTERROMPIDO);
-            v.setSaida(ultimoSinal);
-            v.setDuracaoMinutos((int) Duration.between(v.getEntrada(), ultimoSinal).toMinutes());
-            // `agora` (write time), não `ultimoSinal` (pode ser de até ~15min atrás, o
-            // ciclo deste job) — mesmo motivo do checkout, achado do code-review.
-            v.setProcessadoEm(agora);
+            Update update = new Update()
+                    .set("status", StatusVisita.GPS_INTERROMPIDO)
+                    .set("saida", ultimoSinal)
+                    .set("duracaoMinutos", (int) Duration.between(v.getEntrada(), ultimoSinal).toMinutes())
+                    // `agora` (write time), não `ultimoSinal` (pode ser de até ~15min atrás, o
+                    // ciclo deste job) — mesmo motivo do checkout, achado do code-review.
+                    .set("processadoEm", agora);
+            encerrarSeSemSinalNovo(v, apagarPontos(update));
         });
-        visitaRepository.saveAll(semSinal);
+    }
+
+    @Override
+    public long apagarPontosDeVisitasEncerradas() {
+        // Rede de segurança do DAD-01: visitas encerradas antes desta regra, ou por um caminho
+        // que não passe pelos encerramentos acima, perdem a trilha na próxima execução.
+        Query query = new Query(Criteria.where("status").nin(STATUS_ATIVOS).and("pontosAmostrais").exists(true));
+        return mongoTemplate.updateMulti(query, apagarPontos(new Update()), VisitaDocument.class).getModifiedCount();
+    }
+
+    @Override
+    public long desvincularVisitasAntigas() {
+        // DAD-01 B: depois do prazo, a visita perde quem a fez (conta e aparelho) e fica só
+        // como dado agregado: hospital, entrada, saída, duração e status.
+        Query query = new Query(Criteria.where("entrada").lt(Instant.now().minus(PRAZO_VINCULO_PESSOAL))
+                .orOperator(Criteria.where("usuarioId").ne(null), Criteria.where("dispositivoId").ne(null)));
+        Update update = new Update().set("usuarioId", null).unset("dispositivoId");
+        return mongoTemplate.updateMulti(query, apagarPontos(update), VisitaDocument.class).getModifiedCount();
+    }
+
+    /**
+     * A mesma regra do {@link VisitaDono}, como filtro do Mongo: visita logada do próprio
+     * usuário, ou visita anônima do próprio aparelho.
+     */
+    private static Criteria criterioDeDono(String usuarioId, String dispositivoId) {
+        List<Criteria> donos = new java.util.ArrayList<>();
+        if (usuarioId != null) {
+            donos.add(Criteria.where("usuarioId").is(usuarioId));
+        }
+        if (dispositivoId != null && !dispositivoId.isBlank()) {
+            donos.add(Criteria.where("usuarioId").is(null).and("dispositivoId").is(dispositivoId));
+        }
+        if (donos.isEmpty()) {
+            // Sem usuário nem aparelho ninguém é dono: filtro que não casa com nada.
+            return Criteria.where("_id").exists(false);
+        }
+        return new Criteria().orOperator(donos);
+    }
+
+    /**
+     * Encerra a visita só se ela continua ativa e sem sinal novo desde a leitura do job:
+     * um heartbeat que chegue no meio muda {@code ultimoHeartbeat} e a visita segue aberta.
+     */
+    private void encerrarSeSemSinalNovo(VisitaDocument lida, Update update) {
+        Criteria criteria = Criteria.where("_id").is(lida.getId())
+                .and("status").in(STATUS_ATIVOS)
+                .and("ultimoHeartbeat").is(lida.getUltimoHeartbeat());
+        mongoTemplate.updateFirst(new Query(criteria), update, VisitaDocument.class);
+    }
+
+    /**
+     * Aplica o update só se a visita ainda está ativa e devolve o documento já atualizado.
+     * Se um job ou outro pedido a encerrou depois da leitura, responde 409, como uma visita
+     * que já estava encerrada.
+     */
+    private VisitaDocument atualizarSeAtiva(String id, Update update) {
+        Query query = new Query(Criteria.where("_id").is(id).and("status").in(STATUS_ATIVOS));
+        VisitaDocument salva = mongoTemplate.findAndModify(
+                query, update, FindAndModifyOptions.options().returnNew(true), VisitaDocument.class);
+        if (salva == null) {
+            throw new ConflitoException("Visita já encerrada.");
+        }
+        return salva;
+    }
+
+    /**
+     * DAD-01 A: os pontos de GPS só servem enquanto a visita está aberta. Ao encerrar ficam
+     * entrada, saída e duração; a trilha de posições dentro da unidade de saúde (dado
+     * sensível, art. 11 da LGPD) sai junto.
+     */
+    private static Update apagarPontos(Update update) {
+        return update.unset("pontosAmostrais");
     }
 
     /** Último sinal de vida da visita: o mais recente entre {@code ultimoHeartbeat} e {@code ultimaPosicaoEm} (RN-06/E2-05). */

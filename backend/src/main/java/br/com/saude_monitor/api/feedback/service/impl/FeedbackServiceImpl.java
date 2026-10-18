@@ -19,11 +19,16 @@ import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import br.com.saude_monitor.api.visita.document.StatusVisita;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
 import br.com.saude_monitor.api.visita.service.VisitaDono;
+import br.com.saude_monitor.api.visita.service.VisitaService;
 import br.com.saude_monitor.api.visita.repository.VisitaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -70,6 +75,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     private final VisitaRepository visitaRepository;
     private final HospitalRepository hospitalRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final MongoTemplate mongoTemplate;
 
     @Override
     public FeedbackResponse criar(FeedbackRequest request, String usuarioId) {
@@ -223,11 +229,31 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .map(FeedbackDocument::getVisitaId)
                 .collect(Collectors.toSet());
 
-        List<VisitaDocument> semFeedback = encerradas.stream()
-                .filter(v -> !comFeedback.contains(v.getId()))
+        List<String> semFeedback = encerradas.stream()
+                .map(VisitaDocument::getId)
+                .filter(id -> !comFeedback.contains(id))
                 .toList();
-        semFeedback.forEach(v -> v.setStatus(StatusVisita.SEM_FEEDBACK));
-        visitaRepository.saveAll(semFeedback);
+        if (semFeedback.isEmpty()) {
+            return;
+        }
+        // Update só do status, em vez de `saveAll` dos documentos lidos: regravar a visita
+        // inteira podia devolver conta, aparelho ou pontos de GPS apagados no meio do caminho
+        // pela retenção (DAD-01).
+        mongoTemplate.updateMulti(
+                new Query(Criteria.where("_id").in(semFeedback).and("status").is(StatusVisita.FINALIZADA)),
+                new Update().set("status", StatusVisita.SEM_FEEDBACK),
+                VisitaDocument.class);
+    }
+
+    @Override
+    public long desvincularFeedbacksAntigos() {
+        // Mesmo tratamento da exclusão de conta (M-041): o comentário é texto livre e pode
+        // trazer nome, telefone ou o caso da pessoa, então sai junto com o vínculo.
+        Query query = new Query(Criteria.where("criadoEm")
+                .lt(Instant.now().minus(VisitaService.PRAZO_VINCULO_PESSOAL))
+                .and("usuarioId").ne(null));
+        Update update = new Update().set("usuarioId", null).set("anonimizado", true).unset("comentario");
+        return mongoTemplate.updateMulti(query, update, FeedbackDocument.class).getModifiedCount();
     }
 
     /**

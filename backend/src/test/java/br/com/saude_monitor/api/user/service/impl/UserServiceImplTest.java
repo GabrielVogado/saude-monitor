@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.user.service.impl;
 
+import br.com.saude_monitor.api.config.security.UsuarioAutenticadoCache;
 import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.auth.service.AuthService;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
@@ -57,6 +58,7 @@ class UserServiceImplTest {
     private MongoTemplate mongoTemplate;
     private IndicadorService indicadorService;
     private AuthService authService;
+    private UsuarioAutenticadoCache usuarioAutenticadoCache;
 
     @BeforeEach
     void setup() {
@@ -64,13 +66,15 @@ class UserServiceImplTest {
         mongoTemplate = mock(MongoTemplate.class);
         indicadorService = mock(IndicadorService.class);
         authService = mock(AuthService.class);
+        usuarioAutenticadoCache = mock(UsuarioAutenticadoCache.class);
 
         userService = new UserServiceImpl(
                 userRepository,
                 new BCryptPasswordEncoder(),
                 mongoTemplate,
                 indicadorService,
-                authService);
+                authService,
+                usuarioAutenticadoCache);
     }
 
     private UserDocument usuario(String id) {
@@ -113,6 +117,8 @@ class UserServiceImplTest {
         verify(mongoTemplate).updateMulti(any(Query.class), any(),
                 eq(FeedbackDocument.class));
         verify(userRepository).delete(user);
+        // O token ainda válido da conta deixa de autenticar nesta instância (ARQ-03).
+        verify(usuarioAutenticadoCache).esquecer("marina@email.com");
     }
 
     @Test

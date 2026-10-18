@@ -18,6 +18,7 @@ import br.com.saude_monitor.api.hospital.dto.RejeitarSugestaoRequest;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalDetalheResponse;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalResponse;
+import br.com.saude_monitor.api.hospital.service.CatalogoService;
 import br.com.saude_monitor.api.hospital.service.HospitalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,8 +31,13 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -44,6 +50,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class HospitalControllerTest {
 
     private MockMvc mockMvc;
+    private final CatalogoService catalogoService = mock(CatalogoService.class);
 
     @BeforeEach
     void setup() {
@@ -58,7 +65,8 @@ class HospitalControllerTest {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 
-        mockMvc = MockMvcBuilders.standaloneSetup(new HospitalController(service, authHelper, mock(IndicadorService.class)))
+        mockMvc = MockMvcBuilders.standaloneSetup(new HospitalController(service, authHelper, mock(IndicadorService.class),
+                        catalogoService))
                 .setValidator(validator)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -97,6 +105,8 @@ class HospitalControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value("1"))
                 .andExpect(jsonPath("$.nome").value("Hospital Teste"));
+        // O catálogo público guardado nesta instância é descartado (ARQ-01).
+        verify(catalogoService).invalidar();
     }
 
     @Test
@@ -170,6 +180,35 @@ class HospitalControllerTest {
                 .andExpect(jsonPath("$.content").isArray());
     }
 
+    @Test
+    void rankingPodeSerGuardadoPelaBordaMasOAparelhoSempreConfere() throws Exception {
+        mockMvc.perform(get("/api/v1/hospitais/ranking"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "max-age=0, public, s-maxage=300"));
+    }
+
+    @Test
+    void atualizarEAlterarStatusDescartamOCatalogoGuardado() throws Exception {
+        String body = """
+                {
+                  "nome": "Hospital Teste",
+                  "cnpj": "12.345.678/0001-90",
+                  "tipo": "PUBLICO",
+                  "categoria": "HOSPITAL",
+                  "endereco": { "logradouro": "Rua A", "numero": "100", "cidade": "Brasília", "uf": "DF", "cep": "70000-000" },
+                  "contato": { "telefone": "(61) 3325-5000", "email": "contato@teste.com" },
+                  "geofence": { "type": "Polygon", "coordinates": [[[-47.88,-15.78],[-47.87,-15.78],[-47.87,-15.77],[-47.88,-15.78]]] }
+                }
+                """;
+        mockMvc.perform(put("/api/v1/hospitais/1").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+        mockMvc.perform(patch("/api/v1/hospitais/1/status").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ativo\":false}"))
+                .andExpect(status().isOk());
+
+        verify(catalogoService, times(2)).invalidar();
+    }
+
     /** Stub manual do serviço, evita dependência de Mockito/MongoDB. */
     private static class StubService implements HospitalService {
 
@@ -179,6 +218,11 @@ class HospitalControllerTest {
                     request.categoria(), null, null, null, null, null,
                     request.endereco(), request.contato(), request.geofence(),
                     true, null, IndicadoresResponse.indisponivel(), Instant.now(), Instant.now());
+        }
+
+        @Override
+        public List<HospitalResumoResponse> listarCatalogo() {
+            return List.of();
         }
 
         @Override

@@ -20,6 +20,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -91,6 +92,20 @@ class HospitalServiceImplTest {
 
     private IndicadoresResponse disp(double nota, int tempo) {
         return new IndicadoresResponse(true, nota, 8, tempo, null);
+    }
+
+    @Test
+    void catalogoTrazSoAtivosOrdenadosPorNomeEIdComIndicadores() {
+        var captor = org.mockito.ArgumentCaptor.forClass(org.springframework.data.mongodb.core.query.Query.class);
+
+        List<HospitalResumoResponse> catalogo = service.listarCatalogo();
+
+        verify(mongoTemplate).find(captor.capture(),
+                org.mockito.ArgumentMatchers.eq(HospitalDocument.class));
+        assertThat(captor.getValue().getQueryObject()).containsEntry("ativo", true);
+        assertThat(captor.getValue().getSortObject().keySet()).containsExactly("nome", "id");
+        assertThat(catalogo).hasSize(6);
+        assertThat(catalogo.getFirst().indicadores().notaMedia()).isEqualTo(5.0);
     }
 
     @Test

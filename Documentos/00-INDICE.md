@@ -5,6 +5,12 @@
 
 ---
 
+## 📌 Revisão 18/10/2026 — Épico 9: catálogo público com cache e cache curto do usuário (ARQ-01, ARQ-03)
+
+**O que mudou:** novo `GET /api/v1/catalogo` com todos os estabelecimentos ativos e indicadores, `ETag` pelo conteúdo (304 quando o app já tem a versão) e `Cache-Control` público para a borda; montado no máximo a cada 5 min por instância. O ranking ganha `s-maxage=300`, as respostas JSON saem com gzip e a conta do token fica 60 s em memória em vez de uma leitura no banco por requisição. `Especificacao-API-v2.4.md` (§3.7), `De-Para-Backlog-Features.md` (ARQ-01 parcial, ARQ-03 entregue) e `Historico-Melhorias.md` (M-052).
+
+---
+
 ## 📌 Revisão 18/10/2026 — Épico 9: rate limit por identidade (ARQ-02)
 
 **O que mudou:** o rate limit das rotas públicas passa a contar por usuário ou pela instalação do app (`X-Cliente-Id`), não pelo IP que o CGNAT das operadoras faz centenas de celulares dividirem; o IP fica com um teto de abuso de 600/min. O login ganha limite por conta e o refresh sai do limite por IP, limitado só pelo próprio token. `Especificacao-API-v2.4.md` (limites e cabeçalho), `De-Para-Backlog-Features.md` (ARQ-02 entregue) e `Historico-Melhorias.md` (M-051).

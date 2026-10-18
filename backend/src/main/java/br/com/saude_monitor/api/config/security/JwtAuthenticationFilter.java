@@ -18,6 +18,9 @@ import java.io.IOException;
  * Extrai e valida o token {@code Authorization: Bearer <access_token>} de cada requisição
  * (F0-01). Quando válido, popula o {@code SecurityContext} com a autenticação do usuário.
  *
+ * <p>A conta do token vem do {@link UsuarioAutenticadoCache} (ARQ-03), e não do banco a
+ * cada requisição.</p>
+ *
  * <p>Em caso de token ausente, inválido ou expirado, simplesmente segue a cadeia sem
  * autenticar — o {@link RestAuthenticationEntryPoint} devolve 401 nos endpoints protegidos.</p>
  */
@@ -28,7 +31,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtService jwtService;
-    private final CustomUserDetailsService userDetailsService;
+    private final UsuarioAutenticadoCache usuarioAutenticadoCache;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -41,7 +44,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 String email = jwtService.extractEmail(token);
                 if (email != null && jwtService.isAccessTokenValid(token, email)) {
-                    UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                    UserDetails userDetails = usuarioAutenticadoCache.carregar(email);
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

@@ -15,6 +15,8 @@ import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalDetalheResponse;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalResponse;
 
+import java.util.List;
+
 /**
  * Contrato do serviço de hospitais (Épico 01).
  */
@@ -48,6 +50,12 @@ public interface HospitalService {
      * indicadores suficientes (RN-15) ficam ao final, ordenados por nome.
      */
     PageResponse<HospitalResumoResponse> ranking(OrdemRanking ordem, TipoEstabelecimento tipo, int page, int size);
+
+    /**
+     * Catálogo público (ARQ-01): todos os estabelecimentos ativos, com indicadores, em
+     * ordem de nome e id. É a base de {@code GET /api/v1/catalogo}.
+     */
+    List<HospitalResumoResponse> listarCatalogo();
 
     HospitalResponse alterarStatus(String id, boolean ativo);
 

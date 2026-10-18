@@ -17,6 +17,7 @@ import br.com.saude_monitor.api.hospital.dto.RejeitarSugestaoRequest;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalDetalheResponse;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalResponse;
+import br.com.saude_monitor.api.hospital.service.CatalogoService;
 import br.com.saude_monitor.api.hospital.service.HospitalService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
@@ -25,6 +26,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -37,6 +39,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Duration;
 
 /**
  * Endpoints de hospitais (Épico 01).
@@ -55,6 +59,16 @@ public class HospitalController {
     private final HospitalService hospitalService;
     private final AutenticacaoHelper autenticacaoHelper;
     private final IndicadorService indicadorService;
+    private final CatalogoService catalogoService;
+
+    /**
+     * Ranking é o mesmo para qualquer pessoa (ARQ-01): a borda pode guardá-lo por 5 minutos
+     * ({@code s-maxage}, P8), e o aparelho sempre confere ({@code max-age=0}), para quem
+     * acabou de avaliar não ver a lista antiga.
+     */
+    static final CacheControl CACHE_RANKING = CacheControl.maxAge(Duration.ZERO)
+            .sMaxAge(CatalogoService.VALIDADE)
+            .cachePublic();
 
     /** 🔓 Lista hospitais ativos, com filtro geoespacial (raio), tipo e busca textual. */
     @GetMapping
@@ -86,7 +100,9 @@ public class HospitalController {
             @RequestParam(required = false) TipoEstabelecimento tipo,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ResponseEntity.ok(hospitalService.ranking(ordem, tipo, page, size));
+        return ResponseEntity.ok()
+                .cacheControl(CACHE_RANKING)
+                .body(hospitalService.ranking(ordem, tipo, page, size));
     }
 
     /** 🔓 Detalhe público do hospital. */
@@ -121,21 +137,27 @@ public class HospitalController {
     /** 🛡️ Cadastro de hospital + geofence (admin). */
     @PostMapping
     public ResponseEntity<HospitalResponse> criar(@Valid @RequestBody HospitalRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(hospitalService.criar(request));
+        HospitalResponse criado = hospitalService.criar(request);
+        catalogoService.invalidar();
+        return ResponseEntity.status(HttpStatus.CREATED).body(criado);
     }
 
     /** 🛡️ Atualização completa do hospital/geofence (admin). */
     @PutMapping("/{id}")
     public ResponseEntity<HospitalResponse> atualizar(@PathVariable String id,
                                                       @Valid @RequestBody HospitalRequest request) {
-        return ResponseEntity.ok(hospitalService.atualizar(id, request));
+        HospitalResponse atualizado = hospitalService.atualizar(id, request);
+        catalogoService.invalidar();
+        return ResponseEntity.ok(atualizado);
     }
 
     /** 🛡️ Ativa/desativa o hospital (admin). */
     @PatchMapping("/{id}/status")
     public ResponseEntity<HospitalResponse> alterarStatus(@PathVariable String id,
                                                           @Valid @RequestBody AlterarStatusRequest request) {
-        return ResponseEntity.ok(hospitalService.alterarStatus(id, request.ativo()));
+        HospitalResponse alterado = hospitalService.alterarStatus(id, request.ativo());
+        catalogoService.invalidar();
+        return ResponseEntity.ok(alterado);
     }
 
     /** 🔓 Sugestão pública de hospital ainda não cadastrado (E1-05, P2). */

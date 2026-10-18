@@ -230,6 +230,7 @@ A versão anterior (2.0) foi preservada em `_historico/Especificacao-API-v2.0.md
 | `GET /api/v1/hospitais` (+ `{id}`, `geofence`) | 🟢 | PR #12/#13 |
 | `POST/PUT/PATCH /api/v1/hospitais...` | 🟢 (ADMIN) | PR #12/#13 |
 | `GET /api/v1/hospitais/ranking` | 🟢 (backend; UI em S8) | PR #27 |
+| `GET /api/v1/catalogo` | 🟢 (backend; uso no app no APP-01) | ARQ-01, 18/10/2026 |
 | `POST /api/v1/hospitais/sugestoes` + moderação | 🟢 | PR #14 |
 | `POST /api/v1/visitas/checkin` · `checkout` · `heartbeat` · PATCH `tipo-permanencia` | 🟢 | PR #17/#18|
 | `GET /api/v1/visitas/ativas` · `GET /api/v1/contas/visitas` | 🟢 | PR #18/#23 |
@@ -542,6 +543,23 @@ GeoJSON (`FeatureCollection`, RFC 7946, lon/lat) de uma das 4 divisões geográf
 **Atributos por camada:** `regiao-administrativa` (35 features: `nome`, `regiaoSaude`, `macrorregiaoSaude`) · `ride` (33: `nome`) · `regiao-saude` (7: `nome`, `macrorregiaoSaude`, `regioesAdministrativas`) · `macrorregiao-saude` (3: `nome`, `regioesSaude`).
 **Origem e servimento:** `multiplas_camadas_saude_14/*.shp` (CRS `GCS_WGS_1984`, sem reprojeção) → `mapshaper -simplify 10% keep-shapes` + renomeação de atributos → 919 KB em `backend/src/main/resources/camadas/` (regeneração: `backend/data/camadas/README.md`). Servido do classpath com carga única na subida (`RegiaoService`), **sem** coleção Mongo — desvio validado do §5.2 item 4 do plano (divisão quase imutável, nenhuma query espacial no servidor; contrato idêntico). Valores de atributo preservados da fonte (`Sudoeste/Octogonal` literal).
 
+
+### 3.7 Catálogo público (ARQ-01, 18/10/2026)
+
+#### `GET /api/v1/catalogo` 🔓
+Todos os estabelecimentos ativos, com indicadores, em ordem de nome. É o mesmo conteúdo para qualquer pessoa: o app guarda o catálogo e faz distância, filtro e busca no aparelho (APP-01), e a borda pode guardá-lo (SOL-03). Rate limit PÚBLICO.
+```json
+{
+  "versao": "9f2c4e1a7b3d5f60a1b2c3d4e5f60718",
+  "total": 341,
+  "estabelecimentos": [ { "id": "...", "nome": "...", "tipo": "PUBLICO", "categoria": "HOSPITAL", "localizacao": { "latitude": -15.79, "longitude": -47.88 }, "raioMetros": 150, "indicadores": { "indicadoresDisponiveis": true, "notaMedia": 4.2, "nAvaliacoes": 12, "tempoMedianoMinutos": 95 } } ]
+}
+```
+**Itens:** o mesmo `HospitalResumoResponse` de `GET /api/v1/hospitais` (sem CNPJ, contato nem polígono).
+**Cache:** `ETag: W/"<versao>"` (SHA-256 do conteúdo, igual em todas as instâncias) e `Cache-Control: max-age=60, public, s-maxage=300`. Com `If-None-Match` igual à versão atual, a resposta é **304** sem corpo. O servidor monta o catálogo no máximo uma vez a cada 5 min por instância (P8: até 5 min de atraso nos dados públicos); cadastro, edição e ativação feitos pelo admin descartam o catálogo da instância que os recebeu.
+**Compressão:** respostas JSON acima de 2 KB saem com gzip quando o cliente aceita (`server.compression`).
+
+**Ranking (`GET /api/v1/hospitais/ranking`):** desde o ARQ-01 responde com `Cache-Control: max-age=0, public, s-maxage=300`. A borda pode guardar por 5 min; o aparelho sempre confere.
 ---
 
 ## 4. Fluxo de Detecção (Geofence → API)

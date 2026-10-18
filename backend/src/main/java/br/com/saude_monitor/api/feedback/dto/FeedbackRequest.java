@@ -47,6 +47,14 @@ public record FeedbackRequest(
         Integer tratamentoEquipe,
 
         @Size(max = 500, message = "comentario deve ter no máximo 500 caracteres.")
-        String comentario
+        String comentario,
+
+        /**
+         * Aparelho que fez o check-in. Obrigatório para avaliar visita anônima (SEG-02): sem
+         * ele, quem soubesse o id da visita avaliava a visita de outra pessoa e bloqueava a
+         * avaliação legítima (RN-12 aceita uma só).
+         */
+        @Size(max = 64, message = "dispositivoId deve ter no máximo 64 caracteres.")
+        String dispositivoId
 ) {
 }

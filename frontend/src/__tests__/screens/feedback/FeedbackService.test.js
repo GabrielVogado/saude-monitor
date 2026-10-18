@@ -39,6 +39,8 @@ describe("FeedbackService (Épico 03)", () => {
     expect(c.url).toContain("/api/v1/feedbacks");
     expect(c.url).not.toContain("/visitas/");
     expect(JSON.parse(c.body).nota).toBe(4);
+    // SEG-02: prova de que a visita anônima é deste aparelho.
+    expect(JSON.parse(c.body).dispositivoId).toContain("anon-");
     expect(c.headers.Authorization).toBeUndefined();
     expect(resp.recebido).toBe(true);
   });

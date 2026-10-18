@@ -6,7 +6,7 @@
 > |---|---|
 > | **Versão** | 2.4 |
 > | **Status** | Contrato em validação — endpoints já implementados na `develop`; alterações refletidas neste documento e registradas por PR |
-> | **Data** | 07/08/2026 (última atualização: 04/10/2026) |
+> | **Data** | 07/08/2026 (última atualização: 18/10/2026) |
 > | **Base** | Árvore Tecnológica v2.1 (ADRs) · Documento Negocial v2.1 (RN) · Backlog v2.2 (Fase 0 + E1–E8) |
 > | **Padrão** | REST + JSON · OpenAPI 3.1 (geração automática a partir do código — E8-09 entregue) |
 > | **O que mudou na v2.4** | Novo `GET /api/v1/contas/feedbacks/pendentes` 🔒 (visitas do titular que ainda aceitam feedback). `POST /api/v1/feedbacks` passa a aceitar visita `GPS_INTERROMPIDO` (celular descarregado dentro do hospital) e recusa com 404 a visita cuja janela de 24h após a saída já fechou (RN-09). Versão anterior (2.3) preservada em `_historico/Especificacao-API-v2.3.md`. Ver [M-029](../09-melhoria-continua/Historico-Melhorias.md). |
@@ -406,11 +406,13 @@ Registra saída. **Request:** `{ "posicao": {...}, "gpsIndisponivel": false, "en
 ```
 > **`ocorridoEm` (opcional, OPS-05):** mesmas regras do check-in, com uma restrição a mais — a saída nunca é anterior à entrada. Um relógio atrasado no aparelho produziria duração negativa, que envenenaria a mediana de permanência (RN-15); nesse caso o servidor usa a própria entrada.
 
+> **Dono da visita (SEG-02, 18/10/2026):** visita de usuário logado só aceita checkout, heartbeat e feedback do mesmo usuário. Visita **anônima** exige o `dispositivoId` do aparelho que fez o check-in no corpo (`{ ..., "dispositivoId": "anon-..." }`); sem ele, ou com outro, responde **403 `ACESSO_NEGADO`**. Estar logado não dá posse de visita anônima alheia; quem fez login no meio de uma visita anônima continua dono pelo aparelho. Antes, quem soubesse o id da visita anônima (um `ObjectId`, previsível a partir de outro) podia encerrá-la, mantê-la viva ou avaliá-la. Ver [M-047](../09-melhoria-continua/Historico-Melhorias.md).
+
 #### `POST /api/v1/visitas/{id}/heartbeat` 🔒
-Sinal de vida da visita (RN-23). O app envia a cada **30 minutos** enquanto a visita está ativa e o app está aberto e, com o app fechado, a cada **~10 minutos** com `posicao`, pela tarefa de localização em segundo plano (desde 05/10/2026). Atualiza `ultimoHeartbeat`; se a visita estava `SUSPEITA` (2h sem heartbeat), retorna ao status `EM_ATENDIMENTO`. **200** `{ "status": "EM_ATENDIMENTO", "ultimoHeartbeat": "2026-08-07T16:30:00Z" }`
+Sinal de vida da visita (RN-23). O app envia a cada **30 minutos** enquanto a visita está ativa e o app está aberto e, com o app fechado, a cada **~10 minutos** com `posicao`, pela tarefa de localização em segundo plano (desde 05/10/2026). Atualiza `ultimoHeartbeat`; se a visita estava `SUSPEITA` (2h sem heartbeat), retorna ao status `EM_ATENDIMENTO`. **Request:** `{ "posicao": {...}, "dispositivoId": "anon-..." }` (ambos opcionais; `dispositivoId` obrigatório em visita anônima, ver *Dono da visita* acima). **200** `{ "status": "EM_ATENDIMENTO", "ultimoHeartbeat": "2026-08-07T16:30:00Z" }`
 
 #### `PATCH /api/v1/visitas/{id}/tipo-permanencia` 🔒
-Sinaliza internação/observação (RN-24) — disponível quando a visita tem ≥ 12h de duração. **Request:** `{ "tipoPermanencia": "INTERNACAO" }` → **200** `{ "tipoPermanencia": "INTERNACAO" }`. A visita continua ativa, mas **sai do cálculo do tempo médio de pronto-atendimento**.
+Sinaliza internação/observação (RN-24) — disponível quando a visita tem ≥ 12h de duração. **Request:** `{ "tipoPermanencia": "INTERNACAO", "dispositivoId": "anon-..." }` (`dispositivoId` só conta em visita que começou anônima, ver *Dono da visita*) → **200** `{ "tipoPermanencia": "INTERNACAO" }`. A visita continua ativa, mas **sai do cálculo do tempo médio de pronto-atendimento**.
 
 #### `GET /api/v1/visitas/ativas` 🔒
 Retorna visita `EM_ATENDIMENTO` do usuário (para card/cronômetro). **200** `{ "visita": {...} | null }`
@@ -445,11 +447,12 @@ Registra feedback pós-saída. **Autenticação opcional** (se logado, vincula `
   "fezTriagem": "SIM",
   "medicacaoReceita": "RECEBI",
   "nota": 4,
-  "comentario": "Atendimento rápido."
+  "comentario": "Atendimento rápido.",
+  "dispositivoId": "anon-..."
 }
 ```
 **201 Created** `{ "id": "...", "criadoEm": "...", "recebido": true }`
-**Erros:** `CONFLITO` se `visitaId` já tem feedback (RN-12); `RECURSO_NAO_ENCONTRADO` se a visita não existe, não está encerrada (`FINALIZADA` ou `GPS_INTERROMPIDO`) ou saiu há mais de 24h (RN-09). `GPS_INTERROMPIDO` aceita feedback desde a v2.4: é o status que o backend grava quando o celular descarrega ou desliga dentro do hospital (RN-06), e a pessoa esteve lá do mesmo jeito.
+**Erros:** `ACESSO_NEGADO` (403) se quem envia não é dono da visita: outro usuário, ou, em visita anônima, `dispositivoId` ausente ou diferente do check-in (SEG-02, 18/10/2026). A recusa vem antes das regras de status, janela e duplicidade, para não revelar a estranhos se a visita está em andamento, encerrada ou já avaliada, e para a tentativa não consumir a avaliação única. Feedback sem login de visita feita com login também recebe 403. `CONFLITO` se `visitaId` já tem feedback (RN-12); `RECURSO_NAO_ENCONTRADO` se a visita não existe, não está encerrada (`FINALIZADA` ou `GPS_INTERROMPIDO`) ou saiu há mais de 24h (RN-09). `GPS_INTERROMPIDO` aceita feedback desde a v2.4: é o status que o backend grava quando o celular descarrega ou desliga dentro do hospital (RN-06), e a pessoa esteve lá do mesmo jeito.
 
 #### `GET /api/v1/visitas/{id}/feedback` 🔒
 Retorna feedback da visita (se houver) — usado para edição de comentário (opcional).

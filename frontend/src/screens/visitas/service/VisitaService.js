@@ -58,9 +58,20 @@ class VisitaService {
     }
   }
 
-  /** Registra saída (E2-02/E2-05). `gpsIndisponivel` encerra como GPS_INTERROMPIDO. */
+  /**
+   * Registra saída (E2-02/E2-05). `gpsIndisponivel` encerra como GPS_INTERROMPIDO.
+   *
+   * O `dispositivoId` vai sempre: numa visita anônima ele é a prova de que este é o
+   * aparelho que fez o check-in, e o backend recusa (403) quem não o tem. Vale também
+   * para quem fez login no meio de uma visita que começou anônima.
+   */
   static async checkout(id, { posicao, gpsIndisponivel, encerramentoManual } = {}) {
-    const corpo = { posicao, gpsIndisponivel, encerramentoManual };
+    const corpo = {
+      posicao,
+      gpsIndisponivel,
+      encerramentoManual,
+      dispositivoId: await DispositivoId.obterSeDisponivel(),
+    };
 
     try {
       // Repetível pelo mesmo motivo do check-in: o checkout é endereçado à
@@ -89,8 +100,11 @@ class VisitaService {
    *
    * O `ocorridoEm` carrega o momento real do evento, não o do reenvio: sem ele a
    * visita registraria a hora em que a internet voltou.
+   *
+   * Um checkout guardado antes de o app mandar o `dispositivoId` ganha o do aparelho
+   * no reenvio, para não ser recusado como de outro dono.
    */
-  static enviarEventoOffline(item) {
+  static async enviarEventoOffline(item) {
     if (item?.tipo === "checkin") {
       return request(`${BASE_PATH}/checkin`, {
         method: "POST",
@@ -101,29 +115,38 @@ class VisitaService {
 
     if (item?.tipo === "checkout") {
       const { visitaId, ...dados } = item.corpo || {};
+      const dispositivoId = dados.dispositivoId || (await DispositivoId.obterSeDisponivel());
       return request(`${BASE_PATH}/${visitaId}/checkout`, {
         method: "POST",
-        body: { ...dados, ocorridoEm: item.ocorridoEm },
+        body: { ...dados, dispositivoId, ocorridoEm: item.ocorridoEm },
         idempotente: true,
       });
     }
 
-    return Promise.reject(new Error(`Evento desconhecido na fila offline: ${item?.tipo}`));
+    throw new Error(`Evento desconhecido na fila offline: ${item?.tipo}`);
   }
 
-  /** Sinal de vida da visita ativa (E2-09); posição opcional renova o sinal de GPS (E2-05). */
-  static heartbeat(id, posicao) {
+  /**
+   * Sinal de vida da visita ativa (E2-09); posição opcional renova o sinal de GPS (E2-05).
+   * Leva o `dispositivoId` pelo mesmo motivo do checkout.
+   */
+  static async heartbeat(id, posicao) {
+    const dispositivoId = await DispositivoId.obterSeDisponivel();
     return request(`${BASE_PATH}/${id}/heartbeat`, {
       method: "POST",
-      body: posicao ? { posicao } : {},
+      body: posicao ? { posicao, dispositivoId } : { dispositivoId },
     });
   }
 
-  /** Sinaliza observação/internação após 12h de visita ativa (E2-10). */
-  static definirTipoPermanencia(id, tipoPermanencia) {
+  /**
+   * Sinaliza observação/internação após 12h de visita ativa (E2-10). O `dispositivoId`
+   * cobre a visita que começou anônima antes do login.
+   */
+  static async definirTipoPermanencia(id, tipoPermanencia) {
+    const dispositivoId = await DispositivoId.obterSeDisponivel();
     return request(`${BASE_PATH}/${id}/tipo-permanencia`, {
       method: "PATCH",
-      body: { tipoPermanencia },
+      body: { tipoPermanencia, dispositivoId },
     });
   }
 

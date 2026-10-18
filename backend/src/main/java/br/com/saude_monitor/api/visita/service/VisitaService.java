@@ -21,7 +21,7 @@ public interface VisitaService {
 
     CheckoutResponse checkout(String id, CheckoutRequest request, String usuarioId);
 
-    HeartbeatResponse heartbeat(String id, String usuarioId, PosicaoDto posicao);
+    HeartbeatResponse heartbeat(String id, String usuarioId, String dispositivoId, PosicaoDto posicao);
 
     TipoPermanenciaResponse sinalizarTipoPermanencia(String id, TipoPermanenciaRequest request, String usuarioId);
 

@@ -6,6 +6,7 @@ import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.feedback.dto.FeedbackPendenteResponse;
 import br.com.saude_monitor.api.feedback.dto.FeedbackRequest;
+import br.com.saude_monitor.api.feedback.dto.FeedbackResponse;
 import br.com.saude_monitor.api.feedback.repository.FeedbackRepository;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
@@ -108,7 +109,7 @@ class FeedbackServiceImplTest {
     // ------------------------------------------------ criar (achado do code-review, 09/09/2026) ------------------
 
     private FeedbackRequest request(String visitaId) {
-        return new FeedbackRequest(visitaId, null, null, null, null, null, null, 4, null, null);
+        return new FeedbackRequest(visitaId, null, null, null, null, null, null, 4, null, null, null);
     }
 
     /**
@@ -130,11 +131,85 @@ class FeedbackServiceImplTest {
                 .hasMessageContaining("já avaliou");
     }
 
+    // ------------------------------------------------ dono da visita (SEG-02) ------------------
+
+    private FeedbackRequest requestDoAparelho(String visitaId, String dispositivoId) {
+        return new FeedbackRequest(visitaId, null, null, null, null, null, null, 4, null, null, dispositivoId);
+    }
+
+    private VisitaDocument visitaAnonimaEncerrada(String id, String dispositivoId) {
+        return VisitaDocument.builder()
+                .id(id)
+                .dispositivoId(dispositivoId)
+                .hospitalId("h1")
+                .status(StatusVisita.FINALIZADA)
+                .saida(Instant.now().minus(Duration.ofMinutes(10)))
+                .build();
+    }
+
+    @Test
+    void criarRecusaFeedbackDeOutroUsuarioNaVisitaLogada() {
+        when(visitaRepository.findById("v1"))
+                .thenReturn(Optional.of(visitaEncerradaHa("v1", StatusVisita.FINALIZADA, Duration.ofMinutes(30))));
+
+        assertThatThrownBy(() -> service.criar(request("v1"), "invasor"))
+                .isInstanceOf(AcessoNegadoException.class);
+        // Anônimo também não avalia a visita de um usuário logado.
+        assertThatThrownBy(() -> service.criar(requestDoAparelho("v1", "anon-x"), null))
+                .isInstanceOf(AcessoNegadoException.class);
+        // Recusa antes da checagem de duplicidade: o intruso não descobre se já há avaliação.
+        verify(feedbackRepository, never()).existsByVisitaId(anyString());
+        verify(feedbackRepository, never()).save(any());
+    }
+
+    @Test
+    void criarRecusaFeedbackAnonimoSemOAparelhoDono() {
+        when(visitaRepository.findById("v1")).thenReturn(Optional.of(visitaAnonimaEncerrada("v1", "anon-dono")));
+
+        assertThatThrownBy(() -> service.criar(requestDoAparelho("v1", null), null))
+                .isInstanceOf(AcessoNegadoException.class);
+        assertThatThrownBy(() -> service.criar(requestDoAparelho("v1", "anon-intruso"), null))
+                .isInstanceOf(AcessoNegadoException.class);
+        verify(feedbackRepository, never()).save(any());
+    }
+
+    @Test
+    void criarRecusaEstranhoAntesDeRevelarOStatusDaVisita() {
+        VisitaDocument emAndamento = visitaAnonimaEncerrada("v1", "anon-dono");
+        emAndamento.setStatus(StatusVisita.EM_ATENDIMENTO);
+        when(visitaRepository.findById("v1")).thenReturn(Optional.of(emAndamento));
+
+        // Para o estranho, a visita em andamento dá o mesmo 403 que a encerrada.
+        assertThatThrownBy(() -> service.criar(requestDoAparelho("v1", "anon-intruso"), null))
+                .isInstanceOf(AcessoNegadoException.class);
+    }
+
+    @Test
+    void criarAceitaFeedbackAnonimoDoAparelhoDono() {
+        when(visitaRepository.findById("v1")).thenReturn(Optional.of(visitaAnonimaEncerrada("v1", "anon-dono")));
+        when(feedbackRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FeedbackResponse resposta = service.criar(requestDoAparelho("v1", "anon-dono"), null);
+
+        assertThat(resposta.visitaId()).isEqualTo("v1");
+        assertThat(resposta.anonimizado()).isTrue();
+    }
+
+    @Test
+    void criarRecusaVisitaAnonimaSemAparelhoGravado() {
+        // Conta excluída (M-041) apaga o aparelho das visitas: ninguém mais é dono delas.
+        when(visitaRepository.findById("v1")).thenReturn(Optional.of(visitaAnonimaEncerrada("v1", null)));
+
+        assertThatThrownBy(() -> service.criar(requestDoAparelho("v1", "anon-qualquer"), null))
+                .isInstanceOf(AcessoNegadoException.class);
+    }
+
     // ------------------------------------------------ feedback pendente (celular descarregado) ------------------
 
     private VisitaDocument visitaEncerradaHa(String id, StatusVisita status, Duration ha) {
         return VisitaDocument.builder()
                 .id(id)
+                .usuarioId("u1")
                 .hospitalId("h1")
                 .status(status)
                 .saida(Instant.now().minus(ha))

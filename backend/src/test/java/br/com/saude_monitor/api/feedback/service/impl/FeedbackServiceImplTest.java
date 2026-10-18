@@ -102,10 +102,10 @@ class FeedbackServiceImplTest {
                 org.mockito.ArgumentCaptor.forClass(org.springframework.data.mongodb.core.query.Update.class);
         verify(mongoTemplate).updateMulti(query.capture(), update.capture(), eq(VisitaDocument.class));
         org.bson.Document filtro = query.getValue().getQueryObject();
-        assertThat(((org.bson.Document) filtro.get("_id")).get("$in")).isEqualTo(List.of("v2"));
-        assertThat(filtro.get("status")).isEqualTo(StatusVisita.FINALIZADA);
-        assertThat(((org.bson.Document) update.getValue().getUpdateObject().get("$set")).get("status"))
-                .isEqualTo(StatusVisita.SEM_FEEDBACK);
+        assertThat((org.bson.Document) filtro.get("_id")).containsEntry("$in", List.of("v2"));
+        assertThat(filtro).containsEntry("status", StatusVisita.FINALIZADA);
+        assertThat((org.bson.Document) update.getValue().getUpdateObject().get("$set"))
+                .containsEntry("status", StatusVisita.SEM_FEEDBACK);
         verify(visitaRepository, never()).saveAll(any());
         verify(feedbackRepository, never()).existsByVisitaId(anyString());
     }

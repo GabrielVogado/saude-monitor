@@ -500,8 +500,8 @@ class VisitaServiceImplTest {
         when(mongoTemplate.findAndModify(any(Query.class), any(Update.class),
                 any(FindAndModifyOptions.class), eq(VisitaDocument.class))).thenReturn(null);
 
-        assertThrows(ConflitoException.class, () -> visitaService.checkout(
-                "v9", new CheckoutRequest(null, null, null, null, null), "u1"));
+        CheckoutRequest pedido = new CheckoutRequest(null, null, null, null, null);
+        assertThrows(ConflitoException.class, () -> visitaService.checkout("v9", pedido, "u1"));
     }
 
     @Test
@@ -516,8 +516,8 @@ class VisitaServiceImplTest {
         assertEquals(StatusVisita.FINALIZADA, resposta.status());
         assertTrue(resposta.encerramentoManual());
         assertNull(visita.getPontosAmostrais());
-        assertTrue(visita.getUltimaPosicaoEm() != null);
-        assertTrue(visita.getProcessadoEm() != null);
+        assertNotNull(visita.getUltimaPosicaoEm());
+        assertNotNull(visita.getProcessadoEm());
     }
 
     @Test

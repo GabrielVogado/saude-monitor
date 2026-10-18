@@ -86,6 +86,16 @@ public class VisitaServiceImpl implements VisitaService {
     /** Máximo de pontos de GPS guardados numa visita aberta (ARQ-04); os mais antigos saem. */
     static final int LIMITE_PONTOS_AMOSTRAIS = 50;
 
+    /** Campos de {@code visitas} usados nas atualizações atômicas (MongoTemplate). */
+    private static final String CAMPO_ID = "_id";
+    private static final String CAMPO_STATUS = "status";
+    private static final String CAMPO_SAIDA = "saida";
+    private static final String CAMPO_DURACAO = "duracaoMinutos";
+    private static final String CAMPO_ULTIMO_HEARTBEAT = "ultimoHeartbeat";
+    private static final String CAMPO_PONTOS_AMOSTRAIS = "pontosAmostrais";
+    private static final String CAMPO_USUARIO = "usuarioId";
+    private static final String CAMPO_DISPOSITIVO = "dispositivoId";
+
     private static final List<StatusVisita> STATUS_ATIVOS = List.of(StatusVisita.EM_ATENDIMENTO, StatusVisita.SUSPEITA);
 
     private final VisitaRepository visitaRepository;
@@ -159,9 +169,9 @@ public class VisitaServiceImpl implements VisitaService {
         }
 
         Update update = new Update()
-                .set("saida", saida)
-                .set("duracaoMinutos", (int) Duration.between(visita.getEntrada(), saida).toMinutes())
-                .set("status", gpsIndisponivel ? StatusVisita.GPS_INTERROMPIDO : StatusVisita.FINALIZADA)
+                .set(CAMPO_SAIDA, saida)
+                .set(CAMPO_DURACAO, (int) Duration.between(visita.getEntrada(), saida).toMinutes())
+                .set(CAMPO_STATUS, gpsIndisponivel ? StatusVisita.GPS_INTERROMPIDO : StatusVisita.FINALIZADA)
                 // `agora` (write time), não `saida` (business time — pode ser retroativo via
                 // `ocorridoEm` da fila offline, OPS-05): é o que `recalcularPendentes` usa para
                 // saber "isso mudou desde a última varredura", achado do code-review de 09/09/2026.
@@ -186,19 +196,19 @@ public class VisitaServiceImpl implements VisitaService {
         // encerramento feito pelo job no meio do caminho (mesmo padrão do M-007).
         Instant agora = Instant.now();
         Update update = new Update()
-                .set("ultimoHeartbeat", agora)
+                .set(CAMPO_ULTIMO_HEARTBEAT, agora)
                 // SUSPEITA volta a EM_ATENDIMENTO com o sinal de vida (RN-23).
-                .set("status", StatusVisita.EM_ATENDIMENTO);
+                .set(CAMPO_STATUS, StatusVisita.EM_ATENDIMENTO);
         if (posicao != null) {
             update.set("ultimaPosicaoEm", agora);
             // `$push` com `$slice`: a lista guarda só os pontos mais recentes, e o documento
             // deixa de crescer sem limite numa espera longa (~144 pontos em 24h).
-            update.push("pontosAmostrais").slice(-LIMITE_PONTOS_AMOSTRAIS).each(toPontoAmostral(posicao, agora));
+            update.push(CAMPO_PONTOS_AMOSTRAIS).slice(-LIMITE_PONTOS_AMOSTRAIS).each(toPontoAmostral(posicao, agora));
         }
 
         // Um acesso ao banco no caminho feliz (o heartbeat é a rota mais frequente). Só quando
         // nada é atualizado a visita é lida, para responder 404, 403 ou 409 como antes.
-        Criteria criteria = Criteria.where("_id").is(id).and("status").in(STATUS_ATIVOS)
+        Criteria criteria = Criteria.where(CAMPO_ID).is(id).and(CAMPO_STATUS).in(STATUS_ATIVOS)
                 .andOperator(criterioDeDono(usuarioId, dispositivoId));
         VisitaDocument salva = mongoTemplate.findAndModify(new Query(criteria), update,
                 FindAndModifyOptions.options().returnNew(true), VisitaDocument.class);
@@ -267,18 +277,18 @@ public class VisitaServiceImpl implements VisitaService {
         // SUSPEITA em lote e atômico: a condição de tempo vai no próprio update, então um
         // heartbeat que chegue entre a leitura e a escrita não é desfeito (ARQ-04).
         mongoTemplate.updateMulti(
-                new Query(Criteria.where("status").is(StatusVisita.EM_ATENDIMENTO)
-                        .and("ultimoHeartbeat").lt(agora.minus(LIMITE_SUSPEITA))),
-                new Update().set("status", StatusVisita.SUSPEITA),
+                new Query(Criteria.where(CAMPO_STATUS).is(StatusVisita.EM_ATENDIMENTO)
+                        .and(CAMPO_ULTIMO_HEARTBEAT).lt(agora.minus(LIMITE_SUSPEITA))),
+                new Update().set(CAMPO_STATUS, StatusVisita.SUSPEITA),
                 VisitaDocument.class);
 
         List<VisitaDocument> expiradas = visitaRepository.findByStatusInAndUltimoHeartbeatBefore(
                 STATUS_ATIVOS, agora.minus(LIMITE_EXPIRACAO));
         expiradas.forEach(v -> {
             Update update = new Update()
-                    .set("status", StatusVisita.EXPIRADA)
-                    .set("saida", v.getUltimoHeartbeat())
-                    .set("duracaoMinutos", (int) Duration.between(v.getEntrada(), v.getUltimoHeartbeat()).toMinutes());
+                    .set(CAMPO_STATUS, StatusVisita.EXPIRADA)
+                    .set(CAMPO_SAIDA, v.getUltimoHeartbeat())
+                    .set(CAMPO_DURACAO, (int) Duration.between(v.getEntrada(), v.getUltimoHeartbeat()).toMinutes());
             encerrarSeSemSinalNovo(v, apagarPontos(update));
         });
     }
@@ -305,9 +315,9 @@ public class VisitaServiceImpl implements VisitaService {
             // e não do instante em que o job rodou (RN-06/E2-05).
             Instant ultimoSinal = ultimoSinalDe(v);
             Update update = new Update()
-                    .set("status", StatusVisita.GPS_INTERROMPIDO)
-                    .set("saida", ultimoSinal)
-                    .set("duracaoMinutos", (int) Duration.between(v.getEntrada(), ultimoSinal).toMinutes())
+                    .set(CAMPO_STATUS, StatusVisita.GPS_INTERROMPIDO)
+                    .set(CAMPO_SAIDA, ultimoSinal)
+                    .set(CAMPO_DURACAO, (int) Duration.between(v.getEntrada(), ultimoSinal).toMinutes())
                     // `agora` (write time), não `ultimoSinal` (pode ser de até ~15min atrás, o
                     // ciclo deste job) — mesmo motivo do checkout, achado do code-review.
                     .set("processadoEm", agora);
@@ -319,7 +329,7 @@ public class VisitaServiceImpl implements VisitaService {
     public long apagarPontosDeVisitasEncerradas() {
         // Rede de segurança do DAD-01: visitas encerradas antes desta regra, ou por um caminho
         // que não passe pelos encerramentos acima, perdem a trilha na próxima execução.
-        Query query = new Query(Criteria.where("status").nin(STATUS_ATIVOS).and("pontosAmostrais").exists(true));
+        Query query = new Query(Criteria.where(CAMPO_STATUS).nin(STATUS_ATIVOS).and(CAMPO_PONTOS_AMOSTRAIS).exists(true));
         return mongoTemplate.updateMulti(query, apagarPontos(new Update()), VisitaDocument.class).getModifiedCount();
     }
 
@@ -328,8 +338,8 @@ public class VisitaServiceImpl implements VisitaService {
         // DAD-01 B: depois do prazo, a visita perde quem a fez (conta e aparelho) e fica só
         // como dado agregado: hospital, entrada, saída, duração e status.
         Query query = new Query(Criteria.where("entrada").lt(Instant.now().minus(PRAZO_VINCULO_PESSOAL))
-                .orOperator(Criteria.where("usuarioId").ne(null), Criteria.where("dispositivoId").ne(null)));
-        Update update = new Update().set("usuarioId", null).unset("dispositivoId");
+                .orOperator(Criteria.where(CAMPO_USUARIO).ne(null), Criteria.where(CAMPO_DISPOSITIVO).ne(null)));
+        Update update = new Update().set(CAMPO_USUARIO, null).unset(CAMPO_DISPOSITIVO);
         return mongoTemplate.updateMulti(query, apagarPontos(update), VisitaDocument.class).getModifiedCount();
     }
 
@@ -340,14 +350,14 @@ public class VisitaServiceImpl implements VisitaService {
     private static Criteria criterioDeDono(String usuarioId, String dispositivoId) {
         List<Criteria> donos = new java.util.ArrayList<>();
         if (usuarioId != null) {
-            donos.add(Criteria.where("usuarioId").is(usuarioId));
+            donos.add(Criteria.where(CAMPO_USUARIO).is(usuarioId));
         }
         if (dispositivoId != null && !dispositivoId.isBlank()) {
-            donos.add(Criteria.where("usuarioId").is(null).and("dispositivoId").is(dispositivoId));
+            donos.add(Criteria.where(CAMPO_USUARIO).is(null).and(CAMPO_DISPOSITIVO).is(dispositivoId));
         }
         if (donos.isEmpty()) {
             // Sem usuário nem aparelho ninguém é dono: filtro que não casa com nada.
-            return Criteria.where("_id").exists(false);
+            return Criteria.where(CAMPO_ID).exists(false);
         }
         return new Criteria().orOperator(donos);
     }
@@ -357,9 +367,9 @@ public class VisitaServiceImpl implements VisitaService {
      * um heartbeat que chegue no meio muda {@code ultimoHeartbeat} e a visita segue aberta.
      */
     private void encerrarSeSemSinalNovo(VisitaDocument lida, Update update) {
-        Criteria criteria = Criteria.where("_id").is(lida.getId())
-                .and("status").in(STATUS_ATIVOS)
-                .and("ultimoHeartbeat").is(lida.getUltimoHeartbeat());
+        Criteria criteria = Criteria.where(CAMPO_ID).is(lida.getId())
+                .and(CAMPO_STATUS).in(STATUS_ATIVOS)
+                .and(CAMPO_ULTIMO_HEARTBEAT).is(lida.getUltimoHeartbeat());
         mongoTemplate.updateFirst(new Query(criteria), update, VisitaDocument.class);
     }
 
@@ -369,7 +379,7 @@ public class VisitaServiceImpl implements VisitaService {
      * que já estava encerrada.
      */
     private VisitaDocument atualizarSeAtiva(String id, Update update) {
-        Query query = new Query(Criteria.where("_id").is(id).and("status").in(STATUS_ATIVOS));
+        Query query = new Query(Criteria.where(CAMPO_ID).is(id).and(CAMPO_STATUS).in(STATUS_ATIVOS));
         VisitaDocument salva = mongoTemplate.findAndModify(
                 query, update, FindAndModifyOptions.options().returnNew(true), VisitaDocument.class);
         if (salva == null) {
@@ -384,7 +394,7 @@ public class VisitaServiceImpl implements VisitaService {
      * sensível, art. 11 da LGPD) sai junto.
      */
     private static Update apagarPontos(Update update) {
-        return update.unset("pontosAmostrais");
+        return update.unset(CAMPO_PONTOS_AMOSTRAIS);
     }
 
     /** Último sinal de vida da visita: o mais recente entre {@code ultimoHeartbeat} e {@code ultimaPosicaoEm} (RN-06/E2-05). */

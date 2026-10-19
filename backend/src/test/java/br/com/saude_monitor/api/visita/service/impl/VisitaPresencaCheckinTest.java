@@ -52,7 +52,7 @@ class VisitaPresencaCheckinTest {
         when(visitaRepository.save(any(VisitaDocument.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
-    private VisitaDocument checkin(OrigemVisita origem, PosicaoDto posicao, Instant ocorridoEm) {
+    private VisitaDocument fazerCheckin(OrigemVisita origem, PosicaoDto posicao, Instant ocorridoEm) {
         visitaService.checkin(new CheckinRequest("h1", origem, posicao, "anon-1", ocorridoEm), null);
         ArgumentCaptor<VisitaDocument> salva = ArgumentCaptor.forClass(VisitaDocument.class);
         verify(visitaRepository).save(salva.capture());
@@ -61,7 +61,7 @@ class VisitaPresencaCheckinTest {
 
     @Test
     void manualSemPosicaoNaoComprovaENaoConsultaGeofence() {
-        VisitaDocument visita = checkin(OrigemVisita.MANUAL, null, null);
+        VisitaDocument visita = fazerCheckin(OrigemVisita.MANUAL, null, null);
 
         assertFalse(visita.getPresencaComprovada());
         verify(mongoTemplate, never()).exists(any(Query.class), eq(HospitalDocument.class));
@@ -71,7 +71,7 @@ class VisitaPresencaCheckinTest {
     void manualComPosicaoDentroDoHospitalComprova() {
         when(mongoTemplate.exists(any(Query.class), eq(HospitalDocument.class))).thenReturn(true);
 
-        VisitaDocument visita = checkin(OrigemVisita.MANUAL, POSICAO, null);
+        VisitaDocument visita = fazerCheckin(OrigemVisita.MANUAL, POSICAO, null);
 
         assertTrue(visita.getPresencaComprovada());
         ArgumentCaptor<Query> consulta = ArgumentCaptor.forClass(Query.class);
@@ -83,14 +83,14 @@ class VisitaPresencaCheckinTest {
     void manualComPosicaoForaDoHospitalEhAceitoMasNaoComprova() {
         when(mongoTemplate.exists(any(Query.class), eq(HospitalDocument.class))).thenReturn(false);
 
-        VisitaDocument visita = checkin(OrigemVisita.MANUAL, POSICAO, null);
+        VisitaDocument visita = fazerCheckin(OrigemVisita.MANUAL, POSICAO, null);
 
         assertFalse(visita.getPresencaComprovada());
     }
 
     @Test
     void manualComCoordenadaImpossivelEhAceitoSemConsultarGeofence() {
-        VisitaDocument longitudeInvalida = checkin(OrigemVisita.MANUAL, new PosicaoDto("Point", List.of(200.0, -15.9)), null);
+        VisitaDocument longitudeInvalida = fazerCheckin(OrigemVisita.MANUAL, new PosicaoDto("Point", List.of(200.0, -15.9)), null);
 
         assertFalse(longitudeInvalida.getPresencaComprovada());
         verify(mongoTemplate, never()).exists(any(Query.class), eq(HospitalDocument.class));
@@ -98,7 +98,7 @@ class VisitaPresencaCheckinTest {
 
     @Test
     void manualComLatitudeImpossivelNaoComprova() {
-        VisitaDocument latitudeInvalida = checkin(OrigemVisita.MANUAL, new PosicaoDto("Point", List.of(-48.0, -95.0)), null);
+        VisitaDocument latitudeInvalida = fazerCheckin(OrigemVisita.MANUAL, new PosicaoDto("Point", List.of(-48.0, -95.0)), null);
 
         assertFalse(latitudeInvalida.getPresencaComprovada());
         verify(mongoTemplate, never()).exists(any(Query.class), eq(HospitalDocument.class));
@@ -108,7 +108,7 @@ class VisitaPresencaCheckinTest {
     void manualRetroativoAlemDe45MinutosNaoComprova() {
         when(mongoTemplate.exists(any(Query.class), eq(HospitalDocument.class))).thenReturn(true);
 
-        VisitaDocument visita = checkin(OrigemVisita.MANUAL, POSICAO, Instant.now().minusSeconds(3 * 3600));
+        VisitaDocument visita = fazerCheckin(OrigemVisita.MANUAL, POSICAO, Instant.now().minusSeconds(3 * 3600));
 
         assertFalse(visita.getPresencaComprovada());
     }
@@ -118,7 +118,7 @@ class VisitaPresencaCheckinTest {
         when(mongoTemplate.find(any(Query.class), eq(HospitalDocument.class)))
                 .thenReturn(List.of(HospitalDocument.builder().id("h1").ativo(true).build()));
 
-        VisitaDocument visita = checkin(OrigemVisita.GEOFENCE, POSICAO, null);
+        VisitaDocument visita = fazerCheckin(OrigemVisita.GEOFENCE, POSICAO, null);
 
         assertTrue(visita.getPresencaComprovada());
         verify(mongoTemplate, never()).exists(any(Query.class), eq(HospitalDocument.class));

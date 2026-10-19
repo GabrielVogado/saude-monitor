@@ -25,12 +25,12 @@ public class RetencaoDadosPessoaisJob {
     @Scheduled(cron = "0 30 3 * * *", zone = "America/Sao_Paulo")
     public void executar() {
         // Cada passo isolado: a falha de um não pode deixar os outros sem rodar.
-        etapa("pontos de GPS apagados de visitas encerradas", visitaService::apagarPontosDeVisitasEncerradas);
-        etapa("visitas desvinculadas após 90 dias", visitaService::desvincularVisitasAntigas);
-        etapa("feedbacks desvinculados após 90 dias", feedbackService::desvincularFeedbacksAntigos);
+        executarEtapa("pontos de GPS apagados de visitas encerradas", visitaService::apagarPontosDeVisitasEncerradas);
+        executarEtapa("visitas desvinculadas após 90 dias", visitaService::desvincularVisitasAntigas);
+        executarEtapa("feedbacks desvinculados após 90 dias", feedbackService::desvincularFeedbacksAntigos);
     }
 
-    private void etapa(String descricao, LongSupplier passo) {
+    private void executarEtapa(String descricao, LongSupplier passo) {
         try {
             log.info("Retenção (DAD-01): {} {}.", passo.getAsLong(), descricao);
         } catch (RuntimeException e) {

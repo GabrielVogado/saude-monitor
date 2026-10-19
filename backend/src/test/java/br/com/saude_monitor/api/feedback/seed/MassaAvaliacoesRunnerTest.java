@@ -65,7 +65,7 @@ class MassaAvaliacoesRunnerTest {
 
     private MassaAvaliacoesRunner runner(String modo, String senha) {
         return new MassaAvaliacoesRunner(mongoTemplate, passwordEncoder, indicadorService,
-                new MassaAvaliacoesProperties(true, modo, senha), TravasDeTeste.livre());
+                new MassaAvaliacoesProperties(true, modo, senha), TravasDeTeste.criarTravaLivre());
     }
 
     private void comHospitaisAtivos(int quantidade) {

@@ -10,6 +10,8 @@ import br.com.saude_monitor.api.auth.dto.RefreshRequest;
 import br.com.saude_monitor.api.auth.dto.UsuarioDto;
 import br.com.saude_monitor.api.auth.service.AuthService;
 import br.com.saude_monitor.api.config.exception.GlobalExceptionHandler;
+import br.com.saude_monitor.api.config.ratelimit.RateLimitProperties;
+import br.com.saude_monitor.api.config.ratelimit.RateLimitService;
 import br.com.saude_monitor.api.user.dto.UserRequest;
 import br.com.saude_monitor.api.user.dto.UserResponse;
 import br.com.saude_monitor.api.user.service.UserService;
@@ -104,13 +106,16 @@ class AuthControllerTest {
 
     private MockMvc mockMvc;
 
+    /** Limites de produção: 10 por minuto por conta no login e por token no refresh (ARQ-02). */
+    private final RateLimitService rateLimitService = new RateLimitService(new RateLimitProperties(10, 60, 1, 600));
+
     @BeforeEach
     void setup() {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new AuthController(authService, userService))
+                .standaloneSetup(new AuthController(authService, userService, rateLimitService))
                 .setValidator(validator)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -146,6 +151,58 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("new-access"))
                 .andExpect(jsonPath("$.refreshToken").value("new-refresh"));
+    }
+
+    @Test
+    void loginTemLimitePorContaMesmoTrocandoDeIp() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            mockMvc.perform(post("/api/v1/auth/login").with(simularIp("10.2.0." + i))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(criarCorpoLogin("Marina@Email.com")))
+                    .andExpect(status().isOk());
+        }
+        // Mesmo e-mail com outra grafia e de outro IP: mesma conta, mesmo contador.
+        mockMvc.perform(post("/api/v1/auth/login").with(simularIp("10.2.0.99"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(criarCorpoLogin("marina@email.com")))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("LIMITE_EXCEDIDO"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Limite: 10 por minuto")));
+        // Outra conta segue entrando.
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(criarCorpoLogin("joao@email.com")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void refreshTemLimitePorTokenENaoPorQuemChama() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            mockMvc.perform(post("/api/v1/auth/refresh")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"refreshToken\":\"token-repetido\"}"))
+                    .andExpect(status().isOk());
+        }
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"token-repetido\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("LIMITE_EXCEDIDO"));
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"outro-token\"}"))
+                .andExpect(status().isOk());
+    }
+
+    private static String criarCorpoLogin(String email) {
+        return "{\"email\":\"" + email + "\",\"password\":\"S3nh@Forte!\",\"rememberDevice\":false}";
+    }
+
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor simularIp(String ip) {
+        return request -> {
+            request.setRemoteAddr(ip);
+            return request;
+        };
     }
 
     @Test

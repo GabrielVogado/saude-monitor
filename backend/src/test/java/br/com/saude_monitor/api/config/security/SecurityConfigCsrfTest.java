@@ -210,7 +210,8 @@ class SecurityConfigCsrfTest {
         @Bean
         RateLimitFilter rateLimitFilter() {
             // A rota de teste não pertence a nenhum grupo limitado: o filtro só repassa.
-            return new RateLimitFilter(mock(RateLimitService.class), objectMapper, mock(RateLimitProperties.class));
+            return new RateLimitFilter(mock(RateLimitService.class), objectMapper, mock(RateLimitProperties.class),
+                    mock(JwtService.class));
         }
 
         @Bean

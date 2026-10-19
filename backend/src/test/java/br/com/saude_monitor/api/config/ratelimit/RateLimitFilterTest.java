@@ -1,5 +1,8 @@
 package br.com.saude_monitor.api.config.ratelimit;
 
+import br.com.saude_monitor.api.config.security.JwtProperties;
+import br.com.saude_monitor.api.config.security.JwtService;
+import br.com.saude_monitor.api.user.document.UserDocument;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,8 +26,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class RateLimitFilterTest {
 
+    /** Assina tokens de verdade: o filtro só conta por usuário quando o token é válido. */
+    static final JwtService JWT = new JwtService(new JwtProperties(
+            "segredo-de-teste-do-rate-limit-com-32-bytes-ou-mais", 900_000L, 2_592_000_000L));
+
     /** Padroes de producao: os mesmos valores de application.properties. */
-    static final RateLimitProperties PADRAO = new RateLimitProperties(10, 60, 1);
+    static final RateLimitProperties PADRAO = new RateLimitProperties(10, 60, 1, 600);
 
     private RateLimitService service;
     private MockMvc mockMvc;
@@ -32,7 +39,7 @@ class RateLimitFilterTest {
     @BeforeEach
     void setup() {
         service = new RateLimitService(PADRAO);
-        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO);
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO, JWT);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new StubController())
                 .addFilters(filter)
@@ -45,7 +52,7 @@ class RateLimitFilterTest {
 
     @Test
     void deveMapearLoginComoAuth() {
-        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO);
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO, JWT);
         assertThat(filter.resolverGrupo("POST", "/api/v1/auth/login"))
                 .isEqualTo(RateLimitService.Grupo.AUTH);
         assertThat(filter.resolverGrupo("POST", "/api/v1/auth/refresh"))
@@ -54,7 +61,7 @@ class RateLimitFilterTest {
 
     @Test
     void deveMapearEndpointsPublicosComoPublico() {
-        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO);
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO, JWT);
         assertThat(filter.resolverGrupo("GET", "/api/v1/hospitais"))
                 .isEqualTo(RateLimitService.Grupo.PUBLICO);
         assertThat(filter.resolverGrupo("GET", "/api/v1/hospitais/abc/indicadores"))
@@ -69,7 +76,7 @@ class RateLimitFilterTest {
 
     @Test
     void naoDeveLimitarEndpointsAutenticados() {
-        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO);
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO, JWT);
         assertThat(filter.resolverGrupo("GET", "/api/v1/hospitais/sugestoes"))
                 .isNull();
         assertThat(filter.resolverGrupo("POST", "/api/v1/hospitais/sugestoes/1/aprovar"))
@@ -143,7 +150,7 @@ class RateLimitFilterTest {
 
     @Test
     void usaOEnderecoAcrescentadoPeloProxyConfiavel() {
-        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO);
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO, JWT);
         org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
         req.setRemoteAddr("169.254.1.1");
         req.addHeader("X-Forwarded-For", "1.1.1.1, 2.2.2.2, 198.51.100.7");
@@ -154,7 +161,7 @@ class RateLimitFilterTest {
     void variasLinhasDeXForwardedForSaoLidasComoUmaListaSo() {
         // O cliente manda uma linha; o proxy acrescenta OUTRA linha em vez de concatenar.
         // Ler so a primeira devolveria o endereco que o cliente escolheu.
-        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO);
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO, JWT);
         org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
         req.addHeader("X-Forwarded-For", "1.1.1.1");
         req.addHeader("X-Forwarded-For", "198.51.100.7");
@@ -163,8 +170,8 @@ class RateLimitFilterTest {
 
     @Test
     void comDoisProxiesConfiaveisUsaOPenultimoEndereco() {
-        RateLimitProperties doisProxies = new RateLimitProperties(10, 60, 2);
-        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(doisProxies), jsonMapper(), doisProxies);
+        RateLimitProperties doisProxies = new RateLimitProperties(10, 60, 2, 600);
+        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(doisProxies), jsonMapper(), doisProxies, JWT);
         org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
         req.addHeader("X-Forwarded-For", "1.1.1.1, 198.51.100.7, 35.191.0.1");
         assertThat(filter.resolverIp(req)).isEqualTo("198.51.100.7");
@@ -172,8 +179,8 @@ class RateLimitFilterTest {
 
     @Test
     void semProxyConfiavelIgnoraOCabecalho() {
-        RateLimitProperties semProxy = new RateLimitProperties(10, 60, 0);
-        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(semProxy), jsonMapper(), semProxy);
+        RateLimitProperties semProxy = new RateLimitProperties(10, 60, 0, 600);
+        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(semProxy), jsonMapper(), semProxy, JWT);
         org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
         req.setRemoteAddr("10.0.0.9");
         req.addHeader("X-Forwarded-For", "1.1.1.1");
@@ -182,8 +189,8 @@ class RateLimitFilterTest {
 
     @Test
     void cabecalhoMaisCurtoQueOsProxiesCaiNoEnderecoDaConexao() {
-        RateLimitProperties doisProxies = new RateLimitProperties(10, 60, 2);
-        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(doisProxies), jsonMapper(), doisProxies);
+        RateLimitProperties doisProxies = new RateLimitProperties(10, 60, 2, 600);
+        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(doisProxies), jsonMapper(), doisProxies, JWT);
         org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
         req.setRemoteAddr("10.0.0.9");
         req.addHeader("X-Forwarded-For", "1.1.1.1");
@@ -194,10 +201,10 @@ class RateLimitFilterTest {
 
     @Test
     void limitesVemDaConfiguracaoDoAmbiente() throws Exception {
-        RateLimitProperties homologacao = new RateLimitProperties(10, 100, 1);
+        RateLimitProperties homologacao = new RateLimitProperties(10, 100, 1, 600);
         RateLimitService hom = new RateLimitService(homologacao);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(new StubController())
-                .addFilters(new RateLimitFilter(hom, jsonMapper(), homologacao)).build();
+                .addFilters(new RateLimitFilter(hom, jsonMapper(), homologacao, JWT)).build();
         for (int i = 0; i < 100; i++) {
             mvc.perform(get("/api/v1/hospitais").with(deIp("10.0.0.8")))
                     .andExpect(status().isOk())
@@ -207,6 +214,99 @@ class RateLimitFilterTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Limite: 100 por minuto")));
     }
+
+    // ------------------------------------------------ Identidade (ARQ-02) -------------
+    // Atrás do CGNAT, centenas de celulares saem pelo mesmo IP: o limite de cada pessoa
+    // não pode ser o do IP.
+
+    @Test
+    void usuariosAutenticadosNoMesmoIpTemLimitesSeparados() throws Exception {
+        String marina = "Bearer " + JWT.generateAccessToken(criarUsuario("marina@email.com"));
+        String joao = "Bearer " + JWT.generateAccessToken(criarUsuario("joao@email.com"));
+        for (int i = 0; i < 60; i++) {
+            mockMvc.perform(get("/api/v1/hospitais").with(deIp("10.1.0.1")).header("Authorization", marina))
+                    .andExpect(status().isOk());
+        }
+        mockMvc.perform(get("/api/v1/hospitais").with(deIp("10.1.0.1")).header("Authorization", marina))
+                .andExpect(status().isTooManyRequests());
+        mockMvc.perform(get("/api/v1/hospitais").with(deIp("10.1.0.1")).header("Authorization", joao))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void instalacoesDoAppNoMesmoIpTemLimitesSeparadas() throws Exception {
+        for (int i = 0; i < 60; i++) {
+            mockMvc.perform(get("/api/v1/hospitais").with(deIp("10.1.0.2")).header("X-Cliente-Id", CLIENTE_A))
+                    .andExpect(status().isOk());
+        }
+        mockMvc.perform(get("/api/v1/hospitais").with(deIp("10.1.0.2")).header("X-Cliente-Id", CLIENTE_A))
+                .andExpect(status().isTooManyRequests());
+        mockMvc.perform(get("/api/v1/hospitais").with(deIp("10.1.0.2")).header("X-Cliente-Id", CLIENTE_B))
+                .andExpect(status().isOk());
+        // Sem identidade, o IP tem o próprio contador, que ainda não foi tocado.
+        mockMvc.perform(get("/api/v1/hospitais").with(deIp("10.1.0.2")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void tokenInvalidoOuClienteForaDoFormatoCaemNoIp() {
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO, JWT);
+        org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
+        req.addHeader("Authorization", "Bearer nao-e-um-jwt");
+        req.addHeader("X-Cliente-Id", "curto");
+        assertThat(filter.identificarCliente(req, RateLimitService.Grupo.PUBLICO, "10.1.0.3").chave())
+                .isEqualTo("ip:10.1.0.3");
+    }
+
+    @Test
+    void refreshTokenNaoContaComoUsuario() {
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO, JWT);
+        org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
+        req.addHeader("Authorization", "Bearer " + JWT.generateRefreshToken(criarUsuario("marina@email.com")));
+        req.addHeader("X-Cliente-Id", CLIENTE_A);
+        assertThat(filter.identificarCliente(req, RateLimitService.Grupo.PUBLICO, "10.1.0.4").chave())
+                .isEqualTo("cliente:" + CLIENTE_A);
+    }
+
+    @Test
+    void rotasDeAutenticacaoContamPorIpMesmoComIdentidade() {
+        RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO, JWT);
+        org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
+        req.addHeader("X-Cliente-Id", CLIENTE_A);
+        assertThat(filter.identificarCliente(req, RateLimitService.Grupo.AUTH, "10.1.0.5").chave())
+                .isEqualTo("ip:10.1.0.5");
+    }
+
+    @Test
+    void tetoPorIpBarraQuemTrocaDeInstalacaoACadaChamada() throws Exception {
+        RateLimitProperties tetoBaixo = new RateLimitProperties(10, 60, 1, 100);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new StubController())
+                .addFilters(new RateLimitFilter(new RateLimitService(tetoBaixo), jsonMapper(), tetoBaixo, JWT)).build();
+        for (int i = 0; i < 100; i++) {
+            mvc.perform(get("/api/v1/hospitais").with(deIp("10.1.0.6")).header("X-Cliente-Id", String.format("cliente-%010d", i)))
+                    .andExpect(status().isOk());
+        }
+        mvc.perform(get("/api/v1/hospitais").with(deIp("10.1.0.6")).header("X-Cliente-Id", "cliente-novo-0000001"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("X-RateLimit-Limit", "100"));
+    }
+
+    @Test
+    void refreshNaoEhLimitadoPeloIp() throws Exception {
+        // O refresh é limitado pelo próprio token, no AuthController; aqui só o teto por IP.
+        for (int i = 0; i < 30; i++) {
+            mockMvc.perform(post("/api/v1/auth/refresh").with(deIp("10.1.0.7"))
+                            .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    private static UserDocument criarUsuario(String email) {
+        return UserDocument.builder().id(email).email(email).build();
+    }
+
+    private static final String CLIENTE_A = "3f2b8c1e-0d4a-4e8b-9c7f-1a2b3c4d5e6f";
+    private static final String CLIENTE_B = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d";
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor deIp(String ip) {
         return request -> {
@@ -224,6 +324,11 @@ class RateLimitFilterTest {
 
         @GetMapping("/api/v1/hospitais/sugestoes")
         public String sugestoes() {
+            return "ok";
+        }
+
+        @PostMapping("/api/v1/auth/refresh")
+        public String refresh() {
             return "ok";
         }
 

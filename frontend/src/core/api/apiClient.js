@@ -1,6 +1,7 @@
 import { buildApiUrl } from "../../config/api";
 import { classificarErroDeRede, fetchComRetry } from "../../config/http";
 import { deveEncerrarSessao, geracaoDaSessao, renovarSessao } from "../../config/sessao";
+import ClienteId from "../../services/ClienteId";
 import TokenStorage from "../../services/TokenStorage";
 import { ApiError } from "./apiError";
 
@@ -65,9 +66,17 @@ export async function renovarSessaoAposNaoAutorizado(geracao) {
   }
 }
 
+/**
+ * Com login, o access token. Sem login, o id da instalação (`X-Cliente-Id`), que o backend
+ * usa como chave do rate limit no lugar do IP compartilhado pelo CGNAT (ARQ-02).
+ */
 async function authHeaders() {
   const token = await TokenStorage.getAccessToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (token) {
+    return { Authorization: `Bearer ${token}` };
+  }
+  const cliente = await ClienteId.obterSeDisponivel();
+  return cliente ? { "X-Cliente-Id": cliente } : {};
 }
 
 async function lerCorpo(response) {

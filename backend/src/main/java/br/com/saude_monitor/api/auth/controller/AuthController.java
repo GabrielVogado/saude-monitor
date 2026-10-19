@@ -8,9 +8,12 @@ import br.com.saude_monitor.api.auth.dto.RedefinirSenhaRequest;
 import br.com.saude_monitor.api.auth.dto.ReenviarConfirmacaoRequest;
 import br.com.saude_monitor.api.auth.dto.RefreshRequest;
 import br.com.saude_monitor.api.auth.service.AuthService;
+import br.com.saude_monitor.api.config.exception.LimiteExcedidoException;
+import br.com.saude_monitor.api.config.ratelimit.RateLimitService;
 import br.com.saude_monitor.api.user.dto.UserRequest;
 import br.com.saude_monitor.api.user.dto.UserResponse;
 import br.com.saude_monitor.api.user.service.UserService;
+import br.com.saude_monitor.api.user.util.EmailNormalizer;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +26,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Map;
 
 /**
@@ -40,6 +47,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserService userService;
+    private final RateLimitService rateLimitService;
 
     /** 🔓 Cria conta opcional (E5-04); exige aceite dos termos LGPD (consentimento.termosUso). */
     @PostMapping("/registro")
@@ -54,6 +62,9 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         // Nunca logar a senha — apenas a identidade, para rastreabilidade.
         logger.info("[AuthController] Login recebido para email={}", request.email());
+        // Por conta, além do limite por IP do filtro: tentativa de senha contra uma conta
+        // não escapa trocando de IP (ARQ-02).
+        aplicarLimite("login:" + EmailNormalizer.normalizar(request.email()), RateLimitService.Grupo.LOGIN);
         return ResponseEntity.ok(authService.login(request));
     }
 
@@ -61,7 +72,26 @@ public class AuthController {
     @PostMapping("/refresh")
     @SecurityRequirements
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        // Pelo próprio refresh token, nunca pelo IP (ARQ-02): atrás do CGNAT das operadoras,
+        // o limite por IP fazia a renovação de quem tem sessão válida levar 429 no pico.
+        aplicarLimite("refresh:" + calcularHashSha256(request.refreshToken()), RateLimitService.Grupo.REFRESH);
         return ResponseEntity.ok(authService.refresh(request));
+    }
+
+    private void aplicarLimite(String chave, RateLimitService.Grupo grupo) {
+        if (!rateLimitService.tentarConsumir(chave, grupo)) {
+            throw new LimiteExcedidoException(rateLimitService.limite(grupo));
+        }
+    }
+
+    /** SHA-256 do token: o contador em memória não guarda o token em si. */
+    private static String calcularHashSha256(String token) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 indisponível na JVM.", e);
+        }
     }
 
     /**

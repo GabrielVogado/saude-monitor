@@ -219,7 +219,7 @@ A versão anterior (2.0) foi preservada em `_historico/Especificacao-API-v2.0.md
 | Endpoint | Situação | Ref. |
 |---|---|---|
 | `POST /api/v1/auth/registro` | 🟢 (migrado de `/api/user/cadastro`; consentimento LGPD obrigatório) | PR `contas - registro e contas` |
-| `POST /api/v1/auth/login` | 🟢 (rate limit 10/min/IP) | PR #1/#24 |
+| `POST /api/v1/auth/login` | 🟢 (rate limit 10/min/IP e 10/min por conta, ARQ-02) | PR #1/#24 |
 | `POST /api/v1/auth/refresh` | 🟢 (rotação) | PR #22 |
 | `POST /api/v1/auth/logout` | 🟢 (blacklist de refresh; idempotente) | PR `feature/logout-server-revogacao-refresh` |
 | `DELETE /api/v1/contas/exclusao` | 🟢 | PR #25 |
@@ -287,7 +287,7 @@ Cria conta (opcional no MVP — jornada principal funciona sem login). Substitui
   "usuario": { "id": "652c9f3e1a2b3c4d5e6f7081", "nome": "Marina Souza", "email": "marina@email.com", "papel": "USER" }
 }
 ```
-**Regras:** `expiraEm` = 900s (15min); rate limit 10 req/min/IP.
+**Regras:** `expiraEm` = 900s (15min); rate limit 10 req/min por IP e 10 req/min por conta no login; no refresh, 10 req/min pelo próprio refresh token e nenhum limite por IP (ARQ-02, 18/10/2026).
 
 #### `POST /api/v1/auth/refresh` 🔓
 **Request:** `{ "refreshToken": "..." }` → **200** `{ "accessToken": "...", "refreshToken": "...", "expiraEm": 900 }`
@@ -525,7 +525,7 @@ Ranking por `ordem=nota|tempo`. Query: `ordem`, `tipo`, `page`, `size`. Ordena p
 ### 3.6 Camadas geográficas (F-11, §5 do plano do painel web)
 
 #### `GET /api/v1/camadas/{tipo}` 🔓
-GeoJSON (`FeatureCollection`, RFC 7946, lon/lat) de uma das 4 divisões geográficas — base do mapa multi-camada do futuro painel web e de toggles no app. `tipo` ∈ `regiao-administrativa` | `ride` | `regiao-saude` | `macrorregiao-saude`. Leitura pública (mesmo regime dos GET de hospitais; rate limit PÚBLICO 60/min/IP), `Cache-Control: max-age=86400`. Slug fora da lista → **404** no envelope padrão (`RECURSO_NAO_ENCONTRADO`).
+GeoJSON (`FeatureCollection`, RFC 7946, lon/lat) de uma das 4 divisões geográficas — base do mapa multi-camada do futuro painel web e de toggles no app. `tipo` ∈ `regiao-administrativa` | `ride` | `regiao-saude` | `macrorregiao-saude`. Leitura pública (mesmo regime dos GET de hospitais; rate limit PÚBLICO 60/min por identidade), `Cache-Control: max-age=86400`. Slug fora da lista → **404** no envelope padrão (`RECURSO_NAO_ENCONTRADO`).
 **200 OK** (`GET /api/v1/camadas/regiao-saude`)
 ```json
 {
@@ -579,7 +579,7 @@ sequenceDiagram
 | **TLS** | HTTPS obrigatório; HSTS; certificados gerenciados |
 | **JWT** | Access 15min (curto) + Refresh 30d (rotação, SecureStore no app) |
 | **CORS** | Restrito a domínios do app web (dev) |
-| **Rate limit** | Login/refresh 10/min/IP (`AUTH`) · Público 60/min/IP (`PUBLICO`, inclui feedbbacks e agregados) — implementado (PR #24) |
+| **Rate limit** | Desde 18/10/2026 (ARQ-02): público 60/min por identidade (`PUBLICO`: usuário do access token válido, senão a instalação do app no cabeçalho `X-Cliente-Id`, senão o IP) · cadastro, confirmação e senha 10/min/IP (`AUTH`) · login 10/min/IP e 10/min por conta · refresh 10/min por token, sem limite por IP · teto de abuso de 600/min por IP somando todo o tráfego limitado. Resposta `429 LIMITE_EXCEDIDO` no envelope padrão. Implementado no PR #24, revisto no ARQ-02 |
 | **Validação** | Bean Validation em todos os DTOs; mensagens pt-BR |
 | **Logs** | Sem dados pessoais (nunca logar e-mail/senha/posição bruta); `traceId` em todas as respostas |
 | **Papéis** | `USER` (padrão) · `HOSPITAL_ADMIN` (futuro) · `ADMIN` (cadastro de hospitais) |

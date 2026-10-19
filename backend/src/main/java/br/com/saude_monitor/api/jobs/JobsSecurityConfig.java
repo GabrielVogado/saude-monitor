@@ -39,17 +39,17 @@ public class JobsSecurityConfig {
     @Bean
     @Order(1)
     public SecurityFilterChain jobsSecurityFilterChain(HttpSecurity http, JobsProperties properties) {
-        return cadeia(http, properties, decoderGoogle(properties));
+        return construirCadeia(http, properties, criarDecoderGoogle(properties));
     }
 
     /** Cadeia com o decodificador recebido; os testes passam um com chave local. */
-    static SecurityFilterChain cadeia(HttpSecurity http, JobsProperties properties, JwtDecoder decoder) {
+    static SecurityFilterChain construirCadeia(HttpSecurity http, JobsProperties properties, JwtDecoder decoder) {
         http
                 .securityMatcher("/internal/**")
                 // CSRF fica ligado: o resource server já dispensa a verificação quando a
                 // requisição traz Bearer, que é a única credencial aceita aqui.
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
-        if (properties.endpointsHabilitados()) {
+        if (properties.isEndpointsHabilitados()) {
             http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
                     .oauth2ResourceServer(rs -> rs.jwt(jwt -> jwt.decoder(decoder)));
         } else {
@@ -58,13 +58,13 @@ public class JobsSecurityConfig {
         return http.build();
     }
 
-    static JwtDecoder decoderGoogle(JobsProperties properties) {
+    static JwtDecoder criarDecoderGoogle(JobsProperties properties) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(JWKS_GOOGLE).build();
-        decoder.setJwtValidator(validador(properties));
+        decoder.setJwtValidator(criarValidador(properties));
         return decoder;
     }
 
-    static OAuth2TokenValidator<Jwt> validador(JobsProperties properties) {
+    static OAuth2TokenValidator<Jwt> criarValidador(JobsProperties properties) {
         return new DelegatingOAuth2TokenValidator<>(
                 new JwtTimestampValidator(),
                 // Texto, não getIssuer(): "accounts.google.com" não é URL e faria getIssuer() lançar.

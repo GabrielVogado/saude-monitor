@@ -223,8 +223,8 @@ class RateLimitFilterTest {
 
     @Test
     void usuariosAutenticadosNoMesmoIpTemLimitesSeparados() throws Exception {
-        String marina = "Bearer " + JWT.generateAccessToken(usuario("marina@email.com"));
-        String joao = "Bearer " + JWT.generateAccessToken(usuario("joao@email.com"));
+        String marina = "Bearer " + JWT.generateAccessToken(criarUsuario("marina@email.com"));
+        String joao = "Bearer " + JWT.generateAccessToken(criarUsuario("joao@email.com"));
         for (int i = 0; i < 60; i++) {
             mockMvc.perform(get("/api/v1/hospitais").with(deIp("10.1.0.1")).header("Authorization", marina))
                     .andExpect(status().isOk());
@@ -256,7 +256,7 @@ class RateLimitFilterTest {
         org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
         req.addHeader("Authorization", "Bearer nao-e-um-jwt");
         req.addHeader("X-Cliente-Id", "curto");
-        assertThat(filter.identidade(req, RateLimitService.Grupo.PUBLICO, "10.1.0.3").chave())
+        assertThat(filter.identificarCliente(req, RateLimitService.Grupo.PUBLICO, "10.1.0.3").chave())
                 .isEqualTo("ip:10.1.0.3");
     }
 
@@ -264,9 +264,9 @@ class RateLimitFilterTest {
     void refreshTokenNaoContaComoUsuario() {
         RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO, JWT);
         org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
-        req.addHeader("Authorization", "Bearer " + JWT.generateRefreshToken(usuario("marina@email.com")));
+        req.addHeader("Authorization", "Bearer " + JWT.generateRefreshToken(criarUsuario("marina@email.com")));
         req.addHeader("X-Cliente-Id", CLIENTE_A);
-        assertThat(filter.identidade(req, RateLimitService.Grupo.PUBLICO, "10.1.0.4").chave())
+        assertThat(filter.identificarCliente(req, RateLimitService.Grupo.PUBLICO, "10.1.0.4").chave())
                 .isEqualTo("cliente:" + CLIENTE_A);
     }
 
@@ -275,7 +275,7 @@ class RateLimitFilterTest {
         RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO, JWT);
         org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
         req.addHeader("X-Cliente-Id", CLIENTE_A);
-        assertThat(filter.identidade(req, RateLimitService.Grupo.AUTH, "10.1.0.5").chave())
+        assertThat(filter.identificarCliente(req, RateLimitService.Grupo.AUTH, "10.1.0.5").chave())
                 .isEqualTo("ip:10.1.0.5");
     }
 
@@ -303,7 +303,7 @@ class RateLimitFilterTest {
         }
     }
 
-    private static UserDocument usuario(String email) {
+    private static UserDocument criarUsuario(String email) {
         return UserDocument.builder().id(email).email(email).build();
     }
 

@@ -20,7 +20,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record JobsProperties(@DefaultValue("true") boolean agendamentoInterno, String audiencia, String contaServico) {
 
     /** Os endpoints internos só aceitam chamadas quando audiência e conta estão configuradas. */
-    public boolean endpointsHabilitados() {
+    public boolean isEndpointsHabilitados() {
         return audiencia != null && !audiencia.isBlank()
                 && contaServico != null && !contaServico.isBlank();
     }

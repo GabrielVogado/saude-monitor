@@ -48,7 +48,7 @@ class SeedRunnerPublicoComplementarTest {
                 "TESTE", 0.05, 150, 100, 75, 100, 100, 100, 100);
         SeedMapper seedMapper = new SeedMapper(properties, new GeofenceFactory());
         return new SeedRunner(new DbfLeitor(), new ShpPointLeitor(), seedMapper,
-                hospitalRepository, properties, new HospitalPublicoComplementarLeitor(), TravasDeTeste.livre());
+                hospitalRepository, properties, new HospitalPublicoComplementarLeitor(), TravasDeTeste.criarTravaLivre());
     }
 
     @Test

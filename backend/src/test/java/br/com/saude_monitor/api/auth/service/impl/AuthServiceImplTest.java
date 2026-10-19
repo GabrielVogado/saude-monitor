@@ -89,7 +89,7 @@ class AuthServiceImplTest {
         authService = new AuthServiceImpl(
                 userRepository, passwordEncoder, jwtService, revogadoRepository,
                 codigoVerificacaoRepository, emailService, mongoTemplate,
-                new LimiteEnvioEmail(), TempoMinimoResposta.semPiso());
+                new LimiteEnvioEmail(), TempoMinimoResposta.criarSemPiso());
     }
 
     /** "Ativo" aqui inclui e-mail confirmado — a maioria dos testes não exercita esse eixo. */
@@ -323,7 +323,7 @@ class AuthServiceImplTest {
         AuthServiceImpl service = new AuthServiceImpl(
                 userRepository, encoderMockado, jwtService, revogadoRepository,
                 codigoVerificacaoRepository, emailService, mongoTemplate,
-                new LimiteEnvioEmail(), TempoMinimoResposta.semPiso());
+                new LimiteEnvioEmail(), TempoMinimoResposta.criarSemPiso());
         when(userRepository.findByEmail("fantasma@email.com")).thenReturn(Optional.empty());
 
         service.esqueciSenha(new EsqueciSenhaRequest("fantasma@email.com"));
@@ -339,7 +339,7 @@ class AuthServiceImplTest {
         AuthServiceImpl service = new AuthServiceImpl(
                 userRepository, encoderMockado, jwtService, revogadoRepository,
                 codigoVerificacaoRepository, emailService, mongoTemplate,
-                new LimiteEnvioEmail(), TempoMinimoResposta.semPiso());
+                new LimiteEnvioEmail(), TempoMinimoResposta.criarSemPiso());
         when(userRepository.findByEmail("fantasma@email.com")).thenReturn(Optional.empty());
         LoginRequest pedido = new LoginRequest("fantasma@email.com", "qualquer", false);
 
@@ -367,7 +367,7 @@ class AuthServiceImplTest {
     @Test
     void esqueciSenhaEReenvioPassamPeloPisoDeTempo() {
         TempoMinimoResposta piso = mock(TempoMinimoResposta.class);
-        when(piso.garantir(any())).thenAnswer(inv -> inv.<java.util.function.Supplier<?>>getArgument(0).get());
+        when(piso.executarComTempoMinimo(any())).thenAnswer(inv -> inv.<java.util.function.Supplier<?>>getArgument(0).get());
         AuthServiceImpl service = new AuthServiceImpl(
                 userRepository, passwordEncoder, jwtService, revogadoRepository,
                 codigoVerificacaoRepository, emailService, mongoTemplate, new LimiteEnvioEmail(), piso);
@@ -376,7 +376,7 @@ class AuthServiceImplTest {
         service.esqueciSenha(new EsqueciSenhaRequest("fantasma@email.com"));
         service.reenviarConfirmacaoEmail(new ReenviarConfirmacaoRequest("fantasma@email.com"));
 
-        verify(piso, times(2)).garantir(any());
+        verify(piso, times(2)).executarComTempoMinimo(any());
     }
 
     // ------------------------------------------------ Redefinir senha ----------------------------------------------

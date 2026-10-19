@@ -24,27 +24,27 @@ public class AgendamentoInternoJobs {
     private final ExecutorJobs executor;
 
     @Scheduled(fixedRate = QUINZE_MINUTOS_MS)
-    public void indicadores() {
+    public void executarIndicadores() {
         executor.executar(NomeJob.INDICADORES);
     }
 
     @Scheduled(fixedRate = QUINZE_MINUTOS_MS)
-    public void expiracaoVisitas() {
+    public void executarExpiracaoVisitas() {
         executor.executar(NomeJob.EXPIRACAO_VISITAS);
     }
 
     @Scheduled(fixedRate = QUINZE_MINUTOS_MS)
-    public void gpsInterrompido() {
+    public void executarGpsInterrompido() {
         executor.executar(NomeJob.GPS_INTERROMPIDO);
     }
 
     @Scheduled(fixedRate = QUINZE_MINUTOS_MS)
-    public void feedbackSemResposta() {
+    public void executarFeedbackSemResposta() {
         executor.executar(NomeJob.FEEDBACK_SEM_RESPOSTA);
     }
 
     @Scheduled(cron = "0 30 3 * * *", zone = "America/Sao_Paulo")
-    public void retencaoDados() {
+    public void executarRetencaoDados() {
         executor.executar(NomeJob.RETENCAO_DADOS);
     }
 }

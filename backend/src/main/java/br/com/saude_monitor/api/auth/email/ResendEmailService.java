@@ -43,7 +43,7 @@ public class ResendEmailService implements EmailService {
 
     @Autowired
     public ResendEmailService(RestClient.Builder restClientBuilder, ResendProperties properties) {
-        this(restClientBuilder.clone(), properties, fabricaComTeto());
+        this(restClientBuilder.clone(), properties, criarFabricaComTimeout());
     }
 
     /** {@code fabrica} nula mantém a do builder (os testes ligam um servidor simulado nele). */
@@ -59,7 +59,7 @@ public class ResendEmailService implements EmailService {
         this.remetente = properties.remetente();
     }
 
-    static ClientHttpRequestFactory fabricaComTeto() {
+    static ClientHttpRequestFactory criarFabricaComTimeout() {
         JdkClientHttpRequestFactory fabrica = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder().connectTimeout(TIMEOUT_CONEXAO).build());
         fabrica.setReadTimeout(TIMEOUT_LEITURA);

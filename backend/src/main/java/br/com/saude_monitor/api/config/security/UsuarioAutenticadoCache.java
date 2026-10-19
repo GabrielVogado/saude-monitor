@@ -16,7 +16,7 @@ import java.time.Duration;
  * <p>Antes, toda requisição com token lia a conta no Mongo. Agora a conta lida fica
  * {@link #VALIDADE} na memória da instância. O access token já vale 15 minutos, então o
  * risco de papel ou situação desatualizados não muda de ordem de grandeza; a exclusão da
- * conta descarta a entrada na hora ({@link #esquecer(String)}) nesta instância, e nas
+ * conta descarta a entrada na hora ({@link #removerDoCache(String)}) nesta instância, e nas
  * outras o efeito chega em até {@link #VALIDADE}.</p>
  *
  * <p>Conta inexistente não é guardada: a exceção do {@link CustomUserDetailsService} sobe
@@ -49,7 +49,7 @@ public class UsuarioAutenticadoCache {
     }
 
     /** Conta do e-mail do token, da memória ou do banco. */
-    public UserDetails carregar(String email) {
+    public UserDetails carregarUsuario(String email) {
         String chave = EmailNormalizer.normalizar(email);
         if (chave == null) {
             return userDetailsService.loadUserByUsername(email);
@@ -58,7 +58,7 @@ public class UsuarioAutenticadoCache {
     }
 
     /** Descarta a conta da memória (exclusão da conta). */
-    public void esquecer(String email) {
+    public void removerDoCache(String email) {
         String chave = EmailNormalizer.normalizar(email);
         if (chave != null) {
             cache.invalidate(chave);

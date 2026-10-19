@@ -53,6 +53,8 @@ public class VisitaDocument {
 
     private String hospitalId;
 
+    /** Indexado para o job de retenção, que filtra por {@code entrada} sozinha (DAD-01). */
+    @Indexed
     private Instant entrada;
 
     private Instant saida;

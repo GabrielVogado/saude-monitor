@@ -37,4 +37,11 @@ public interface FeedbackService {
      * cuja janela de 24h para responder expirou sem feedback (1 único lembrete já emitido).
      */
     void processarSemResposta();
+
+    /**
+     * Desvincula da conta os feedbacks com mais de 90 dias, como as visitas (DAD-01 B): a
+     * avaliação continua no indicador, mas deixa de dizer quem esteve em qual hospital.
+     * Devolve quantos mudaram.
+     */
+    long desvincularFeedbacksAntigos();
 }

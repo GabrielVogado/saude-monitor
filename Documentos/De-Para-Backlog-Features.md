@@ -16,7 +16,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | Painel Administrativo Web (Épico 7) | 9 | 9 | 100% (✅ E7-01 a E7-09 entregues; E2E com login ADMIN pendente para E7-06 e E7-09) |
 | **Total do backlog** | **51** | **52** | **98%** |
 | Épico 8 — Estabilização e Desempenho (novo, v2.1) | 8 | 15 | 53% |
-| Épico 9 — Escala, Segurança e Privacidade (novo, 18/10/2026) | 1 | 19 | 5% |
+| Épico 9 — Escala, Segurança e Privacidade (novo, 18/10/2026) | 3 | 19 | 16% |
 
 > ⚠️ **Entregue ≠ utilizável.** As 42 estórias abaixo estão implementadas e cobertas por teste em CI, mas o sistema **não passou por validação em campo** e apresenta lentidão transversal de origem confirmada na infraestrutura — o **cold start** na primeira abertura após ociosidade (503 no Cloud Run, ver E8-01). O "1–5 s por requisição com o serviço quente" descrito aqui era o Render antigo: re-medido em 24/09/2026 sobre o Cloud Run quente, os GET ficam em **p95 ~195–245 ms** (ver E8-02). Ver `Features-MVP-v2.1.md` §2.1 e o **Épico 8** do `Backlog-MVP-v2.1.md`.
 
@@ -143,8 +143,8 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 |---|---|---|---|
 | **SEG-02** | Visita e feedback anônimos só para o dono | **F-04**, **F-05** | ✅ Entregue (18/10/2026) — checkout, heartbeat e feedback de visita anônima exigem o `dispositivoId` do aparelho que fez o check-in, e o feedback de visita logada exige o mesmo usuário (403 caso contrário). App manda o `dispositivoId` nas três chamadas, inclusive no reenvio da fila offline. Testes de BOLA com Mongo real (`VisitaAnonimaDonoIntegracaoTest`, ENG-04). Ver [M-047](09-melhoria-continua/Historico-Melhorias.md). |
 | **ENG-04** | Testes de lógica de negócio de segurança na esteira | Cross | 🟡 Parcial (18/10/2026) — BOLA em visita e feedback anônimos coberto (SEG-02); retroatividade e limites entram com o SEG-01. |
-| **DAD-01** | Retenção dos pontos de GPS da visita | **F-04**, **F-09** | 🔴 Pendente |
-| **ARQ-04** | Heartbeat com update atômico e lista de pontos limitada | **F-04** | 🔴 Pendente |
+| **DAD-01** | Retenção dos pontos de GPS da visita | **F-04**, **F-09** | ✅ Entregue (18/10/2026) — pontos de GPS apagados no checkout, na expiração e no GPS interrompido; visitas e feedbacks com mais de 90 dias perdem conta, aparelho e comentário (`RetencaoDadosPessoaisJob`, diário, que também limpa os pontos de visitas encerradas antes da regra). Política de privacidade 1.1. RIPD (DAD-03) segue pendente. Ver [M-048](09-melhoria-continua/Historico-Melhorias.md). |
+| **ARQ-04** | Heartbeat com update atômico e lista de pontos limitada | **F-04** | ✅ Entregue (18/10/2026) — heartbeat e checkout por `findAndModify` condicionado à visita ativa, `$push` com `$slice` (50 pontos); jobs só encerram visita sem sinal novo desde a leitura. Ver [M-048](09-melhoria-continua/Historico-Melhorias.md). |
 | **SEG-01** | Prova de presença para a avaliação contar no indicador | **F-05**, **F-06** | 🔴 Pendente (parte de código; atestação do aparelho depende do console) |
 | **SOL-02** | Seed e reconciliações sem corrida entre instâncias | Cross | 🔴 Pendente |
 | **ARQ-02** | Rate limit por identidade, renovação de token fora do limite por IP | **F-02** | 🔴 Pendente |

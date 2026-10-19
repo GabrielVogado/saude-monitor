@@ -30,7 +30,7 @@ class FeedbackSalvoEventTest {
     private final HospitalRepository hospitalRepository = mock(HospitalRepository.class);
     private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     private final FeedbackServiceImpl service =
-            new FeedbackServiceImpl(feedbackRepository, visitaRepository, hospitalRepository, publisher);
+            new FeedbackServiceImpl(feedbackRepository, visitaRepository, hospitalRepository, publisher, mock(org.springframework.data.mongodb.core.MongoTemplate.class));
 
     private VisitaDocument visitaFinalizada(String id, String hospitalId) {
         return VisitaDocument.builder().id(id).usuarioId("u1").hospitalId(hospitalId).status(StatusVisita.FINALIZADA).build();

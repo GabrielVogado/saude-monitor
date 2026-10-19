@@ -2638,6 +2638,62 @@ para não ligar o `dispositivoId` à conta.
 
 ---
 
+## M-048 — Pontos de GPS apagados ao encerrar a visita e vínculo pessoal só por 90 dias (DAD-01, ARQ-04)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0. **DAD-01 (Alto):** os pontos de
+GPS da visita (`pontosAmostrais`) não tinham prazo nem expurgo, e a visita ficava ligada para
+sempre à conta e ao aparelho. Estar numa unidade de saúde em data e hora conhecidas é dado
+sensível (art. 11 da LGPD), e o Documento Negocial v2.1 §11 promete "dados de localização
+agregados sem vínculo pessoal após 90 dias". **ARQ-04 (Médio):** o heartbeat lia a visita,
+acrescentava um ponto e fazia `save()` do documento inteiro: a lista crescia sem limite (~144
+pontos em 24 h, todos regravados a cada heartbeat) e o `save()` podia desfazer um encerramento
+feito pelo job no meio do caminho, o mesmo padrão do M-007.
+
+### O que mudou
+
+- Premissa P9 da análise (sem resposta do PO, vale a sugestão): apagar os pontos ao encerrar
+  e desvincular a identidade após 90 dias.
+- Checkout, expiração (24 h) e GPS interrompido apagam `pontosAmostrais`. Ficam hospital,
+  entrada, saída, duração e status. Nada no sistema lia os pontos depois do encerramento.
+- Heartbeat, checkout e sinalização de internação viram update atômico condicionado à visita
+  ainda estar ativa (`findAndModify`). O heartbeat leva também o filtro de dono no próprio
+  update (um acesso ao banco por chamada; a visita só é lida para responder 404/403/409 quando
+  nada foi atualizado) e usa `$push` com `$slice`, guardando só os 50 pontos mais recentes. Se a
+  visita foi encerrada entre a leitura e a escrita, a resposta é 409, como para visita já
+  encerrada.
+- O job de feedback sem resposta passa a mudar só o status (`updateMulti` condicionado a
+  `FINALIZADA`), em vez de regravar as visitas lidas, o que podia devolver dados apagados pela
+  retenção no meio do caminho.
+- Jobs: a marcação de SUSPEITA é um `updateMulti` com a condição de tempo no próprio update. A
+  expiração e o GPS interrompido encerram cada visita só se `ultimoHeartbeat` não mudou desde a
+  leitura, então um heartbeat que chegue no meio mantém a visita aberta.
+- `RetencaoDadosPessoaisJob` (todo dia às 3h30, horário de Brasília), em três etapas isoladas
+  (a falha de uma não impede as outras): apaga os pontos que tenham sobrado em visitas já
+  encerradas, inclusive as encerradas antes desta versão; visitas com entrada há mais de 90 dias
+  perdem `usuarioId`, `dispositivoId` e pontos; feedbacks criados há mais de 90 dias perdem
+  `usuarioId` e o comentário e ficam `anonimizado`, como na exclusão de conta (M-041). Tudo é
+  idempotente, então rodar em duas instâncias não muda o resultado. `entrada` ganha índice
+  próprio para o filtro do job.
+- Política de privacidade (`site/`, versão 1.1): §7 diz que as posições são apagadas ao fim da
+  visita e que o vínculo com a conta e o aparelho dura 90 dias.
+
+### Efeito para quem usa
+
+O histórico de visitas e de avaliações do app passa a mostrar só os últimos 90 dias. Os
+indicadores públicos não mudam.
+
+### Verificação
+
+- Backend: 401 testes, com integração em Mongo real (`VisitaRetencaoGpsIntegracaoTest`:
+  heartbeat acrescenta ponto, checkout apaga a trilha, visita de 91 dias perde conta e aparelho
+  e a recente não). Cobertura das linhas alteradas: 100%.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

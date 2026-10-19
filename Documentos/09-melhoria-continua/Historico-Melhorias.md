@@ -3172,3 +3172,46 @@ do usuário.
 - `quarkus` — o backend é **Spring Boot 4**, não Quarkus. Não ativar por semelhança de "backend Java".
 - `awesome-llm-apps-fullstack-developer` — o produto não tem camada de LLM.
 - `lobehub-react` — **removida da coluna de `frontend/` em 03/09/2026** ([OBS-003](../../skill-observations/OBS-003-skill-anunciada-nao-e-skill-ativada.md)). O conteúdo dela é `@lobehub/ui`, antd, Next.js App Router e `react-router-dom`; verificado no `package.json` que **nenhuma das cinco existe**. O projeto é Expo/React Native com React Navigation e componentes próprios (`CS*`).
+
+---
+
+## M-058 — Nomes de métodos do Épico 9 no padrão do Java
+
+**Data:** 19/10/2026 · **PR:** #206 a #216 (um commit em cada) · **Épico 9**
+
+### Como apareceu
+
+Revisão do PO sobre o código dos PRs #206 a #216: vários métodos tinham nome de substantivo
+(`obter()`, `nomes()`, `identidade()`, `etapa()`), booleano sem pergunta (`pertenceA`,
+`comprovada`, `permitir`, `endpointsHabilitados`) ou abreviação (`obterAtivaOu409`). A regra
+seguida é a convenção da Oracle mais Clean Code: lowerCamelCase, começar por verbo, booleano como
+pergunta (`is`/`has`), nome que diz o que faz e unidade no nome quando há medida.
+
+### O que mudou
+
+Só nomes, sem mudança de comportamento, nos métodos criados (ou com regra nova) no Épico 9, em
+backend, app e auxiliares de teste. Principais trocas:
+
+- Booleanos: `VisitaDono.pertenceA` → `isDonoDaVisita`; `PresencaVisita.comprovada`/`noCheckin` →
+  `isComprovada`/`isComprovadaNoCheckin`; `ConfiguracaoRemotaService.modoSomenteLeitura` →
+  `isModoSomenteLeitura`; `JobsProperties.endpointsHabilitados` → `isEndpointsHabilitados`;
+  `isAtualizacaoObrigatoria` no app (era `precisaAtualizar`).
+- Verbo e intenção: `CatalogoService.obter`/`invalidar` → `obterCatalogo`/`invalidarCache`;
+  `ConfiguracaoRemotaService.obter` → `obterConfiguracao`; `RateLimitFilter.identidade`/`excedeu` →
+  `identificarCliente`/`bloquearSeLimiteExcedido`; `UsuarioAutenticadoCache.carregar`/`esquecer` →
+  `carregarUsuario`/`removerDoCache`; `TempoMinimoResposta.garantir` → `executarComTempoMinimo`;
+  `LimiteEnvioEmail.permitir` → `tentarRegistrarEnvio`; `ExecutorJobs.nomes` → `listarNomes`;
+  agendamentos `indicadores()` etc. → `executarIndicadores()` etc.; `VisitaServiceImpl.obterAtivaOu409`
+  → `obterVisitaAtivaDoDono`; no app, `CatalogoLocal.estabelecimentos` → `obterEstabelecimentos`.
+- Unidade: `decorrido(inicio)` → `calcularMilissegundosDesde(inicioEmNanos)`; `comTimeout(promise, ms)`
+  → `aguardarComTimeout(promise, timeoutEmMs)`.
+
+Ficam como estão, por regra da linguagem ou do framework: métodos sobrescritos (`doFilterInternal`,
+`shouldNotFilter`), acessores de `record` (o Java usa o nome do componente, sem `get`), métodos `@Bean`
+(o nome é o nome do bean) e os `handleX` do `GlobalExceptionHandler`, no padrão do arquivo. Métodos que
+já existiam na `develop` antes do Épico 9 ficam para outro PR, se o PO quiser.
+
+### Verificação
+
+Backend compilado em cada um dos 11 PRs e suíte completa verde no último; app com 656 testes, lint
+com 11 avisos (teto 16), `tsc` limpo.

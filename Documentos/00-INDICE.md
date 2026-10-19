@@ -1,7 +1,13 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 18/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 19/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 19/10/2026 — Épico 9: nomes de métodos no padrão do Java
+
+**O que mudou:** os métodos criados nos PRs #206 a #216 passam a começar por verbo, com booleano como pergunta (`is`/`has`) e unidade no nome quando há medida (ex.: `pertenceA` → `isDonoDaVisita`, `obter` → `obterCatalogo`). Só nomes, sem mudança de comportamento. Registro em `Historico-Melhorias.md` (M-058).
 
 ---
 

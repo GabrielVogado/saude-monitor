@@ -1,7 +1,6 @@
 package br.com.saude_monitor.api.visita.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -15,7 +14,6 @@ public class VisitaGpsInterrompidoJob {
 
     private final VisitaService visitaService;
 
-    @Scheduled(fixedRate = 15 * 60 * 1000L)
     public void executar() {
         visitaService.processarGpsInterrompido();
     }

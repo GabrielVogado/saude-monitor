@@ -35,6 +35,8 @@ dependencies {
 	implementation 'io.micrometer:micrometer-registry-prometheus'
 	implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
+	// Validação do token OIDC do Cloud Scheduler nos endpoints internos de jobs (SOL-05).
+	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	// Cache local do usuário autenticado (ARQ-03). Versão gerenciada pelo BOM do Spring Boot.

@@ -1,7 +1,6 @@
 package br.com.saude_monitor.api.feedback.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -16,7 +15,6 @@ public class FeedbackSemRespostaJob {
 
     private final FeedbackService feedbackService;
 
-    @Scheduled(fixedRate = 15 * 60 * 1000L)
     public void executar() {
         feedbackService.processarSemResposta();
     }

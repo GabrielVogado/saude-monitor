@@ -134,11 +134,11 @@ class FeedbackServiceImplTest {
 
     // ------------------------------------------------ dono da visita (SEG-02) ------------------
 
-    private FeedbackRequest requestDoAparelho(String visitaId, String dispositivoId) {
+    private FeedbackRequest criarRequestDoAparelho(String visitaId, String dispositivoId) {
         return new FeedbackRequest(visitaId, null, null, null, null, null, null, 4, null, null, dispositivoId);
     }
 
-    private VisitaDocument visitaAnonimaEncerrada(String id, String dispositivoId) {
+    private VisitaDocument criarVisitaAnonimaEncerrada(String id, String dispositivoId) {
         return VisitaDocument.builder()
                 .id(id)
                 .dispositivoId(dispositivoId)
@@ -157,7 +157,7 @@ class FeedbackServiceImplTest {
         assertThatThrownBy(() -> service.criar(pedido, "invasor"))
                 .isInstanceOf(AcessoNegadoException.class);
         // Anônimo também não avalia a visita de um usuário logado.
-        FeedbackRequest outroPedido = requestDoAparelho("v1", "anon-x");
+        FeedbackRequest outroPedido = criarRequestDoAparelho("v1", "anon-x");
         assertThatThrownBy(() -> service.criar(outroPedido, null))
                 .isInstanceOf(AcessoNegadoException.class);
         // Recusa antes da checagem de duplicidade: o intruso não descobre se já há avaliação.
@@ -167,12 +167,12 @@ class FeedbackServiceImplTest {
 
     @Test
     void criarRecusaFeedbackAnonimoSemOAparelhoDono() {
-        when(visitaRepository.findById("v1")).thenReturn(Optional.of(visitaAnonimaEncerrada("v1", "anon-dono")));
+        when(visitaRepository.findById("v1")).thenReturn(Optional.of(criarVisitaAnonimaEncerrada("v1", "anon-dono")));
 
-        FeedbackRequest pedido = requestDoAparelho("v1", null);
+        FeedbackRequest pedido = criarRequestDoAparelho("v1", null);
         assertThatThrownBy(() -> service.criar(pedido, null))
                 .isInstanceOf(AcessoNegadoException.class);
-        FeedbackRequest outroPedido = requestDoAparelho("v1", "anon-intruso");
+        FeedbackRequest outroPedido = criarRequestDoAparelho("v1", "anon-intruso");
         assertThatThrownBy(() -> service.criar(outroPedido, null))
                 .isInstanceOf(AcessoNegadoException.class);
         verify(feedbackRepository, never()).save(any());
@@ -180,22 +180,22 @@ class FeedbackServiceImplTest {
 
     @Test
     void criarRecusaEstranhoAntesDeRevelarOStatusDaVisita() {
-        VisitaDocument emAndamento = visitaAnonimaEncerrada("v1", "anon-dono");
+        VisitaDocument emAndamento = criarVisitaAnonimaEncerrada("v1", "anon-dono");
         emAndamento.setStatus(StatusVisita.EM_ATENDIMENTO);
         when(visitaRepository.findById("v1")).thenReturn(Optional.of(emAndamento));
 
         // Para o estranho, a visita em andamento dá o mesmo 403 que a encerrada.
-        FeedbackRequest pedido = requestDoAparelho("v1", "anon-intruso");
+        FeedbackRequest pedido = criarRequestDoAparelho("v1", "anon-intruso");
         assertThatThrownBy(() -> service.criar(pedido, null))
                 .isInstanceOf(AcessoNegadoException.class);
     }
 
     @Test
     void criarAceitaFeedbackAnonimoDoAparelhoDono() {
-        when(visitaRepository.findById("v1")).thenReturn(Optional.of(visitaAnonimaEncerrada("v1", "anon-dono")));
+        when(visitaRepository.findById("v1")).thenReturn(Optional.of(criarVisitaAnonimaEncerrada("v1", "anon-dono")));
         when(feedbackRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        FeedbackResponse resposta = service.criar(requestDoAparelho("v1", "anon-dono"), null);
+        FeedbackResponse resposta = service.criar(criarRequestDoAparelho("v1", "anon-dono"), null);
 
         assertThat(resposta.visitaId()).isEqualTo("v1");
         assertThat(resposta.anonimizado()).isTrue();
@@ -204,9 +204,9 @@ class FeedbackServiceImplTest {
     @Test
     void criarRecusaVisitaAnonimaSemAparelhoGravado() {
         // Conta excluída (M-041) apaga o aparelho das visitas: ninguém mais é dono delas.
-        when(visitaRepository.findById("v1")).thenReturn(Optional.of(visitaAnonimaEncerrada("v1", null)));
+        when(visitaRepository.findById("v1")).thenReturn(Optional.of(criarVisitaAnonimaEncerrada("v1", null)));
 
-        FeedbackRequest pedido = requestDoAparelho("v1", "anon-qualquer");
+        FeedbackRequest pedido = criarRequestDoAparelho("v1", "anon-qualquer");
         assertThatThrownBy(() -> service.criar(pedido, null))
                 .isInstanceOf(AcessoNegadoException.class);
     }

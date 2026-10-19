@@ -141,7 +141,7 @@ public class VisitaServiceImpl implements VisitaService {
 
     @Override
     public CheckoutResponse checkout(String id, CheckoutRequest request, String usuarioId) {
-        VisitaDocument visita = obterAtivaOu409(id, usuarioId, request.dispositivoId());
+        VisitaDocument visita = obterVisitaAtivaDoDono(id, usuarioId, request.dispositivoId());
 
         Instant agora = Instant.now();
         boolean gpsIndisponivel = Boolean.TRUE.equals(request.gpsIndisponivel());
@@ -175,7 +175,7 @@ public class VisitaServiceImpl implements VisitaService {
 
     @Override
     public HeartbeatResponse heartbeat(String id, String usuarioId, String dispositivoId, PosicaoDto posicao) {
-        VisitaDocument visita = obterAtivaOu409(id, usuarioId, dispositivoId);
+        VisitaDocument visita = obterVisitaAtivaDoDono(id, usuarioId, dispositivoId);
 
         Instant agora = Instant.now();
         visita.setUltimoHeartbeat(agora);
@@ -193,7 +193,7 @@ public class VisitaServiceImpl implements VisitaService {
 
     @Override
     public TipoPermanenciaResponse sinalizarTipoPermanencia(String id, TipoPermanenciaRequest request, String usuarioId) {
-        VisitaDocument visita = obterAtivaOu409(id, usuarioId, request.dispositivoId());
+        VisitaDocument visita = obterVisitaAtivaDoDono(id, usuarioId, request.dispositivoId());
 
         if (request.tipoPermanencia() == TipoPermanencia.ATENDIMENTO) {
             throw new ValidacaoNegocioException("tipoPermanencia deve ser OBSERVACAO ou INTERNACAO.");
@@ -383,11 +383,11 @@ public class VisitaServiceImpl implements VisitaService {
      * Busca a visita e garante que está ativa e pertence a quem chama: o usuário autenticado,
      * quando a visita tem dono logado, ou o aparelho que fez o check-in, quando é anônima.
      */
-    private VisitaDocument obterAtivaOu409(String id, String usuarioId, String dispositivoId) {
+    private VisitaDocument obterVisitaAtivaDoDono(String id, String usuarioId, String dispositivoId) {
         VisitaDocument visita = visitaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Visita não encontrada para o id informado."));
 
-        if (!VisitaDono.pertenceA(visita, usuarioId, dispositivoId)) {
+        if (!VisitaDono.isDonoDaVisita(visita, usuarioId, dispositivoId)) {
             // 403, não 401 (achado F-02 do pentest de 23/09/2026): quem chama pode até estar
             // autenticado; só não é dono desta visita (BOLA).
             throw new AcessoNegadoException("Visita não pertence ao usuário ou aparelho informado.");

@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 19/10/2026 — Homologação v1.0.0-rc.6
+
+**O que entrou:** registro da rc que leva o Épico 9 (adequação em código) da `develop` de 19/10/2026 para a homologação: o que entrou desde a rc.5 (PRs #203, #205 e #206 a #216, M-047 a M-058), o que fica de fora (infraestrutura do Épico 9), rollback e o roteiro de teste no aparelho, que repete os itens da rc.5 ainda não validados. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.6.md`](./10-git-flow/homologacoes/v1.0.0-rc.6.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
+
+---
+
 ## 📌 Revisão 19/10/2026 — Épico 9: nomes de métodos no padrão do Java
 
 **O que mudou:** os métodos criados nos PRs #206 a #216 passam a começar por verbo, com booleano como pergunta (`is`/`has`) e unidade no nome quando há medida (ex.: `pertenceA` → `isDonoDaVisita`, `obter` → `obterCatalogo`). Só nomes, sem mudança de comportamento. Registro em `Historico-Melhorias.md` (M-058).

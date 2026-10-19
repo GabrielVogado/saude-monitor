@@ -49,13 +49,13 @@ async function conferir(guardado, agora) {
   let resposta;
   try {
     resposta = await apiRequest(CAMINHO, { headers });
-  } catch (erro) {
-    if (guardado && erro?.status === STATUS_NAO_MODIFICADO) {
+  } catch (error_) {
+    if (guardado && error_?.status === STATUS_NAO_MODIFICADO) {
       const conferido = { ...guardado, conferidoEm: agora };
       await guardar(conferido);
       return conferido;
     }
-    throw erro;
+    throw error_;
   }
   if (!Array.isArray(resposta?.estabelecimentos)) {
     // Algumas pilhas HTTP devolvem o 304 como resposta vazia; a cópia continua valendo.
@@ -97,11 +97,11 @@ class CatalogoLocal {
     }
     try {
       return (await conferenciaEmAndamento).estabelecimentos;
-    } catch (erro) {
+    } catch (error_) {
       if (guardado) {
         return guardado.estabelecimentos;
       }
-      throw erro;
+      throw error_;
     }
   }
 

@@ -16,11 +16,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Seed de estabelecimentos de saúde a partir de DBF (atributos) + SHP (geometria).
@@ -202,14 +202,11 @@ public class SeedRunner implements ApplicationRunner {
      * atributos completos), registrando a chave de gêmeo de cada um.
      */
     private Set<String> gravarComCnes(List<DocPendente> pendentes, Contagem contagem) {
-        Set<String> chavesCnes = new HashSet<>();
-        for (DocPendente pendente : pendentes) {
-            if (pendente.doc().getCodigoCnes() != null
-                    && contagem.registrar(salvarUpsert(pendente.doc()))) {
-                chavesCnes.add(chaveGemea(pendente.doc()));
-            }
-        }
-        return chavesCnes;
+        return pendentes.stream()
+                .map(DocPendente::doc)
+                .filter(doc -> doc.getCodigoCnes() != null && contagem.registrar(salvarUpsert(doc)))
+                .map(SeedRunner::chaveGemea)
+                .collect(Collectors.toSet());
     }
 
     /**

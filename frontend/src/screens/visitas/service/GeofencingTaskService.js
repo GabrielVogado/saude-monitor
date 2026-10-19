@@ -782,7 +782,7 @@ export async function iniciarGeofencing({ interativo = true } = {}) {
   if (lista === null) {
     raioRecalculo = RAIO_RECALCULO_SEM_LISTA_METROS;
   } else if (regioes.length > 0) {
-    const maisDistante = regioes[regioes.length - 1].distancia;
+    const maisDistante = regioes.at(-1).distancia;
     raioRecalculo = Math.max(
       PISO_RAIO_DISPARO_METROS,
       Math.min(RAIO_RECALCULO_MAX_METROS, maisDistante / 2)

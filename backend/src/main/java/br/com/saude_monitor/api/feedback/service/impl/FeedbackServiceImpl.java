@@ -269,7 +269,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         // SEG-02: só quem fez a visita avalia. 403, como no BOLA de checkout (F-02). Vem
         // antes das regras de status e de janela para não contar a estranhos se a visita
         // está em andamento, encerrada ou já avaliada.
-        if (!VisitaDono.pertenceA(visita, usuarioId, dispositivoId)) {
+        if (!VisitaDono.isDonoDaVisita(visita, usuarioId, dispositivoId)) {
             throw new AcessoNegadoException("Visita não pertence ao usuário ou aparelho informado.");
         }
         if (!STATUS_AVALIAVEIS.contains(visita.getStatus())) {

@@ -31,8 +31,8 @@ class UsuarioAutenticadoCacheTest {
     void leOBancoUmaVezDentroDaValidadeMesmoComOutraCaixaNoEmail() {
         when(userDetailsService.loadUserByUsername(EMAIL)).thenReturn(maria);
 
-        UserDetails primeiro = cache.carregar(EMAIL);
-        UserDetails segundo = cache.carregar(" Maria@Email.com ");
+        UserDetails primeiro = cache.carregarUsuario(EMAIL);
+        UserDetails segundo = cache.carregarUsuario(" Maria@Email.com ");
 
         assertThat(segundo).isSameAs(primeiro);
         verify(userDetailsService, times(1)).loadUserByUsername(EMAIL);
@@ -42,9 +42,9 @@ class UsuarioAutenticadoCacheTest {
     void leOBancoDeNovoDepoisDaValidade() {
         when(userDetailsService.loadUserByUsername(EMAIL)).thenReturn(maria);
 
-        cache.carregar(EMAIL);
+        cache.carregarUsuario(EMAIL);
         nanos.addAndGet(UsuarioAutenticadoCache.VALIDADE.toNanos() + 1);
-        cache.carregar(EMAIL);
+        cache.carregarUsuario(EMAIL);
 
         verify(userDetailsService, times(2)).loadUserByUsername(EMAIL);
     }
@@ -55,10 +55,10 @@ class UsuarioAutenticadoCacheTest {
                 .thenReturn(maria)
                 .thenThrow(new UsernameNotFoundException("excluída"));
 
-        cache.carregar(EMAIL);
-        cache.esquecer("MARIA@email.com");
+        cache.carregarUsuario(EMAIL);
+        cache.removerDoCache("MARIA@email.com");
 
-        assertThatThrownBy(() -> cache.carregar(EMAIL)).isInstanceOf(UsernameNotFoundException.class);
+        assertThatThrownBy(() -> cache.carregarUsuario(EMAIL)).isInstanceOf(UsernameNotFoundException.class);
     }
 
     @Test
@@ -67,16 +67,16 @@ class UsuarioAutenticadoCacheTest {
                 .thenThrow(new UsernameNotFoundException("não existe"))
                 .thenReturn(maria);
 
-        assertThatThrownBy(() -> cache.carregar(EMAIL)).isInstanceOf(UsernameNotFoundException.class);
-        assertThat(cache.carregar(EMAIL)).isSameAs(maria);
+        assertThatThrownBy(() -> cache.carregarUsuario(EMAIL)).isInstanceOf(UsernameNotFoundException.class);
+        assertThat(cache.carregarUsuario(EMAIL)).isSameAs(maria);
     }
 
     @Test
     void emailNuloVaiDiretoAoServicoEEsquecerNuloNaoFazNada() {
         when(userDetailsService.loadUserByUsername(null)).thenThrow(new UsernameNotFoundException("vazio"));
 
-        assertThatThrownBy(() -> cache.carregar(null)).isInstanceOf(UsernameNotFoundException.class);
-        cache.esquecer(null);
+        assertThatThrownBy(() -> cache.carregarUsuario(null)).isInstanceOf(UsernameNotFoundException.class);
+        cache.removerDoCache(null);
         verify(userDetailsService, times(1)).loadUserByUsername(null);
     }
 }

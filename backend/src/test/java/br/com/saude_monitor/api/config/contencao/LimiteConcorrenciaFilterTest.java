@@ -22,7 +22,7 @@ class LimiteConcorrenciaFilterTest {
     private final LimiteConcorrenciaFilter filter =
             new LimiteConcorrenciaFilter(new ContencaoProperties(1, 7, 300, false), objectMapper);
 
-    private static MockHttpServletRequest requisicao(String uri) {
+    private static MockHttpServletRequest criarRequisicao(String uri) {
         return new MockHttpServletRequest("GET", uri);
     }
 
@@ -31,11 +31,11 @@ class LimiteConcorrenciaFilterTest {
         MockHttpServletResponse resposta = new MockHttpServletResponse();
         AtomicReference<Integer> vagasDurante = new AtomicReference<>();
 
-        filter.doFilter(requisicao("/api/v1/hospitais"), resposta,
-                (req, res) -> vagasDurante.set(filter.vagasLivres()));
+        filter.doFilter(criarRequisicao("/api/v1/hospitais"), resposta,
+                (req, res) -> vagasDurante.set(filter.contarVagasLivres()));
 
         assertThat(vagasDurante.get()).isZero();
-        assertThat(filter.vagasLivres()).isEqualTo(1);
+        assertThat(filter.contarVagasLivres()).isEqualTo(1);
         assertThat(resposta.getStatus()).isEqualTo(200);
     }
 
@@ -45,8 +45,8 @@ class LimiteConcorrenciaFilterTest {
         AtomicReference<Boolean> segundaPassou = new AtomicReference<>(false);
 
         // A primeira requisição ocupa a única vaga enquanto a segunda chega.
-        filter.doFilter(requisicao("/api/v1/hospitais"), new MockHttpServletResponse(), (req, res) ->
-                filter.doFilter(requisicao("/api/v1/catalogo"), recusada, (r2, s2) -> segundaPassou.set(true)));
+        filter.doFilter(criarRequisicao("/api/v1/hospitais"), new MockHttpServletResponse(), (req, res) ->
+                filter.doFilter(criarRequisicao("/api/v1/catalogo"), recusada, (r2, s2) -> segundaPassou.set(true)));
 
         assertThat(segundaPassou.get()).isFalse();
         assertThat(recusada.getStatus()).isEqualTo(503);
@@ -55,7 +55,7 @@ class LimiteConcorrenciaFilterTest {
         assertThat(corpo.get("code").asText()).isEqualTo(LimiteConcorrenciaFilter.CODIGO);
         assertThat(corpo.get("status").asInt()).isEqualTo(503);
         assertThat(corpo.get("traceId").asText()).isNotBlank();
-        assertThat(filter.vagasLivres()).isEqualTo(1);
+        assertThat(filter.contarVagasLivres()).isEqualTo(1);
     }
 
     @Test
@@ -63,8 +63,8 @@ class LimiteConcorrenciaFilterTest {
         MockHttpServletResponse saude = new MockHttpServletResponse();
         AtomicReference<Boolean> saudePassou = new AtomicReference<>(false);
 
-        filter.doFilter(requisicao("/api/v1/hospitais"), new MockHttpServletResponse(), (req, res) ->
-                filter.doFilter(requisicao("/actuator/health"), saude, (r2, s2) -> saudePassou.set(true)));
+        filter.doFilter(criarRequisicao("/api/v1/hospitais"), new MockHttpServletResponse(), (req, res) ->
+                filter.doFilter(criarRequisicao("/actuator/health"), saude, (r2, s2) -> saudePassou.set(true)));
 
         assertThat(saudePassou.get()).isTrue();
         assertThat(saude.getStatus()).isEqualTo(200);
@@ -76,20 +76,20 @@ class LimiteConcorrenciaFilterTest {
             throw new ServletException("erro no controller");
         };
 
-        assertThatThrownBy(() -> filter.doFilter(requisicao("/api/v1/hospitais"), new MockHttpServletResponse(), falha))
+        assertThatThrownBy(() -> filter.doFilter(criarRequisicao("/api/v1/hospitais"), new MockHttpServletResponse(), falha))
                 .isInstanceOf(ServletException.class);
-        assertThat(filter.vagasLivres()).isEqualTo(1);
+        assertThat(filter.contarVagasLivres()).isEqualTo(1);
     }
 
     @Test
     void voltaAAtenderDepoisDeUmaRajadaDeRecusas() throws IOException, ServletException {
-        filter.doFilter(requisicao("/api/v1/hospitais"), new MockHttpServletResponse(), (req, res) -> {
-            filter.doFilter(requisicao("/api/v1/catalogo"), new MockHttpServletResponse(), (r, s) -> { });
-            filter.doFilter(requisicao("/api/v1/catalogo"), new MockHttpServletResponse(), (r, s) -> { });
+        filter.doFilter(criarRequisicao("/api/v1/hospitais"), new MockHttpServletResponse(), (req, res) -> {
+            filter.doFilter(criarRequisicao("/api/v1/catalogo"), new MockHttpServletResponse(), (r, s) -> { });
+            filter.doFilter(criarRequisicao("/api/v1/catalogo"), new MockHttpServletResponse(), (r, s) -> { });
         });
         MockHttpServletResponse depois = new MockHttpServletResponse();
 
-        filter.doFilter(requisicao("/api/v1/catalogo"), depois, (req, res) -> { });
+        filter.doFilter(criarRequisicao("/api/v1/catalogo"), depois, (req, res) -> { });
 
         assertThat(depois.getStatus()).isEqualTo(200);
     }

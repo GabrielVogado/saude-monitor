@@ -42,7 +42,7 @@ class ConfiguracaoControllerTest {
 
     @Test
     void leituraPublicaComCacheDeUmMinuto() throws Exception {
-        when(servico.obter()).thenReturn(new ConfiguracaoRemotaResponse(true, "1.0.0", null));
+        when(servico.obterConfiguracao()).thenReturn(new ConfiguracaoRemotaResponse(true, "1.0.0", null));
 
         mockMvc.perform(get("/api/v1/configuracao"))
                 .andExpect(status().isOk())

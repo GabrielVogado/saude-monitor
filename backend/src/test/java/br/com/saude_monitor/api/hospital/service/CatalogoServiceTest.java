@@ -44,7 +44,7 @@ class CatalogoServiceTest {
     };
     private final CatalogoService service = new CatalogoService(hospitalService, clock);
 
-    private static HospitalResumoResponse item(String id, Double nota) {
+    private static HospitalResumoResponse criarItem(String id, Double nota) {
         IndicadoresResponse indicadores = nota == null
                 ? IndicadoresResponse.indisponivel()
                 : new IndicadoresResponse(true, nota, 8, 30, null);
@@ -54,11 +54,11 @@ class CatalogoServiceTest {
 
     @Test
     void montaUmaVezEReaproveitaDentroDaValidade() {
-        when(hospitalService.listarCatalogo()).thenReturn(List.of(item("a", 4.0), item("b", null)));
+        when(hospitalService.listarCatalogo()).thenReturn(List.of(criarItem("a", 4.0), criarItem("b", null)));
 
-        CatalogoResponse primeiro = service.obter();
+        CatalogoResponse primeiro = service.obterCatalogo();
         agora.set(INICIO.plus(CatalogoService.VALIDADE).minusSeconds(1));
-        CatalogoResponse segundo = service.obter();
+        CatalogoResponse segundo = service.obterCatalogo();
 
         assertThat(segundo).isSameAs(primeiro);
         assertThat(primeiro.total()).isEqualTo(2);
@@ -68,22 +68,22 @@ class CatalogoServiceTest {
 
     @Test
     void remontaDepoisDaValidade() {
-        when(hospitalService.listarCatalogo()).thenReturn(List.of(item("a", 4.0)));
+        when(hospitalService.listarCatalogo()).thenReturn(List.of(criarItem("a", 4.0)));
 
-        service.obter();
+        service.obterCatalogo();
         agora.set(INICIO.plus(CatalogoService.VALIDADE));
-        service.obter();
+        service.obterCatalogo();
 
         verify(hospitalService, times(2)).listarCatalogo();
     }
 
     @Test
     void invalidarFazAProximaLeituraIrAoBanco() {
-        when(hospitalService.listarCatalogo()).thenReturn(List.of(item("a", 4.0)));
+        when(hospitalService.listarCatalogo()).thenReturn(List.of(criarItem("a", 4.0)));
 
-        service.obter();
-        service.invalidar();
-        service.obter();
+        service.obterCatalogo();
+        service.invalidarCache();
+        service.obterCatalogo();
 
         verify(hospitalService, times(2)).listarCatalogo();
     }
@@ -91,15 +91,15 @@ class CatalogoServiceTest {
     @Test
     void versaoSoMudaQuandoOConteudoMuda() {
         when(hospitalService.listarCatalogo())
-                .thenReturn(List.of(item("a", 4.0)))
-                .thenReturn(List.of(item("a", 4.0)))
-                .thenReturn(List.of(item("a", 4.5)));
+                .thenReturn(List.of(criarItem("a", 4.0)))
+                .thenReturn(List.of(criarItem("a", 4.0)))
+                .thenReturn(List.of(criarItem("a", 4.5)));
 
-        String v1 = service.obter().versao();
+        String v1 = service.obterCatalogo().versao();
         agora.set(agora.get().plus(Duration.ofMinutes(6)));
-        String v2 = service.obter().versao();
+        String v2 = service.obterCatalogo().versao();
         agora.set(agora.get().plus(Duration.ofMinutes(6)));
-        String v3 = service.obter().versao();
+        String v3 = service.obterCatalogo().versao();
 
         assertThat(v1).hasSize(32).isEqualTo(v2);
         assertThat(v3).isNotEqualTo(v1);

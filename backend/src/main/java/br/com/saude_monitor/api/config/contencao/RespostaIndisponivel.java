@@ -25,7 +25,7 @@ final class RespostaIndisponivel {
     private RespostaIndisponivel() {
     }
 
-    static void escrever(HttpServletResponse response, ObjectMapper objectMapper,
+    static void escreverResposta(HttpServletResponse response, ObjectMapper objectMapper,
                          String codigo, String mensagem, int retryAfterSegundos) throws IOException {
         response.setStatus(STATUS);
         response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSegundos));

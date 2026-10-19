@@ -27,7 +27,7 @@ public class AdminConfiguracaoController {
     private final AutenticacaoHelper autenticacaoHelper;
 
     @PutMapping
-    public ResponseEntity<ConfiguracaoRemotaResponse> atualizar(@Valid @RequestBody ConfiguracaoRemotaRequest request) {
+    public ResponseEntity<ConfiguracaoRemotaResponse> atualizarConfiguracao(@Valid @RequestBody ConfiguracaoRemotaRequest request) {
         String administradorId = autenticacaoHelper.usuarioIdAtual()
                 .orElseThrow(() -> new NaoAutorizadoException("Usuário não autenticado."));
         return ResponseEntity.ok(configuracaoRemotaService.atualizar(request, administradorId));

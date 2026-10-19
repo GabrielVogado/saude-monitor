@@ -118,7 +118,7 @@ class UserServiceImplTest {
                 eq(FeedbackDocument.class));
         verify(userRepository).delete(user);
         // O token ainda válido da conta deixa de autenticar nesta instância (ARQ-03).
-        verify(usuarioAutenticadoCache).esquecer("marina@email.com");
+        verify(usuarioAutenticadoCache).removerDoCache("marina@email.com");
     }
 
     @Test

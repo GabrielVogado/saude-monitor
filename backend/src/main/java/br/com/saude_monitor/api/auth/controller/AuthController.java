@@ -64,7 +64,7 @@ public class AuthController {
         logger.info("[AuthController] Login recebido para email={}", request.email());
         // Por conta, além do limite por IP do filtro: tentativa de senha contra uma conta
         // não escapa trocando de IP (ARQ-02).
-        limitar("login:" + EmailNormalizer.normalizar(request.email()), RateLimitService.Grupo.LOGIN);
+        aplicarLimite("login:" + EmailNormalizer.normalizar(request.email()), RateLimitService.Grupo.LOGIN);
         return ResponseEntity.ok(authService.login(request));
     }
 
@@ -74,18 +74,18 @@ public class AuthController {
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
         // Pelo próprio refresh token, nunca pelo IP (ARQ-02): atrás do CGNAT das operadoras,
         // o limite por IP fazia a renovação de quem tem sessão válida levar 429 no pico.
-        limitar("refresh:" + resumo(request.refreshToken()), RateLimitService.Grupo.REFRESH);
+        aplicarLimite("refresh:" + calcularHashSha256(request.refreshToken()), RateLimitService.Grupo.REFRESH);
         return ResponseEntity.ok(authService.refresh(request));
     }
 
-    private void limitar(String chave, RateLimitService.Grupo grupo) {
+    private void aplicarLimite(String chave, RateLimitService.Grupo grupo) {
         if (!rateLimitService.tentarConsumir(chave, grupo)) {
             throw new LimiteExcedidoException(rateLimitService.limite(grupo));
         }
     }
 
     /** SHA-256 do token: o contador em memória não guarda o token em si. */
-    private static String resumo(String token) {
+    private static String calcularHashSha256(String token) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);

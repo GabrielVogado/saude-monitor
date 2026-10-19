@@ -77,7 +77,7 @@ class JobsSecurityConfigTest {
         }
     }
 
-    private static JWTClaimsSet.Builder claimsValidas() {
+    private static JWTClaimsSet.Builder criarClaimsValidas() {
         Instant agora = Instant.now();
         return new JWTClaimsSet.Builder()
                 .issuer("https://accounts.google.com")
@@ -89,8 +89,8 @@ class JobsSecurityConfigTest {
                 .expirationTime(Date.from(agora.plusSeconds(300)));
     }
 
-    private static String token(UnaryOperator<JWTClaimsSet.Builder> ajuste) throws Exception {
-        SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.RS256), ajuste.apply(claimsValidas()).build());
+    private static String gerarToken(UnaryOperator<JWTClaimsSet.Builder> ajuste) throws Exception {
+        SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.RS256), ajuste.apply(criarClaimsValidas()).build());
         jwt.sign(new RSASSASigner(CHAVES.getPrivate()));
         return jwt.serialize();
     }
@@ -102,7 +102,7 @@ class JobsSecurityConfigTest {
 
     @Test
     void tokenDaContaDoAgendadorDisparaOJob() throws Exception {
-        mockMvc.perform(post("/internal/jobs/indicadores").header("Authorization", "Bearer " + token(c -> c)))
+        mockMvc.perform(post("/internal/jobs/indicadores").header("Authorization", "Bearer " + gerarToken(c -> c)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.job").value("indicadores"))
                 .andExpect(jsonPath("$.resultado").value("EXECUTADO"));
@@ -111,13 +111,13 @@ class JobsSecurityConfigTest {
     @Test
     void emissorSemEsquemaTambemEhOGoogle() throws Exception {
         mockMvc.perform(post("/internal/jobs/indicadores")
-                        .header("Authorization", "Bearer " + token(c -> c.issuer("accounts.google.com"))))
+                        .header("Authorization", "Bearer " + gerarToken(c -> c.issuer("accounts.google.com"))))
                 .andExpect(status().isOk());
     }
 
     @Test
     void nomeDesconhecidoDa404() throws Exception {
-        mockMvc.perform(post("/internal/jobs/inexistente").header("Authorization", "Bearer " + token(c -> c)))
+        mockMvc.perform(post("/internal/jobs/inexistente").header("Authorization", "Bearer " + gerarToken(c -> c)))
                 .andExpect(status().isNotFound());
     }
 
@@ -129,33 +129,33 @@ class JobsSecurityConfigTest {
 
     @Test
     void outraContaEhRecusada() throws Exception {
-        esperarRecusa(token(c -> c.claim("email", "intruso@outro-projeto.iam.gserviceaccount.com")));
+        esperarRecusa(gerarToken(c -> c.claim("email", "intruso@outro-projeto.iam.gserviceaccount.com")));
     }
 
     @Test
     void emailNaoVerificadoEhRecusado() throws Exception {
-        esperarRecusa(token(c -> c.claim("email_verified", false)));
+        esperarRecusa(gerarToken(c -> c.claim("email_verified", false)));
     }
 
     @Test
     void outraAudienciaEhRecusada() throws Exception {
-        esperarRecusa(token(c -> c.audience("https://outro-servico.run.app")));
+        esperarRecusa(gerarToken(c -> c.audience("https://outro-servico.run.app")));
     }
 
     @Test
     void outroEmissorEhRecusado() throws Exception {
-        esperarRecusa(token(c -> c.issuer("https://emissor-falso.example")));
+        esperarRecusa(gerarToken(c -> c.issuer("https://emissor-falso.example")));
     }
 
     @Test
     void tokenVencidoEhRecusado() throws Exception {
         Instant antes = Instant.now().minusSeconds(3600);
-        esperarRecusa(token(c -> c.issueTime(Date.from(antes)).expirationTime(Date.from(antes.plusSeconds(300)))));
+        esperarRecusa(gerarToken(c -> c.issueTime(Date.from(antes)).expirationTime(Date.from(antes.plusSeconds(300)))));
     }
 
     @Test
     void tokenAssinadoPorOutraChaveEhRecusado() throws Exception {
-        SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.RS256), claimsValidas().build());
+        SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.RS256), criarClaimsValidas().build());
         jwt.sign(new RSASSASigner(gerarChaves().getPrivate()));
         esperarRecusa(jwt.serialize());
     }
@@ -175,8 +175,8 @@ class JobsSecurityConfigTest {
         SecurityFilterChain jobs(HttpSecurity http) {
             JobsProperties properties = new JobsProperties(false, AUDIENCIA, CONTA);
             NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey((RSAPublicKey) CHAVES.getPublic()).build();
-            decoder.setJwtValidator(JobsSecurityConfig.validador(properties));
-            return JobsSecurityConfig.cadeia(http, properties, decoder);
+            decoder.setJwtValidator(JobsSecurityConfig.criarValidador(properties));
+            return JobsSecurityConfig.construirCadeia(http, properties, decoder);
         }
     }
 }

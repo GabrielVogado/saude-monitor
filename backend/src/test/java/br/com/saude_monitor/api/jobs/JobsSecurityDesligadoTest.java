@@ -41,15 +41,15 @@ class JobsSecurityDesligadoTest {
 
     @Test
     void endpointsSoFicamHabilitadosComAudienciaEConta() {
-        assertThat(new JobsProperties(true, null, null).endpointsHabilitados()).isFalse();
-        assertThat(new JobsProperties(true, "https://api", " ").endpointsHabilitados()).isFalse();
-        assertThat(new JobsProperties(true, "", "conta@x").endpointsHabilitados()).isFalse();
-        assertThat(new JobsProperties(true, "https://api", "conta@x").endpointsHabilitados()).isTrue();
+        assertThat(new JobsProperties(true, null, null).isEndpointsHabilitados()).isFalse();
+        assertThat(new JobsProperties(true, "https://api", " ").isEndpointsHabilitados()).isFalse();
+        assertThat(new JobsProperties(true, "", "conta@x").isEndpointsHabilitados()).isFalse();
+        assertThat(new JobsProperties(true, "https://api", "conta@x").isEndpointsHabilitados()).isTrue();
     }
 
     @Test
     void decodificadorDoGoogleEhMontadoSemIrARede() {
-        assertThat(JobsSecurityConfig.decoderGoogle(new JobsProperties(false, "https://api", "conta@x"))).isNotNull();
+        assertThat(JobsSecurityConfig.criarDecoderGoogle(new JobsProperties(false, "https://api", "conta@x"))).isNotNull();
     }
 
     @Configuration

@@ -24,15 +24,15 @@ public final class VisitaDono {
      * {@code true} quando quem chama é dono da visita. Visita anônima sem
      * {@code dispositivoId} gravado (ex.: conta excluída, M-041) não tem dono.
      */
-    public static boolean pertenceA(VisitaDocument visita, String usuarioId, String dispositivoId) {
+    public static boolean isDonoDaVisita(VisitaDocument visita, String usuarioId, String dispositivoId) {
         if (visita.getUsuarioId() != null) {
             return visita.getUsuarioId().equals(usuarioId);
         }
-        return iguais(visita.getDispositivoId(), dispositivoId);
+        return isIgual(visita.getDispositivoId(), dispositivoId);
     }
 
     /** Comparação em tempo constante: o id do aparelho é segredo. */
-    private static boolean iguais(String esperado, String informado) {
+    private static boolean isIgual(String esperado, String informado) {
         if (esperado == null || esperado.isBlank() || informado == null) {
             return false;
         }

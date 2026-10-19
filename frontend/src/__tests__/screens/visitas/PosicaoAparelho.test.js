@@ -3,12 +3,12 @@
  * sem diálogo, e sem travar o toque quando o GPS não responde.
  */
 import * as Location from "expo-location";
-import { posicaoParaCheckinManual } from "../../../screens/visitas/service/PosicaoAparelho";
+import { obterPosicaoParaCheckinManual } from "../../../screens/visitas/service/PosicaoAparelho";
 
 const coords = { latitude: -15.9023, longitude: -48.0742 };
 const esperado = { type: "Point", coordinates: [-48.0742, -15.9023] };
 
-describe("posicaoParaCheckinManual", () => {
+describe("obterPosicaoParaCheckinManual", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     Location.getForegroundPermissionsAsync.mockResolvedValue({ granted: true });
@@ -23,7 +23,7 @@ describe("posicaoParaCheckinManual", () => {
   test("sem permissão não lê o GPS nem pede permissão", async () => {
     Location.getForegroundPermissionsAsync.mockResolvedValue({ granted: false });
 
-    await expect(posicaoParaCheckinManual()).resolves.toBeUndefined();
+    await expect(obterPosicaoParaCheckinManual()).resolves.toBeUndefined();
     expect(Location.requestForegroundPermissionsAsync).not.toHaveBeenCalled();
     expect(Location.getCurrentPositionAsync).not.toHaveBeenCalled();
   });
@@ -31,20 +31,20 @@ describe("posicaoParaCheckinManual", () => {
   test("usa a última leitura recente sem acionar o GPS", async () => {
     Location.getLastKnownPositionAsync.mockResolvedValue({ coords });
 
-    await expect(posicaoParaCheckinManual()).resolves.toEqual(esperado);
+    await expect(obterPosicaoParaCheckinManual()).resolves.toEqual(esperado);
     expect(Location.getLastKnownPositionAsync).toHaveBeenCalledWith({ maxAge: 120000 });
     expect(Location.getCurrentPositionAsync).not.toHaveBeenCalled();
   });
 
   test("sem leitura recente, lê o GPS ao vivo", async () => {
-    await expect(posicaoParaCheckinManual()).resolves.toEqual(esperado);
+    await expect(obterPosicaoParaCheckinManual()).resolves.toEqual(esperado);
   });
 
   test("GPS que não responde em 5 s não trava o check-in", async () => {
     jest.useFakeTimers();
     Location.getCurrentPositionAsync.mockReturnValue(new Promise(() => {}));
 
-    const resultado = posicaoParaCheckinManual();
+    const resultado = obterPosicaoParaCheckinManual();
     await jest.advanceTimersByTimeAsync(5000);
 
     await expect(resultado).resolves.toBeUndefined();
@@ -53,6 +53,6 @@ describe("posicaoParaCheckinManual", () => {
   test("erro do módulo de localização vira 'sem posição'", async () => {
     Location.getForegroundPermissionsAsync.mockRejectedValue(new Error("indisponível"));
 
-    await expect(posicaoParaCheckinManual()).resolves.toBeUndefined();
+    await expect(obterPosicaoParaCheckinManual()).resolves.toBeUndefined();
   });
 });

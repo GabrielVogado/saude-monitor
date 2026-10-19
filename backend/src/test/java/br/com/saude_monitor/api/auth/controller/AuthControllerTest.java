@@ -156,22 +156,22 @@ class AuthControllerTest {
     @Test
     void loginTemLimitePorContaMesmoTrocandoDeIp() throws Exception {
         for (int i = 0; i < 10; i++) {
-            mockMvc.perform(post("/api/v1/auth/login").with(deIp("10.2.0." + i))
+            mockMvc.perform(post("/api/v1/auth/login").with(simularIp("10.2.0." + i))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(login("Marina@Email.com")))
+                            .content(criarCorpoLogin("Marina@Email.com")))
                     .andExpect(status().isOk());
         }
         // Mesmo e-mail com outra grafia e de outro IP: mesma conta, mesmo contador.
-        mockMvc.perform(post("/api/v1/auth/login").with(deIp("10.2.0.99"))
+        mockMvc.perform(post("/api/v1/auth/login").with(simularIp("10.2.0.99"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(login("marina@email.com")))
+                        .content(criarCorpoLogin("marina@email.com")))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value("LIMITE_EXCEDIDO"))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Limite: 10 por minuto")));
         // Outra conta segue entrando.
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(login("joao@email.com")))
+                        .content(criarCorpoLogin("joao@email.com")))
                 .andExpect(status().isOk());
     }
 
@@ -194,11 +194,11 @@ class AuthControllerTest {
                 .andExpect(status().isOk());
     }
 
-    private static String login(String email) {
+    private static String criarCorpoLogin(String email) {
         return "{\"email\":\"" + email + "\",\"password\":\"S3nh@Forte!\",\"rememberDevice\":false}";
     }
 
-    private static org.springframework.test.web.servlet.request.RequestPostProcessor deIp(String ip) {
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor simularIp(String ip) {
         return request -> {
             request.setRemoteAddr(ip);
             return request;

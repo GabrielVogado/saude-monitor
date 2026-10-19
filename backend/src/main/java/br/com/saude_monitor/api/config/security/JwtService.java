@@ -99,7 +99,7 @@ public class JwtService {
      * rate limit para contar por usuário em vez de por IP (ARQ-02); quem decide a
      * autenticação continua sendo o {@code JwtAuthenticationFilter}.
      */
-    public Optional<String> assuntoDoAccessToken(String token) {
+    public Optional<String> extrairAssuntoDoAccessToken(String token) {
         try {
             Claims claims = extractAllClaims(token);
             boolean valido = TYPE_ACCESS.equals(claims.get(CLAIM_TYPE, String.class))

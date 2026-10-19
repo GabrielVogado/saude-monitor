@@ -30,7 +30,7 @@ class RateLimitServiceTest {
 
     @Test
     void limiteDeCadaGrupoVemDaConfiguracao() {
-        RateLimitService service = new RateLimitService(new RateLimitProperties(3, 5, 1));
+        RateLimitService service = new RateLimitService(new RateLimitProperties(3, 5, 1, 600));
         assertThat(service.limite(RateLimitService.Grupo.AUTH)).isEqualTo(3);
         assertThat(service.limite(RateLimitService.Grupo.PUBLICO)).isEqualTo(5);
         for (int i = 0; i < 3; i++) {
@@ -56,5 +56,23 @@ class RateLimitServiceTest {
         service.limparObsoletos(agora + (5 * RateLimitService.JANELA_MS));
         // Após limpar, a mesma chave pode consumir novamente.
         assertThat(service.tentarConsumir("ip-antigo", RateLimitService.Grupo.PUBLICO)).isTrue();
+    }
+
+    @Test
+    void loginERefreshUsamOLimiteDeAutenticacao() {
+        RateLimitService service = new RateLimitService(RateLimitFilterTest.PADRAO);
+        assertThat(service.limite(RateLimitService.Grupo.LOGIN)).isEqualTo(10);
+        assertThat(service.limite(RateLimitService.Grupo.REFRESH)).isEqualTo(10);
+    }
+
+    @Test
+    void tetoPorIpNuncaFicaAbaixoDosOutrosLimites() {
+        assertThat(new RateLimitService(RateLimitFilterTest.PADRAO).limite(RateLimitService.Grupo.IP))
+                .isEqualTo(600);
+        // Homologação: público 2000/min para o teste de carga, que sai de um IP só.
+        assertThat(new RateLimitService(new RateLimitProperties(300, 2000, 1, 600)).limite(RateLimitService.Grupo.IP))
+                .isEqualTo(2000);
+        assertThat(new RateLimitService(new RateLimitProperties(700, 60, 1, 600)).limite(RateLimitService.Grupo.IP))
+                .isEqualTo(700);
     }
 }

@@ -6,7 +6,7 @@
 > |---|---|
 > | **Versão** | 2.4 |
 > | **Status** | Contrato em validação — endpoints já implementados na `develop`; alterações refletidas neste documento e registradas por PR |
-> | **Data** | 07/08/2026 (última atualização: 04/10/2026) |
+> | **Data** | 07/08/2026 (última atualização: 18/10/2026) |
 > | **Base** | Árvore Tecnológica v2.1 (ADRs) · Documento Negocial v2.1 (RN) · Backlog v2.2 (Fase 0 + E1–E8) |
 > | **Padrão** | REST + JSON · OpenAPI 3.1 (geração automática a partir do código — E8-09 entregue) |
 > | **O que mudou na v2.4** | Novo `GET /api/v1/contas/feedbacks/pendentes` 🔒 (visitas do titular que ainda aceitam feedback). `POST /api/v1/feedbacks` passa a aceitar visita `GPS_INTERROMPIDO` (celular descarregado dentro do hospital) e recusa com 404 a visita cuja janela de 24h após a saída já fechou (RN-09). Versão anterior (2.3) preservada em `_historico/Especificacao-API-v2.3.md`. Ver [M-029](../09-melhoria-continua/Historico-Melhorias.md). |
@@ -82,6 +82,11 @@ A versão anterior (2.0) foi preservada em `_historico/Especificacao-API-v2.0.md
 | `CONFLITO` | 409 | Violação de unicidade/estado (ex.: feedback duplicado) |
 | `LIMITE_EXCEDIDO` | 429 | Rate limit |
 | `ERRO_INTERNO` | 500 | Erro não tratado |
+| `SERVICO_SOBRECARREGADO` | 503 | Instância no teto de requisições simultâneas (ARQ-05); `Retry-After: 5` |
+| `BANCO_INDISPONIVEL` | 503 | Banco fora, sem conexão livre no pool ou consulta acima do prazo (ARQ-05, SOL-07); `Retry-After: 5` |
+| `MODO_SOMENTE_LEITURA` | 503 | Gravação recusada durante o modo somente leitura (ARQ-09); `Retry-After: 300` |
+
+**503 (ARQ-05, 18/10/2026):** falha passageira, nunca da requisição. O cliente espera o `Retry-After` e repete; o app já faz isso para 502, 503 e 504.
 
 ---
 
@@ -219,7 +224,7 @@ A versão anterior (2.0) foi preservada em `_historico/Especificacao-API-v2.0.md
 | Endpoint | Situação | Ref. |
 |---|---|---|
 | `POST /api/v1/auth/registro` | 🟢 (migrado de `/api/user/cadastro`; consentimento LGPD obrigatório) | PR `contas - registro e contas` |
-| `POST /api/v1/auth/login` | 🟢 (rate limit 10/min/IP) | PR #1/#24 |
+| `POST /api/v1/auth/login` | 🟢 (rate limit 10/min/IP e 10/min por conta, ARQ-02) | PR #1/#24 |
 | `POST /api/v1/auth/refresh` | 🟢 (rotação) | PR #22 |
 | `POST /api/v1/auth/logout` | 🟢 (blacklist de refresh; idempotente) | PR `feature/logout-server-revogacao-refresh` |
 | `DELETE /api/v1/contas/exclusao` | 🟢 | PR #25 |
@@ -230,6 +235,7 @@ A versão anterior (2.0) foi preservada em `_historico/Especificacao-API-v2.0.md
 | `GET /api/v1/hospitais` (+ `{id}`, `geofence`) | 🟢 | PR #12/#13 |
 | `POST/PUT/PATCH /api/v1/hospitais...` | 🟢 (ADMIN) | PR #12/#13 |
 | `GET /api/v1/hospitais/ranking` | 🟢 (backend; UI em S8) | PR #27 |
+| `GET /api/v1/catalogo` | 🟢 (backend; uso no app no APP-01) | ARQ-01, 18/10/2026 |
 | `POST /api/v1/hospitais/sugestoes` + moderação | 🟢 | PR #14 |
 | `POST /api/v1/visitas/checkin` · `checkout` · `heartbeat` · PATCH `tipo-permanencia` | 🟢 | PR #17/#18|
 | `GET /api/v1/visitas/ativas` · `GET /api/v1/contas/visitas` | 🟢 | PR #18/#23 |
@@ -287,7 +293,8 @@ Cria conta (opcional no MVP — jornada principal funciona sem login). Substitui
   "usuario": { "id": "652c9f3e1a2b3c4d5e6f7081", "nome": "Marina Souza", "email": "marina@email.com", "papel": "USER" }
 }
 ```
-**Regras:** `expiraEm` = 900s (15min); rate limit 10 req/min/IP.
+**Regras:** `expiraEm` = 900s (15min); rate limit 10 req/min por IP e 10 req/min por conta no login; no refresh, 10 req/min pelo próprio refresh token e nenhum limite por IP (ARQ-02, 18/10/2026).
+**E-mail e códigos (SOL-09 e SEG-03, 18/10/2026):** o login com e-mail sem conta roda o mesmo BCrypt de uma senha errada (o tempo não revela a conta). Os códigos de 6 dígitos (cadastro, `reenviar-confirmacao`, `esqueci-senha`) são enviados dentro da requisição, com teto de 1,5 s para o Resend; `esqueci-senha` e `reenviar-confirmacao` respondem sempre depois de **2 s** contados da chegada, exista ou não a conta. Cada endereço recebe no máximo 5 códigos por hora; acima disso o pedido é ignorado com a mesma resposta genérica. O cadastro continua respondendo 409 para e-mail já cadastrado.
 
 #### `POST /api/v1/auth/refresh` 🔓
 **Request:** `{ "refreshToken": "..." }` → **200** `{ "accessToken": "...", "refreshToken": "...", "expiraEm": 900 }`
@@ -392,6 +399,8 @@ Registra entrada (automática via geofence ou manual).
 ```
 **Regras:** valida se ponto está dentro do geofence (`$geoIntersects`) quando `origem=GEOFENCE`; se já existe visita `EM_ATENDIMENTO` no mesmo hospital, retorna a existente (idempotente); `dispositivoId` permite visita anônima (sem login).
 
+> **Prova de presença (SEG-01 — 18/10/2026):** o check-in `MANUAL` continua aceito de qualquer lugar, mas a visita só entra no indicador público (nota e tempo) com prova de presença: a `posicao` enviada no check-in está dentro do geofence do hospital e o check-in chegou até 45 min depois de `ocorridoEm`. O check-in `GEOFENCE` já valida a posição. Fica de fora o check-in sem posição, com posição fora do hospital ou retroativo além de 45 min. A resposta não muda; o campo `presencaComprovada` fica só no banco.
+
 > **`ocorridoEm` (opcional, OPS-05 — 03/09/2026):** momento real da entrada, enviado quando o check-in foi detectado **sem internet** e ficou na fila offline do aplicativo. Sem ele, o evento reenviado registraria a hora em que a conexão voltou, e o tempo de permanência passaria a medir a rede do aparelho em vez da fila do hospital. O campo é opcional e **não é confiável** (o endpoint é público, OPS-03): o servidor só o aceita no passado recente — dentro da janela de 24h da RN-04, nunca no futuro além de 5 min de tolerância de relógio. Fora disso vale o relógio do servidor.
 
 #### `POST /api/v1/visitas/{id}/checkout` 🔒
@@ -406,11 +415,15 @@ Registra saída. **Request:** `{ "posicao": {...}, "gpsIndisponivel": false, "en
 ```
 > **`ocorridoEm` (opcional, OPS-05):** mesmas regras do check-in, com uma restrição a mais — a saída nunca é anterior à entrada. Um relógio atrasado no aparelho produziria duração negativa, que envenenaria a mediana de permanência (RN-15); nesse caso o servidor usa a própria entrada.
 
+> **Pontos de GPS (DAD-01, 18/10/2026):** ao encerrar a visita (checkout, expiração ou GPS interrompido), os pontos de GPS são apagados; ficam hospital, entrada, saída, duração e status. Visitas e feedbacks com mais de 90 dias perdem `usuarioId` e `dispositivoId` (job diário), e por isso `GET /contas/visitas` e `GET /contas/feedbacks` mostram só os últimos 90 dias. Ver [M-048](../09-melhoria-continua/Historico-Melhorias.md).
+
+> **Dono da visita (SEG-02, 18/10/2026):** visita de usuário logado só aceita checkout, heartbeat e feedback do mesmo usuário. Visita **anônima** exige o `dispositivoId` do aparelho que fez o check-in no corpo (`{ ..., "dispositivoId": "anon-..." }`); sem ele, ou com outro, responde **403 `ACESSO_NEGADO`**. Estar logado não dá posse de visita anônima alheia; quem fez login no meio de uma visita anônima continua dono pelo aparelho. Antes, quem soubesse o id da visita anônima (um `ObjectId`, previsível a partir de outro) podia encerrá-la, mantê-la viva ou avaliá-la. Ver [M-047](../09-melhoria-continua/Historico-Melhorias.md).
+
 #### `POST /api/v1/visitas/{id}/heartbeat` 🔒
-Sinal de vida da visita (RN-23). O app envia a cada **30 minutos** enquanto a visita está ativa e o app está aberto e, com o app fechado, a cada **~10 minutos** com `posicao`, pela tarefa de localização em segundo plano (desde 05/10/2026). Atualiza `ultimoHeartbeat`; se a visita estava `SUSPEITA` (2h sem heartbeat), retorna ao status `EM_ATENDIMENTO`. **200** `{ "status": "EM_ATENDIMENTO", "ultimoHeartbeat": "2026-08-07T16:30:00Z" }`
+Sinal de vida da visita (RN-23). O app envia a cada **30 minutos** enquanto a visita está ativa e o app está aberto e, com o app fechado, a cada **~10 minutos** com `posicao`, pela tarefa de localização em segundo plano (desde 05/10/2026). Atualiza `ultimoHeartbeat`; se a visita estava `SUSPEITA` (2h sem heartbeat), retorna ao status `EM_ATENDIMENTO`. A atualização é atômica e só vale para visita ainda ativa: se ela foi encerrada no meio do caminho, responde **409**. Com `posicao`, guarda o ponto entre os 50 mais recentes da visita (ARQ-04, 18/10/2026). **Request:** `{ "posicao": {...}, "dispositivoId": "anon-..." }` (ambos opcionais; `dispositivoId` obrigatório em visita anônima, ver *Dono da visita* acima). **200** `{ "status": "EM_ATENDIMENTO", "ultimoHeartbeat": "2026-08-07T16:30:00Z" }`
 
 #### `PATCH /api/v1/visitas/{id}/tipo-permanencia` 🔒
-Sinaliza internação/observação (RN-24) — disponível quando a visita tem ≥ 12h de duração. **Request:** `{ "tipoPermanencia": "INTERNACAO" }` → **200** `{ "tipoPermanencia": "INTERNACAO" }`. A visita continua ativa, mas **sai do cálculo do tempo médio de pronto-atendimento**.
+Sinaliza internação/observação (RN-24) — disponível quando a visita tem ≥ 12h de duração. **Request:** `{ "tipoPermanencia": "INTERNACAO", "dispositivoId": "anon-..." }` (`dispositivoId` só conta em visita que começou anônima, ver *Dono da visita*) → **200** `{ "tipoPermanencia": "INTERNACAO" }`. A visita continua ativa, mas **sai do cálculo do tempo médio de pronto-atendimento**.
 
 #### `GET /api/v1/visitas/ativas` 🔒
 Retorna visita `EM_ATENDIMENTO` do usuário (para card/cronômetro). **200** `{ "visita": {...} | null }`
@@ -445,11 +458,12 @@ Registra feedback pós-saída. **Autenticação opcional** (se logado, vincula `
   "fezTriagem": "SIM",
   "medicacaoReceita": "RECEBI",
   "nota": 4,
-  "comentario": "Atendimento rápido."
+  "comentario": "Atendimento rápido.",
+  "dispositivoId": "anon-..."
 }
 ```
 **201 Created** `{ "id": "...", "criadoEm": "...", "recebido": true }`
-**Erros:** `CONFLITO` se `visitaId` já tem feedback (RN-12); `RECURSO_NAO_ENCONTRADO` se a visita não existe, não está encerrada (`FINALIZADA` ou `GPS_INTERROMPIDO`) ou saiu há mais de 24h (RN-09). `GPS_INTERROMPIDO` aceita feedback desde a v2.4: é o status que o backend grava quando o celular descarrega ou desliga dentro do hospital (RN-06), e a pessoa esteve lá do mesmo jeito.
+**Erros:** `ACESSO_NEGADO` (403) se quem envia não é dono da visita: outro usuário, ou, em visita anônima, `dispositivoId` ausente ou diferente do check-in (SEG-02, 18/10/2026). A recusa vem antes das regras de status, janela e duplicidade, para não revelar a estranhos se a visita está em andamento, encerrada ou já avaliada, e para a tentativa não consumir a avaliação única. Feedback sem login de visita feita com login também recebe 403. `CONFLITO` se `visitaId` já tem feedback (RN-12); `RECURSO_NAO_ENCONTRADO` se a visita não existe, não está encerrada (`FINALIZADA` ou `GPS_INTERROMPIDO`) ou saiu há mais de 24h (RN-09). `GPS_INTERROMPIDO` aceita feedback desde a v2.4: é o status que o backend grava quando o celular descarrega ou desliga dentro do hospital (RN-06), e a pessoa esteve lá do mesmo jeito.
 
 #### `GET /api/v1/visitas/{id}/feedback` 🔒
 Retorna feedback da visita (se houver) — usado para edição de comentário (opcional).
@@ -508,6 +522,8 @@ Vide §3.1 — exclui conta e anonimiza dados (LGPD art. 18/19), recomputando os
 ```
 Se `nAvaliacoes < 5`: `"indicadoresDisponiveis": false` e campos de média `null` (RN-15).
 
+> **Só avaliações verificadas (SEG-01 — 18/10/2026):** `nAvaliacoes`, `notaMedia`, `tempoMedianoMinutos` e `nVisitas` contam apenas visitas com prova de presença (ver `POST /visitas/checkin`) e os feedbacks dessas visitas. A avaliação de quem não comprovou presença continua aceita (RN-20), mas não entra no indicador.
+
 #### `GET /api/v1/hospitais/ranking` 🔓
 Ranking por `ordem=nota|tempo`. Query: `ordem`, `tipo`, `page`, `size`. Ordena pelos campos do agregado.
 
@@ -516,7 +532,7 @@ Ranking por `ordem=nota|tempo`. Query: `ordem`, `tipo`, `page`, `size`. Ordena p
 ### 3.6 Camadas geográficas (F-11, §5 do plano do painel web)
 
 #### `GET /api/v1/camadas/{tipo}` 🔓
-GeoJSON (`FeatureCollection`, RFC 7946, lon/lat) de uma das 4 divisões geográficas — base do mapa multi-camada do futuro painel web e de toggles no app. `tipo` ∈ `regiao-administrativa` | `ride` | `regiao-saude` | `macrorregiao-saude`. Leitura pública (mesmo regime dos GET de hospitais; rate limit PÚBLICO 60/min/IP), `Cache-Control: max-age=86400`. Slug fora da lista → **404** no envelope padrão (`RECURSO_NAO_ENCONTRADO`).
+GeoJSON (`FeatureCollection`, RFC 7946, lon/lat) de uma das 4 divisões geográficas — base do mapa multi-camada do futuro painel web e de toggles no app. `tipo` ∈ `regiao-administrativa` | `ride` | `regiao-saude` | `macrorregiao-saude`. Leitura pública (mesmo regime dos GET de hospitais; rate limit PÚBLICO 60/min por identidade), `Cache-Control: max-age=86400`. Slug fora da lista → **404** no envelope padrão (`RECURSO_NAO_ENCONTRADO`).
 **200 OK** (`GET /api/v1/camadas/regiao-saude`)
 ```json
 {
@@ -533,6 +549,47 @@ GeoJSON (`FeatureCollection`, RFC 7946, lon/lat) de uma das 4 divisões geográf
 **Atributos por camada:** `regiao-administrativa` (35 features: `nome`, `regiaoSaude`, `macrorregiaoSaude`) · `ride` (33: `nome`) · `regiao-saude` (7: `nome`, `macrorregiaoSaude`, `regioesAdministrativas`) · `macrorregiao-saude` (3: `nome`, `regioesSaude`).
 **Origem e servimento:** `multiplas_camadas_saude_14/*.shp` (CRS `GCS_WGS_1984`, sem reprojeção) → `mapshaper -simplify 10% keep-shapes` + renomeação de atributos → 919 KB em `backend/src/main/resources/camadas/` (regeneração: `backend/data/camadas/README.md`). Servido do classpath com carga única na subida (`RegiaoService`), **sem** coleção Mongo — desvio validado do §5.2 item 4 do plano (divisão quase imutável, nenhuma query espacial no servidor; contrato idêntico). Valores de atributo preservados da fonte (`Sudoeste/Octogonal` literal).
 
+
+### 3.7 Catálogo público (ARQ-01, 18/10/2026)
+
+#### `GET /api/v1/catalogo` 🔓
+Todos os estabelecimentos ativos, com indicadores, em ordem de nome. É o mesmo conteúdo para qualquer pessoa: o app guarda o catálogo e faz distância, filtro e busca no aparelho (APP-01), e a borda pode guardá-lo (SOL-03). Rate limit PÚBLICO.
+```json
+{
+  "versao": "9f2c4e1a7b3d5f60a1b2c3d4e5f60718",
+  "total": 341,
+  "estabelecimentos": [ { "id": "...", "nome": "...", "tipo": "PUBLICO", "categoria": "HOSPITAL", "localizacao": { "latitude": -15.79, "longitude": -47.88 }, "raioMetros": 150, "indicadores": { "indicadoresDisponiveis": true, "notaMedia": 4.2, "nAvaliacoes": 12, "tempoMedianoMinutos": 95 } } ]
+}
+```
+**Itens:** o mesmo `HospitalResumoResponse` de `GET /api/v1/hospitais` (sem CNPJ, contato nem polígono).
+**Cache:** `ETag: W/"<versao>"` (SHA-256 do conteúdo, igual em todas as instâncias) e `Cache-Control: max-age=60, public, s-maxage=300`. Com `If-None-Match` igual à versão atual, a resposta é **304** sem corpo. O servidor monta o catálogo no máximo uma vez a cada 5 min por instância (P8: até 5 min de atraso nos dados públicos); cadastro, edição e ativação feitos pelo admin descartam o catálogo da instância que os recebeu.
+**Compressão:** respostas JSON acima de 2 KB saem com gzip quando o cliente aceita (`server.compression`).
+**Uso no app (APP-01, 18/10/2026):** o app guarda o catálogo e escolhe no aparelho os estabelecimentos monitorados pelo geofencing. Confere com `If-None-Match` a cópia mais velha que 5 min (app aberto) ou que 1 dia (recálculo em segundo plano). CORS aceita o cabeçalho `If-None-Match`.
+
+**Ranking (`GET /api/v1/hospitais/ranking`):** desde o ARQ-01 responde com `Cache-Control: max-age=0, public, s-maxage=300`. A borda pode guardar por 5 min; o aparelho sempre confere.
+
+### 3.8 Jobs internos (SOL-05, 18/10/2026)
+
+#### `POST /internal/jobs/{nome}` 🔒 (só Cloud Scheduler, fora do OpenAPI)
+Dispara um job periódico. `nome` ∈ `indicadores` | `expiracao-visitas` | `gps-interrompido` | `feedback-sem-resposta` (a cada 15 min) | `retencao-dados` (diário, 03:30 de Brasília). Corpo vazio.
+**Autenticação:** `Authorization: Bearer <token OIDC>` emitido pelo Google para a conta de serviço configurada em `APP_JOBS_CONTA_SERVICO`, com `aud` igual a `APP_JOBS_AUDIENCIA` e `email_verified=true`. O access token do app não vale aqui. Sem as duas variáveis, a rota responde **403** a tudo.
+**Respostas:** `200 {"job":"indicadores","resultado":"EXECUTADO"}` · `200 … "PULADO"` (outra instância está executando o mesmo job; trava `job-<nome>` em `travas_execucao`, validade 14 min) · `404` nome desconhecido · `500` falha do job (o Cloud Scheduler tenta de novo). Todos os jobs são idempotentes.
+**Disparo interno:** `APP_JOBS_AGENDAMENTO_INTERNO` (padrão `true`) mantém o `@Scheduled` na aplicação, passando pela mesma trava. Com o Cloud Scheduler configurado, desligar.
+**Modo somente leitura (ARQ-09):** todos os jobs gravam no banco, então respondem `PULADO` enquanto o modo estiver ligado.
+
+### 3.9 Configuração remota (ARQ-09, 18/10/2026)
+
+#### `GET /api/v1/configuracao` 🔓
+Lida pelo app ao abrir e ao voltar ao primeiro plano (APP-03): abaixo de `versaoMinimaApp`, o app mostra a tela de atualização. **200** `{ "modoSomenteLeitura": false, "versaoMinimaApp": "1.0.0", "mensagem": null }`. `versaoMinimaApp` e `mensagem` podem ser `null`.
+**Cache:** `Cache-Control: max-age=60, public`. Cada instância relê a configuração no banco no máximo a cada 30 s; uma alteração chega ao app em até cerca de 1 min e meio. Se o banco falhar na releitura, a instância mantém o último valor lido.
+
+#### `PUT /api/v1/admin/configuracao` 🛡️
+**Request:** `{ "modoSomenteLeitura": true, "versaoMinimaApp": "1.1.0", "mensagem": "Troca do banco até 23h." }` → **200** com a configuração em vigor. Substitui o documento inteiro (`configuracao_remota`, `_id: "atual"`); campo omitido volta ao padrão. `versaoMinimaApp` no formato `1.2.3`; `mensagem` até 200 caracteres.
+
+**Modo somente leitura:** com ele ligado, `POST`, `PUT`, `PATCH` e `DELETE` em `/api/**` respondem **503 `MODO_SOMENTE_LEITURA`** com `Retry-After: 300` e a `mensagem` configurada (ou o texto padrão). Seguem aceitos: todas as consultas, `auth/login`, `auth/refresh`, `auth/logout` e o próprio `PUT /api/v1/admin/configuracao`. `APP_SOMENTE_LEITURA_FORCADO=true` liga o modo por variável de ambiente, para quando o banco nem pode ser lido.
+
+**Teto por instância (ARQ-05):** no máximo `APP_CONTENCAO_REQUISICOES_SIMULTANEAS` (padrão 80) requisições ao mesmo tempo; acima disso, **503 `SERVICO_SOBRECARREGADO`** na hora. `/actuator/**` fica de fora.
+**Banco (SOL-07):** pool de até `APP_MONGO_POOL_MAXIMO` (padrão 20) conexões por instância; 2 s de espera por conexão e 5 s para achar o servidor, depois **503 `BANCO_INDISPONIVEL`**; leitura de até 30 s.
 ---
 
 ## 4. Fluxo de Detecção (Geofence → API)
@@ -570,10 +627,13 @@ sequenceDiagram
 | **TLS** | HTTPS obrigatório; HSTS; certificados gerenciados |
 | **JWT** | Access 15min (curto) + Refresh 30d (rotação, SecureStore no app) |
 | **CORS** | Restrito a domínios do app web (dev) |
-| **Rate limit** | Login/refresh 10/min/IP (`AUTH`) · Público 60/min/IP (`PUBLICO`, inclui feedbbacks e agregados) — implementado (PR #24) |
+| **Rate limit** | Desde 18/10/2026 (ARQ-02): público 60/min por identidade (`PUBLICO`: usuário do access token válido, senão a instalação do app no cabeçalho `X-Cliente-Id`, senão o IP) · cadastro, confirmação e senha 10/min/IP (`AUTH`) · login 10/min/IP e 10/min por conta · refresh 10/min por token, sem limite por IP · teto de abuso de 600/min por IP somando todo o tráfego limitado. Resposta `429 LIMITE_EXCEDIDO` no envelope padrão. Implementado no PR #24, revisto no ARQ-02 |
 | **Validação** | Bean Validation em todos os DTOs; mensagens pt-BR |
 | **Logs** | Sem dados pessoais (nunca logar e-mail/senha/posição bruta); `traceId` em todas as respostas |
 | **Papéis** | `USER` (padrão) · `HOSPITAL_ADMIN` (futuro) · `ADMIN` (cadastro de hospitais) |
+| **Contrato OpenAPI** | `/v3/api-docs` e `/swagger-ui.html` públicos em desenvolvimento e homologação; desligados no perfil `prod` (SEG-07, 18/10/2026) |
+| **Admin inicial** | Seed desligado por padrão, sem e-mail nem senha no código. Ligado (`APP_SEEDADMIN_ENABLED=true`), exige `ADMIN_EMAIL` e `ADMIN_SENHA` com 12+ caracteres, ou a aplicação não sobe (SEG-07) |
+| **Contêiner** | Aplicação roda como usuário sem privilégio (UID 10001), sem `curl` na imagem final (SEG-06) |
 
 ---
 

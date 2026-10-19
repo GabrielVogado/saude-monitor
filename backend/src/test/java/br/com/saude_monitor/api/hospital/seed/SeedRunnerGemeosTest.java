@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.hospital.seed;
 
+import br.com.saude_monitor.api.config.trava.TravasDeTeste;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import br.com.saude_monitor.api.hospital.service.GeofenceFactory;
@@ -42,7 +43,7 @@ class SeedRunnerGemeosTest {
                 "TESTE", 0.05, 150, 100, 75, 100, 100, 100, 100);
         SeedMapper seedMapper = new SeedMapper(properties, new GeofenceFactory());
         return new SeedRunner(new DbfLeitor(), new ShpPointLeitor(), seedMapper,
-                hospitalRepository, properties, mock(HospitalPublicoComplementarLeitor.class));
+                hospitalRepository, properties, mock(HospitalPublicoComplementarLeitor.class), TravasDeTeste.criarTravaLivre());
     }
 
     @Test

@@ -22,6 +22,19 @@ describe("DispositivoId (modo anônimo)", () => {
     expect(persistido).toBe(id);
   });
 
+  test("chamadas simultâneas na primeira execução recebem o mesmo id (SEG-02)", async () => {
+    const [a, b] = await Promise.all([DispositivoId.obter(), DispositivoId.obter()]);
+
+    expect(b).toBe(a);
+    expect(await AsyncStorage.getItem("@saude_monitor:dispositivoId")).toBe(a);
+  });
+
+  test("obterSeDisponivel devolve undefined quando o armazenamento falha", async () => {
+    AsyncStorage.getItem.mockRejectedValueOnce(new Error("disco cheio"));
+
+    await expect(DispositivoId.obterSeDisponivel()).resolves.toBeUndefined();
+  });
+
   test("reutiliza o mesmo id nas chamadas seguintes", async () => {
     const primeiro = await DispositivoId.obter();
     const segundo = await DispositivoId.obter();

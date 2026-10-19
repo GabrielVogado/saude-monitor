@@ -64,6 +64,11 @@ class FeedbackControllerTest {
         public void processarSemResposta() {
             // no-op no teste de controller
         }
+
+        @Override
+        public long desvincularFeedbacksAntigos() {
+            return 0;
+        }
     };
 
     private MockMvc mockMvc;

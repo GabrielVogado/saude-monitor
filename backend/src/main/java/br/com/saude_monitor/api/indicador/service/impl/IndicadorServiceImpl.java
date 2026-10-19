@@ -13,6 +13,7 @@ import br.com.saude_monitor.api.visita.document.StatusVisita;
 import br.com.saude_monitor.api.visita.document.TipoPermanencia;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
 import br.com.saude_monitor.api.visita.repository.VisitaRepository;
+import br.com.saude_monitor.api.visita.service.PresencaVisita;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -29,6 +30,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -45,6 +47,9 @@ import java.util.stream.Collectors;
  *       {@code tipoPermanencia = ATENDIMENTO} (exclui {@code INTERNACAO}/{@code OBSERVACAO} —
  *       RN-16/RN-24); durações < 2min são ruído e ficam de fora (RN-07); visitas
  *       {@code GPS_INTERROMPIDO} entram apenas se a cobertura de GPS ≥ 90% (RN-17);</li>
+ *   <li><b>prova de presença</b> — nota e tempo só contam visitas com
+ *       {@link PresencaVisita#isComprovada} (SEG-01); a avaliação de quem não comprovou
+ *       presença continua aceita, mas fica fora do indicador público;</li>
  *   <li><b>{@code atualizadoEm}</b> — atualização ≤ 15min após feedback, via evento
  *       (RN-18) e job de 15min.</li>
  * </ul>
@@ -82,8 +87,9 @@ public class IndicadorServiceImpl implements IndicadorService {
         Instant fim = Instant.now().truncatedTo(ChronoUnit.SECONDS);
         Instant inicio = fim.minus(PERIODO_PADRAO);
 
-        List<FeedbackDocument> feedbacks = feedbackRepository
-                .findByHospitalIdAndCriadoEmAfterAndNotaNotNull(hospitalId, inicio);
+        // SEG-01: só conta o feedback de visita com prova de presença.
+        List<FeedbackDocument> feedbacks = filtrarDeVisitasComprovadas(feedbackRepository
+                .findByHospitalIdAndCriadoEmAfterAndNotaNotNull(hospitalId, inicio));
 
         List<Integer> notas = feedbacks.stream()
                 .map(FeedbackDocument::getNota)
@@ -100,6 +106,7 @@ public class IndicadorServiceImpl implements IndicadorService {
                         hospitalId, STATUS_TEMPO, inicio, fim, TipoPermanencia.ATENDIMENTO);
 
         List<Integer> duracoes = candidatas.stream()
+                .filter(PresencaVisita::isComprovada)
                 .filter(v -> v.getDuracaoMinutos() != null)
                 .filter(v -> v.getDuracaoMinutos() >= DURACAO_MINIMA_MINUTOS)
                 .filter(v -> v.getDuracaoMinutos() <= TETO_DURACAO_MINUTOS)
@@ -204,6 +211,28 @@ public class IndicadorServiceImpl implements IndicadorService {
         }
         double fracao = EstatisticaService.fracaoCoberta(entrada, saida, visita.getUltimaPosicaoEm());
         return fracao >= EstatisticaService.PERCENTUAL_MINIMO_COBERTURA_GPS;
+    }
+
+    /**
+     * Mantém só os feedbacks cuja visita tem prova de presença (SEG-01), lendo as visitas em
+     * lote. Feedback sem visita encontrada fica de fora.
+     */
+    private List<FeedbackDocument> filtrarDeVisitasComprovadas(List<FeedbackDocument> feedbacks) {
+        List<String> visitaIds = feedbacks.stream()
+                .map(FeedbackDocument::getVisitaId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (visitaIds.isEmpty()) {
+            return List.of();
+        }
+        Set<String> comprovadas = new HashSet<>();
+        visitaRepository.findAllById(visitaIds).forEach(v -> {
+            if (PresencaVisita.isComprovada(v)) {
+                comprovadas.add(v.getId());
+            }
+        });
+        return feedbacks.stream().filter(f -> comprovadas.contains(f.getVisitaId())).toList();
     }
 
     /** Persiste o indicador com upsert idempotente por {@code hospitalId}. */

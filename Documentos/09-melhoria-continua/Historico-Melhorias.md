@@ -2583,6 +2583,565 @@ Até aqui nenhuma `release/` tinha sido criada, então o defeito não tinha apar
 
 ---
 
+## M-047 — Visita e feedback anônimos só para o aparelho dono (SEG-02)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0, gap SEG-02 (Alto), achado por
+leitura de código: o dono só era conferido quando a visita tinha `usuarioId`. Para visita
+anônima, quem tivesse o id fazia checkout e heartbeat, e o feedback era aceito para qualquer
+visita encerrada, inclusive a de usuário logado. Os ids são `ObjectId` (carimbo de tempo e
+contador), então o id de uma visita própria leva aos vizinhos. Com isso dava para encerrar a
+visita de outra pessoa ou avaliá-la primeiro e bloquear a avaliação legítima (RN-12 aceita uma
+só). O pentest de 23/09/2026 cobriu só o BOLA de usuário logado.
+
+### O que mudou
+
+- Backend: `VisitaDono` concentra a regra. Visita logada pertence ao `usuarioId`; visita
+  anônima pertence ao `dispositivoId` do check-in (comparado em tempo constante). Checkout,
+  heartbeat e `POST /feedbacks` recebem `dispositivoId` no corpo e respondem 403 a quem não é
+  dono. No feedback a recusa vem antes da checagem de duplicidade.
+- No feedback, a conferência de dono vem logo depois de achar a visita, antes das regras de
+  status, janela e duplicidade: um estranho recebe o mesmo 403 para visita em andamento,
+  encerrada ou já avaliada.
+- Estar logado não dá posse de visita anônima alheia (antes, qualquer usuário logado podia
+  sinalizar internação numa visita anônima). A sinalização de internação também aceita o
+  `dispositivoId`, para quem começou a visita anônima e fez login depois.
+- App: checkout, heartbeat e feedback mandam o `dispositivoId` sempre, também com login (para
+  quem entrou na conta no meio de uma visita anônima). Checkout guardado na fila offline antes
+  desta versão ganha o `dispositivoId` no reenvio. Se o armazenamento do aparelho falhar ao
+  ler o id, o pedido sai sem ele, em vez de perder o checkout e a fila offline.
+- `DispositivoId.obter()` compartilha a leitura em andamento: duas chamadas na primeira
+  execução geravam ids diferentes, e o checkout podia levar um id diferente do check-in.
+- Das opções do relatório, ficou a B (dono pelo usuário ou pelo aparelho). A A (token secreto
+  devolvido no check-in) não foi feita: o `dispositivoId` já é um UUID v4 aleatório que a API
+  nunca devolve, então cumpre o mesmo papel sem guardar mais um segredo no aparelho e na fila.
+
+### Efeito para quem usa
+
+APK antigo que faz visita anônima recebe 403 no checkout, no heartbeat e no feedback. Não há
+produção; a homologação precisa do APK novo.
+
+Efeito aceito: quem fez check-in logado e perdeu a sessão antes de avaliar recebe 403 ao
+avaliar sem login (antes a avaliação entrava como anônima). Era exatamente esse caminho que
+deixava avaliar a visita de outra pessoa. A visita logada não guarda o aparelho, de propósito,
+para não ligar o `dispositivoId` à conta.
+
+### Verificação
+
+- Backend: 388 testes (integração com Mongo real incluída), 0 falhas; `VisitaAnonimaDonoIntegracaoTest`
+  cobre heartbeat, checkout e feedback por intruso sem e com outro aparelho, e confirma que a
+  tentativa não consome a avaliação do dono. Cobertura das linhas alteradas: 100%.
+- App: 55 suítes, 616 testes; cobertura das linhas alteradas: 100%.
+
+---
+
+## M-048 — Pontos de GPS apagados ao encerrar a visita e vínculo pessoal só por 90 dias (DAD-01, ARQ-04)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0. **DAD-01 (Alto):** os pontos de
+GPS da visita (`pontosAmostrais`) não tinham prazo nem expurgo, e a visita ficava ligada para
+sempre à conta e ao aparelho. Estar numa unidade de saúde em data e hora conhecidas é dado
+sensível (art. 11 da LGPD), e o Documento Negocial v2.1 §11 promete "dados de localização
+agregados sem vínculo pessoal após 90 dias". **ARQ-04 (Médio):** o heartbeat lia a visita,
+acrescentava um ponto e fazia `save()` do documento inteiro: a lista crescia sem limite (~144
+pontos em 24 h, todos regravados a cada heartbeat) e o `save()` podia desfazer um encerramento
+feito pelo job no meio do caminho, o mesmo padrão do M-007.
+
+### O que mudou
+
+- Premissa P9 da análise (sem resposta do PO, vale a sugestão): apagar os pontos ao encerrar
+  e desvincular a identidade após 90 dias.
+- Checkout, expiração (24 h) e GPS interrompido apagam `pontosAmostrais`. Ficam hospital,
+  entrada, saída, duração e status. Nada no sistema lia os pontos depois do encerramento.
+- Heartbeat, checkout e sinalização de internação viram update atômico condicionado à visita
+  ainda estar ativa (`findAndModify`). O heartbeat leva também o filtro de dono no próprio
+  update (um acesso ao banco por chamada; a visita só é lida para responder 404/403/409 quando
+  nada foi atualizado) e usa `$push` com `$slice`, guardando só os 50 pontos mais recentes. Se a
+  visita foi encerrada entre a leitura e a escrita, a resposta é 409, como para visita já
+  encerrada.
+- O job de feedback sem resposta passa a mudar só o status (`updateMulti` condicionado a
+  `FINALIZADA`), em vez de regravar as visitas lidas, o que podia devolver dados apagados pela
+  retenção no meio do caminho.
+- Jobs: a marcação de SUSPEITA é um `updateMulti` com a condição de tempo no próprio update. A
+  expiração e o GPS interrompido encerram cada visita só se `ultimoHeartbeat` não mudou desde a
+  leitura, então um heartbeat que chegue no meio mantém a visita aberta.
+- `RetencaoDadosPessoaisJob` (todo dia às 3h30, horário de Brasília), em três etapas isoladas
+  (a falha de uma não impede as outras): apaga os pontos que tenham sobrado em visitas já
+  encerradas, inclusive as encerradas antes desta versão; visitas com entrada há mais de 90 dias
+  perdem `usuarioId`, `dispositivoId` e pontos; feedbacks criados há mais de 90 dias perdem
+  `usuarioId` e o comentário e ficam `anonimizado`, como na exclusão de conta (M-041). Tudo é
+  idempotente, então rodar em duas instâncias não muda o resultado. `entrada` ganha índice
+  próprio para o filtro do job.
+- Política de privacidade (`site/`, versão 1.1): §7 diz que as posições são apagadas ao fim da
+  visita e que o vínculo com a conta e o aparelho dura 90 dias.
+
+### Efeito para quem usa
+
+O histórico de visitas e de avaliações do app passa a mostrar só os últimos 90 dias. Os
+indicadores públicos não mudam.
+
+### Verificação
+
+- Backend: 401 testes, com integração em Mongo real (`VisitaRetencaoGpsIntegracaoTest`:
+  heartbeat acrescenta ponto, checkout apaga a trilha, visita de 91 dias perde conta e aparelho
+  e a recente não). Cobertura das linhas alteradas: 100%.
+
+---
+
+## M-049 — Só avaliação com prova de presença conta no indicador público (SEG-01, parte de código)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0, **SEG-01 (Crítico)**: o check-in
+`MANUAL` aceitava qualquer `dispositivoId` sem conferir posição, e o `ocorridoEm` retroativo de
+até 24 h valia no check-in. Com check-in retroativo, checkout e feedback, três chamadas HTTP
+viravam uma avaliação com qualquer duração, e o mínimo de 5 avaliações para publicar a nota caía
+em segundos. É o ataque mais provável contra um produto de transparência pública.
+
+### O que mudou
+
+- Premissa P10 da análise (sem resposta do PO, vale a sugestão): a avaliação anônima continua
+  possível (RN-20), mas só conta no indicador público com prova de presença. Esta entrega é a
+  solução B da análise; a atestação do aparelho (A) depende do console da Play Store e a
+  quarentena de rajadas (C) vem depois.
+- A visita grava `presencaComprovada` no check-in. É `true` quando a posição enviada está dentro
+  do geofence do hospital (o `GEOFENCE` já validava; o `MANUAL` com posição passa por um
+  `$geoIntersects` no próprio hospital) e o check-in chegou até 45 min depois da entrada
+  informada, a mesma janela do GPS interrompido (RN-06). O check-in `MANUAL` continua aceito de
+  qualquer lugar.
+- O indicador (`IndicadorServiceImpl.recalcular`) conta nota e tempo só das visitas com prova de
+  presença, e dos feedbacks delas (as visitas são lidas em lote). Visitas anteriores à regra não
+  têm a marcação: para elas vale a origem `GEOFENCE` com até 45 min entre a entrada e o
+  recebimento, o que os campos guardados permitem conferir.
+- O app manda a posição do aparelho no check-in manual quando a permissão de localização já
+  existe (última leitura de até 2 min, ou leitura ao vivo com limite de 5 s). Nunca pede
+  permissão nesse caminho.
+- A massa de avaliações do dev é marcada como comprovada, para o indicador do dev não mudar.
+
+### Efeito para quem usa
+
+A nota e o tempo publicados passam a contar só visitas com prova de presença. Quem faz check-in
+manual longe do hospital, sem permissão de localização, ou com o check-in chegando mais de
+45 min depois (fila offline longa) continua com a visita e a avaliação registradas, mas elas não
+entram no indicador. Nos ambientes de dev e homologação, avaliações feitas por check-in manual
+de teste deixam de contar.
+
+### Limites conhecidos
+
+- A posição vem do aparelho e pode ser falsificada por quem escreve um script; a atestação do
+  aparelho é o que fecha isso.
+- A prova é só no check-in; heartbeats com posição fora do hospital ainda não retiram a prova.
+
+### Verificação
+
+- Backend: 420 testes, com integração em Mongo real (`FeedbackEIndicadorIntegracaoTest`: o
+  feedback de check-in manual de dentro do hospital entra no indicador; o de check-in anônimo
+  sem posição é aceito e fica fora). Cobertura das linhas alteradas: 100%.
+- App: testes da leitura de posição sem permissão, com cache, ao vivo e com GPS travado.
+
+---
+
+## M-050 — Seed e tarefas de inicialização com trava distribuída (SOL-02)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0, **SOL-02 (Crítico)**: o backend
+roda com `--max-instances=1` no Cloud Run, e o próprio workflow explica por quê: o `SeedRunner`
+lê `count()` e só depois grava, então duas instâncias subindo juntas contra o banco vazio
+importariam tudo duas vezes. O mesmo vale para o seed do admin (dois admins, ou falha de chave
+duplicada no boot) e para a massa de avaliações do dev. Com uma instância só, o teto do sistema
+é 1 vCPU.
+
+### O que mudou
+
+- Nova `TravaDistribuida` (pacote `config.trava`): cada tarefa tem um documento na coleção
+  `travas_execucao` com `_id` igual ao nome da tarefa. Adquirir é um único upsert condicionado
+  a "não existe ou já venceu"; se outra instância tem a trava válida, o índice único do `_id`
+  recusa a inserção. A trava tem validade e só a instância dona a libera, sempre no fim da
+  tarefa, com ou sem erro.
+- Passam a rodar sob a trava: seed de hospitais, reconciliação de raio de geofence,
+  reconciliação de região administrativa, importação CNES, seed do admin e massa de avaliações
+  do dev. A instância que não consegue a trava pula a tarefa em vez de esperar, porque outra já
+  está fazendo o mesmo trabalho.
+- Se a instância dona morrer no meio, a trava vence (2 a 15 min, conforme a tarefa) e a próxima
+  subida refaz o trabalho. As tarefas já eram idempotentes (upsert por `codigoCnes`/`importKey`
+  com índice único, update condicionado), então refazer não duplica nada.
+- A `TravaDistribuida` serve também aos jobs agendados, que entram no SOL-05.
+
+### O que fica para a infraestrutura
+
+Subir `--max-instances` no `cd-backend-google.yml` (a análise sugere 10 na homologação e 20 em
+produção). O comentário do workflow que trava o limite em 1 deixa de ter motivo com este PR.
+
+### Verificação
+
+- Backend: 429 testes. `TravaDistribuidaIntegracaoTest` com Mongo real: segunda instância não
+  adquire trava válida, só a dona libera, trava vencida é retomada, a tarefa libera a trava
+  mesmo com erro, e oito instâncias disputando a mesma tarefa executam uma vez só. Cobertura das
+  linhas alteradas: 100%.
+
+---
+
+## M-051 — Rate limit por identidade e renovação de sessão fora do limite por IP (ARQ-02)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0, **ARQ-02 (Crítico)**: o rate limit
+contava tudo por IP (60/min nas rotas públicas, 10/min em login e refresh). As operadoras móveis
+usam CGNAT, então centenas de celulares saem pelo mesmo IP. No pico, o check-in e o heartbeat de
+uns levavam 429 por causa dos outros, e a renovação de sessão (o refresh do access token de 15
+min) também, o que derruba quem tem sessão válida.
+
+### O que mudou (comportamento)
+
+- **Rotas públicas** passam a contar por pessoa: o usuário do access token válido, depois a
+  instalação do app (cabeçalho `X-Cliente-Id`) e só então o IP. O limite continua 60/min.
+- **Teto por IP**: todo o tráfego limitado que sai de um mesmo IP soma num teto de abuso,
+  600/min por padrão (`APP_RATELIMIT_IP_POR_MINUTO`), que nunca fica abaixo dos outros limites.
+  É o que segura quem troca de `X-Cliente-Id` a cada chamada.
+- **Login**: além dos 10/min por IP, 10/min por conta (e-mail normalizado). Tentar senha contra
+  uma conta deixa de escapar trocando de IP.
+- **Refresh**: deixa de ter limite por IP. Fica limitado a 10/min pelo próprio refresh token
+  (o contador guarda o SHA-256, não o token).
+- **App**: sem login, toda chamada leva `X-Cliente-Id`, um UUID aleatório gerado na primeira
+  execução e guardado no aparelho. É separado do `dispositivoId` de propósito: aquele é a prova
+  de dono da visita anônima (SEG-02) e não deve ir em todo cabeçalho; este não dá acesso a nada.
+- CORS aceita o cabeçalho `X-Cliente-Id`.
+- A resposta 429 continua no envelope padrão (`LIMITE_EXCEDIDO`), agora também vinda do
+  `AuthController` no login e no refresh. O log da primeira rejeição por janela não traz e-mail
+  nem id, só o tipo da chave ("usuário autenticado", "instalação do app") ou o IP.
+
+### O que fica para depois
+
+Os contadores continuam em memória, por instância: com N instâncias o limite efetivo é N vezes
+maior. Para limite por pessoa isso é aceitável; o teto global por IP fica para a borda (SOL-03).
+
+### Verificação
+
+- Backend: testes do filtro com usuários e instalações diferentes no mesmo IP, token inválido e
+  refresh token caindo no IP ou na instalação, rotas de autenticação por IP, teto por IP contra
+  troca de `X-Cliente-Id`, refresh sem limite por IP; login limitado por conta trocando de IP e
+  refresh limitado por token, no `AuthController`.
+- App: o cabeçalho vai sem login e não vai com login; falha do armazenamento não impede a chamada.
+
+---
+
+## M-052 — Catálogo público com cache HTTP e cache curto do usuário no filtro JWT (ARQ-01 servidor, ARQ-03)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0. **ARQ-01 (Crítico)**: a lista por
+raio recebe a posição exata de cada pessoa, então nenhuma resposta serve para outra, e o ranking
+lê todos os hospitais a cada chamada; nada tinha `ETag` nem `Cache-Control` público. É a maior
+parte do tráfego, igual para todo usuário, batendo na origem e no banco. **ARQ-03 (Médio)**: o
+filtro JWT lia a conta no Mongo a cada requisição autenticada.
+
+### O que mudou (comportamento)
+
+- **Novo `GET /api/v1/catalogo`** (público): todos os estabelecimentos ativos, com indicadores,
+  em ordem de nome, no mesmo formato da listagem. Traz `versao` (SHA-256 do conteúdo) e responde
+  com `ETag: W/"<versao>"`; quem manda `If-None-Match` com a versão atual recebe **304** sem
+  corpo. `Cache-Control: max-age=60, public, s-maxage=300`.
+- O servidor monta o catálogo **no máximo uma vez a cada 5 min por instância** (P8, atraso
+  aceito nos dados públicos). Nota, tempo e cadastro novos aparecem no catálogo dentro dessa
+  janela; cadastro, edição e ativação pelo admin descartam o catálogo da instância que recebeu a
+  alteração. A listagem por raio e o detalhe continuam lendo do banco, como antes.
+- **Ranking** responde com `Cache-Control: max-age=0, public, s-maxage=300`: uma borda pode
+  guardá-lo por 5 min; o aparelho sempre confere, então quem acabou de avaliar não vê lista velha.
+  Sem borda (hoje), nada muda na prática.
+- **gzip** nas respostas JSON acima de 2 KB, quando o cliente aceita. O `ETag` é fraco (`W/`)
+  justamente porque os bytes mudam com a compressão e o conteúdo não.
+- **Conta do token em memória por 60 s** (Caffeine, até 10 mil contas por instância). O access
+  token já vale 15 min, então papel e situação desatualizados por até 1 min não mudam o risco. A
+  exclusão da conta (LGPD) descarta a entrada na hora na instância que a recebeu; nas outras, o
+  token da conta excluída para de autenticar em até 60 s (antes parava na hora).
+- Rate limit: `GET /api/v1/catalogo` entra no grupo público.
+
+### O que fica para depois
+
+O app ainda não usa o catálogo (APP-01, último PR desta série) e não há borda (SOL-03). A opção
+B do ARQ-01 (arredondar a posição para a lista por raio ficar cacheável) não foi feita: o app
+ainda não foi publicado na loja, então não há versão antiga instalada a manter.
+
+### Verificação
+
+- Catálogo: reaproveitamento dentro de 5 min, nova leitura depois disso e depois de alteração do
+  admin, versão estável para o mesmo conteúdo e diferente quando um indicador muda, 200 com
+  `ETag` e `Cache-Control`, 304 com a versão atual e 200 com uma versão velha; consulta só de
+  ativos, ordenada por nome e id.
+- Cache de conta: uma leitura no banco dentro da validade (inclusive com o e-mail em outra
+  caixa), nova leitura depois da validade e depois da exclusão, conta inexistente não guardada.
+- Contrato OpenAPI: 39 operações, 21 públicas.
+
+---
+
+## M-053 — Jobs periódicos disparáveis pelo Cloud Scheduler, com trava e log (SOL-05, ARQ-08)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0, **SOL-05 (Alto)**: os quatro jobs de
+15 min (indicadores, expiração de visitas, GPS interrompido e feedback sem resposta) e o de
+retenção diário rodavam em `@Scheduled`. No Cloud Run com cobrança por requisição, a CPU é
+estrangulada entre requisições e o próprio guia do Cloud Run avisa que timers podem não
+executar. Os jobs não deixavam log, então um job parado só aparecia nos dados, e com N
+instâncias cada um rodava N vezes. **ARQ-08 (Baixo)**: o recálculo do indicador em `@Async`
+depende desse job como rede de segurança.
+
+### O que mudou (comportamento)
+
+- **Novo `POST /internal/jobs/{nome}`**, fora do contrato público, para o Cloud Scheduler disparar
+  cada job. Só aceita o token OIDC que o Google emite para a conta de serviço configurada
+  (`APP_JOBS_CONTA_SERVICO`), com a audiência configurada (`APP_JOBS_AUDIENCIA`). Sem essas duas
+  variáveis, a rota recusa tudo com 403, que é o estado dos ambientes atuais.
+- **Uma execução por vez**: cada job roda sob a trava distribuída do SOL-02 (`job-<nome>`). Com
+  várias instâncias, ou com o disparo interno e o Cloud Scheduler ligados juntos, o job roda uma
+  vez e as outras chamadas respondem `PULADO`.
+- **Log** de início, de fim com a duração e de erro com a exceção, em cada execução.
+- **Falha** do job vira 500 para o Cloud Scheduler tentar de novo. No disparo interno, o erro
+  fica no log como antes.
+- **Disparo interno** (`@Scheduled`) continua ligado por padrão (`APP_JOBS_AGENDAMENTO_INTERNO`),
+  com os mesmos intervalos, agora passando pela trava.
+- **ARQ-08**: opção A da análise, sem mudança no `@Async`; o job `indicadores` confiável cobre a
+  perda de um recálculo.
+
+### Para ativar (etapa de infraestrutura, não feita aqui)
+
+1. Criar uma conta de serviço para o agendador, com permissão de invocar o serviço.
+2. Criar 5 agendamentos no Cloud Scheduler com destino HTTP `POST <url>/internal/jobs/<nome>`,
+   token OIDC dessa conta e audiência `<url>`: 4 a cada 15 min e `retencao-dados` às 03:30.
+3. Configurar `APP_JOBS_AUDIENCIA=<url>` e `APP_JOBS_CONTA_SERVICO=<e-mail da conta>` no serviço.
+4. Conferir no log os `[Job] … concluído` e então `APP_JOBS_AGENDAMENTO_INTERNO=false`.
+
+### Verificação
+
+- Executor: cada nome chama seu job sob a própria trava, trava ocupada pula sem executar, nome
+  desconhecido não toca na trava, falha do job sobe para quem disparou.
+- Segurança da rota com tokens assinados por chave local no lugar do Google: aceita a conta
+  configurada (com e sem `https://` no emissor), recusa sem token, outra conta, e-mail não
+  verificado, outra audiência, outro emissor, token vencido e outra chave; sem configuração,
+  recusa tudo com 403 sem chamar o executor.
+
+---
+
+## M-054 — E-mail de código dentro da requisição, piso de tempo e limite por destino (SOL-09, SEG-03)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0. **SOL-09 (Médio)**: os e-mails de
+código saíam em `@Async`. No Cloud Run com cobrança por requisição, a tarefa em segundo plano
+fica sem CPU e o código podia atrasar até a próxima requisição de qualquer pessoa, ou se perder
+sem log; o "Reenviar código" podia piorar. **SEG-03 (Médio)**: cadastro, reenvio e "esqueci a
+senha" só tinham limite por IP, e o login revelava pelo tempo de resposta se o e-mail tinha conta
+(só rodava o BCrypt quando a conta existia).
+
+### O que mudou (comportamento)
+
+- **Envio síncrono** dos códigos (cadastro, reenvio e "esqueci a senha"), com teto de 500 ms
+  para conectar e 1 s para a resposta do Resend. Envio que estoura o teto é registrado em log e
+  o usuário toca em "Reenviar".
+- **Piso de 2 s** no `esqueci-senha` e no `reenviar-confirmacao`: a resposta sai 2 s depois da
+  chegada, exista ou não a conta. Fecha o canal de tempo que o `@Async` fechava e também o resto
+  que ele deixava (a gravação do código só acontecia com conta). Essas duas telas ficam ~2 s mais
+  lentas.
+- **Cadastro** envia o código na própria requisição, sem piso: ele já responde 409 para e-mail
+  cadastrado (opção E da análise), então o tempo não revela nada novo.
+- **Limite por destino**: no máximo 5 códigos por hora para o mesmo endereço, somando os três
+  fluxos. O excedente não gera nem envia código, e a resposta não muda; o código anterior
+  continua valendo. Contagem por instância, em memória.
+- **Login de e-mail sem conta** roda o mesmo BCrypt de uma senha errada, sobre um hash
+  descartável calculado uma vez.
+- **Desligamento**: o Spring espera as tarefas `@Async` pendentes (ex.: recálculo de indicador)
+  por até 8 s, dentro dos 10 s em que o Cloud Run ainda dá CPU.
+
+### O que fica para depois
+
+Limite por aparelho, regra de bot e alerta de envio anômalo dependem da borda (SOL-03) e da
+atestação do aparelho (SEG-01 A). Fechar a enumeração no cadastro é decisão de produto: o 409
+continua, porque ajuda quem esqueceu que já tem conta. Conferir nos logs do Resend se já houve
+código atrasado ou perdido (verificação aberta da análise).
+
+### Verificação
+
+- Piso: espera o que falta, não espera quando a operação passou do piso, espera também em erro e
+  preserva a interrupção da thread.
+- Limite: 5 por hora, o sexto recusado mesmo com o e-mail em outra caixa, outro destino livre,
+  nova janela zera; no serviço, o sexto "esqueci a senha" responde igual e não envia.
+- Login de e-mail inexistente chama o BCrypt com o hash descartável, calculado uma vez.
+- Resend: teto menor que o piso; o construtor da aplicação põe o teto numa cópia do builder.
+
+---
+
+## M-055 — Contenção de falhas, pool do banco e configuração remota (ARQ-05, SOL-07, ARQ-09)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0. **ARQ-05 (Alto)**: com virtual
+threads o Tomcat não limita mais quantas requisições a instância atende ao mesmo tempo; num pico,
+todas disputam as conexões do banco, estouram o tempo juntas e a falha volta como 500, que o app
+trata como erro definitivo. Não havia como segurar as gravações numa manutenção sem tirar o app do
+ar. **SOL-07 (Médio)**: o driver do MongoDB usava os padrões de servidor dedicado (100 conexões
+por instância, 2 min esperando conexão, 30 s escolhendo servidor, leitura sem prazo); no Atlas
+compartilhado, com teto de 500 conexões no cluster, poucas instâncias esgotavam o banco.
+**ARQ-09 (Médio)**: modo evento e versão mínima do app só mudavam com novo deploy.
+
+### O que mudou (comportamento)
+
+- **Teto por instância**: no máximo 80 requisições ao mesmo tempo
+  (`APP_CONTENCAO_REQUISICOES_SIMULTANEAS`). Acima disso a requisição recebe na hora 503
+  `SERVICO_SOBRECARREGADO` com `Retry-After: 5`, sem esperar vaga. `/actuator/**` fica de fora,
+  para a verificação de saúde não cair por instância cheia. O 503 sai com CORS e cabeçalhos de
+  segurança (o filtro fica dentro da cadeia do Spring Security).
+- **Banco indisponível vira 503**: conexão do pool esgotada, servidor não encontrado ou consulta
+  acima do prazo respondem 503 `BANCO_INDISPONIVEL` com `Retry-After: 5`, em vez de 500
+  `ERRO_INTERNO`. O app já repete 503 respeitando o `Retry-After`.
+- **Pool do MongoDB**: até 20 conexões por instância (`APP_MONGO_POOL_MAXIMO`, era 100), 2 s
+  esperando conexão (era 2 min), 5 s escolhendo servidor (era 30 s), leitura de até 30 s (era sem
+  prazo) e conexão ociosa fechada em 60 s. Os valores valem mesmo que a `MONGO_URI` traga os seus.
+  Com 20 por instância, 20 instâncias ainda ficam abaixo das 500 conexões do Atlas compartilhado.
+- **Configuração remota** (coleção `configuracao_remota`, documento `atual`): modo somente leitura,
+  versão mínima do app e mensagem de manutenção. `GET /api/v1/configuracao` é público (cache de
+  1 min) e `PUT /api/v1/admin/configuracao` é só ADMIN. Cada instância relê a cada 30 s; se o banco
+  falhar, mantém o último valor lido. Sem documento, tudo liberado e sem versão mínima.
+- **Modo somente leitura**: com ele ligado, `POST`, `PUT`, `PATCH` e `DELETE` em `/api/**`
+  respondem 503 `MODO_SOMENTE_LEITURA` com `Retry-After: 300`; as consultas seguem. Login,
+  renovação e saída da sessão continuam aceitos, e o próprio `PUT` da configuração também, para o
+  ADMIN poder desligar o modo. Os jobs periódicos são pulados enquanto o modo estiver ligado.
+  `APP_SOMENTE_LEITURA_FORCADO=true` liga o modo por variável de ambiente, para quando o banco nem
+  pode ser lido.
+- **Contrato**: 2 endpoints novos (41 operações, 22 públicas no OpenAPI).
+
+### O que fica para depois
+
+O app passa a ler `GET /api/v1/configuracao` e a mostrar a tela de atualização e o aviso de
+manutenção no APP-03. O teto de 80 e o pool de 20 são estimativas até a prova de carga (PERF-01);
+ajustar por variável de ambiente sem novo build. Tela no Painel Admin para a configuração fica
+como item novo (hoje é pelo `PUT`).
+
+### Verificação
+
+- Teto: dentro dele atende e devolve a vaga; acima, 503 com `Retry-After` no envelope padrão; o
+  Actuator passa mesmo com a instância cheia; a vaga volta quando a requisição falha.
+- Modo somente leitura: gravação recusada com 503, mensagem configurada ou padrão; consultas,
+  sessão, configuração e jobs internos (`/internal/**`) passam; desligado, nada muda.
+- Configuração: lida uma vez por 30 s, mantém o último valor com o banco fora, cai no padrão sem
+  nada lido, variável de ambiente força o modo, alteração vale na hora na instância que a recebeu.
+- Pool: o customizador vence o `maxPoolSize` da URI. Banco indisponível vira 503 sem vazar a
+  mensagem do driver. Jobs pulados no modo somente leitura sem tocar a trava.
+
+---
+
+## M-056 — Swagger fora de produção, admin sem senha padrão e contêiner sem root (SEG-07, SEG-06)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0. **SEG-07 (Baixo)**: Swagger UI e
+`/v3/api-docs` públicos em qualquer ambiente, e a senha padrão de admin (`admin123`) no
+`application.properties`, neutralizada só pelo `APP_SEEDADMIN_ENABLED=false` do deploy. Um deploy
+sem a flag criaria um admin com senha conhecida num serviço público. **SEG-06 (Médio)**: a imagem
+do backend rodava como root e trazia `curl`.
+
+### O que mudou (comportamento)
+
+- **Perfil `prod`** (`application-prod.properties`, ativado pelo `cd-backend-google.yml` em
+  `release/**`): `/v3/api-docs` e `/swagger-ui.html` respondem 404. Desenvolvimento e homologação
+  não mudam.
+- **Seed de admin desligado por padrão** (`APP_SEEDADMIN_ENABLED`, antes ligado), sem e-mail nem
+  senha padrão no código. Ligado sem `ADMIN_EMAIL`, sem `ADMIN_SENHA` ou com senha de menos de
+  12 caracteres, **a aplicação não sobe** (antes pulava o seed com uma linha de log, ou criava o
+  admin com `admin123`). Nenhum deploy muda: todos já passam `APP_SEEDADMIN_ENABLED=false`. Quem
+  roda o backend local e ainda não tem admin na base precisa ligar o seed com as duas variáveis
+  (`backend/.env.example`); um admin já existente não é afetado.
+- **Contêiner**: a aplicação roda como o usuário `app` (UID 10001), sem privilégio, e o `curl`
+  saiu da imagem final (servia só ao deploy da Oracle Cloud, que não existe mais).
+
+### O que fica para depois
+
+Do SEG-06: base fixada por *digest*, Trivy na imagem e nas dependências, Dependabot e SBOM na
+release. Mexem na esteira e geram PRs automáticos, então ficam para a fase de infraestrutura.
+
+### Verificação
+
+- `OpenApiProducaoTest`: com o perfil `prod`, contrato e Swagger UI respondem 404 (Mongo real).
+- Seed: boot falha sem senha, com senha em branco, com `admin123` e sem e-mail; não duplica
+  quando já há admin; cria com credencial válida.
+- A imagem não foi construída nesta sessão (sem Docker para build); o build do CD confirma.
+
+---
+
+## M-057 — Catálogo local no geofencing e versão mínima do app (APP-01, APP-03)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0. **APP-01 (Crítico)**: a cada
+saída da região de recálculo, com o app fechado, o geofencing pedia ao servidor os hospitais num
+raio de 5 km da posição exata. Na meta de uso do DF, estimado em ~333 req/s só disso, mais que todo
+o resto do tráfego, e nada cacheável. **APP-03 (Médio)**: não havia versão mínima: uma correção
+de escala ou de segurança dependia de cada pessoa atualizar o app.
+
+### O que mudou (comportamento)
+
+- **Catálogo no aparelho** (`CatalogoLocal`): o app baixa `GET /api/v1/catalogo` (ARQ-01) e guarda
+  no armazenamento local, com a versão. Com o app aberto, a cópia mais velha que 5 min é conferida
+  com `If-None-Match` (304 sem corpo quando nada mudou); no recálculo em segundo plano, a cópia de
+  até um dia vale sem rede. Sem rede, vale a cópia guardada, por mais velha que seja.
+- **Geofencing**: a escolha dos 19 estabelecimentos monitorados (a até 5 km, mais próximos
+  primeiro) é feita no aparelho sobre o catálogo. O recálculo em segundo plano deixa de fazer
+  requisição quase sempre. Mesmo comportamento de antes quando não há catálogo nenhum (primeiro uso
+  sem internet): na abertura mantém as regiões registradas; em segundo plano registra só a região de
+  recálculo curta.
+- **Versão mínima**: ao abrir e ao voltar ao primeiro plano, o app lê `GET /api/v1/configuracao`
+  (ARQ-09). Se a versão instalada estiver abaixo de `versaoMinimaApp`, a navegação dá lugar à tela
+  "Atualize o Radar Saúde", com o botão para a Play Store (app da loja, ou a página web). O sufixo de
+  homologação não conta (`1.0.0-rc.5` vale como `1.0.0`). Sem rede, sem mínima ou com versão
+  ilegível, o app segue normal. O geofencing e a fila offline continuam rodando por baixo.
+- **Backend**: o CORS aceita o cabeçalho `If-None-Match`, para a versão web do app.
+
+### O que fica para depois
+
+As telas de lista, mapa e ranking continuam na listagem paginada: passá-las para o catálogo local é
+o próximo passo do ARQ-01. A borda (SOL-03) ainda não existe, então o 304 vem da origem. O aviso de
+manutenção do modo somente leitura aparece hoje só como a mensagem do 503 nas gravações; um aviso
+fixo na tela fica como item novo. Atualização OTA (EAS Update) não entrou.
+
+### Verificação
+
+- `CatalogoLocal`: baixa e guarda; cópia dentro da idade vale sem rede; cópia vencida conferida com
+  `If-None-Match`; 304 como erro ou como corpo vazio mantém a cópia; versão nova substitui; sem rede
+  vale a cópia; sem cópia e sem rede, falha; chamadas simultâneas fazem uma requisição.
+- Geofencing: só entra quem está a até 5 km; idade de 5 min no primeiro plano e de um dia no
+  recálculo em segundo plano; os testes de regiões, permissão e recálculo seguem verdes sobre o
+  catálogo.
+- Versão mínima: compara pelos três números; bloqueia só abaixo da mínima; botão abre a loja e cai
+  na página web; sem rede segue normal; confere de novo ao voltar ao primeiro plano.
+- App: 655 testes, lint com 11 avisos (teto 16), `tsc` limpo. Sonar local sem issue nas linhas
+  alteradas.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**
@@ -2613,3 +3172,46 @@ do usuário.
 - `quarkus` — o backend é **Spring Boot 4**, não Quarkus. Não ativar por semelhança de "backend Java".
 - `awesome-llm-apps-fullstack-developer` — o produto não tem camada de LLM.
 - `lobehub-react` — **removida da coluna de `frontend/` em 03/09/2026** ([OBS-003](../../skill-observations/OBS-003-skill-anunciada-nao-e-skill-ativada.md)). O conteúdo dela é `@lobehub/ui`, antd, Next.js App Router e `react-router-dom`; verificado no `package.json` que **nenhuma das cinco existe**. O projeto é Expo/React Native com React Navigation e componentes próprios (`CS*`).
+
+---
+
+## M-058 — Nomes de métodos do Épico 9 no padrão do Java
+
+**Data:** 19/10/2026 · **PR:** #206 a #216 (um commit em cada) · **Épico 9**
+
+### Como apareceu
+
+Revisão do PO sobre o código dos PRs #206 a #216: vários métodos tinham nome de substantivo
+(`obter()`, `nomes()`, `identidade()`, `etapa()`), booleano sem pergunta (`pertenceA`,
+`comprovada`, `permitir`, `endpointsHabilitados`) ou abreviação (`obterAtivaOu409`). A regra
+seguida é a convenção da Oracle mais Clean Code: lowerCamelCase, começar por verbo, booleano como
+pergunta (`is`/`has`), nome que diz o que faz e unidade no nome quando há medida.
+
+### O que mudou
+
+Só nomes, sem mudança de comportamento, nos métodos criados (ou com regra nova) no Épico 9, em
+backend, app e auxiliares de teste. Principais trocas:
+
+- Booleanos: `VisitaDono.pertenceA` → `isDonoDaVisita`; `PresencaVisita.comprovada`/`noCheckin` →
+  `isComprovada`/`isComprovadaNoCheckin`; `ConfiguracaoRemotaService.modoSomenteLeitura` →
+  `isModoSomenteLeitura`; `JobsProperties.endpointsHabilitados` → `isEndpointsHabilitados`;
+  `isAtualizacaoObrigatoria` no app (era `precisaAtualizar`).
+- Verbo e intenção: `CatalogoService.obter`/`invalidar` → `obterCatalogo`/`invalidarCache`;
+  `ConfiguracaoRemotaService.obter` → `obterConfiguracao`; `RateLimitFilter.identidade`/`excedeu` →
+  `identificarCliente`/`bloquearSeLimiteExcedido`; `UsuarioAutenticadoCache.carregar`/`esquecer` →
+  `carregarUsuario`/`removerDoCache`; `TempoMinimoResposta.garantir` → `executarComTempoMinimo`;
+  `LimiteEnvioEmail.permitir` → `tentarRegistrarEnvio`; `ExecutorJobs.nomes` → `listarNomes`;
+  agendamentos `indicadores()` etc. → `executarIndicadores()` etc.; `VisitaServiceImpl.obterAtivaOu409`
+  → `obterVisitaAtivaDoDono`; no app, `CatalogoLocal.estabelecimentos` → `obterEstabelecimentos`.
+- Unidade: `decorrido(inicio)` → `calcularMilissegundosDesde(inicioEmNanos)`; `comTimeout(promise, ms)`
+  → `aguardarComTimeout(promise, timeoutEmMs)`.
+
+Ficam como estão, por regra da linguagem ou do framework: métodos sobrescritos (`doFilterInternal`,
+`shouldNotFilter`), acessores de `record` (o Java usa o nome do componente, sem `get`), métodos `@Bean`
+(o nome é o nome do bean) e os `handleX` do `GlobalExceptionHandler`, no padrão do arquivo. Métodos que
+já existiam na `develop` antes do Épico 9 ficam para outro PR, se o PO quiser.
+
+### Verificação
+
+Backend compilado em cada um dos 11 PRs e suíte completa verde no último; app com 656 testes, lint
+com 11 avisos (teto 16), `tsc` limpo.

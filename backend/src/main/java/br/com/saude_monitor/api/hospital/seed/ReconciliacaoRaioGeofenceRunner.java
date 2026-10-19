@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.hospital.seed;
 
+import br.com.saude_monitor.api.config.trava.TravaDistribuida;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import br.com.saude_monitor.api.hospital.service.GeofenceFactory;
@@ -22,6 +23,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -52,6 +54,12 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class ReconciliacaoRaioGeofenceRunner implements ApplicationRunner {
 
+    /** Nome da trava desta tarefa ({@link TravaDistribuida}). */
+    static final String NOME_TRAVA = "reconciliacao-raio-geofence";
+
+    /** Folga para a tarefa terminar; se a instância morrer no meio, a trava vence e outra refaz. */
+    private static final Duration VALIDADE_TRAVA = Duration.ofMinutes(10);
+
     /** Depois do seed ({@link SeedRunner#ORDEM}): reconcilia o que já existia, não o recém-semeado. */
     public static final int ORDEM = 20;
 
@@ -70,8 +78,15 @@ public class ReconciliacaoRaioGeofenceRunner implements ApplicationRunner {
     private final SeedProperties properties;
     private final MongoTemplate mongoTemplate;
 
+    /** Uma instância por vez (SOL-02): as outras pulam enquanto esta executa. */
+    private final TravaDistribuida trava;
+
     @Override
     public void run(ApplicationArguments args) {
+        trava.executar(NOME_TRAVA, VALIDADE_TRAVA, this::executar);
+    }
+
+    private void executar() {
         int ajustados = 0;
         int preservados = 0;
         int semGeometria = 0;
@@ -90,36 +105,12 @@ public class ReconciliacaoRaioGeofenceRunner implements ApplicationRunner {
 
             for (HospitalDocument hospital : page.getContent()) {
                 total++;
-                GeoJsonPolygon geofence = hospital.getGeofence();
-                GeoJsonPoint centro = hospital.getLocalizacao();
-                if (geofence == null || centro == null || hospital.getCategoria() == null) {
-                    semGeometria++;
-                    continue;
+                switch (reconciliar(hospital, bulkOps)) {
+                    case AJUSTADO -> naPagina++;
+                    case PRESERVADO -> preservados++;
+                    case SEM_GEOMETRIA -> semGeometria++;
+                    case NO_RAIO -> { /* já está no raio da categoria */ }
                 }
-
-                Integer raioAtual = geofenceFactory.raioAproximadoMetros(geofence, centro);
-                int raioAlvo = (int) Math.round(properties.raio(hospital.getCategoria()));
-                if (raioAtual == null) {
-                    semGeometria++;
-                    continue;
-                }
-                if (Math.abs(raioAtual - raioAlvo) <= TOLERANCIA_METROS) {
-                    continue; // já está no raio da categoria
-                }
-                if (!geofenceFactory.ehCirculoRegular(geofence, centro)) {
-                    preservados++;
-                    log.info("[Geofence] '{}' ({}) tem polígono próprio de ~{} m; "
-                            + "raio da categoria é {} m. Preservado — reconciliação só regrava círculos gerados.",
-                            hospital.getNome(), hospital.getId(), raioAtual, raioAlvo);
-                    continue;
-                }
-
-                GeoJsonPolygon novoGeofence = geofenceFactory.criarCirculo(
-                        centro.getY(), centro.getX(), raioAlvo, GeofenceFactory.LADOS_CIRCULO);
-                bulkOps.updateOne(
-                        Query.query(Criteria.where("id").is(hospital.getId())),
-                        Update.update("geofence", novoGeofence).set("atualizadoEm", Instant.now()));
-                naPagina++;
             }
 
             if (naPagina > 0) {
@@ -137,5 +128,39 @@ public class ReconciliacaoRaioGeofenceRunner implements ApplicationRunner {
                     + "{} com polígono próprio preservado, {} sem geometria utilizável.",
                     total, ajustados, preservados, semGeometria);
         }
+    }
+
+    /** O que a reconciliação fez com um estabelecimento. */
+    private enum Situacao { AJUSTADO, PRESERVADO, SEM_GEOMETRIA, NO_RAIO }
+
+    /** Decide o caso de um estabelecimento e, se for o caso, agenda a regravação do círculo. */
+    private Situacao reconciliar(HospitalDocument hospital, BulkOperations bulkOps) {
+        GeoJsonPolygon geofence = hospital.getGeofence();
+        GeoJsonPoint centro = hospital.getLocalizacao();
+        if (geofence == null || centro == null || hospital.getCategoria() == null) {
+            return Situacao.SEM_GEOMETRIA;
+        }
+
+        Integer raioAtual = geofenceFactory.raioAproximadoMetros(geofence, centro);
+        int raioAlvo = (int) Math.round(properties.raio(hospital.getCategoria()));
+        if (raioAtual == null) {
+            return Situacao.SEM_GEOMETRIA;
+        }
+        if (Math.abs(raioAtual - raioAlvo) <= TOLERANCIA_METROS) {
+            return Situacao.NO_RAIO;
+        }
+        if (!geofenceFactory.ehCirculoRegular(geofence, centro)) {
+            log.info("[Geofence] '{}' ({}) tem polígono próprio de ~{} m; "
+                    + "raio da categoria é {} m. Preservado — reconciliação só regrava círculos gerados.",
+                    hospital.getNome(), hospital.getId(), raioAtual, raioAlvo);
+            return Situacao.PRESERVADO;
+        }
+
+        GeoJsonPolygon novoGeofence = geofenceFactory.criarCirculo(
+                centro.getY(), centro.getX(), raioAlvo, GeofenceFactory.LADOS_CIRCULO);
+        bulkOps.updateOne(
+                Query.query(Criteria.where("id").is(hospital.getId())),
+                Update.update("geofence", novoGeofence).set("atualizadoEm", Instant.now()));
+        return Situacao.AJUSTADO;
     }
 }

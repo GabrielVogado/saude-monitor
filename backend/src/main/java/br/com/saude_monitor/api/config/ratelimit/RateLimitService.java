@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * Rate limiting por IP com janela deslizante (F0-04).
+ * Rate limiting com janela fixa de 1 minuto (F0-04), por identidade e por IP (ARQ-02).
  *
  * <p>Mantém um cache in-memory thread-safe de contadores por chave (IP + grupo de
  * recurso) dentro de uma janela de 1 minuto. Quando o limite é excedido, devolve
@@ -15,9 +15,17 @@ import java.util.concurrent.ConcurrentMap;
  *
  * <p>Grupos (spec F0-04), com os limites vindos de {@link RateLimitProperties}:</p>
  * <ul>
- *   <li>{@code AUTH} — login/refresh: padrão 10 req/min/IP</li>
- *   <li>{@code PUBLICO} — demais endpoints públicos: padrão 60 req/min/IP</li>
+ *   <li>{@code AUTH} — cadastro, confirmação e senha: padrão 10 req/min por IP;</li>
+ *   <li>{@code LOGIN} — 10 req/min por conta, além do {@code AUTH} por IP;</li>
+ *   <li>{@code REFRESH} — 10 req/min por refresh token;</li>
+ *   <li>{@code PUBLICO} — demais endpoints públicos: padrão 60 req/min por usuário,
+ *       instalação do app ou IP;</li>
+ *   <li>{@code IP} — teto de abuso por IP, padrão 600 req/min.</li>
  * </ul>
+ *
+ * <p>Os contadores ficam em memória, por instância. Com N instâncias o limite efetivo
+ * multiplica por N, o que é aceitável enquanto o limite é por identidade; o teto global
+ * de abuso por IP fica para a borda (SOL-03).</p>
  */
 @Service
 public class RateLimitService {
@@ -26,8 +34,16 @@ public class RateLimitService {
     static final long JANELA_MS = 60_000L;
 
     public enum Grupo {
+        /** Rotas de autenticação sem outra identidade (cadastro, confirmação, senha), por IP. */
         AUTH,
-        PUBLICO
+        /** Rotas públicas, por usuário, instalação do app ou IP, nesta ordem. */
+        PUBLICO,
+        /** Login, por conta (e-mail), além do limite por IP do {@link #AUTH}. */
+        LOGIN,
+        /** Renovação de sessão, pelo próprio refresh token, nunca pelo IP. */
+        REFRESH,
+        /** Teto de abuso por IP, somando o tráfego limitado inteiro. */
+        IP
     }
 
     private final RateLimitProperties properties;
@@ -42,8 +58,10 @@ public class RateLimitService {
     /** Limite do grupo por minuto, conforme a configuração do ambiente. */
     public int limite(Grupo grupo) {
         return switch (grupo) {
-            case AUTH -> properties.authPorMinuto();
+            case AUTH, LOGIN, REFRESH -> properties.authPorMinuto();
             case PUBLICO -> properties.publicoPorMinuto();
+            case IP -> Math.max(properties.ipPorMinuto(),
+                    Math.max(properties.authPorMinuto(), properties.publicoPorMinuto()));
         };
     }
 

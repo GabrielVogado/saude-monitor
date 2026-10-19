@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.user.seed;
 
+import br.com.saude_monitor.api.config.trava.TravaDistribuida;
 import br.com.saude_monitor.api.user.document.Papel;
 import br.com.saude_monitor.api.user.document.UserDocument;
 import br.com.saude_monitor.api.user.repository.UserRepository;
@@ -12,44 +13,65 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
 
 /**
- * Cria um usuário ADMIN padrão no primeiro boot, se ainda não existir nenhum.
+ * Cria um usuário ADMIN no primeiro boot, se ainda não existir nenhum.
  *
  * <p>Resolve o gap de bootstrap: sem um ADMIN cadastrado, ninguém consegue
  * POST/PUT/PATCH em {@code /api/v1/hospitais/**} (403). Idempotente — não duplica.</p>
+ *
+ * <p>SEG-07: só roda ligado de propósito ({@code app.seed-admin.enabled=true}) e não há
+ * e-mail nem senha padrão no código. Ligado sem e-mail, sem senha ou com senha curta, a
+ * aplicação não sobe: um admin com senha conhecida num serviço público é pior do que nenhum,
+ * e o erro no boot aparece na hora, ao contrário de um seed pulado em silêncio.</p>
  */
 @Slf4j
 @Component
-@ConditionalOnProperty(prefix = "app.seed-admin", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "app.seed-admin", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class AdminUserSeeder implements ApplicationRunner {
+
+    /** Nome da trava desta tarefa ({@link TravaDistribuida}). */
+    static final String NOME_TRAVA = "seed-admin";
+
+    /** Folga para a tarefa terminar; se a instância morrer no meio, a trava vence e outra refaz. */
+    private static final Duration VALIDADE_TRAVA = Duration.ofMinutes(2);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AdminSeedProperties properties;
 
+    /** Uma instância por vez (SOL-02): as outras pulam enquanto esta executa. */
+    private final TravaDistribuida trava;
+
+    /** Menor senha aceita para o admin semeado. */
+    static final int SENHA_MINIMA = 12;
+
     @Override
     public void run(ApplicationArguments args) {
-        if (properties.email() == null || properties.email().isBlank()) {
-            log.warn("[AdminSeed] E-mail de admin não configurado (app.seed-admin.email). Seed ignorado.");
-            return;
-        }
+        validarConfiguracao();
+        trava.executar(NOME_TRAVA, VALIDADE_TRAVA, this::executar);
+    }
 
+    /** Falha o boot quando o seed está ligado sem credencial utilizável (SEG-07). */
+    private void validarConfiguracao() {
+        if (properties.email() == null || properties.email().isBlank()) {
+            throw new IllegalStateException(
+                    "Seed de admin ligado sem ADMIN_EMAIL. Configure o e-mail ou desligue APP_SEEDADMIN_ENABLED.");
+        }
+        if (properties.senha() == null || properties.senha().isBlank()
+                || properties.senha().strip().length() < SENHA_MINIMA) {
+            throw new IllegalStateException("Seed de admin ligado sem ADMIN_SENHA com pelo menos "
+                    + SENHA_MINIMA + " caracteres. Configure a senha ou desligue APP_SEEDADMIN_ENABLED.");
+        }
+    }
+
+    private void executar() {
         // Idempotência: só cria se não existir NENHUM usuário ADMIN.
         if (userRepository.existsByPapel(Papel.ADMIN)) {
             log.info("[AdminSeed] Já existe usuário ADMIN. Nada a fazer.");
-            return;
-        }
-
-        if (properties.senha() == null || properties.senha().isBlank()) {
-            // Não cria admin com senha vazia: o hash de "" nunca autentica (LoginRequest
-            // exige senha não-branco), então o time ficaria sem acesso administrativo sem
-            // nenhum sinal disso no boot — antes este caso seguia em frente e logava
-            // "criado com sucesso" mesmo sem credencial utilizável.
-            log.error("[AdminSeed] app.seed-admin.email configurado mas app.seed-admin.senha "
-                    + "está ausente/vazio. Seed do admin ABORTADO — configure a senha antes do próximo boot.");
             return;
         }
 

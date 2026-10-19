@@ -8,6 +8,10 @@ import org.springframework.validation.annotation.Validated;
 /**
  * Propriedades do rate limiting (F0-04), lidas do prefixo {@code app.ratelimit}.
  *
+ * <p>Desde o ARQ-02 (18/10/2026) os limites de {@code auth} e {@code publico} contam por
+ * identidade sempre que existe uma; o IP só entra no teto de abuso ({@code ipPorMinuto}) e
+ * nas rotas de autenticação que não têm outra identidade (cadastro, confirmação, senha).</p>
+ *
  * <p>Os limites eram constantes do {@code enum} {@link RateLimitService.Grupo}. Viraram
  * configuração em 23/09/2026 para o ambiente de homologação poder receber carga de
  * teste de desempenho vinda de uma única máquina — com 60 req/min por IP, o teste
@@ -38,6 +42,15 @@ public record RateLimitProperties(
          * enviar um {@code X-Forwarded-For} diferente a cada requisição para nunca bater
          * no limite.</p>
          */
-        @PositiveOrZero int proxiesConfiaveis
+        @PositiveOrZero int proxiesConfiaveis,
+        /**
+         * Teto de abuso por IP, somando o tráfego limitado que sai do mesmo endereço
+         * (ARQ-02). É alto de propósito: atrás do CGNAT das operadoras, centenas de celulares
+         * dividem um IP, e o limite que vale para cada pessoa é o da identidade (usuário,
+         * instalação do app, conta no login, refresh token na renovação). Nunca fica abaixo
+         * dos outros limites, para o teste de carga da homologação, que sai de uma máquina só,
+         * não medir este teto.
+         */
+        @Positive int ipPorMinuto
 ) {
 }

@@ -1,6 +1,7 @@
 package br.com.saude_monitor.api.visita.dto;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 
@@ -13,11 +14,16 @@ import java.time.Instant;
  *
  * <p>{@code ocorridoEm} é o momento real da saída, usado quando o checkout ficou na fila
  * offline do aplicativo (OPS-05). Ver {@link CheckinRequest} para as restrições.</p>
+ *
+ * <p>{@code dispositivoId} é obrigatório para encerrar visita anônima: é a prova de que quem
+ * chama é o aparelho que fez o check-in (SEG-02). Ignorado em visita de usuário logado.</p>
  */
 public record CheckoutRequest(
         @Valid PosicaoDto posicao,
         Boolean gpsIndisponivel,
         Boolean encerramentoManual,
-        Instant ocorridoEm
+        Instant ocorridoEm,
+        @Size(max = 64, message = "dispositivoId deve ter no máximo 64 caracteres.")
+        String dispositivoId
 ) {
 }

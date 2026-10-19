@@ -1,4 +1,5 @@
 import { apiRequest as request } from "../../../core/api/apiClient";
+import DispositivoId from "../../../services/DispositivoId";
 
 const BASE_PATH = "/api/v1/feedbacks";
 
@@ -17,9 +18,13 @@ class FeedbackService {
    * `existsByVisitaId`): uma repetição em 502/503/504 — que tipicamente ocorre antes
    * de a aplicação processar qualquer coisa — no pior caso bate em 409 ("Você já
    * avaliou esta visita"), já tratado pela tela como sucesso, não como erro.
+   *
+   * O `dispositivoId` prova que a visita anônima é deste aparelho: sem ele o backend
+   * recusa (403), para ninguém avaliar a visita de outra pessoa pelo id.
    */
-  static enviar(payload) {
-    return request(BASE_PATH, { method: "POST", body: payload, idempotente: true });
+  static async enviar(payload) {
+    const corpo = { ...payload, dispositivoId: await DispositivoId.obterSeDisponivel() };
+    return request(BASE_PATH, { method: "POST", body: corpo, idempotente: true });
   }
 
   /** Feedback da visita (dono) — usado para pré-preencher a edição dentro da janela de 24h. */

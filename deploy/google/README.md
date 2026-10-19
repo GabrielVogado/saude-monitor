@@ -66,15 +66,16 @@ especificacao da revisao para qualquer um com `viewer`.
 
 **`ADMIN_EMAIL` e `ADMIN_SENHA` nao existem no Secret Manager.** Enquanto for
 assim, o deploy passa `APP_SEEDADMIN_ENABLED=false` e nenhum admin e criado.
-Sem isso, `application.properties:70-71` cairia em `admin@saude.com` /
-`admin123` num servico com `--allow-unauthenticated`. Para ligar o seed:
+Desde o SEG-07 (18/10/2026) o seed ja vem desligado por padrao e nao ha e-mail nem
+senha padrao no codigo: ligado sem os dois, ou com senha de menos de 12 caracteres,
+a aplicacao nao sobe. Para ligar o seed:
 
 ```bash
 printf 'SEU_EMAIL' | gcloud secrets create ADMIN_EMAIL --data-file=- --replication-policy=automatic
 gcloud secrets create ADMIN_SENHA --data-file=- --replication-policy=automatic   # cole a senha e Ctrl+D
 ```
 
-e entao trocar `APP_SEEDADMIN_ENABLED=false` por essas duas entradas em `secrets:`.
+e entao trocar `APP_SEEDADMIN_ENABLED=false` por `APP_SEEDADMIN_ENABLED=true` e essas duas entradas em `secrets:`.
 
 ## Pontos em aberto
 

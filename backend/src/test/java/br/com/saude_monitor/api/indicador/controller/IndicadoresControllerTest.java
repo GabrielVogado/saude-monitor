@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.indicador.controller;
 
+import br.com.saude_monitor.api.hospital.service.CatalogoService;
 import br.com.saude_monitor.api.indicador.dto.IndicadoresDetalheResponse;
 import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
@@ -32,7 +33,8 @@ class IndicadoresControllerTest {
     @BeforeEach
     void setup() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new HospitalController(hospitalService, new AutenticacaoHelper(null), indicadorService))
+                .standaloneSetup(new HospitalController(hospitalService, new AutenticacaoHelper(null), indicadorService,
+                        mock(CatalogoService.class)))
                 .build();
     }
 

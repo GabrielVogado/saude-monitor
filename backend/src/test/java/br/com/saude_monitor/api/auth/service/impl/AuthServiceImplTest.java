@@ -8,6 +8,8 @@ import br.com.saude_monitor.api.auth.dto.RedefinirSenhaRequest;
 import br.com.saude_monitor.api.auth.dto.ReenviarConfirmacaoRequest;
 import br.com.saude_monitor.api.auth.dto.RefreshRequest;
 import br.com.saude_monitor.api.auth.email.EmailService;
+import br.com.saude_monitor.api.auth.service.LimiteEnvioEmail;
+import br.com.saude_monitor.api.auth.service.TempoMinimoResposta;
 import br.com.saude_monitor.api.auth.verificacao.CodigoVerificacaoDocument;
 import br.com.saude_monitor.api.auth.verificacao.CodigoVerificacaoRepository;
 import br.com.saude_monitor.api.auth.verificacao.Proposito;
@@ -49,6 +51,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.matches;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -85,7 +88,8 @@ class AuthServiceImplTest {
 
         authService = new AuthServiceImpl(
                 userRepository, passwordEncoder, jwtService, revogadoRepository,
-                codigoVerificacaoRepository, emailService, mongoTemplate);
+                codigoVerificacaoRepository, emailService, mongoTemplate,
+                new LimiteEnvioEmail(), TempoMinimoResposta.criarSemPiso());
     }
 
     /** "Ativo" aqui inclui e-mail confirmado — a maioria dos testes não exercita esse eixo. */
@@ -318,12 +322,61 @@ class AuthServiceImplTest {
         PasswordEncoder encoderMockado = mock(PasswordEncoder.class);
         AuthServiceImpl service = new AuthServiceImpl(
                 userRepository, encoderMockado, jwtService, revogadoRepository,
-                codigoVerificacaoRepository, emailService, mongoTemplate);
+                codigoVerificacaoRepository, emailService, mongoTemplate,
+                new LimiteEnvioEmail(), TempoMinimoResposta.criarSemPiso());
         when(userRepository.findByEmail("fantasma@email.com")).thenReturn(Optional.empty());
 
         service.esqueciSenha(new EsqueciSenhaRequest("fantasma@email.com"));
 
         verify(encoderMockado).encode(anyString());
+    }
+
+    @Test
+    void loginComEmailInexistenteGastaOMesmoBcryptDeUmaSenhaErrada() {
+        // SEG-03: sem o BCrypt descartável, o login de e-mail sem conta respondia mais rápido.
+        PasswordEncoder encoderMockado = mock(PasswordEncoder.class);
+        when(encoderMockado.encode(anyString())).thenReturn("$2a$10$hashdescartavel");
+        AuthServiceImpl service = new AuthServiceImpl(
+                userRepository, encoderMockado, jwtService, revogadoRepository,
+                codigoVerificacaoRepository, emailService, mongoTemplate,
+                new LimiteEnvioEmail(), TempoMinimoResposta.criarSemPiso());
+        when(userRepository.findByEmail("fantasma@email.com")).thenReturn(Optional.empty());
+        LoginRequest pedido = new LoginRequest("fantasma@email.com", "qualquer", false);
+
+        assertThrows(NaoAutorizadoException.class, () -> service.login(pedido));
+        assertThrows(NaoAutorizadoException.class, () -> service.login(pedido));
+
+        verify(encoderMockado, times(2)).matches("qualquer", "$2a$10$hashdescartavel");
+        // O hash descartável é calculado uma vez só.
+        verify(encoderMockado, times(1)).encode(anyString());
+    }
+
+    @Test
+    void codigosParaOMesmoDestinoParamNoLimiteSemMudarAResposta() {
+        when(userRepository.findByEmail("marina@email.com")).thenReturn(Optional.of(usuarioAtivo("marina@email.com")));
+        EsqueciSenhaRequest pedido = new EsqueciSenhaRequest("marina@email.com");
+
+        for (int i = 0; i <= LimiteEnvioEmail.MAXIMO_POR_JANELA; i++) {
+            assertTrue((Boolean) authService.esqueciSenha(pedido).get("success"));
+        }
+
+        verify(emailService, times(LimiteEnvioEmail.MAXIMO_POR_JANELA))
+                .enviarCodigoRedefinicaoSenha(eq("marina@email.com"), anyString());
+    }
+
+    @Test
+    void esqueciSenhaEReenvioPassamPeloPisoDeTempo() {
+        TempoMinimoResposta piso = mock(TempoMinimoResposta.class);
+        when(piso.executarComTempoMinimo(any())).thenAnswer(inv -> inv.<java.util.function.Supplier<?>>getArgument(0).get());
+        AuthServiceImpl service = new AuthServiceImpl(
+                userRepository, passwordEncoder, jwtService, revogadoRepository,
+                codigoVerificacaoRepository, emailService, mongoTemplate, new LimiteEnvioEmail(), piso);
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
+
+        service.esqueciSenha(new EsqueciSenhaRequest("fantasma@email.com"));
+        service.reenviarConfirmacaoEmail(new ReenviarConfirmacaoRequest("fantasma@email.com"));
+
+        verify(piso, times(2)).executarComTempoMinimo(any());
     }
 
     // ------------------------------------------------ Redefinir senha ----------------------------------------------

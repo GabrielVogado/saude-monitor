@@ -65,7 +65,8 @@ public class VisitaController {
                                                        @Valid @RequestBody(required = false) HeartbeatRequest request) {
         String usuarioId = autenticacaoHelper.usuarioIdAtual().orElse(null);
         PosicaoDto posicao = request == null ? null : request.posicao();
-        return ResponseEntity.ok(visitaService.heartbeat(id, usuarioId, posicao));
+        String dispositivoId = request == null ? null : request.dispositivoId();
+        return ResponseEntity.ok(visitaService.heartbeat(id, usuarioId, dispositivoId, posicao));
     }
 
     /** 🔒 Sinaliza observação/internação após 12h de visita ativa (E2-10). */

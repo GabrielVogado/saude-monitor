@@ -16,8 +16,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,15 +49,32 @@ class IndicadorServiceImplTest {
     private final IndicadorService service =
             new IndicadorServiceImpl(indicadorRepository, feedbackRepository, visitaRepository, hospitalRepository, mongoTemplate);
 
+    /** Visitas que o stub de {@code findAllById} devolve sem prova de presença (SEG-01). */
+    private final Set<String> visitasNaoComprovadas = new HashSet<>();
+    /** Visitas que o stub de {@code findAllById} não encontra. */
+    private final Set<String> visitasInexistentes = new HashSet<>();
+    private int proximaVisita;
+
     @BeforeEach
     void setup() {
+        when(visitaRepository.findAllById(any())).thenAnswer(inv -> {
+            Iterable<String> ids = inv.getArgument(0);
+            List<VisitaDocument> visitas = new ArrayList<>();
+            ids.forEach(id -> {
+                if (!visitasInexistentes.contains(id)) {
+                    visitas.add(VisitaDocument.builder().id(id)
+                            .presencaComprovada(!visitasNaoComprovadas.contains(id)).build());
+                }
+            });
+            return visitas;
+        });
         when(feedbackRepository.findByHospitalIdAndCriadoEmAfterAndNotaNotNull(eq("h1"), any())).thenReturn(List.of());
         when(visitaRepository.findByHospitalIdAndStatusInAndSaidaBetweenAndTipoPermanencia(
                 eq("h1"), any(), any(), any(), any())).thenReturn(List.of());
     }
 
     private FeedbackDocument feedback(String hosp, int nota) {
-        return FeedbackDocument.builder().hospitalId(hosp).nota(nota).build();
+        return FeedbackDocument.builder().visitaId("v" + (++proximaVisita)).hospitalId(hosp).nota(nota).build();
     }
 
     // ------------------------------------------------ RN-14/RN-15 (média + N) ---------------------------------------
@@ -87,6 +107,51 @@ class IndicadorServiceImplTest {
         assertThat(indicador.getNotaMedia()).isEqualTo(5.0);
     }
 
+    // ------------------------------------------------ SEG-01 (prova de presença) ------------------------------------
+
+    @Test
+    void recalcularIgnoraFeedbackDeVisitaSemProvaDePresenca() {
+        FeedbackDocument comprovado = feedback("h1", 4);
+        FeedbackDocument semProva = feedback("h1", 1);
+        visitasNaoComprovadas.add(semProva.getVisitaId());
+        when(feedbackRepository.findByHospitalIdAndCriadoEmAfterAndNotaNotNull(eq("h1"), any()))
+                .thenReturn(List.of(comprovado, semProva));
+
+        IndicadorHospitalDocument indicador = service.recalcular("h1");
+
+        assertThat(indicador.getNAvaliacoes()).isEqualTo(1);
+        assertThat(indicador.getNotaMedia()).isEqualTo(4.0);
+    }
+
+    @Test
+    void recalcularIgnoraFeedbackSemVisitaEncontrada() {
+        FeedbackDocument comprovado = feedback("h1", 5);
+        FeedbackDocument orfao = feedback("h1", 1);
+        FeedbackDocument semVisita = FeedbackDocument.builder().hospitalId("h1").nota(1).build();
+        visitasInexistentes.add(orfao.getVisitaId());
+        when(feedbackRepository.findByHospitalIdAndCriadoEmAfterAndNotaNotNull(eq("h1"), any()))
+                .thenReturn(List.of(comprovado, orfao, semVisita));
+
+        IndicadorHospitalDocument indicador = service.recalcular("h1");
+
+        assertThat(indicador.getNAvaliacoes()).isEqualTo(1);
+        assertThat(indicador.getNotaMedia()).isEqualTo(5.0);
+    }
+
+    @Test
+    void recalcularIgnoraTempoDeVisitaSemProvaDePresenca() {
+        VisitaDocument semProva = visitaFinalizada(600);
+        semProva.setPresencaComprovada(false);
+        when(visitaRepository.findByHospitalIdAndStatusInAndSaidaBetweenAndTipoPermanencia(
+                eq("h1"), any(), any(), any(), any()))
+                .thenReturn(List.of(visitaFinalizada(40), semProva));
+
+        IndicadorHospitalDocument indicador = service.recalcular("h1");
+
+        assertThat(indicador.getNVisitas()).isEqualTo(1);
+        assertThat(indicador.getTempoMedianoMinutos()).isEqualTo(40);
+    }
+
     // ------------------------------------------------ RN-16 (mediana do tempo) --------------------------------------
 
     private VisitaDocument visitaFinalizada(int minutos) {
@@ -95,6 +160,7 @@ class IndicadorServiceImplTest {
                 .status(StatusVisita.FINALIZADA)
                 .tipoPermanencia(TipoPermanencia.ATENDIMENTO)
                 .duracaoMinutos(minutos)
+                .presencaComprovada(true)
                 .build();
     }
 
@@ -137,7 +203,7 @@ class IndicadorServiceImplTest {
     void recalcularExcluiVisitasSemDuracao() {
         VisitaDocument semDuracao = VisitaDocument.builder()
                 .hospitalId("h1").status(StatusVisita.FINALIZADA)
-                .tipoPermanencia(TipoPermanencia.ATENDIMENTO).duracaoMinutos(null).build();
+                .tipoPermanencia(TipoPermanencia.ATENDIMENTO).duracaoMinutos(null).presencaComprovada(true).build();
         when(visitaRepository.findByHospitalIdAndStatusInAndSaidaBetweenAndTipoPermanencia(
                 eq("h1"), any(), any(), any(), any()))
                 .thenReturn(List.of(visitaFinalizada(45), semDuracao));
@@ -165,6 +231,7 @@ class IndicadorServiceImplTest {
                 .saida(saida)
                 .ultimaPosicaoEm(ultimaPosicao)
                 .duracaoMinutos((int) java.time.Duration.between(entrada, saida).toMinutes())
+                .presencaComprovada(true)
                 .build();
     }
 

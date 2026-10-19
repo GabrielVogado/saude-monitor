@@ -1,7 +1,100 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 15/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 19/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 19/10/2026 — Homologação v1.0.0-rc.6
+
+**O que entrou:** registro da rc que leva o Épico 9 (adequação em código) da `develop` de 19/10/2026 para a homologação: o que entrou desde a rc.5 (PRs #203, #205 e #206 a #216, M-047 a M-058), o que fica de fora (infraestrutura do Épico 9), rollback e o roteiro de teste no aparelho, que repete os itens da rc.5 ainda não validados. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.6.md`](./10-git-flow/homologacoes/v1.0.0-rc.6.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
+
+---
+
+## 📌 Revisão 19/10/2026 — Épico 9: nomes de métodos no padrão do Java
+
+**O que mudou:** os métodos criados nos PRs #206 a #216 passam a começar por verbo, com booleano como pergunta (`is`/`has`) e unidade no nome quando há medida (ex.: `pertenceA` → `isDonoDaVisita`, `obter` → `obterCatalogo`). Só nomes, sem mudança de comportamento. Registro em `Historico-Melhorias.md` (M-058).
+
+---
+
+## 📌 Revisão 18/10/2026 — Épico 9: catálogo local no geofencing e versão mínima do app (APP-01, APP-03)
+
+**O que mudou:** o app guarda o catálogo de estabelecimentos e faz no aparelho a escolha dos hospitais monitorados pelo geofencing, sem pedir a lista ao servidor a cada deslocamento; e passa a ler a configuração remota, mostrando a tela "Atualize o Radar Saúde" abaixo da versão mínima. `Especificacao-API-v2.4.md` (§3.7 e §3.9), `De-Para-Backlog-Features.md` (APP-01 e APP-03 entregues, ARQ-01 atualizado) e `Historico-Melhorias.md` (M-057).
+
+---
+
+## 📌 Revisão 18/10/2026 — Épico 9: Swagger fora de produção, admin sem senha padrão e contêiner sem root (SEG-07, SEG-06)
+
+**O que mudou:** o perfil `prod` deixa de servir `/v3/api-docs` e o Swagger UI; o seed de admin fica desligado por padrão, sem e-mail nem senha no código, e derruba o boot se ligado sem credencial forte; a imagem do backend roda como usuário sem privilégio e sem `curl`. `Especificacao-API-v2.4.md` (§5), `De-Para-Backlog-Features.md` (SEG-07 entregue, SEG-06 parcial), `deploy/google/README.md` e `Historico-Melhorias.md` (M-056).
+
+---
+
+## 📌 Revisão 18/10/2026 — Épico 9: contenção de falhas, pool do banco e configuração remota (ARQ-05, SOL-07, ARQ-09)
+
+**O que mudou:** cada instância atende no máximo 80 requisições ao mesmo tempo e responde 503 com `Retry-After` acima disso; falha passageira do banco vira 503 em vez de 500; o pool do MongoDB fica limitado a 20 conexões com prazos explícitos; e nasce a configuração remota (modo somente leitura e versão mínima do app), lida em `GET /api/v1/configuracao` e alterada pelo ADMIN. `Especificacao-API-v2.4.md` (§1.2 e §3.9), `De-Para-Backlog-Features.md` (ARQ-05, SOL-07 e ARQ-09 entregues) e `Historico-Melhorias.md` (M-055).
+
+---
+
+## 📌 Revisão 18/10/2026 — Épico 9: e-mail de código síncrono e limite por destino (SOL-09, SEG-03)
+
+**O que mudou:** os códigos de cadastro, reenvio e "esqueci a senha" saem dentro da requisição, com teto de 1,5 s para o Resend, em vez de `@Async` (que no Cloud Run podia ficar sem CPU). Reenvio e "esqueci a senha" respondem sempre em 2 s, cada endereço recebe no máximo 5 códigos por hora e o login de e-mail sem conta gasta o mesmo BCrypt. `Especificacao-API-v2.4.md` (§3.1), `De-Para-Backlog-Features.md` (SOL-09 e SEG-03 entregues) e `Historico-Melhorias.md` (M-054).
+
+---
+
+## 📌 Revisão 18/10/2026 — Épico 9: jobs disparáveis pelo Cloud Scheduler (SOL-05, ARQ-08)
+
+**O que mudou:** os 5 jobs periódicos ganham `POST /internal/jobs/{nome}`, aceito só com o token OIDC da conta de serviço do Cloud Scheduler, e passam a rodar uma vez por vez entre instâncias (trava distribuída), com log de início, fim e erro. O `@Scheduled` interno segue ligado até a infraestrutura criar os agendamentos. `Especificacao-API-v2.4.md` (§3.8), `De-Para-Backlog-Features.md` (SOL-05 parcial, ARQ-08 entregue) e `Historico-Melhorias.md` (M-053, com o passo a passo para ativar).
+
+---
+
+## 📌 Revisão 18/10/2026 — Épico 9: catálogo público com cache e cache curto do usuário (ARQ-01, ARQ-03)
+
+**O que mudou:** novo `GET /api/v1/catalogo` com todos os estabelecimentos ativos e indicadores, `ETag` pelo conteúdo (304 quando o app já tem a versão) e `Cache-Control` público para a borda; montado no máximo a cada 5 min por instância. O ranking ganha `s-maxage=300`, as respostas JSON saem com gzip e a conta do token fica 60 s em memória em vez de uma leitura no banco por requisição. `Especificacao-API-v2.4.md` (§3.7), `De-Para-Backlog-Features.md` (ARQ-01 parcial, ARQ-03 entregue) e `Historico-Melhorias.md` (M-052).
+
+---
+
+## 📌 Revisão 18/10/2026 — Épico 9: rate limit por identidade (ARQ-02)
+
+**O que mudou:** o rate limit das rotas públicas passa a contar por usuário ou pela instalação do app (`X-Cliente-Id`), não pelo IP que o CGNAT das operadoras faz centenas de celulares dividirem; o IP fica com um teto de abuso de 600/min. O login ganha limite por conta e o refresh sai do limite por IP, limitado só pelo próprio token. `Especificacao-API-v2.4.md` (limites e cabeçalho), `De-Para-Backlog-Features.md` (ARQ-02 entregue) e `Historico-Melhorias.md` (M-051).
+
+---
+
+## 📌 Revisão 18/10/2026 — Épico 9: seed e tarefas de inicialização com trava distribuída (SOL-02)
+
+**O que mudou:** seed de hospitais, reconciliações, importação CNES, seed do admin e massa do dev passam a rodar sob uma trava no MongoDB: com várias instâncias subindo juntas, só uma executa. É o pré-requisito de código para tirar o `--max-instances=1` do Cloud Run, que fica para a etapa de infraestrutura. `De-Para-Backlog-Features.md` (SOL-02 entregue) e `Historico-Melhorias.md` (M-050).
+
+---
+
+## 📌 Revisão 18/10/2026 — Épico 9: só avaliação com prova de presença conta no indicador (SEG-01)
+
+**O que mudou:** o indicador público (nota e tempo) passa a contar só visitas cujo check-in trouxe posição dentro do geofence do hospital, recebido até 45 min depois da entrada, e os feedbacks delas. O check-in manual sem posição e o retroativo continuam aceitos, mas ficam fora do indicador. `Especificacao-API-v2.4.md` (check-in e indicadores), `De-Para-Backlog-Features.md` (SEG-01 parcial) e `Historico-Melhorias.md` (M-049).
+
+---
+
+## 📌 Revisão 18/10/2026 — Épico 9: GPS apagado ao encerrar a visita e vínculo pessoal só por 90 dias (DAD-01, ARQ-04)
+
+**O que mudou:** os pontos de GPS de uma visita são apagados quando ela termina, e visitas e avaliações com mais de 90 dias perdem o vínculo com a conta e o aparelho, como promete o Documento Negocial §11. O heartbeat e o checkout viram update atômico, sem regravar a visita inteira nem desfazer um encerramento do job. `Especificacao-API-v2.4.md` e a política de privacidade (`site/`, versão 1.1) atualizadas. `De-Para-Backlog-Features.md` (DAD-01 e ARQ-04 entregues) e `Historico-Melhorias.md` (M-048).
+
+---
+
+## 📌 Revisão 18/10/2026 — Épico 9: visita e feedback anônimos só para o dono (SEG-02)
+
+**O que mudou:** primeiro PR do Épico 9 (Escala, Segurança e Privacidade), que entra no `De-Para-Backlog-Features.md` com os gaps de código da análise de 17/10. Checkout, heartbeat e feedback de visita anônima passam a exigir o `dispositivoId` do aparelho que fez o check-in, e o feedback de visita logada exige o mesmo usuário (403 caso contrário). `Especificacao-API-v2.4.md` atualizada nos três endpoints. Registro em `Historico-Melhorias.md` (M-047).
+
+---
+
+## 📌 Revisão 18/10/2026 — Contexto da análise de escala para o projeto Radar Saude
+
+**O que entrou:** o [`Contexto-Sessao-Analise-Escala-Seguranca-2026-10-18.md`](./02-arquitetura-tecnica/Contexto-Sessao-Analise-Escala-Seguranca-2026-10-18.md), um resumo da análise de escalabilidade, segurança e custo (item 3d), feito para servir de conhecimento do projeto "Radar Saude" no Claude. Ele reúne em um arquivo curto o produto, as conclusões, os 46 gaps com a correção dos críticos, as 15 perguntas pendentes ao PO com a sugestão e o efeito de cada resposta, o roteiro por fase e onde está cada documento. Em caso de divergência, vale o relatório.
+**Sem mudança de código.** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` sem mudança.
+
+---
+
+## 📌 Revisão 17/10/2026 — Análise de escalabilidade, segurança e custo para o DF
+
+**O que entrou:** a [`Analise-Escalabilidade-Seguranca-DF-v1.0.md`](./02-arquitetura-tecnica/Analise-Escalabilidade-Seguranca-DF-v1.0.md) (versão em PDF ao lado), pedida pelo PO para a meta de 60–70% da população do DF. Organiza 46 gaps em 8 setores (soluções, software, app, segurança, LGPD, desempenho, operação e processo), cada um com evidência no código, impacto, soluções possíveis e recomendação. Revisa o modelo de carga do `Plano-Escala-Infraestrutura-DF-v1.0` com o recálculo de geofence em segundo plano, que ele não cobria. Traz custos por patamar, roteiro em fases, plano de prova de carga e o ADR-016 proposto (borda + catálogo local + Cloud Scheduler no lugar de Upstash + Cloud Tasks). Termina com 15 perguntas ao PO, cada uma com a sugestão recomendada. Atualizado em 18/10/2026 com a §12.4 (por que não Quarkus), o cache AOT do Java 25 no SOL-04 e o SOL-09 (e-mail de confirmação em `@Async` pode não sair na cobrança por requisição do Cloud Run).
+**Sem mudança de código.** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` sem mudança (é análise; nada foi entregue). O ADR-016 entra no `adrs.md` depois da decisão do PO.
 
 ---
 
@@ -253,7 +346,10 @@ Documentos/
 │   ├── Arvore-Tecnologica-v2.1.md            ← stack atual vs. proposta, manter/refatorar, ADRs, roadmap
 │   ├── Especificacao-API-v2.4.md             ← contratos REST (OpenAPI), modelo de dados MongoDB, fluxos (+ §3.6 camadas)
 │   ├── Plano-Tecnico-Painel-Administrativo-Web-v1.0.md  ← stack, estrutura de pastas e consumo de API do painel web (F-11)
-│   └── Plano-Escala-Infraestrutura-DF-v1.0.md  ← patamares de carga, custo e migração da infraestrutura para o DF
+│   ├── Plano-Escala-Infraestrutura-DF-v1.0.md  ← patamares de carga, custo e migração da infraestrutura para o DF
+│   ├── Analise-Escalabilidade-Seguranca-DF-v1.0.md (+ .pdf)  ← 46 gaps por setor, soluções, custos, roteiro e perguntas ao PO
+│   ├── Contexto-Sessao-Analise-Escala-Seguranca-2026-10-18.md  ← resumo da análise para o projeto Radar Saude no Claude
+│   └── assets/                               ← diagramas usados pelos documentos desta pasta
 │
 ├── 03-ui-ux/                                 ← padrão de experiência e interface
 │   └── Padrao-UI-UX-v2.1.md                  ← princípios, personas, jornada, design system, acessibilidade, LGPD
@@ -315,6 +411,8 @@ Documentos/
 | 3 | [Especificação da API](./02-arquitetura-tecnica/Especificacao-API-v2.4.md) | **2.4** | ✅ Ativo | Contratos REST de todos os endpoints (auth, hospitais, visitas, feedbacks, agregados, **camadas**), coleções MongoDB com índices/GeoJSON e fluxo geofence → API. **v2.4 (04/10/2026):** `GET /api/v1/contas/feedbacks/pendentes` e feedback aceito em visita `GPS_INTERROMPIDO` (M-029). **v2.2 (12/09/2026):** novo §3.6 `GET /api/v1/camadas/{tipo}` (F-11). v2.1 (06/09/2026) fechava CONT-01/CONT-02 (E8-14). |
 | 3b | [Plano Técnico — Painel Administrativo Web](./02-arquitetura-tecnica/Plano-Tecnico-Painel-Administrativo-Web-v1.0.md) | 1.0 | 🟡 Proposta | Stack (React + Vite + Leaflet), estrutura de pastas de `web-admin/` e estratégia de consumo da API existente para o painel administrativo (F-11). |
 | 3c | [Plano de Escala da Infraestrutura para o DF](./02-arquitetura-tecnica/Plano-Escala-Infraestrutura-DF-v1.0.md) | 1.0 | 🟡 Proposta | Estrutura atual medida, travas para escalar, patamares de carga com custo estimado (US$/mês) e migração em cinco fases. ADR-015. |
+| 3d | [Análise de Escalabilidade, Segurança e Custo para o DF](./02-arquitetura-tecnica/Analise-Escalabilidade-Seguranca-DF-v1.0.md) ([PDF](./02-arquitetura-tecnica/Analise-Escalabilidade-Seguranca-DF-v1.0.pdf)) | 1.0 | 🟡 Proposta | 46 gaps em 8 setores com evidência, soluções e recomendação; modelo de carga revisado (recálculo de geofence em 2º plano); arquitetura-alvo; custos por patamar; roteiro; plano de prova de carga; ADR-016 proposto; por que não Quarkus (§12.4); 15 perguntas ao PO com sugestões. Complementa o 3c. |
+| 3e | [Contexto da análise de escala (resumo)](./02-arquitetura-tecnica/Contexto-Sessao-Analise-Escala-Seguranca-2026-10-18.md) | 18/10/2026 | ✅ Ativo | Resumo do 3d para o projeto "Radar Saude" no Claude: conclusões, gaps, perguntas pendentes com o efeito de cada resposta, roteiro e mapa dos documentos. Em caso de divergência, vale o 3d. |
 | 4 | [Padrão UI/UX](./03-ui-ux/Padrao-UI-UX-v2.1.md) | **2.1** | ✅ Ativo | Princípios de UX, personas, jornada ponta a ponta, arquitetura de informação, design system completo (tokens, componentes), acessibilidade WCAG AA, LGPD por design e protótipos ASCII. |
 | 5 | [Backlog do MVP](./04-backlog/Backlog-MVP-v2.2.md) | **2.2** | ✅ Ativo | Backlog priorizado (Fase 0 + 8 épicos), decisões de priorização (§2.1), **Épico 8 — Estabilização e Desempenho**, sequência real S0–S8 + planejada S9–S12, DoD com situação real e regra de atualização documental. |
 | 6 | [Plano de Sprints](./06-sprints/Plano-Sprints-v2.2.md) | **2.2** | ✅ Ativo | S0–S6 e S8 concluídas, S7 adiada, **S9–S12 planejadas (§22)** com diagnóstico de desempenho medido, velocity, riscos, cerimônias e métricas. |

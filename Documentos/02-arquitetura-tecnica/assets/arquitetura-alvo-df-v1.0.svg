@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" font-family="Inter, 'DejaVu Sans', Arial, sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">Arquitetura-alvo do Radar Saúde para a meta de 60–70% do DF</title>
+  <desc id="d">Clientes falam com a borda (Cloudflare), que serve o público em cache e repassa à origem no GCP São Paulo só o que é pessoal ou escrita. A origem roda no Cloud Run, com jobs no Cloud Scheduler, seed num Cloud Run Job e banco Atlas de produção dedicado.</desc>
+  <defs>
+    <marker id="seta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+    <marker id="setaTeal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0f766e"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1000" height="640" fill="#ffffff"/>
+
+  <!-- Coluna 1: clientes -->
+  <text x="20" y="34" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1">CLIENTES</text>
+  <rect x="20" y="50" width="200" height="200" rx="10" fill="#eef2f7" stroke="#1f3a5f" stroke-width="1.5"/>
+  <text x="36" y="76" font-size="15" font-weight="700" fill="#1f3a5f">App Radar Saúde</text>
+  <text x="36" y="94" font-size="12" fill="#334155">Android · iOS (Expo)</text>
+  <text x="36" y="120" font-size="12" fill="#0f172a">• Catálogo local versionado</text>
+  <text x="46" y="136" font-size="12" fill="#0f172a">(ETag, filtro no aparelho)</text>
+  <text x="36" y="156" font-size="12" fill="#0f172a">• Geofence no aparelho,</text>
+  <text x="46" y="172" font-size="12" fill="#0f172a">sem chamar a API</text>
+  <text x="36" y="192" font-size="12" fill="#0f172a">• Atestação do aparelho</text>
+  <text x="36" y="212" font-size="12" fill="#0f172a">• Retry com jitter e</text>
+  <text x="46" y="228" font-size="12" fill="#0f172a">Retry-After (já existe)</text>
+
+  <rect x="20" y="280" width="200" height="80" rx="10" fill="#eef2f7" stroke="#1f3a5f" stroke-width="1.5"/>
+  <text x="36" y="306" font-size="15" font-weight="700" fill="#1f3a5f">Painel Admin</text>
+  <text x="36" y="324" font-size="12" fill="#334155">Angular · mesmo site</text>
+  <text x="36" y="342" font-size="12" fill="#334155">registrável (ADR-013)</text>
+
+  <!-- Coluna 2: borda -->
+  <text x="270" y="34" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1">BORDA</text>
+  <rect x="270" y="50" width="260" height="310" rx="10" fill="#ecfdf5" stroke="#0f766e" stroke-width="1.5"/>
+  <text x="286" y="76" font-size="15" font-weight="700" fill="#0f766e">Cloudflare</text>
+  <text x="286" y="94" font-size="12" fill="#334155">api.saudemonitor.dev</text>
+  <text x="286" y="122" font-size="12" fill="#0f172a">• TLS, HSTS, DNS</text>
+  <text x="286" y="144" font-size="12" fill="#0f172a">• WAF, anti-DDoS, filtro de bots</text>
+  <text x="286" y="166" font-size="12" fill="#0f172a">• Rate limit de abuso (IP, limite</text>
+  <text x="296" y="182" font-size="12" fill="#0f172a">alto por causa do CGNAT)</text>
+  <text x="286" y="204" font-size="12" fill="#0f172a">• Cache público (5 min a 1 dia):</text>
+  <text x="296" y="220" font-size="12" fill="#0f172a">catálogo, ranking, indicadores,</text>
+  <text x="296" y="236" font-size="12" fill="#0f172a">camadas geográficas</text>
+  <rect x="286" y="256" width="228" height="86" rx="8" fill="#ffffff" stroke="#0f766e" stroke-dasharray="4 3"/>
+  <text x="300" y="280" font-size="13" font-weight="700" fill="#0f766e">Tiles do mapa</text>
+  <text x="300" y="298" font-size="12" fill="#0f172a">PMTiles do DF no R2</text>
+  <text x="300" y="316" font-size="12" fill="#0f172a">(egress gratuito) + MapLibre</text>
+  <text x="300" y="334" font-size="12" fill="#334155">substitui o Mapbox por MAU</text>
+
+  <!-- Coluna 3: origem GCP -->
+  <text x="580" y="34" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1">ORIGEM · GCP southamerica-east1</text>
+  <rect x="580" y="50" width="400" height="310" rx="10" fill="#f8fafc" stroke="#334155" stroke-width="1.5"/>
+
+  <rect x="596" y="66" width="368" height="104" rx="8" fill="#eef2f7" stroke="#1f3a5f"/>
+  <text x="612" y="90" font-size="15" font-weight="700" fill="#1f3a5f">Cloud Run · API Spring Boot</text>
+  <text x="612" y="110" font-size="12" fill="#0f172a">min 1–2 · max N (teto de custo) · cpu-boost</text>
+  <text x="612" y="128" font-size="12" fill="#0f172a">concorrência e timeouts explícitos · pool Mongo 20</text>
+  <text x="612" y="146" font-size="12" fill="#0f172a">rate limit por identidade (JWT / aparelho atestado)</text>
+  <text x="612" y="162" font-size="12" fill="#334155">sem estado local: escala horizontal livre</text>
+
+  <rect x="596" y="182" width="178" height="74" rx="8" fill="#ffffff" stroke="#334155"/>
+  <text x="608" y="204" font-size="13" font-weight="700" fill="#1f3a5f">Cloud Scheduler</text>
+  <text x="608" y="222" font-size="12" fill="#0f172a">4 jobs de 15 min</text>
+  <text x="608" y="240" font-size="12" fill="#0f172a">OIDC, 1 execução por vez</text>
+
+  <rect x="786" y="182" width="178" height="74" rx="8" fill="#ffffff" stroke="#334155"/>
+  <text x="798" y="204" font-size="13" font-weight="700" fill="#1f3a5f">Cloud Run Job</text>
+  <text x="798" y="222" font-size="12" fill="#0f172a">seed, reconciliações e</text>
+  <text x="798" y="240" font-size="12" fill="#0f172a">migrations pós-deploy</text>
+
+  <rect x="596" y="268" width="178" height="76" rx="8" fill="#ffffff" stroke="#334155"/>
+  <text x="608" y="290" font-size="13" font-weight="700" fill="#1f3a5f">Secret Manager</text>
+  <text x="608" y="308" font-size="12" fill="#0f172a">Mongo, JWT (com kid),</text>
+  <text x="608" y="326" font-size="12" fill="#0f172a">e-mail · WIF na esteira</text>
+
+  <rect x="786" y="268" width="178" height="76" rx="8" fill="#ffffff" stroke="#334155"/>
+  <text x="798" y="290" font-size="13" font-weight="700" fill="#1f3a5f">Monitoring / Logging</text>
+  <text x="798" y="308" font-size="12" fill="#0f172a">SLO 99,5%, alertas,</text>
+  <text x="798" y="326" font-size="12" fill="#0f172a">orçamento, logs JSON</text>
+
+  <!-- Dados -->
+  <text x="580" y="404" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1">DADOS</text>
+  <rect x="580" y="420" width="400" height="104" rx="10" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+  <text x="596" y="446" font-size="15" font-weight="700" fill="#b45309">MongoDB Atlas · produção dedicada</text>
+  <text x="596" y="466" font-size="12" fill="#0f172a">no GCP São Paulo (mesma nuvem e região da API)</text>
+  <text x="596" y="484" font-size="12" fill="#0f172a">Flex (P1–P2) → M10 → M20 com auto-scaling</text>
+  <text x="596" y="502" font-size="12" fill="#0f172a">backup + restauração testada · acesso de rede restrito</text>
+  <text x="596" y="518" font-size="12" fill="#334155">dev e homologação ficam fora, no M0</text>
+
+  <!-- Serviços externos -->
+  <text x="20" y="404" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1">SERVIÇOS EXTERNOS</text>
+  <rect x="20" y="420" width="510" height="104" rx="10" fill="#f8fafc" stroke="#64748b" stroke-width="1.2"/>
+  <text x="36" y="446" font-size="13" font-weight="700" fill="#1f3a5f">Play Integrity / App Attest</text>
+  <text x="36" y="464" font-size="12" fill="#0f172a">token do aparelho, validado pela API</text>
+  <text x="36" y="490" font-size="13" font-weight="700" fill="#1f3a5f">Crashlytics / Analytics</text>
+  <text x="36" y="508" font-size="12" fill="#0f172a">erros do app e DAU real (calibra a carga)</text>
+  <text x="300" y="446" font-size="13" font-weight="700" fill="#1f3a5f">Resend (plano pago)</text>
+  <text x="300" y="464" font-size="12" fill="#0f172a">confirmação e recuperação de senha</text>
+  <text x="300" y="490" font-size="13" font-weight="700" fill="#1f3a5f">Firebase Remote Config</text>
+  <text x="300" y="508" font-size="12" fill="#0f172a">flags e versão mínima do app</text>
+
+  <!-- Setas -->
+  <line x1="220" y1="150" x2="266" y2="150" stroke="#334155" stroke-width="2" marker-end="url(#seta)"/>
+  <line x1="220" y1="320" x2="266" y2="300" stroke="#334155" stroke-width="2" marker-end="url(#seta)"/>
+  <line x1="530" y1="118" x2="592" y2="118" stroke="#0f766e" stroke-width="2.5" marker-end="url(#setaTeal)"/>
+  <text x="534" y="108" font-size="10.5" fill="#0f766e" font-weight="700">só miss,</text>
+  <text x="534" y="140" font-size="10.5" fill="#0f766e" font-weight="700">pessoal</text>
+  <text x="534" y="154" font-size="10.5" fill="#0f766e" font-weight="700">e escrita</text>
+  <line x1="780" y1="170" x2="780" y2="182" stroke="#334155" stroke-width="2"/>
+  <line x1="685" y1="182" x2="685" y2="174" stroke="#334155" stroke-width="2" marker-end="url(#seta)"/>
+  <line x1="780" y1="344" x2="780" y2="416" stroke="#b45309" stroke-width="2.5" marker-end="url(#seta)"/>
+  <line x1="875" y1="256" x2="875" y2="264" stroke="#334155" stroke-width="2"/>
+  <path d="M964,219 C990,219 990,400 930,416" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#seta)"/>
+  <path d="M120,250 L120,416" fill="none" stroke="#64748b" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#seta)"/>
+  <path d="M580,500 L534,500" fill="none" stroke="#64748b" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#seta)"/>
+
+  <!-- Legenda -->
+  <rect x="20" y="556" width="960" height="66" rx="8" fill="#f1f5f9"/>
+  <text x="36" y="580" font-size="12.5" fill="#0f172a"><tspan font-weight="700">Leitura:</tspan> o público (catálogo, ranking, indicadores, camadas, tiles) é servido pela borda e pelo próprio aparelho;</text>
+  <text x="36" y="600" font-size="12.5" fill="#0f172a">a origem recebe só o que é pessoal ou escrita. Nada de Kubernetes, microsserviços, Kafka ou Redis neste patamar:</text>
+  <text x="36" y="618" font-size="12.5" fill="#0f172a">cada um tem gatilho de revisão medido no §12.3.</text>
+</svg>

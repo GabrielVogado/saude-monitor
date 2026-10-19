@@ -2,6 +2,7 @@ package br.com.saude_monitor.api.config.ratelimit;
 
 import br.com.saude_monitor.api.config.exception.ApiError;
 import br.com.saude_monitor.api.config.exception.CampoInvalido;
+import br.com.saude_monitor.api.config.security.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -17,16 +18,16 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
- * Filtro de rate limiting (F0-04): aplica limites por IP conforme o grupo do
- * recurso e responde 429 no envelope padrão da API quando o limite é excedido.
- * Os limites vêm de {@link RateLimitProperties} (padrão: auth 10/min, públicos
- * 60/min; o deploy de homologação os sobe para os testes de desempenho).
+ * Filtro de rate limiting (F0-04, ARQ-02): duas camadas por requisição limitada, um teto
+ * de abuso por IP e o limite de cada pessoa (usuário, instalação do app ou IP), e 429 no
+ * envelope padrão da API quando um deles é excedido. Os limites vêm de
+ * {@link RateLimitProperties} (padrão: auth 10/min, públicos 60/min, teto por IP 600/min;
+ * o deploy de homologação os sobe para os testes de desempenho).
  *
- * <p>Endpoints autenticados (com token JWT) não são limitados aqui — a
- * identificação via token já oferece controle granular e evita bloquear usuários
- * legítimos atrás de um mesmo NAT/IP.</p>
+ * <p>Rotas fora dos grupos (as que exigem login) não são limitadas aqui.</p>
  */
 @Slf4j
 @Component
@@ -35,9 +36,21 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     static final String HEADER_LIMITE = "X-RateLimit-Limit";
 
+    /** Identificador aleatório da instalação do app, enviado sem login (ARQ-02). */
+    static final String HEADER_CLIENTE = "X-Cliente-Id";
+
+    /** UUID ou texto curto equivalente; qualquer outra coisa cai no limite por IP. */
+    private static final Pattern FORMATO_CLIENTE = Pattern.compile("[A-Za-z0-9-]{16,64}");
+
+    static final String ROTA_REFRESH = "/api/v1/auth/refresh";
+
+    private static final String PREFIXO_IP = "ip:";
+    private static final String PREFIXO_BEARER = "Bearer ";
+
     private final RateLimitService rateLimitService;
     private final ObjectMapper objectMapper;
     private final RateLimitProperties properties;
+    private final JwtService jwtService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -51,25 +64,68 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         String ip = resolverIp(request);
-        long feitas = rateLimitService.registrar(ip, grupo);
-        int limite = rateLimitService.limite(grupo);
-        boolean permitido = feitas <= limite;
-
-        response.setHeader(HEADER_LIMITE, String.valueOf(limite));
-
-        if (!permitido) {
-            // Registra QUEM foi limitado -- e a forma de conferir, em producao, que a chave e
-            // o IP real do cliente (e nao o do proxy, que limitaria todo mundo junto). So a
-            // PRIMEIRA rejeicao de cada chave por janela: sob ataque, uma linha por minuto
-            // por IP, nao uma por requisicao.
-            if (feitas == limite + 1L) {
-                log.info("[RateLimit] 429 {} para {} em {} {}", grupo, ip, request.getMethod(), request.getRequestURI());
-            }
-            escrever429(response, grupo);
+        // Camada 1: teto de abuso por IP, alto, somando o tráfego limitado (ARQ-02).
+        if (bloquearSeLimiteExcedido(request, response, RateLimitService.Grupo.IP, PREFIXO_IP + ip, "ip " + ip)) {
             return;
         }
 
+        // Camada 2: limite de cada pessoa. A renovação de sessão não passa por aqui: ela é
+        // limitada pelo próprio refresh token, no AuthController, e nunca pelo IP.
+        if (!ROTA_REFRESH.equals(request.getRequestURI())) {
+            Identidade identidade = identificarCliente(request, grupo, ip);
+            response.setHeader(HEADER_LIMITE, String.valueOf(rateLimitService.limite(grupo)));
+            if (bloquearSeLimiteExcedido(request, response, grupo, identidade.chave(), identidade.descricao())) {
+                return;
+            }
+        }
+
         filterChain.doFilter(request, response);
+    }
+
+    /** Chave do limite e como ela aparece no log (sem e-mail nem id em claro). */
+    record Identidade(String chave, String descricao) {
+    }
+
+    /**
+     * Quem conta no limite. Nas rotas públicas: o usuário do access token válido, depois a
+     * instalação do app ({@value #HEADER_CLIENTE}), e só então o IP. Atrás do CGNAT das
+     * operadoras, centenas de celulares saem pelo mesmo IP; contar por IP fazia o pico de
+     * uns derrubar o check-in e o heartbeat dos outros. Nas rotas de autenticação, o IP
+     * (o login também é limitado por conta, no AuthController).
+     */
+    Identidade identificarCliente(HttpServletRequest request, RateLimitService.Grupo grupo, String ip) {
+        if (grupo == RateLimitService.Grupo.PUBLICO) {
+            String autorizacao = request.getHeader("Authorization");
+            if (autorizacao != null && autorizacao.startsWith(PREFIXO_BEARER)) {
+                var usuario = jwtService.extrairAssuntoDoAccessToken(autorizacao.substring(PREFIXO_BEARER.length()));
+                if (usuario.isPresent()) {
+                    return new Identidade("usuario:" + usuario.get(), "usuário autenticado");
+                }
+            }
+            String cliente = request.getHeader(HEADER_CLIENTE);
+            if (cliente != null && FORMATO_CLIENTE.matcher(cliente).matches()) {
+                return new Identidade("cliente:" + cliente, "instalação do app");
+            }
+        }
+        return new Identidade(PREFIXO_IP + ip, "ip " + ip);
+    }
+
+    private boolean bloquearSeLimiteExcedido(HttpServletRequest request, HttpServletResponse response,
+                            RateLimitService.Grupo grupo, String chave, String descricao) throws IOException {
+        long feitas = rateLimitService.registrar(chave, grupo);
+        int limite = rateLimitService.limite(grupo);
+        if (feitas <= limite) {
+            return false;
+        }
+        // Só a PRIMEIRA rejeição de cada chave por janela: sob ataque, uma linha por minuto
+        // por chave, não uma por requisição. Para IP, é também a forma de conferir em
+        // produção que a chave é o IP real do cliente, e não o do proxy.
+        if (feitas == limite + 1L) {
+            log.info("[RateLimit] 429 {} para {} em {} {}", grupo, descricao, request.getMethod(), request.getRequestURI());
+        }
+        response.setHeader(HEADER_LIMITE, String.valueOf(limite));
+        escrever429(response, limite);
+        return true;
     }
 
     /**
@@ -79,7 +135,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
      *         (ex.: endpoints autenticados).
      */
     RateLimitService.Grupo resolverGrupo(String method, String uri) {
-        // Auth: login e refresh — limite mais restrito (padrão 10/min).
+        // Auth: cadastro, login, refresh, confirmação e senha.
         if (uri.startsWith("/api/v1/auth/")) {
             return RateLimitService.Grupo.AUTH;
         }
@@ -101,6 +157,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
         // GET de hospitais (lista + detalhe + indicadores): públicos.
         if ("GET".equals(method) && uri.startsWith("/api/v1/hospitais")) {
+            return true;
+        }
+        // Catálogo público de estabelecimentos (ARQ-01).
+        if ("GET".equals(method) && "/api/v1/catalogo".equals(uri)) {
+            return true;
+        }
+        // Configuração remota lida pelo app ao abrir (ARQ-09).
+        if ("GET".equals(method) && "/api/v1/configuracao".equals(uri)) {
             return true;
         }
         // GET de camadas geográficas (F-11, §5): leitura pública de recurso estático.
@@ -157,7 +221,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final int SC_TOO_MANY_REQUESTS = 429;
 
-    private void escrever429(HttpServletResponse response, RateLimitService.Grupo grupo) throws IOException {
+    private void escrever429(HttpServletResponse response, int limite) throws IOException {
         response.setStatus(SC_TOO_MANY_REQUESTS);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
@@ -167,7 +231,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 SC_TOO_MANY_REQUESTS,
                 "LIMITE_EXCEDIDO",
                 "Muitas requisições. Tente novamente em instantes. Limite: "
-                        + rateLimitService.limite(grupo) + " por minuto.",
+                        + limite + " por minuto.",
                 List.<CampoInvalido>of(),
                 UUID.randomUUID().toString().replace("-", "")
         );

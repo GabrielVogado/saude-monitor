@@ -2,7 +2,10 @@ import { Alert, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as TaskManager from "expo-task-manager";
 import * as Location from "expo-location";
-import HospitalService from "../../hospitais/service/HospitalService";
+import CatalogoLocal, {
+  IDADE_MAXIMA_PRIMEIRO_PLANO_MS,
+  IDADE_MAXIMA_SEGUNDO_PLANO_MS,
+} from "../../../services/CatalogoLocal";
 import VisitaService from "./VisitaService";
 import { invalidarVisitaAtiva } from "../../../core/query/queryClient";
 import { agendarFeedback } from "../../feedback/service/FeedbackNotificationService";
@@ -37,7 +40,12 @@ export const GEOFENCING_TASK = "VISITAS_GEOFENCING_TASK";
  */
 const PISO_RAIO_DISPARO_METROS = 100;
 
-const RAIO_BUSCA_HOSPITAIS_KM = 5;
+/**
+ * Só entram na lista os estabelecimentos a até 5 km da posição. A conta é feita no próprio
+ * aparelho, sobre o catálogo local (APP-01): antes cada recálculo pedia esta lista ao
+ * servidor com a posição exata.
+ */
+const RAIO_BUSCA_HOSPITAIS_METROS = 5000;
 
 // RN-01: só confirma entrada após 2 minutos contínuos dentro do geofence.
 const TOLERANCIA_ENTRADA_MS = 2 * 60 * 1000;
@@ -729,16 +737,16 @@ export async function iniciarGeofencing({ interativo = true } = {}) {
 
   let lista;
   try {
-    const hospitais = await HospitalService.listar({
-      ...origem,
-      raioKm: RAIO_BUSCA_HOSPITAIS_KM,
-      size: 50,
+    // Com o app aberto, o catálogo é conferido se tiver mais de 5 min; no recálculo em
+    // segundo plano, a cópia de até um dia vale sem rede nenhuma.
+    lista = await CatalogoLocal.obterEstabelecimentos({
+      idadeMaximaMs: interativo ? IDADE_MAXIMA_PRIMEIRO_PLANO_MS : IDADE_MAXIMA_SEGUNDO_PLANO_MS,
     });
-    lista = hospitais?.content || hospitais || [];
   } catch {
-    // Na abertura do app, as regiões que já estão registradas continuam valendo. No
-    // recálculo em segundo plano a região antiga já ficou para trás: sem registrar uma
-    // nova, nenhum recálculo aconteceria mais até o usuário abrir o app.
+    // Sem catálogo guardado e sem servidor (primeiro uso sem internet). Na abertura do
+    // app, as regiões que já estão registradas continuam valendo. No recálculo em segundo
+    // plano a região antiga já ficou para trás: sem registrar uma nova, nenhum recálculo
+    // aconteceria mais até o usuário abrir o app.
     if (interativo) {
       return;
     }
@@ -747,7 +755,7 @@ export async function iniciarGeofencing({ interativo = true } = {}) {
 
   const regioes = (lista || [])
     .map((hospital) => {
-      // E8-03: a listagem devolve `localizacao` (centroide) em vez do poligono.
+      // E8-03: o catálogo traz `localizacao` (centroide) em vez do poligono.
       const centroide = centroDoHospital(hospital);
       if (!centroide || !hospital.id) {
         return null;
@@ -763,7 +771,7 @@ export async function iniciarGeofencing({ interativo = true } = {}) {
         distancia: haversineMetros(origem, centroide) ?? Number.MAX_VALUE,
       };
     })
-    .filter(Boolean)
+    .filter((regiao) => regiao && regiao.distancia <= RAIO_BUSCA_HOSPITAIS_METROS)
     .sort((a, b) => a.distancia - b.distancia)
     .slice(0, MAX_REGIOES_HOSPITAIS);
 
@@ -774,7 +782,7 @@ export async function iniciarGeofencing({ interativo = true } = {}) {
   if (lista === null) {
     raioRecalculo = RAIO_RECALCULO_SEM_LISTA_METROS;
   } else if (regioes.length > 0) {
-    const maisDistante = regioes[regioes.length - 1].distancia;
+    const maisDistante = regioes.at(-1).distancia;
     raioRecalculo = Math.max(
       PISO_RAIO_DISPARO_METROS,
       Math.min(RAIO_RECALCULO_MAX_METROS, maisDistante / 2)

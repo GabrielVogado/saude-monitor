@@ -18,11 +18,17 @@ import br.com.saude_monitor.api.hospital.dto.PageResponse;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import br.com.saude_monitor.api.visita.document.StatusVisita;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
+import br.com.saude_monitor.api.visita.service.VisitaDono;
+import br.com.saude_monitor.api.visita.service.VisitaService;
 import br.com.saude_monitor.api.visita.repository.VisitaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -69,10 +75,11 @@ public class FeedbackServiceImpl implements FeedbackService {
     private final VisitaRepository visitaRepository;
     private final HospitalRepository hospitalRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final MongoTemplate mongoTemplate;
 
     @Override
     public FeedbackResponse criar(FeedbackRequest request, String usuarioId) {
-        VisitaDocument visita = obterVisitaAvaliavel(request.visitaId());
+        VisitaDocument visita = obterVisitaAvaliavel(request.visitaId(), usuarioId, request.dispositivoId());
 
         if (feedbackRepository.existsByVisitaId(request.visitaId())) {
             throw new ConflitoException("Você já avaliou esta visita.");
@@ -222,23 +229,49 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .map(FeedbackDocument::getVisitaId)
                 .collect(Collectors.toSet());
 
-        List<VisitaDocument> semFeedback = encerradas.stream()
-                .filter(v -> !comFeedback.contains(v.getId()))
+        List<String> semFeedback = encerradas.stream()
+                .map(VisitaDocument::getId)
+                .filter(id -> !comFeedback.contains(id))
                 .toList();
-        semFeedback.forEach(v -> v.setStatus(StatusVisita.SEM_FEEDBACK));
-        visitaRepository.saveAll(semFeedback);
+        if (semFeedback.isEmpty()) {
+            return;
+        }
+        // Update só do status, em vez de `saveAll` dos documentos lidos: regravar a visita
+        // inteira podia devolver conta, aparelho ou pontos de GPS apagados no meio do caminho
+        // pela retenção (DAD-01).
+        mongoTemplate.updateMulti(
+                new Query(Criteria.where("_id").in(semFeedback).and("status").is(StatusVisita.FINALIZADA)),
+                new Update().set("status", StatusVisita.SEM_FEEDBACK),
+                VisitaDocument.class);
+    }
+
+    @Override
+    public long desvincularFeedbacksAntigos() {
+        // Mesmo tratamento da exclusão de conta (M-041): o comentário é texto livre e pode
+        // trazer nome, telefone ou o caso da pessoa, então sai junto com o vínculo.
+        Query query = new Query(Criteria.where("criadoEm")
+                .lt(Instant.now().minus(VisitaService.PRAZO_VINCULO_PESSOAL))
+                .and("usuarioId").ne(null));
+        Update update = new Update().set("usuarioId", null).set("anonimizado", true).unset("comentario");
+        return mongoTemplate.updateMulti(query, update, FeedbackDocument.class).getModifiedCount();
     }
 
     /**
-     * Busca a visita e garante que ela aceita feedback: encerrada ({@code FINALIZADA} ou
+     * Busca a visita e garante que ela é de quem chama e aceita feedback: encerrada ({@code FINALIZADA} ou
      * {@code GPS_INTERROMPIDO}) e dentro da janela de 24h após a saída (RN-09). Fora disso
      * responde 404, o mesmo que a visita já marcada {@code SEM_FEEDBACK} pelo job recebe,
      * para o app tratar os dois casos como "não está mais disponível".
      */
-    private VisitaDocument obterVisitaAvaliavel(String visitaId) {
+    private VisitaDocument obterVisitaAvaliavel(String visitaId, String usuarioId, String dispositivoId) {
         VisitaDocument visita = visitaRepository.findById(visitaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(
                         "Visita não encontrada para o id informado."));
+        // SEG-02: só quem fez a visita avalia. 403, como no BOLA de checkout (F-02). Vem
+        // antes das regras de status e de janela para não contar a estranhos se a visita
+        // está em andamento, encerrada ou já avaliada.
+        if (!VisitaDono.isDonoDaVisita(visita, usuarioId, dispositivoId)) {
+            throw new AcessoNegadoException("Visita não pertence ao usuário ou aparelho informado.");
+        }
         if (!STATUS_AVALIAVEIS.contains(visita.getStatus())) {
             throw new RecursoNaoEncontradoException(
                     "O feedback só pode ser enviado após a visita ser encerrada.");

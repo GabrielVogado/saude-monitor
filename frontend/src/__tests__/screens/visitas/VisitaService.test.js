@@ -78,10 +78,31 @@ describe("VisitaService (Épico 02)", () => {
     expect(JSON.parse(c.body).posicao).toEqual(posicao);
   });
 
-  test("heartbeat sem posição envia corpo vazio (sinal de vida, RN-23)", async () => {
+  test("heartbeat sem posição envia só o aparelho (sinal de vida, RN-23)", async () => {
     await VisitaService.heartbeat("v1", null);
     const body = JSON.parse(chamadas[0].body);
     expect(body.posicao).toBeUndefined();
+    expect(body.dispositivoId).toContain("anon-");
+  });
+
+  test("checkout e heartbeat provam o aparelho dono da visita, mesmo com login (SEG-02)", async () => {
+    await TokenStorage.salvarTokens({ accessToken: "TOK", refreshToken: "R" });
+    await VisitaService.checkout("v1", {});
+    await VisitaService.heartbeat("v1", { type: "Point", coordinates: [-47.88, -15.79] });
+
+    const [checkout, heartbeat] = chamadas.map((c) => JSON.parse(c.body));
+    expect(checkout.dispositivoId).toContain("anon-");
+    expect(heartbeat.dispositivoId).toBe(checkout.dispositivoId);
+  });
+
+  test("definirTipoPermanencia faz PATCH com o tipo e o aparelho", async () => {
+    await VisitaService.definirTipoPermanencia("v1", "INTERNACAO");
+
+    expect(chamadas[0].method).toBe("PATCH");
+    expect(chamadas[0].url).toContain("/api/v1/visitas/v1/tipo-permanencia");
+    const body = JSON.parse(chamadas[0].body);
+    expect(body.tipoPermanencia).toBe("INTERNACAO");
+    expect(body.dispositivoId).toContain("anon-");
   });
 
   test("buscarAtiva faz GET em /ativas", async () => {
@@ -195,6 +216,7 @@ describe("VisitaService (Épico 02)", () => {
       const [item] = await itensDaFila();
       expect(item).toMatchObject({ chave: "checkout:v1", tipo: "checkout" });
       expect(item.corpo.visitaId).toBe("v1");
+      expect(item.corpo.dispositivoId).toContain("anon-");
     });
 
     test("a mensagem promete o que a fila cumpre, em vez de anunciar falha", async () => {
@@ -238,6 +260,24 @@ describe("VisitaService (Épico 02)", () => {
       const corpo = JSON.parse(chamadas[0].body);
       expect(corpo.visitaId).toBeUndefined();
       expect(corpo.gpsIndisponivel).toBe(true);
+      // Item guardado antes do SEG-02: ganha o aparelho no reenvio.
+      expect(corpo.dispositivoId).toContain("anon-");
+    });
+
+    test("o reenvio do checkout mantém o aparelho guardado no item", async () => {
+      await VisitaService.enviarEventoOffline({
+        tipo: "checkout",
+        corpo: { visitaId: "v9", dispositivoId: "anon-guardado" },
+        ocorridoEm: "2026-09-03T10:15:00.000Z",
+      });
+
+      expect(JSON.parse(chamadas[0].body).dispositivoId).toBe("anon-guardado");
+    });
+
+    test("evento desconhecido na fila é recusado", async () => {
+      await expect(VisitaService.enviarEventoOffline({ tipo: "outro" })).rejects.toThrow(
+        /Evento desconhecido/
+      );
     });
   });
 

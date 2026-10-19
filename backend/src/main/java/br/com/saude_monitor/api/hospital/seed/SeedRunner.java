@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.hospital.seed;
 
+import br.com.saude_monitor.api.config.trava.TravaDistribuida;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,12 +14,13 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Seed de estabelecimentos de saúde a partir de DBF (atributos) + SHP (geometria).
@@ -44,6 +46,12 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class SeedRunner implements ApplicationRunner {
 
+    /** Nome da trava desta tarefa ({@link TravaDistribuida}). */
+    static final String NOME_TRAVA = "seed-hospitais";
+
+    /** Folga para a tarefa terminar; se a instância morrer no meio, a trava vence e outra refaz. */
+    private static final Duration VALIDADE_TRAVA = Duration.ofMinutes(15);
+
     /**
      * Primeiro entre os runners de dados: semear o banco vazio precede reconciliar o que
      * já existe ({@link ReconciliacaoRaioGeofenceRunner#ORDEM}). Sem ordem explícita, o
@@ -59,6 +67,9 @@ public class SeedRunner implements ApplicationRunner {
     private final SeedProperties properties;
     private final HospitalPublicoComplementarLeitor hospitalPublicoComplementarLeitor;
 
+    /** Uma instância por vez (SOL-02): as outras pulam enquanto esta executa. */
+    private final TravaDistribuida trava;
+
     /**
      * Nome do arquivo JSON com hospitais PÚBLICOS do CNES ausentes da fonte InfoSaúde/GDF
      * (ver {@code backend/data/README.md}). Fonte exclusiva de hospitais públicos — ver
@@ -68,6 +79,10 @@ public class SeedRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        trava.executar(NOME_TRAVA, VALIDADE_TRAVA, this::executar);
+    }
+
+    private void executar() {
         Path diretorio = Path.of(properties.path());
         if (!Files.isDirectory(diretorio)) {
             log.warn("[Seed] Diretório de dados não encontrado: {} — seed ignorado.",
@@ -83,137 +98,161 @@ public class SeedRunner implements ApplicationRunner {
             return;
         }
 
-        Charset charset = Charset.forName(properties.codepage());
-        int novos = 0;
-        int atualizados = 0;
-        int descartados = 0;
-        int gemeosIgnorados = 0;
-        int camadasProcessadas = 0;
+        Contagem contagem = new Contagem();
 
         // Fase 1 — monta todos os documentos em memória, sem gravar. A ordem é
         // determinística (camadas em ordem alfabética, linhas em ordem) para logs
         // e testes reproduzíveis.
         List<DocPendente> pendentes = new ArrayList<>();
+        montarCamadas(diretorio, pendentes, contagem);
+        montarPublicosComplementares(diretorio, pendentes, contagem);
+
+        Set<String> chavesCnes = gravarComCnes(pendentes, contagem);
+        gravarSemCnes(pendentes, chavesCnes, contagem);
+
+        log.info("[Seed] Concluído — camadas: {}, novos: {}, atualizados: {}, descartados: {}, gêmeos ignorados: {}.",
+                contagem.camadas, contagem.novos, contagem.atualizados, contagem.descartados,
+                contagem.gemeosIgnorados);
+    }
+
+    /** Lê as camadas SHP/DBF do diretório, em ordem alfabética. */
+    private void montarCamadas(Path diretorio, List<DocPendente> pendentes, Contagem contagem) {
+        Charset charset = Charset.forName(properties.codepage());
         try (var fluxo = Files.list(diretorio)) {
             for (Path shp : fluxo
                     .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".shp"))
                     .sorted()
                     .toList()) {
-
-                String stem = stemDe(shp);
-                if (CamadaEstabelecimento.CAMADAS_IGNORADAS.contains(stem)) {
-                    continue; // camadas de limite/região
-                }
-                Optional<CamadaEstabelecimento> camadaOpt = CamadaEstabelecimento.porStem(stem);
-                if (camadaOpt.isEmpty()) {
-                    log.warn("[Seed] Camada sem mapeamento, ignorada: {}", stem);
-                    continue;
-                }
-                CamadaEstabelecimento camada = camadaOpt.get();
-
-                Path dbf = diretorio.resolve(stem + ".dbf");
-                if (!Files.isRegularFile(dbf)) {
-                    log.warn("[Seed] DBF ausente para a camada {}, ignorada: {}", stem, dbf.getFileName());
-                    continue;
-                }
-
-                List<Map<String, String>> linhas = dbfLeitor.ler(dbf, charset);
-                List<double[]> pontos = shpPointLeitor.ler(shp);
-                int total = Math.min(linhas.size(), pontos.size());
-
-                int lidos = 0;
-                for (int i = 0; i < total; i++) {
-                    double[] ponto = pontos.get(i);
-                    if (ponto == null) {
-                        descartados++;
-                        continue;
-                    }
-                    HospitalDocument doc = seedMapper.montar(camada, linhas.get(i), ponto[0], ponto[1]);
-                    if (doc == null) {
-                        descartados++;
-                        continue;
-                    }
-                    lidos++;
-                    pendentes.add(new DocPendente(doc, stem));
-                }
-                camadasProcessadas++;
-                log.info("[Seed] Camada '{}': {} registro(s) montados.", stem, lidos);
+                montarCamada(diretorio, shp, charset, pendentes, contagem);
             }
         } catch (Exception e) {
             log.error("[Seed] Falha ao processar o diretório de dados.", e);
         }
+    }
 
+    private void montarCamada(Path diretorio, Path shp, Charset charset,
+                              List<DocPendente> pendentes, Contagem contagem) {
+        String stem = stemDe(shp);
+        if (CamadaEstabelecimento.CAMADAS_IGNORADAS.contains(stem)) {
+            return; // camadas de limite/região
+        }
+        Optional<CamadaEstabelecimento> camadaOpt = CamadaEstabelecimento.porStem(stem);
+        if (camadaOpt.isEmpty()) {
+            log.warn("[Seed] Camada sem mapeamento, ignorada: {}", stem);
+            return;
+        }
+        CamadaEstabelecimento camada = camadaOpt.get();
+
+        Path dbf = diretorio.resolve(stem + ".dbf");
+        if (!Files.isRegularFile(dbf)) {
+            log.warn("[Seed] DBF ausente para a camada {}, ignorada: {}", stem, dbf.getFileName());
+            return;
+        }
+
+        List<Map<String, String>> linhas = dbfLeitor.ler(dbf, charset);
+        List<double[]> pontos = shpPointLeitor.ler(shp);
+        int total = Math.min(linhas.size(), pontos.size());
+
+        int lidos = 0;
+        for (int i = 0; i < total; i++) {
+            double[] ponto = pontos.get(i);
+            HospitalDocument doc = ponto == null
+                    ? null
+                    : seedMapper.montar(camada, linhas.get(i), ponto[0], ponto[1]);
+            if (doc == null) {
+                contagem.descartados++;
+            } else {
+                lidos++;
+                pendentes.add(new DocPendente(doc, stem));
+            }
+        }
+        contagem.camadas++;
+        log.info("[Seed] Camada '{}': {} registro(s) montados.", stem, lidos);
+    }
+
+    /** Lê o JSON de hospitais públicos complementares, quando presente. */
+    private void montarPublicosComplementares(Path diretorio, List<DocPendente> pendentes, Contagem contagem) {
         Path jsonPublicosComplementares = diretorio.resolve(ARQUIVO_PUBLICOS_COMPLEMENTARES);
-        if (Files.isRegularFile(jsonPublicosComplementares)) {
-            try {
-                List<HospitalPublicoComplementarRecord> registros =
-                        hospitalPublicoComplementarLeitor.ler(jsonPublicosComplementares);
-                int lidos = 0;
-                for (HospitalPublicoComplementarRecord registro : registros) {
-                    HospitalDocument doc = seedMapper.montarPublicoComplementar(registro);
-                    if (doc == null) {
-                        descartados++;
-                        continue;
-                    }
+        if (!Files.isRegularFile(jsonPublicosComplementares)) {
+            return;
+        }
+        String origem = jsonPublicosComplementares.getFileName().toString();
+        try {
+            List<HospitalPublicoComplementarRecord> registros =
+                    hospitalPublicoComplementarLeitor.ler(jsonPublicosComplementares);
+            int lidos = 0;
+            for (HospitalPublicoComplementarRecord registro : registros) {
+                HospitalDocument doc = seedMapper.montarPublicoComplementar(registro);
+                if (doc == null) {
+                    contagem.descartados++;
+                } else {
                     lidos++;
-                    pendentes.add(new DocPendente(doc, jsonPublicosComplementares.getFileName().toString()));
+                    pendentes.add(new DocPendente(doc, origem));
                 }
-                log.info("[Seed] Arquivo '{}': {} registro(s) montados.",
-                        jsonPublicosComplementares.getFileName(), lidos);
-            } catch (Exception e) {
-                log.error("[Seed] Falha ao processar {}.", jsonPublicosComplementares.getFileName(), e);
             }
+            log.info("[Seed] Arquivo '{}': {} registro(s) montados.",
+                    jsonPublicosComplementares.getFileName(), lidos);
+        } catch (Exception e) {
+            log.error("[Seed] Falha ao processar {}.", jsonPublicosComplementares.getFileName(), e);
         }
+    }
 
-        // Fase 2a — documentos COM CNES primeiro (versão autoritativa: coordenadas e
-        // atributos completos), registrando a chave de gêmeo de cada um.
-        Set<String> chavesCnes = new HashSet<>();
-        for (DocPendente pendente : pendentes) {
-            if (pendente.doc().getCodigoCnes() == null) {
-                continue;
-            }
-            switch (salvarUpsert(pendente.doc())) {
-                case NOVO -> {
-                    novos++;
-                    chavesCnes.add(chaveGemea(pendente.doc()));
-                }
-                case ATUALIZADO -> {
-                    atualizados++;
-                    chavesCnes.add(chaveGemea(pendente.doc()));
-                }
-                case IGNORADO_TIPO_DIVERGENTE -> descartados++;
-            }
-        }
+    /**
+     * Fase 2a — documentos COM CNES primeiro (versão autoritativa: coordenadas e
+     * atributos completos), registrando a chave de gêmeo de cada um.
+     */
+    private Set<String> gravarComCnes(List<DocPendente> pendentes, Contagem contagem) {
+        return pendentes.stream()
+                .map(DocPendente::doc)
+                .filter(doc -> doc.getCodigoCnes() != null && contagem.registrarResultado(salvarUpsert(doc)))
+                .map(SeedRunner::chaveGemea)
+                .collect(Collectors.toSet());
+    }
 
-        // Fase 2b — documentos SEM CNES, exceto gêmeos de um CNES já importado nesta
-        // execução. É o caso das camadas sem coluna CNES (ex.: UBS Indígena/Rua) que
-        // repetem unidades da camada principal com coordenadas ligeiramente
-        // diferentes: sem este filtro, cada versão vira um documento (círculos
-        // amontoados no mapa — auditoria em `07-dados/relatorio-auditoria-duplicatas-coordenadas-20260912.md`).
-        // Unidades sem gêmeo CNES (ex.: prisionais com nome sintético) passam — pontos
-        // distintos com o mesmo nome são preservados, não fundidos: fundir duas
-        // unidades sem CNES entre si arrisca perder dado real (podem ser unidades
-        // distintas do mesmo complexo), diferente do caso com CNES, onde a versão
-        // autoritativa já foi confirmada na fase 2a.
+    /**
+     * Fase 2b — documentos SEM CNES, exceto gêmeos de um CNES já importado nesta
+     * execução. É o caso das camadas sem coluna CNES (ex.: UBS Indígena/Rua) que
+     * repetem unidades da camada principal com coordenadas ligeiramente
+     * diferentes: sem este filtro, cada versão vira um documento (círculos
+     * amontoados no mapa — auditoria em `07-dados/relatorio-auditoria-duplicatas-coordenadas-20260912.md`).
+     * Unidades sem gêmeo CNES (ex.: prisionais com nome sintético) passam — pontos
+     * distintos com o mesmo nome são preservados, não fundidos: fundir duas
+     * unidades sem CNES entre si arrisca perder dado real (podem ser unidades
+     * distintas do mesmo complexo), diferente do caso com CNES, onde a versão
+     * autoritativa já foi confirmada na fase 2a.
+     */
+    private void gravarSemCnes(List<DocPendente> pendentes, Set<String> chavesCnes, Contagem contagem) {
         for (DocPendente pendente : pendentes) {
             if (pendente.doc().getCodigoCnes() != null) {
                 continue;
             }
             if (chavesCnes.contains(chaveGemea(pendente.doc()))) {
-                gemeosIgnorados++;
+                contagem.gemeosIgnorados++;
                 log.info("[Seed] Gêmeo sem CNES ignorado (versão CNES importada): {} [{}].",
                         pendente.doc().getNome(), pendente.origem());
-                continue;
+            } else {
+                contagem.registrarResultado(salvarUpsert(pendente.doc()));
             }
-            switch (salvarUpsert(pendente.doc())) {
+        }
+    }
+
+    /** Totais da execução, para o log final. */
+    private static final class Contagem {
+        private int novos;
+        private int atualizados;
+        private int descartados;
+        private int gemeosIgnorados;
+        private int camadas;
+
+        /** Soma o resultado da gravação; devolve se o documento foi gravado. */
+        private boolean registrarResultado(ResultadoUpsert resultado) {
+            switch (resultado) {
                 case NOVO -> novos++;
                 case ATUALIZADO -> atualizados++;
                 case IGNORADO_TIPO_DIVERGENTE -> descartados++;
             }
+            return resultado != ResultadoUpsert.IGNORADO_TIPO_DIVERGENTE;
         }
-
-        log.info("[Seed] Concluído — camadas: {}, novos: {}, atualizados: {}, descartados: {}, gêmeos ignorados: {}.",
-                camadasProcessadas, novos, atualizados, descartados, gemeosIgnorados);
     }
 
     /** Documento montado aguardando gravação, com a origem para log. */

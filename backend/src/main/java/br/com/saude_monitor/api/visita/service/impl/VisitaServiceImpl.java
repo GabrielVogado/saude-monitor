@@ -156,7 +156,7 @@ public class VisitaServiceImpl implements VisitaService {
 
     @Override
     public CheckoutResponse checkout(String id, CheckoutRequest request, String usuarioId) {
-        VisitaDocument visita = obterAtivaOu409(id, usuarioId, request.dispositivoId());
+        VisitaDocument visita = obterVisitaAtivaDoDono(id, usuarioId, request.dispositivoId());
 
         Instant agora = Instant.now();
         boolean gpsIndisponivel = Boolean.TRUE.equals(request.gpsIndisponivel());
@@ -209,11 +209,11 @@ public class VisitaServiceImpl implements VisitaService {
         // Um acesso ao banco no caminho feliz (o heartbeat é a rota mais frequente). Só quando
         // nada é atualizado a visita é lida, para responder 404, 403 ou 409 como antes.
         Criteria criteria = Criteria.where(CAMPO_ID).is(id).and(CAMPO_STATUS).in(STATUS_ATIVOS)
-                .andOperator(criterioDeDono(usuarioId, dispositivoId));
+                .andOperator(criarCriterioDeDono(usuarioId, dispositivoId));
         VisitaDocument salva = mongoTemplate.findAndModify(new Query(criteria), update,
                 FindAndModifyOptions.options().returnNew(true), VisitaDocument.class);
         if (salva == null) {
-            obterAtivaOu409(id, usuarioId, dispositivoId);
+            obterVisitaAtivaDoDono(id, usuarioId, dispositivoId);
             throw new ConflitoException("Visita já encerrada.");
         }
         return new HeartbeatResponse(salva.getStatus(), salva.getUltimoHeartbeat());
@@ -221,7 +221,7 @@ public class VisitaServiceImpl implements VisitaService {
 
     @Override
     public TipoPermanenciaResponse sinalizarTipoPermanencia(String id, TipoPermanenciaRequest request, String usuarioId) {
-        VisitaDocument visita = obterAtivaOu409(id, usuarioId, request.dispositivoId());
+        VisitaDocument visita = obterVisitaAtivaDoDono(id, usuarioId, request.dispositivoId());
 
         if (request.tipoPermanencia() == TipoPermanencia.ATENDIMENTO) {
             throw new ValidacaoNegocioException("tipoPermanencia deve ser OBSERVACAO ou INTERNACAO.");
@@ -347,7 +347,7 @@ public class VisitaServiceImpl implements VisitaService {
      * A mesma regra do {@link VisitaDono}, como filtro do Mongo: visita logada do próprio
      * usuário, ou visita anônima do próprio aparelho.
      */
-    private static Criteria criterioDeDono(String usuarioId, String dispositivoId) {
+    private static Criteria criarCriterioDeDono(String usuarioId, String dispositivoId) {
         List<Criteria> donos = new java.util.ArrayList<>();
         if (usuarioId != null) {
             donos.add(Criteria.where(CAMPO_USUARIO).is(usuarioId));
@@ -489,11 +489,11 @@ public class VisitaServiceImpl implements VisitaService {
      * Busca a visita e garante que está ativa e pertence a quem chama: o usuário autenticado,
      * quando a visita tem dono logado, ou o aparelho que fez o check-in, quando é anônima.
      */
-    private VisitaDocument obterAtivaOu409(String id, String usuarioId, String dispositivoId) {
+    private VisitaDocument obterVisitaAtivaDoDono(String id, String usuarioId, String dispositivoId) {
         VisitaDocument visita = visitaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Visita não encontrada para o id informado."));
 
-        if (!VisitaDono.pertenceA(visita, usuarioId, dispositivoId)) {
+        if (!VisitaDono.isDonoDaVisita(visita, usuarioId, dispositivoId)) {
             // 403, não 401 (achado F-02 do pentest de 23/09/2026): quem chama pode até estar
             // autenticado; só não é dono desta visita (BOLA).
             throw new AcessoNegadoException("Visita não pertence ao usuário ou aparelho informado.");

@@ -76,7 +76,7 @@ class VisitaServiceImplTest {
             Query query = inv.getArgument(0);
             String id = String.valueOf(query.getQueryObject().get("_id"));
             return visitaRepository.findById(id)
-                    .filter(v -> casaComDono(v, query.getQueryObject()))
+                    .filter(v -> hasDonoCorrespondente(v, query.getQueryObject()))
                     .map(v -> aplicar(v, inv.getArgument(1)))
                     .orElse(null);
         });
@@ -87,7 +87,7 @@ class VisitaServiceImplTest {
      * sobre o documento em memória. Sem {@code $and}, não há filtro de dono.
      */
     @SuppressWarnings("unchecked")
-    private static boolean casaComDono(VisitaDocument v, Document filtro) {
+    private static boolean hasDonoCorrespondente(VisitaDocument v, Document filtro) {
         if (!filtro.containsKey("$and")) {
             return true;
         }
@@ -458,7 +458,7 @@ class VisitaServiceImplTest {
 
     private static final PosicaoDto POSICAO = new PosicaoDto("Point", List.of(-47.88, -15.79));
 
-    private VisitaDocument visitaLogadaAtiva() {
+    private VisitaDocument criarVisitaLogadaAtiva() {
         return VisitaDocument.builder()
                 .id("v9").usuarioId("u1").hospitalId("h1")
                 .entrada(Instant.now().minus(Duration.ofHours(1)))
@@ -469,7 +469,7 @@ class VisitaServiceImplTest {
 
     @Test
     void heartbeatComPosicaoGuardaSoOsPontosMaisRecentes() {
-        VisitaDocument visita = visitaLogadaAtiva();
+        VisitaDocument visita = criarVisitaLogadaAtiva();
         for (int i = 0; i < VisitaServiceImpl.LIMITE_PONTOS_AMOSTRAIS; i++) {
             visita.getPontosAmostrais().add(PontoAmostralDocument.builder().em(Instant.EPOCH.plusSeconds(i)).build());
         }
@@ -486,7 +486,7 @@ class VisitaServiceImplTest {
 
     @Test
     void heartbeatDeVisitaEncerradaNoMeioDoCaminhoLancaConflito() {
-        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaLogadaAtiva()));
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(criarVisitaLogadaAtiva()));
         // O job encerrou a visita entre a leitura e a escrita: o update condicionado não acha nada.
         when(mongoTemplate.findAndModify(any(Query.class), any(Update.class),
                 any(FindAndModifyOptions.class), eq(VisitaDocument.class))).thenReturn(null);
@@ -496,7 +496,7 @@ class VisitaServiceImplTest {
 
     @Test
     void checkoutDeVisitaEncerradaPeloJobNoMeioDoCaminhoLancaConflito() {
-        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaLogadaAtiva()));
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(criarVisitaLogadaAtiva()));
         when(mongoTemplate.findAndModify(any(Query.class), any(Update.class),
                 any(FindAndModifyOptions.class), eq(VisitaDocument.class))).thenReturn(null);
 
@@ -506,7 +506,7 @@ class VisitaServiceImplTest {
 
     @Test
     void checkoutApagaOsPontosDeGpsEGuardaSoEntradaSaidaEDuracao() {
-        VisitaDocument visita = visitaLogadaAtiva();
+        VisitaDocument visita = criarVisitaLogadaAtiva();
         visita.getPontosAmostrais().add(PontoAmostralDocument.builder().em(Instant.now()).build());
         when(visitaRepository.findById("v9")).thenReturn(Optional.of(visita));
 

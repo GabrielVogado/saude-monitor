@@ -33,7 +33,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * geográficas (F-11, §5 — `GET /api/v1/camadas/{tipo}`) somam 36; a listagem
  * administrativa (E7-02/E7-07 — `GET /api/v1/admin/hospitais`, restrita a ADMIN) soma
  * 37; as avaliações pendentes do titular (M-029 — `GET /api/v1/contas/feedbacks/pendentes`)
- * somam 38; o catálogo público (ARQ-01 — `GET /api/v1/catalogo`) soma **39**. Este teste mede o total de operações que o springdoc realmente gera, não
+ * somam 38; o catálogo público (ARQ-01 — `GET /api/v1/catalogo`) soma 39; a configuração remota
+ * (ARQ-09 — `GET /api/v1/configuracao` e `PUT /api/v1/admin/configuracao`) soma **41**. Este teste mede o total de operações que o springdoc realmente gera, não
  * presume que bateu.</p>
  */
 @Testcontainers
@@ -81,7 +82,7 @@ class OpenApiContratoTest {
             }
         }
 
-        assertThat(operacoes).isEqualTo(39);
+        assertThat(operacoes).isEqualTo(41);
     }
 
     /**
@@ -119,7 +120,8 @@ class OpenApiContratoTest {
                 "GET /api/v1/hospitais/{id}/indicadores",
                 "POST /api/v1/hospitais/sugestoes",
                 "GET /api/v1/camadas/{tipo}",
-                "GET /api/v1/catalogo");
+                "GET /api/v1/catalogo",
+                "GET /api/v1/configuracao");
 
         String corpo = mockMvc.perform(get("/v3/api-docs").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())

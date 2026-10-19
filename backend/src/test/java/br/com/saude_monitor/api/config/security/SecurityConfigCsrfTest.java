@@ -1,8 +1,13 @@
 package br.com.saude_monitor.api.config.security;
 
+import br.com.saude_monitor.api.config.contencao.ContencaoProperties;
+import br.com.saude_monitor.api.config.contencao.LimiteConcorrenciaFilter;
+import br.com.saude_monitor.api.config.contencao.ModoSomenteLeituraFilter;
 import br.com.saude_monitor.api.config.ratelimit.RateLimitFilter;
 import br.com.saude_monitor.api.config.ratelimit.RateLimitProperties;
 import br.com.saude_monitor.api.config.ratelimit.RateLimitService;
+import br.com.saude_monitor.api.configuracao.dto.ConfiguracaoRemotaResponse;
+import br.com.saude_monitor.api.configuracao.service.ConfiguracaoRemotaService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.Filter;
 import jakarta.servlet.http.Cookie;
@@ -217,6 +222,18 @@ class SecurityConfigCsrfTest {
             // A rota de teste não pertence a nenhum grupo limitado: o filtro só repassa.
             return new RateLimitFilter(mock(RateLimitService.class), objectMapper, mock(RateLimitProperties.class),
                     mock(JwtService.class));
+        }
+
+        @Bean
+        LimiteConcorrenciaFilter limiteConcorrenciaFilter() {
+            return new LimiteConcorrenciaFilter(new ContencaoProperties(80, 5, 300, false), objectMapper);
+        }
+
+        @Bean
+        ModoSomenteLeituraFilter modoSomenteLeituraFilter() {
+            ConfiguracaoRemotaService configuracao = mock(ConfiguracaoRemotaService.class);
+            when(configuracao.obterConfiguracao()).thenReturn(ConfiguracaoRemotaResponse.PADRAO);
+            return new ModoSomenteLeituraFilter(configuracao, new ContencaoProperties(80, 5, 300, false), objectMapper);
         }
 
         @Bean

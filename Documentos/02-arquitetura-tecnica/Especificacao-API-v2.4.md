@@ -82,6 +82,11 @@ A versão anterior (2.0) foi preservada em `_historico/Especificacao-API-v2.0.md
 | `CONFLITO` | 409 | Violação de unicidade/estado (ex.: feedback duplicado) |
 | `LIMITE_EXCEDIDO` | 429 | Rate limit |
 | `ERRO_INTERNO` | 500 | Erro não tratado |
+| `SERVICO_SOBRECARREGADO` | 503 | Instância no teto de requisições simultâneas (ARQ-05); `Retry-After: 5` |
+| `BANCO_INDISPONIVEL` | 503 | Banco fora, sem conexão livre no pool ou consulta acima do prazo (ARQ-05, SOL-07); `Retry-After: 5` |
+| `MODO_SOMENTE_LEITURA` | 503 | Gravação recusada durante o modo somente leitura (ARQ-09); `Retry-After: 300` |
+
+**503 (ARQ-05, 18/10/2026):** falha passageira, nunca da requisição. O cliente espera o `Retry-After` e repete; o app já faz isso para 502, 503 e 504.
 
 ---
 
@@ -569,6 +574,21 @@ Dispara um job periódico. `nome` ∈ `indicadores` | `expiracao-visitas` | `gps
 **Autenticação:** `Authorization: Bearer <token OIDC>` emitido pelo Google para a conta de serviço configurada em `APP_JOBS_CONTA_SERVICO`, com `aud` igual a `APP_JOBS_AUDIENCIA` e `email_verified=true`. O access token do app não vale aqui. Sem as duas variáveis, a rota responde **403** a tudo.
 **Respostas:** `200 {"job":"indicadores","resultado":"EXECUTADO"}` · `200 … "PULADO"` (outra instância está executando o mesmo job; trava `job-<nome>` em `travas_execucao`, validade 14 min) · `404` nome desconhecido · `500` falha do job (o Cloud Scheduler tenta de novo). Todos os jobs são idempotentes.
 **Disparo interno:** `APP_JOBS_AGENDAMENTO_INTERNO` (padrão `true`) mantém o `@Scheduled` na aplicação, passando pela mesma trava. Com o Cloud Scheduler configurado, desligar.
+**Modo somente leitura (ARQ-09):** todos os jobs gravam no banco, então respondem `PULADO` enquanto o modo estiver ligado.
+
+### 3.9 Configuração remota (ARQ-09, 18/10/2026)
+
+#### `GET /api/v1/configuracao` 🔓
+Lida pelo app ao abrir. **200** `{ "modoSomenteLeitura": false, "versaoMinimaApp": "1.0.0", "mensagem": null }`. `versaoMinimaApp` e `mensagem` podem ser `null`.
+**Cache:** `Cache-Control: max-age=60, public`. Cada instância relê a configuração no banco no máximo a cada 30 s; uma alteração chega ao app em até cerca de 1 min e meio. Se o banco falhar na releitura, a instância mantém o último valor lido.
+
+#### `PUT /api/v1/admin/configuracao` 🛡️
+**Request:** `{ "modoSomenteLeitura": true, "versaoMinimaApp": "1.1.0", "mensagem": "Troca do banco até 23h." }` → **200** com a configuração em vigor. Substitui o documento inteiro (`configuracao_remota`, `_id: "atual"`); campo omitido volta ao padrão. `versaoMinimaApp` no formato `1.2.3`; `mensagem` até 200 caracteres.
+
+**Modo somente leitura:** com ele ligado, `POST`, `PUT`, `PATCH` e `DELETE` em `/api/**` respondem **503 `MODO_SOMENTE_LEITURA`** com `Retry-After: 300` e a `mensagem` configurada (ou o texto padrão). Seguem aceitos: todas as consultas, `auth/login`, `auth/refresh`, `auth/logout` e o próprio `PUT /api/v1/admin/configuracao`. `APP_SOMENTE_LEITURA_FORCADO=true` liga o modo por variável de ambiente, para quando o banco nem pode ser lido.
+
+**Teto por instância (ARQ-05):** no máximo `APP_CONTENCAO_REQUISICOES_SIMULTANEAS` (padrão 80) requisições ao mesmo tempo; acima disso, **503 `SERVICO_SOBRECARREGADO`** na hora. `/actuator/**` fica de fora.
+**Banco (SOL-07):** pool de até `APP_MONGO_POOL_MAXIMO` (padrão 20) conexões por instância; 2 s de espera por conexão e 5 s para achar o servidor, depois **503 `BANCO_INDISPONIVEL`**; leitura de até 30 s.
 ---
 
 ## 4. Fluxo de Detecção (Geofence → API)

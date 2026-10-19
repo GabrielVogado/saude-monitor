@@ -1,6 +1,7 @@
 package br.com.saude_monitor.api.jobs;
 
 import br.com.saude_monitor.api.config.trava.TravaDistribuida;
+import br.com.saude_monitor.api.configuracao.service.ConfiguracaoRemotaService;
 import br.com.saude_monitor.api.feedback.service.FeedbackSemRespostaJob;
 import br.com.saude_monitor.api.indicador.service.IndicadorHospitalJob;
 import br.com.saude_monitor.api.visita.service.RetencaoDadosPessoaisJob;
@@ -26,6 +27,7 @@ import static org.mockito.Mockito.when;
 class ExecutorJobsTest {
 
     private final TravaDistribuida trava = mock(TravaDistribuida.class);
+    private final ConfiguracaoRemotaService configuracao = mock(ConfiguracaoRemotaService.class);
     private final IndicadorHospitalJob indicadores = mock(IndicadorHospitalJob.class);
     private final VisitaExpiracaoJob expiracao = mock(VisitaExpiracaoJob.class);
     private final VisitaGpsInterrompidoJob gps = mock(VisitaGpsInterrompidoJob.class);
@@ -33,7 +35,7 @@ class ExecutorJobsTest {
     private final RetencaoDadosPessoaisJob retencao = mock(RetencaoDadosPessoaisJob.class);
 
     private final ExecutorJobs executor =
-            new ExecutorJobs(trava, indicadores, expiracao, gps, semResposta, retencao);
+            new ExecutorJobs(trava, configuracao, indicadores, expiracao, gps, semResposta, retencao);
 
     private void simularTravaLivre() {
         when(trava.executar(anyString(), any(Duration.class), any(Runnable.class))).thenAnswer(inv -> {
@@ -72,6 +74,14 @@ class ExecutorJobsTest {
 
         assertThat(executor.executar("indicadores")).contains(ExecutorJobs.Resultado.PULADO);
         verify(indicadores, never()).executar();
+    }
+
+    @Test
+    void pulaNoModoSomenteLeituraSemPegarATrava() {
+        when(configuracao.isModoSomenteLeitura()).thenReturn(true);
+
+        assertThat(executor.executar("retencao-dados")).contains(ExecutorJobs.Resultado.PULADO);
+        verifyNoInteractions(trava, retencao);
     }
 
     @Test

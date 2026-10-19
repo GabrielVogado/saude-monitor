@@ -5,6 +5,12 @@
 
 ---
 
+## 📌 Revisão 18/10/2026 — Épico 9: contenção de falhas, pool do banco e configuração remota (ARQ-05, SOL-07, ARQ-09)
+
+**O que mudou:** cada instância atende no máximo 80 requisições ao mesmo tempo e responde 503 com `Retry-After` acima disso; falha passageira do banco vira 503 em vez de 500; o pool do MongoDB fica limitado a 20 conexões com prazos explícitos; e nasce a configuração remota (modo somente leitura e versão mínima do app), lida em `GET /api/v1/configuracao` e alterada pelo ADMIN. `Especificacao-API-v2.4.md` (§1.2 e §3.9), `De-Para-Backlog-Features.md` (ARQ-05, SOL-07 e ARQ-09 entregues) e `Historico-Melhorias.md` (M-055).
+
+---
+
 ## 📌 Revisão 18/10/2026 — Épico 9: e-mail de código síncrono e limite por destino (SOL-09, SEG-03)
 
 **O que mudou:** os códigos de cadastro, reenvio e "esqueci a senha" saem dentro da requisição, com teto de 1,5 s para o Resend, em vez de `@Async` (que no Cloud Run podia ficar sem CPU). Reenvio e "esqueci a senha" respondem sempre em 2 s, cada endereço recebe no máximo 5 códigos por hora e o login de e-mail sem conta gasta o mesmo BCrypt. `Especificacao-API-v2.4.md` (§3.1), `De-Para-Backlog-Features.md` (SOL-09 e SEG-03 entregues) e `Historico-Melhorias.md` (M-054).

@@ -65,7 +65,7 @@ public class ExecutorJobs {
     }
 
     /** Nomes aceitos, na ordem de registro. */
-    public Set<String> nomes() {
+    public Set<String> listarNomes() {
         return jobs.keySet();
     }
 
@@ -81,30 +81,30 @@ public class ExecutorJobs {
         if (job == null) {
             return Optional.empty();
         }
-        if (configuracaoRemota.modoSomenteLeitura()) {
+        if (configuracaoRemota.isModoSomenteLeitura()) {
             log.info("[Job] {} pulado: modo somente leitura ligado.", nome);
             return Optional.of(Resultado.PULADO);
         }
-        boolean rodou = trava.executar(PREFIXO_TRAVA + nome, VALIDADE_TRAVA, () -> medir(nome, job));
+        boolean rodou = trava.executar(PREFIXO_TRAVA + nome, VALIDADE_TRAVA, () -> executarMedindoTempo(nome, job));
         if (!rodou) {
             log.info("[Job] {} pulado: outra instância está executando.", nome);
         }
         return Optional.of(rodou ? Resultado.EXECUTADO : Resultado.PULADO);
     }
 
-    private static void medir(String nome, Runnable job) {
-        long inicio = System.nanoTime();
+    private static void executarMedindoTempo(String nome, Runnable job) {
+        long inicioEmNanos = System.nanoTime();
         log.info("[Job] {} iniciado.", nome);
         try {
             job.run();
         } catch (RuntimeException e) {
-            log.error("[Job] {} falhou depois de {} ms.", nome, decorrido(inicio), e);
+            log.error("[Job] {} falhou depois de {} ms.", nome, calcularMilissegundosDesde(inicioEmNanos), e);
             throw e;
         }
-        log.info("[Job] {} concluído em {} ms.", nome, decorrido(inicio));
+        log.info("[Job] {} concluído em {} ms.", nome, calcularMilissegundosDesde(inicioEmNanos));
     }
 
-    private static long decorrido(long inicio) {
-        return Duration.ofNanos(System.nanoTime() - inicio).toMillis();
+    private static long calcularMilissegundosDesde(long inicioEmNanos) {
+        return Duration.ofNanos(System.nanoTime() - inicioEmNanos).toMillis();
     }
 }

@@ -232,7 +232,7 @@ class SecurityConfigCsrfTest {
         @Bean
         ModoSomenteLeituraFilter modoSomenteLeituraFilter() {
             ConfiguracaoRemotaService configuracao = mock(ConfiguracaoRemotaService.class);
-            when(configuracao.obter()).thenReturn(ConfiguracaoRemotaResponse.PADRAO);
+            when(configuracao.obterConfiguracao()).thenReturn(ConfiguracaoRemotaResponse.PADRAO);
             return new ModoSomenteLeituraFilter(configuracao, new ContencaoProperties(80, 5, 300, false), objectMapper);
         }
 

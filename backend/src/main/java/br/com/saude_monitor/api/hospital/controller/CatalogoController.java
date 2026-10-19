@@ -40,8 +40,8 @@ public class CatalogoController {
     /** 🔓 Todos os estabelecimentos ativos, com indicadores. */
     @GetMapping
     @SecurityRequirements
-    public ResponseEntity<CatalogoResponse> obter() {
-        CatalogoResponse catalogo = catalogoService.obter();
+    public ResponseEntity<CatalogoResponse> obterCatalogo() {
+        CatalogoResponse catalogo = catalogoService.obterCatalogo();
         return ResponseEntity.ok()
                 .cacheControl(CACHE)
                 .eTag("W/\"" + catalogo.versao() + "\"")

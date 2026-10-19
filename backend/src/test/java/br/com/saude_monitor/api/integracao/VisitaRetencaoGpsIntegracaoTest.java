@@ -51,7 +51,7 @@ class VisitaRetencaoGpsIntegracaoTest extends IntegracaoTestBase {
     private static final String POSICAO = """
             "posicao": { "type": "Point", "coordinates": [-47.88, -15.79] }""";
 
-    private String checkinAnonimo(String dispositivoId) throws Exception {
+    private String fazerCheckinAnonimo(String dispositivoId) throws Exception {
         String resposta = mockMvc.perform(post("/api/v1/visitas/checkin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -65,7 +65,7 @@ class VisitaRetencaoGpsIntegracaoTest extends IntegracaoTestBase {
     @Test
     void heartbeatAcrescentaPontoECheckoutApagaATrilha() throws Exception {
         String aparelho = "anon-retencao-" + System.nanoTime();
-        String visitaId = checkinAnonimo(aparelho);
+        String visitaId = fazerCheckinAnonimo(aparelho);
 
         mockMvc.perform(post("/api/v1/visitas/" + visitaId + "/heartbeat")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -92,12 +92,12 @@ class VisitaRetencaoGpsIntegracaoTest extends IntegracaoTestBase {
     @Test
     void visitaComMaisDe90DiasPerdeContaEAparelho() throws Exception {
         String aparelho = "anon-antiga-" + System.nanoTime();
-        String antigaId = checkinAnonimo(aparelho);
+        String antigaId = fazerCheckinAnonimo(aparelho);
         VisitaDocument antiga = mongoTemplate.findById(antigaId, VisitaDocument.class);
         antiga.setEntrada(Instant.now().minus(Duration.ofDays(91)));
         antiga.setUsuarioId("u-antigo");
         mongoTemplate.save(antiga);
-        String recenteId = checkinAnonimo("anon-recente-" + System.nanoTime());
+        String recenteId = fazerCheckinAnonimo("anon-recente-" + System.nanoTime());
 
         assertThat(visitaService.desvincularVisitasAntigas()).isGreaterThanOrEqualTo(1L);
 

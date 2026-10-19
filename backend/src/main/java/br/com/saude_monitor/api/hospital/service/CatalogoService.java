@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * em vez de a cada requisição. O atraso aceito nos dados públicos é de até 5 minutos (P8
  * da análise de escala): nota, tempo e cadastro novos aparecem no catálogo dentro dessa
  * janela. Uma alteração administrativa feita nesta instância descarta o catálogo na hora
- * ({@link #invalidar()}).</p>
+ * ({@link #invalidarCache()}).</p>
  *
  * <p>A versão é o SHA-256 do conteúdo, então duas instâncias com os mesmos dados dão a
  * mesma versão, e o {@code If-None-Match} do app vale em qualquer uma delas.</p>
@@ -49,27 +49,27 @@ public class CatalogoService {
     }
 
     /** Catálogo atual, montado de novo só quando o guardado venceu ou foi descartado. */
-    public CatalogoResponse obter() {
+    public CatalogoResponse obterCatalogo() {
         Guardado atual = guardado.get();
         if (atual != null && clock.instant().isBefore(atual.expiraEm())) {
             return atual.catalogo();
         }
-        return remontar();
+        return remontarCatalogo();
     }
 
     /** Descarta o catálogo guardado; a próxima leitura vai ao banco. */
-    public void invalidar() {
+    public void invalidarCache() {
         guardado.set(null);
     }
 
-    private synchronized CatalogoResponse remontar() {
+    private synchronized CatalogoResponse remontarCatalogo() {
         Instant agora = clock.instant();
         Guardado atual = guardado.get();
         if (atual != null && agora.isBefore(atual.expiraEm())) {
             return atual.catalogo(); // outra thread remontou enquanto esta esperava
         }
         List<HospitalResumoResponse> itens = hospitalService.listarCatalogo();
-        CatalogoResponse catalogo = new CatalogoResponse(versaoDe(itens), itens.size(), itens);
+        CatalogoResponse catalogo = new CatalogoResponse(calcularVersao(itens), itens.size(), itens);
         guardado.set(new Guardado(catalogo, agora.plus(VALIDADE)));
         return catalogo;
     }
@@ -79,7 +79,7 @@ public class CatalogoService {
      * {@code toString} é determinístico, então serve de forma canônica sem depender da
      * serialização JSON.
      */
-    static String versaoDe(List<HospitalResumoResponse> itens) {
+    static String calcularVersao(List<HospitalResumoResponse> itens) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256")
                     .digest(itens.toString().getBytes(StandardCharsets.UTF_8));

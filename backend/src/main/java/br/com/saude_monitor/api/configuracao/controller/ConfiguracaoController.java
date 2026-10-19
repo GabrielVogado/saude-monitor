@@ -31,7 +31,7 @@ public class ConfiguracaoController {
     /** 🔓 Modo somente leitura, versão mínima do app e mensagem de manutenção. */
     @GetMapping
     @SecurityRequirements
-    public ResponseEntity<ConfiguracaoRemotaResponse> obter() {
-        return ResponseEntity.ok().cacheControl(CACHE).body(configuracaoRemotaService.obter());
+    public ResponseEntity<ConfiguracaoRemotaResponse> obterConfiguracao() {
+        return ResponseEntity.ok().cacheControl(CACHE).body(configuracaoRemotaService.obterConfiguracao());
     }
 }

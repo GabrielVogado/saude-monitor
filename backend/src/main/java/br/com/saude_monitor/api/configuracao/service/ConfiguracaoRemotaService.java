@@ -52,8 +52,8 @@ public class ConfiguracaoRemotaService {
     }
 
     /** Configuração em vigor, com o modo somente leitura forçado por ambiente já aplicado. */
-    public ConfiguracaoRemotaResponse obter() {
-        ConfiguracaoRemotaResponse lida = lida();
+    public ConfiguracaoRemotaResponse obterConfiguracao() {
+        ConfiguracaoRemotaResponse lida = obterConfiguracaoGuardada();
         if (contencao.somenteLeituraForcado() && !lida.modoSomenteLeitura()) {
             return new ConfiguracaoRemotaResponse(true, lida.versaoMinimaApp(), lida.mensagem());
         }
@@ -61,8 +61,8 @@ public class ConfiguracaoRemotaService {
     }
 
     /** Atalho para filtros e jobs. */
-    public boolean modoSomenteLeitura() {
-        return obter().modoSomenteLeitura();
+    public boolean isModoSomenteLeitura() {
+        return obterConfiguracao().modoSomenteLeitura();
     }
 
     /** Grava a nova configuração e passa a usá-la nesta instância na hora. */
@@ -78,20 +78,20 @@ public class ConfiguracaoRemotaService {
         repository.save(documento);
         log.info("[Configuracao] alterada por {}: somente leitura={}, versão mínima={}.",
                 administradorId, documento.isModoSomenteLeitura(), documento.getVersaoMinimaApp());
-        ConfiguracaoRemotaResponse nova = paraResposta(documento);
+        ConfiguracaoRemotaResponse nova = converterParaResposta(documento);
         guardada.set(new Guardada(nova, clock.instant().plus(VALIDADE)));
-        return obter();
+        return obterConfiguracao();
     }
 
-    private ConfiguracaoRemotaResponse lida() {
+    private ConfiguracaoRemotaResponse obterConfiguracaoGuardada() {
         Guardada atual = guardada.get();
         if (atual != null && clock.instant().isBefore(atual.expiraEm())) {
             return atual.configuracao();
         }
-        return reler();
+        return relerDoBanco();
     }
 
-    private synchronized ConfiguracaoRemotaResponse reler() {
+    private synchronized ConfiguracaoRemotaResponse relerDoBanco() {
         Instant agora = clock.instant();
         Guardada atual = guardada.get();
         if (atual != null && agora.isBefore(atual.expiraEm())) {
@@ -100,7 +100,7 @@ public class ConfiguracaoRemotaService {
         ConfiguracaoRemotaResponse configuracao;
         try {
             configuracao = repository.findById(ConfiguracaoRemotaDocument.ID_UNICO)
-                    .map(ConfiguracaoRemotaService::paraResposta)
+                    .map(ConfiguracaoRemotaService::converterParaResposta)
                     .orElse(ConfiguracaoRemotaResponse.PADRAO);
         } catch (DataAccessException e) {
             configuracao = atual != null ? atual.configuracao() : ConfiguracaoRemotaResponse.PADRAO;
@@ -110,7 +110,7 @@ public class ConfiguracaoRemotaService {
         return configuracao;
     }
 
-    private static ConfiguracaoRemotaResponse paraResposta(ConfiguracaoRemotaDocument documento) {
+    private static ConfiguracaoRemotaResponse converterParaResposta(ConfiguracaoRemotaDocument documento) {
         return new ConfiguracaoRemotaResponse(
                 documento.isModoSomenteLeitura(), documento.getVersaoMinimaApp(), documento.getMensagem());
     }

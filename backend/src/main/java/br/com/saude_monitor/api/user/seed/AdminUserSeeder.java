@@ -51,12 +51,12 @@ public class AdminUserSeeder implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        validar();
+        validarConfiguracao();
         trava.executar(NOME_TRAVA, VALIDADE_TRAVA, this::executar);
     }
 
     /** Falha o boot quando o seed está ligado sem credencial utilizável (SEG-07). */
-    private void validar() {
+    private void validarConfiguracao() {
         if (properties.email() == null || properties.email().isBlank()) {
             throw new IllegalStateException(
                     "Seed de admin ligado sem ADMIN_EMAIL. Configure o e-mail ou desligue APP_SEEDADMIN_ENABLED.");

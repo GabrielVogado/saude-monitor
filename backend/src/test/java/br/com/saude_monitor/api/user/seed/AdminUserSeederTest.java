@@ -33,10 +33,10 @@ class AdminUserSeederTest {
     }
 
     private AdminUserSeeder seederCom(AdminSeedProperties properties) {
-        return new AdminUserSeeder(userRepository, new BCryptPasswordEncoder(), properties, TravasDeTeste.livre());
+        return new AdminUserSeeder(userRepository, new BCryptPasswordEncoder(), properties, TravasDeTeste.criarTravaLivre());
     }
 
-    private void bootFalha(AdminSeedProperties properties) {
+    private void verificarFalhaNoBoot(AdminSeedProperties properties) {
         seeder = seederCom(properties);
 
         assertThatThrownBy(() -> seeder.run(mock(ApplicationArguments.class)))
@@ -46,23 +46,23 @@ class AdminUserSeederTest {
 
     @Test
     void bootFalhaQuandoSenhaAusente() {
-        bootFalha(new AdminSeedProperties(true, "admin@saude-monitor.com", null, "Admin"));
+        verificarFalhaNoBoot(new AdminSeedProperties(true, "admin@saude-monitor.com", null, "Admin"));
     }
 
     @Test
     void bootFalhaQuandoSenhaEmBranco() {
-        bootFalha(new AdminSeedProperties(true, "admin@saude-monitor.com", "   ", "Admin"));
+        verificarFalhaNoBoot(new AdminSeedProperties(true, "admin@saude-monitor.com", "   ", "Admin"));
     }
 
     @Test
     void bootFalhaComASenhaPadraoAntiga() {
-        bootFalha(new AdminSeedProperties(true, "admin@saude.com", "admin123", "Admin"));
+        verificarFalhaNoBoot(new AdminSeedProperties(true, "admin@saude.com", "admin123", "Admin"));
     }
 
     @Test
     void bootFalhaSemEmail() {
-        bootFalha(new AdminSeedProperties(true, " ", "S3nh@Forte!2026", "Admin"));
-        bootFalha(new AdminSeedProperties(true, null, "S3nh@Forte!2026", "Admin"));
+        verificarFalhaNoBoot(new AdminSeedProperties(true, " ", "S3nh@Forte!2026", "Admin"));
+        verificarFalhaNoBoot(new AdminSeedProperties(true, null, "S3nh@Forte!2026", "Admin"));
     }
 
     @Test
@@ -90,7 +90,7 @@ class AdminUserSeederTest {
         // SOL-02: duas instâncias subindo juntas não criam dois admins.
         seeder = new AdminUserSeeder(userRepository, new BCryptPasswordEncoder(),
                 new AdminSeedProperties(true, "admin@saude-monitor.com", "S3nh@Forte!2026", "Admin"),
-                TravasDeTeste.ocupada());
+                TravasDeTeste.criarTravaOcupada());
 
         seeder.run(mock(ApplicationArguments.class));
 

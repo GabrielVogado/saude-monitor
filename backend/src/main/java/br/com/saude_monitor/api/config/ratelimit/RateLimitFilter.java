@@ -65,16 +65,16 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         String ip = resolverIp(request);
         // Camada 1: teto de abuso por IP, alto, somando o tráfego limitado (ARQ-02).
-        if (excedeu(request, response, RateLimitService.Grupo.IP, PREFIXO_IP + ip, "ip " + ip)) {
+        if (bloquearSeLimiteExcedido(request, response, RateLimitService.Grupo.IP, PREFIXO_IP + ip, "ip " + ip)) {
             return;
         }
 
         // Camada 2: limite de cada pessoa. A renovação de sessão não passa por aqui: ela é
         // limitada pelo próprio refresh token, no AuthController, e nunca pelo IP.
         if (!ROTA_REFRESH.equals(request.getRequestURI())) {
-            Identidade identidade = identidade(request, grupo, ip);
+            Identidade identidade = identificarCliente(request, grupo, ip);
             response.setHeader(HEADER_LIMITE, String.valueOf(rateLimitService.limite(grupo)));
-            if (excedeu(request, response, grupo, identidade.chave(), identidade.descricao())) {
+            if (bloquearSeLimiteExcedido(request, response, grupo, identidade.chave(), identidade.descricao())) {
                 return;
             }
         }
@@ -93,11 +93,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
      * uns derrubar o check-in e o heartbeat dos outros. Nas rotas de autenticação, o IP
      * (o login também é limitado por conta, no AuthController).
      */
-    Identidade identidade(HttpServletRequest request, RateLimitService.Grupo grupo, String ip) {
+    Identidade identificarCliente(HttpServletRequest request, RateLimitService.Grupo grupo, String ip) {
         if (grupo == RateLimitService.Grupo.PUBLICO) {
             String autorizacao = request.getHeader("Authorization");
             if (autorizacao != null && autorizacao.startsWith(PREFIXO_BEARER)) {
-                var usuario = jwtService.assuntoDoAccessToken(autorizacao.substring(PREFIXO_BEARER.length()));
+                var usuario = jwtService.extrairAssuntoDoAccessToken(autorizacao.substring(PREFIXO_BEARER.length()));
                 if (usuario.isPresent()) {
                     return new Identidade("usuario:" + usuario.get(), "usuário autenticado");
                 }
@@ -110,7 +110,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return new Identidade(PREFIXO_IP + ip, "ip " + ip);
     }
 
-    private boolean excedeu(HttpServletRequest request, HttpServletResponse response,
+    private boolean bloquearSeLimiteExcedido(HttpServletRequest request, HttpServletResponse response,
                             RateLimitService.Grupo grupo, String chave, String descricao) throws IOException {
         long feitas = rateLimitService.registrar(chave, grupo);
         int limite = rateLimitService.limite(grupo);

@@ -43,7 +43,7 @@ class SeedRunnerGemeosTest {
                 "TESTE", 0.05, 150, 100, 75, 100, 100, 100, 100);
         SeedMapper seedMapper = new SeedMapper(properties, new GeofenceFactory());
         return new SeedRunner(new DbfLeitor(), new ShpPointLeitor(), seedMapper,
-                hospitalRepository, properties, mock(HospitalPublicoComplementarLeitor.class), TravasDeTeste.livre());
+                hospitalRepository, properties, mock(HospitalPublicoComplementarLeitor.class), TravasDeTeste.criarTravaLivre());
     }
 
     @Test

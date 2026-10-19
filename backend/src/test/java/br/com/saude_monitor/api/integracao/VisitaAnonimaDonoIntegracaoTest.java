@@ -33,7 +33,7 @@ class VisitaAnonimaDonoIntegracaoTest extends IntegracaoTestBase {
         registry.add("spring.mongodb.uri", mongo::getReplicaSetUrl);
     }
 
-    private String checkinAnonimo(String dispositivoId) throws Exception {
+    private String fazerCheckinAnonimo(String dispositivoId) throws Exception {
         String resposta = mockMvc.perform(post("/api/v1/visitas/checkin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -44,7 +44,7 @@ class VisitaAnonimaDonoIntegracaoTest extends IntegracaoTestBase {
         return objectMapper.readTree(resposta).get("id").asText();
     }
 
-    private String corpoDispositivo(String dispositivoId) {
+    private String criarCorpoDispositivo(String dispositivoId) {
         return dispositivoId == null ? "{}" : """
                 { "dispositivoId": "%s" }
                 """.formatted(dispositivoId);
@@ -53,36 +53,36 @@ class VisitaAnonimaDonoIntegracaoTest extends IntegracaoTestBase {
     @Test
     void heartbeatECheckoutDeVisitaAnonimaExigemOAparelhoDono() throws Exception {
         String dono = "anon-dono-" + System.nanoTime();
-        String visitaId = checkinAnonimo(dono);
+        String visitaId = fazerCheckinAnonimo(dono);
 
         for (String intruso : new String[]{null, "anon-intruso-" + System.nanoTime()}) {
             mockMvc.perform(post("/api/v1/visitas/" + visitaId + "/heartbeat")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(corpoDispositivo(intruso)))
+                            .content(criarCorpoDispositivo(intruso)))
                     .andExpect(status().isForbidden());
             mockMvc.perform(post("/api/v1/visitas/" + visitaId + "/checkout")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(corpoDispositivo(intruso)))
+                            .content(criarCorpoDispositivo(intruso)))
                     .andExpect(status().isForbidden());
         }
 
         mockMvc.perform(post("/api/v1/visitas/" + visitaId + "/heartbeat")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(corpoDispositivo(dono)))
+                        .content(criarCorpoDispositivo(dono)))
                 .andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/visitas/" + visitaId + "/checkout")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(corpoDispositivo(dono)))
+                        .content(criarCorpoDispositivo(dono)))
                 .andExpect(status().isOk());
     }
 
     @Test
     void feedbackDeVisitaAnonimaSoDoAparelhoDonoENaoBloqueiaOLegitimo() throws Exception {
         String dono = "anon-dono-" + System.nanoTime();
-        String visitaId = checkinAnonimo(dono);
+        String visitaId = fazerCheckinAnonimo(dono);
         mockMvc.perform(post("/api/v1/visitas/" + visitaId + "/checkout")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(corpoDispositivo(dono)))
+                        .content(criarCorpoDispositivo(dono)))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/v1/feedbacks")

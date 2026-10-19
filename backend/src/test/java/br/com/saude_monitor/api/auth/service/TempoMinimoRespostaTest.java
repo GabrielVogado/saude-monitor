@@ -27,7 +27,7 @@ class TempoMinimoRespostaTest {
 
     @Test
     void operacaoRapidaEsperaOQueFaltaParaOPiso() {
-        String resultado = tempo.garantir(() -> {
+        String resultado = tempo.executarComTempoMinimo(() -> {
             nanos.addAndGet(Duration.ofMillis(300).toNanos());
             return "ok";
         });
@@ -38,14 +38,14 @@ class TempoMinimoRespostaTest {
 
     @Test
     void operacaoMaisLentaQueOPisoNaoEspera() {
-        tempo.garantir(() -> nanos.addAndGet(Duration.ofMillis(2500).toNanos()));
+        tempo.executarComTempoMinimo(() -> nanos.addAndGet(Duration.ofMillis(2500).toNanos()));
 
         assertThat(esperas).isEmpty();
     }
 
     @Test
     void erroTambemSaiSoDepoisDoPiso() {
-        assertThatThrownBy(() -> tempo.garantir(() -> {
+        assertThatThrownBy(() -> tempo.executarComTempoMinimo(() -> {
             throw new IllegalStateException("Mongo fora");
         })).isInstanceOf(IllegalStateException.class);
 
@@ -58,13 +58,13 @@ class TempoMinimoRespostaTest {
             throw new InterruptedException("desligando");
         });
 
-        assertThat(interrompido.garantir(() -> "ok")).isEqualTo("ok");
+        assertThat(interrompido.executarComTempoMinimo(() -> "ok")).isEqualTo("ok");
         assertThat(Thread.currentThread().isInterrupted()).isTrue();
     }
 
     @Test
     void semPisoNaoEspera() {
-        assertThat(TempoMinimoResposta.semPiso().garantir(() -> 42)).isEqualTo(42);
+        assertThat(TempoMinimoResposta.criarSemPiso().executarComTempoMinimo(() -> 42)).isEqualTo(42);
         assertThat(new TempoMinimoResposta()).isNotNull();
     }
 }

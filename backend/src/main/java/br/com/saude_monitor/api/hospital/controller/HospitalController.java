@@ -138,7 +138,7 @@ public class HospitalController {
     @PostMapping
     public ResponseEntity<HospitalResponse> criar(@Valid @RequestBody HospitalRequest request) {
         HospitalResponse criado = hospitalService.criar(request);
-        catalogoService.invalidar();
+        catalogoService.invalidarCache();
         return ResponseEntity.status(HttpStatus.CREATED).body(criado);
     }
 
@@ -147,7 +147,7 @@ public class HospitalController {
     public ResponseEntity<HospitalResponse> atualizar(@PathVariable String id,
                                                       @Valid @RequestBody HospitalRequest request) {
         HospitalResponse atualizado = hospitalService.atualizar(id, request);
-        catalogoService.invalidar();
+        catalogoService.invalidarCache();
         return ResponseEntity.ok(atualizado);
     }
 
@@ -156,7 +156,7 @@ public class HospitalController {
     public ResponseEntity<HospitalResponse> alterarStatus(@PathVariable String id,
                                                           @Valid @RequestBody AlterarStatusRequest request) {
         HospitalResponse alterado = hospitalService.alterarStatus(id, request.ativo());
-        catalogoService.invalidar();
+        catalogoService.invalidarCache();
         return ResponseEntity.ok(alterado);
     }
 

@@ -45,22 +45,22 @@ public class TempoMinimoResposta {
     }
 
     /** Sem piso: para testes de quem usa esta classe. */
-    public static TempoMinimoResposta semPiso() {
+    public static TempoMinimoResposta criarSemPiso() {
         return new TempoMinimoResposta(Duration.ZERO, System::nanoTime, duracao -> { });
     }
 
     /** Executa a operação e só devolve depois do piso, com ou sem erro. */
-    public <T> T garantir(Supplier<T> operacao) {
-        long inicio = relogioNanos.getAsLong();
+    public <T> T executarComTempoMinimo(Supplier<T> operacao) {
+        long inicioEmNanos = relogioNanos.getAsLong();
         try {
             return operacao.get();
         } finally {
-            completar(inicio);
+            aguardarTempoRestante(inicioEmNanos);
         }
     }
 
-    private void completar(long inicio) {
-        Duration falta = minimo.minusNanos(relogioNanos.getAsLong() - inicio);
+    private void aguardarTempoRestante(long inicioEmNanos) {
+        Duration falta = minimo.minusNanos(relogioNanos.getAsLong() - inicioEmNanos);
         if (falta.isNegative() || falta.isZero()) {
             return;
         }

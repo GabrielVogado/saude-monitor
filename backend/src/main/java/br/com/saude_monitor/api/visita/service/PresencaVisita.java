@@ -35,8 +35,8 @@ public final class PresencaVisita {
      * @param entrada           momento da entrada (pode ser retroativo, fila offline)
      * @param recebidoEm        momento em que o servidor recebeu o check-in
      */
-    public static boolean noCheckin(boolean posicaoNoHospital, Instant entrada, Instant recebidoEm) {
-        return posicaoNoHospital && dentroDoAtraso(entrada, recebidoEm);
+    public static boolean isComprovadaNoCheckin(boolean posicaoNoHospital, Instant entrada, Instant recebidoEm) {
+        return posicaoNoHospital && isDentroDoAtrasoMaximo(entrada, recebidoEm);
     }
 
     /**
@@ -44,15 +44,15 @@ public final class PresencaVisita {
      * marcação gravada; para ela vale o que os campos guardados permitem conferir: o check-in
      * pelo geofence sempre validou a posição, e {@code criadoEm} mostra o atraso.
      */
-    public static boolean comprovada(VisitaDocument visita) {
+    public static boolean isComprovada(VisitaDocument visita) {
         if (visita.getPresencaComprovada() != null) {
             return visita.getPresencaComprovada();
         }
         return visita.getOrigem() == OrigemVisita.GEOFENCE
-                && dentroDoAtraso(visita.getEntrada(), visita.getCriadoEm());
+                && isDentroDoAtrasoMaximo(visita.getEntrada(), visita.getCriadoEm());
     }
 
-    private static boolean dentroDoAtraso(Instant entrada, Instant recebidoEm) {
+    private static boolean isDentroDoAtrasoMaximo(Instant entrada, Instant recebidoEm) {
         return entrada != null && recebidoEm != null
                 && Duration.between(entrada, recebidoEm).compareTo(ATRASO_MAXIMO) <= 0;
     }

@@ -3,7 +3,7 @@ import { invalidarVisitaAtiva } from "../../../core/query/queryClient";
 import { queryKeys } from "../../../core/query/queryKeys";
 import { useSessao } from "../../../core/stores/sessaoStore";
 import VisitaService from "../service/VisitaService";
-import { posicaoParaCheckinManual } from "../service/PosicaoAparelho";
+import { obterPosicaoParaCheckinManual } from "../service/PosicaoAparelho";
 
 /**
  * Grava a visita que o servidor acabou de confirmar só na chave da visita ativa deste
@@ -33,7 +33,7 @@ export function useCheckinManual() {
 
   return useMutation({
     mutationFn: async ({ hospitalId }) =>
-      VisitaService.checkin({ hospitalId, origem: "MANUAL", posicao: await posicaoParaCheckinManual() }),
+      VisitaService.checkin({ hospitalId, origem: "MANUAL", posicao: await obterPosicaoParaCheckinManual() }),
     onSuccess: (resposta) => confirmar({ ...resposta, origem: "MANUAL" }),
   });
 }

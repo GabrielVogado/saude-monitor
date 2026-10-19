@@ -60,7 +60,7 @@ class ReconciliacaoRaioGeofenceRunnerTest {
             150.0, 100.0, 75.0, 100.0, 100.0, 100.0, 100.0);
 
     private final ReconciliacaoRaioGeofenceRunner runner =
-            new ReconciliacaoRaioGeofenceRunner(repository, factory, properties, mongoTemplate, TravasDeTeste.livre());
+            new ReconciliacaoRaioGeofenceRunner(repository, factory, properties, mongoTemplate, TravasDeTeste.criarTravaLivre());
 
     {
         when(mongoTemplate.bulkOps(eq(BulkOperations.BulkMode.UNORDERED), eq(HospitalDocument.class)))

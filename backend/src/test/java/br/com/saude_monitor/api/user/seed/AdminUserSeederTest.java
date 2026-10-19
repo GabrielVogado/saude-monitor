@@ -32,7 +32,7 @@ class AdminUserSeederTest {
     }
 
     private AdminUserSeeder seederCom(AdminSeedProperties properties) {
-        return new AdminUserSeeder(userRepository, new BCryptPasswordEncoder(), properties, TravasDeTeste.livre());
+        return new AdminUserSeeder(userRepository, new BCryptPasswordEncoder(), properties, TravasDeTeste.criarTravaLivre());
     }
 
     @Test
@@ -70,7 +70,7 @@ class AdminUserSeederTest {
         // SOL-02: duas instâncias subindo juntas não criam dois admins.
         seeder = new AdminUserSeeder(userRepository, new BCryptPasswordEncoder(),
                 new AdminSeedProperties(true, "admin@saude-monitor.com", "S3nh@Forte!", "Admin"),
-                TravasDeTeste.ocupada());
+                TravasDeTeste.criarTravaOcupada());
 
         seeder.run(mock(ApplicationArguments.class));
 

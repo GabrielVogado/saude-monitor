@@ -18,6 +18,7 @@ import br.com.saude_monitor.api.hospital.dto.PageResponse;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import br.com.saude_monitor.api.visita.document.StatusVisita;
 import br.com.saude_monitor.api.visita.document.VisitaDocument;
+import br.com.saude_monitor.api.visita.service.VisitaDono;
 import br.com.saude_monitor.api.visita.repository.VisitaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -72,7 +73,7 @@ public class FeedbackServiceImpl implements FeedbackService {
 
     @Override
     public FeedbackResponse criar(FeedbackRequest request, String usuarioId) {
-        VisitaDocument visita = obterVisitaAvaliavel(request.visitaId());
+        VisitaDocument visita = obterVisitaAvaliavel(request.visitaId(), usuarioId, request.dispositivoId());
 
         if (feedbackRepository.existsByVisitaId(request.visitaId())) {
             throw new ConflitoException("Você já avaliou esta visita.");
@@ -230,15 +231,21 @@ public class FeedbackServiceImpl implements FeedbackService {
     }
 
     /**
-     * Busca a visita e garante que ela aceita feedback: encerrada ({@code FINALIZADA} ou
+     * Busca a visita e garante que ela é de quem chama e aceita feedback: encerrada ({@code FINALIZADA} ou
      * {@code GPS_INTERROMPIDO}) e dentro da janela de 24h após a saída (RN-09). Fora disso
      * responde 404, o mesmo que a visita já marcada {@code SEM_FEEDBACK} pelo job recebe,
      * para o app tratar os dois casos como "não está mais disponível".
      */
-    private VisitaDocument obterVisitaAvaliavel(String visitaId) {
+    private VisitaDocument obterVisitaAvaliavel(String visitaId, String usuarioId, String dispositivoId) {
         VisitaDocument visita = visitaRepository.findById(visitaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(
                         "Visita não encontrada para o id informado."));
+        // SEG-02: só quem fez a visita avalia. 403, como no BOLA de checkout (F-02). Vem
+        // antes das regras de status e de janela para não contar a estranhos se a visita
+        // está em andamento, encerrada ou já avaliada.
+        if (!VisitaDono.isDonoDaVisita(visita, usuarioId, dispositivoId)) {
+            throw new AcessoNegadoException("Visita não pertence ao usuário ou aparelho informado.");
+        }
         if (!STATUS_AVALIAVEIS.contains(visita.getStatus())) {
             throw new RecursoNaoEncontradoException(
                     "O feedback só pode ser enviado após a visita ser encerrada.");

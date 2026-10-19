@@ -6,6 +6,7 @@ import br.com.saude_monitor.api.config.exception.RecursoNaoEncontradoException;
 import br.com.saude_monitor.api.feedback.document.FeedbackDocument;
 import br.com.saude_monitor.api.feedback.dto.FeedbackPendenteResponse;
 import br.com.saude_monitor.api.feedback.dto.FeedbackRequest;
+import br.com.saude_monitor.api.feedback.dto.FeedbackResponse;
 import br.com.saude_monitor.api.feedback.repository.FeedbackRepository;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
@@ -108,7 +109,7 @@ class FeedbackServiceImplTest {
     // ------------------------------------------------ criar (achado do code-review, 09/09/2026) ------------------
 
     private FeedbackRequest request(String visitaId) {
-        return new FeedbackRequest(visitaId, null, null, null, null, null, null, 4, null, null);
+        return new FeedbackRequest(visitaId, null, null, null, null, null, null, 4, null, null, null);
     }
 
     /**
@@ -125,9 +126,89 @@ class FeedbackServiceImplTest {
         when(feedbackRepository.existsByVisitaId("v1")).thenReturn(false);
         when(feedbackRepository.save(any())).thenThrow(new DuplicateKeyException("chave duplicada"));
 
-        assertThatThrownBy(() -> service.criar(request("v1"), "u1"))
+        FeedbackRequest pedido = request("v1");
+        assertThatThrownBy(() -> service.criar(pedido, "u1"))
                 .isInstanceOf(ConflitoException.class)
                 .hasMessageContaining("já avaliou");
+    }
+
+    // ------------------------------------------------ dono da visita (SEG-02) ------------------
+
+    private FeedbackRequest criarRequestDoAparelho(String visitaId, String dispositivoId) {
+        return new FeedbackRequest(visitaId, null, null, null, null, null, null, 4, null, null, dispositivoId);
+    }
+
+    private VisitaDocument criarVisitaAnonimaEncerrada(String id, String dispositivoId) {
+        return VisitaDocument.builder()
+                .id(id)
+                .dispositivoId(dispositivoId)
+                .hospitalId("h1")
+                .status(StatusVisita.FINALIZADA)
+                .saida(Instant.now().minus(Duration.ofMinutes(10)))
+                .build();
+    }
+
+    @Test
+    void criarRecusaFeedbackDeOutroUsuarioNaVisitaLogada() {
+        when(visitaRepository.findById("v1"))
+                .thenReturn(Optional.of(visitaEncerradaHa("v1", StatusVisita.FINALIZADA, Duration.ofMinutes(30))));
+
+        FeedbackRequest pedido = request("v1");
+        assertThatThrownBy(() -> service.criar(pedido, "invasor"))
+                .isInstanceOf(AcessoNegadoException.class);
+        // Anônimo também não avalia a visita de um usuário logado.
+        FeedbackRequest outroPedido = criarRequestDoAparelho("v1", "anon-x");
+        assertThatThrownBy(() -> service.criar(outroPedido, null))
+                .isInstanceOf(AcessoNegadoException.class);
+        // Recusa antes da checagem de duplicidade: o intruso não descobre se já há avaliação.
+        verify(feedbackRepository, never()).existsByVisitaId(anyString());
+        verify(feedbackRepository, never()).save(any());
+    }
+
+    @Test
+    void criarRecusaFeedbackAnonimoSemOAparelhoDono() {
+        when(visitaRepository.findById("v1")).thenReturn(Optional.of(criarVisitaAnonimaEncerrada("v1", "anon-dono")));
+
+        FeedbackRequest pedido = criarRequestDoAparelho("v1", null);
+        assertThatThrownBy(() -> service.criar(pedido, null))
+                .isInstanceOf(AcessoNegadoException.class);
+        FeedbackRequest outroPedido = criarRequestDoAparelho("v1", "anon-intruso");
+        assertThatThrownBy(() -> service.criar(outroPedido, null))
+                .isInstanceOf(AcessoNegadoException.class);
+        verify(feedbackRepository, never()).save(any());
+    }
+
+    @Test
+    void criarRecusaEstranhoAntesDeRevelarOStatusDaVisita() {
+        VisitaDocument emAndamento = criarVisitaAnonimaEncerrada("v1", "anon-dono");
+        emAndamento.setStatus(StatusVisita.EM_ATENDIMENTO);
+        when(visitaRepository.findById("v1")).thenReturn(Optional.of(emAndamento));
+
+        // Para o estranho, a visita em andamento dá o mesmo 403 que a encerrada.
+        FeedbackRequest pedido = criarRequestDoAparelho("v1", "anon-intruso");
+        assertThatThrownBy(() -> service.criar(pedido, null))
+                .isInstanceOf(AcessoNegadoException.class);
+    }
+
+    @Test
+    void criarAceitaFeedbackAnonimoDoAparelhoDono() {
+        when(visitaRepository.findById("v1")).thenReturn(Optional.of(criarVisitaAnonimaEncerrada("v1", "anon-dono")));
+        when(feedbackRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FeedbackResponse resposta = service.criar(criarRequestDoAparelho("v1", "anon-dono"), null);
+
+        assertThat(resposta.visitaId()).isEqualTo("v1");
+        assertThat(resposta.anonimizado()).isTrue();
+    }
+
+    @Test
+    void criarRecusaVisitaAnonimaSemAparelhoGravado() {
+        // Conta excluída (M-041) apaga o aparelho das visitas: ninguém mais é dono delas.
+        when(visitaRepository.findById("v1")).thenReturn(Optional.of(criarVisitaAnonimaEncerrada("v1", null)));
+
+        FeedbackRequest pedido = criarRequestDoAparelho("v1", "anon-qualquer");
+        assertThatThrownBy(() -> service.criar(pedido, null))
+                .isInstanceOf(AcessoNegadoException.class);
     }
 
     // ------------------------------------------------ feedback pendente (celular descarregado) ------------------
@@ -135,6 +216,7 @@ class FeedbackServiceImplTest {
     private VisitaDocument visitaEncerradaHa(String id, StatusVisita status, Duration ha) {
         return VisitaDocument.builder()
                 .id(id)
+                .usuarioId("u1")
                 .hospitalId("h1")
                 .status(status)
                 .saida(Instant.now().minus(ha))
@@ -161,7 +243,8 @@ class FeedbackServiceImplTest {
         when(visitaRepository.findById("v1"))
                 .thenReturn(Optional.of(visitaEncerradaHa("v1", StatusVisita.GPS_INTERROMPIDO, Duration.ofHours(25))));
 
-        assertThatThrownBy(() -> service.criar(request("v1"), "u1"))
+        FeedbackRequest pedido = request("v1");
+        assertThatThrownBy(() -> service.criar(pedido, "u1"))
                 .isInstanceOf(RecursoNaoEncontradoException.class)
                 .hasMessageContaining("24 horas");
         verify(feedbackRepository, never()).save(any());
@@ -172,7 +255,8 @@ class FeedbackServiceImplTest {
         when(visitaRepository.findById("v1"))
                 .thenReturn(Optional.of(visitaEncerradaHa("v1", StatusVisita.EM_ATENDIMENTO, Duration.ZERO)));
 
-        assertThatThrownBy(() -> service.criar(request("v1"), "u1"))
+        FeedbackRequest pedido = request("v1");
+        assertThatThrownBy(() -> service.criar(pedido, "u1"))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
     }
 

@@ -16,6 +16,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | Painel Administrativo Web (Épico 7) | 9 | 9 | 100% (✅ E7-01 a E7-09 entregues; E2E com login ADMIN pendente para E7-06 e E7-09) |
 | **Total do backlog** | **51** | **52** | **98%** |
 | Épico 8 — Estabilização e Desempenho (novo, v2.1) | 8 | 15 | 53% |
+| Épico 9 — Escala, Segurança e Privacidade (novo, 18/10/2026) | 1 | 19 | 5% |
 
 > ⚠️ **Entregue ≠ utilizável.** As 42 estórias abaixo estão implementadas e cobertas por teste em CI, mas o sistema **não passou por validação em campo** e apresenta lentidão transversal de origem confirmada na infraestrutura — o **cold start** na primeira abertura após ociosidade (503 no Cloud Run, ver E8-01). O "1–5 s por requisição com o serviço quente" descrito aqui era o Render antigo: re-medido em 24/09/2026 sobre o Cloud Run quente, os GET ficam em **p95 ~195–245 ms** (ver E8-02). Ver `Features-MVP-v2.1.md` §2.1 e o **Épico 8** do `Backlog-MVP-v2.1.md`.
 
@@ -133,6 +134,32 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **E8-13** | Lint no frontend (o `typecheck` atual não verifica nada) | Cross | ✅ Entregue (02/09/2026) — ESLint 9 + `eslint-config-expo` com `eslint.config.js` comentado regra a regra; `npm run lint` roda no `ci.yml` depois do typecheck e reprova o PR por erro **ou** por aviso acima do piso congelado (18), mesma lógica do piso de cobertura. **Encontrou defeito de produção na primeira execução:** `SugestoesPendentesScreen` importava `MapPinOff` e renderizava `<MapPin />` — `ReferenceError` ao desenhar qualquer item da fila de moderação (E1-06). A tela era uma das 7 sem teste (ENG-05); ganhou 4 testes, sendo o primeiro a regressão do defeito. Segundo achado: `concluirFeedback(visitaId)` recebia o id e o ignorava, apagando a pendência guardada fosse ela de qual visita fosse. Também foram removidos 8 imports mortos. Sobram 18 avisos das regras da geração React Compiler (`refs`, `set-state-in-effect`, `purity`), catalogados como dívida ARQ-03 |
 | **E8-14** | Encerrar divergências de contrato (`password`/`senha`, `users`/`usuarios`) | **F-02** | ✅ Entregue (06/09/2026) — abertas desde 20/08/2026 (CONT-01/CONT-02). **Decisão do PO:** alinhar a documentação ao código, não o inverso — nenhum cliente real hoje depende do nome pt-BR, e mudar o código quebraria o login do app já em uso (`password`) ou exigiria migrar, em produção, uma coleção com contas reais (`users`). `Especificacao-API-v2.0.md` → **v2.1** (antiga preservada em `_historico/`); `Consolidacao-Tecnica-e-Backlog-Pendente-v1.1.md` e `Pendencias-Epico-01.md` atualizados com a resolução. Nenhuma mudança de código — só documentação |
 | **E8-15** | Retenção de dados (LGPD art. 16) e teste de restauração de backup | **F-09** | 🔴 Pendente |
+
+## Épico 9 — Escala, Segurança e Privacidade (novo em 18/10/2026)
+
+> Nasce da [Análise de Escalabilidade, Segurança e Custo para o DF v1.0](02-arquitetura-tecnica/Analise-Escalabilidade-Seguranca-DF-v1.0.md) (PR #203). Por decisão do PO (18/10/2026), primeiro entra o que é **só código** (Fase 1 do roteiro da §14 e a parte da Fase 2 que não depende de borda nem de domínio); infraestrutura (Atlas de produção, Cloudflare, domínio, `max-instances`, Cloud Scheduler) e a prova de carga ficam para depois. Os IDs são os dos gaps da análise. Perguntas P1–P15 da §17 sem resposta valem com a sugestão recomendada (regra do PO); cada PR diz quais assumiu.
+
+| ID (gap) | Estória | Feature(s) Relacionada(s) | Status Implementação |
+|---|---|---|---|
+| **SEG-02** | Visita e feedback anônimos só para o dono | **F-04**, **F-05** | ✅ Entregue (18/10/2026) — checkout, heartbeat e feedback de visita anônima exigem o `dispositivoId` do aparelho que fez o check-in, e o feedback de visita logada exige o mesmo usuário (403 caso contrário). App manda o `dispositivoId` nas três chamadas, inclusive no reenvio da fila offline. Testes de BOLA com Mongo real (`VisitaAnonimaDonoIntegracaoTest`, ENG-04). Ver [M-047](09-melhoria-continua/Historico-Melhorias.md). |
+| **ENG-04** | Testes de lógica de negócio de segurança na esteira | Cross | 🟡 Parcial (18/10/2026) — BOLA em visita e feedback anônimos coberto (SEG-02); retroatividade e limites entram com o SEG-01. |
+| **DAD-01** | Retenção dos pontos de GPS da visita | **F-04**, **F-09** | 🔴 Pendente |
+| **ARQ-04** | Heartbeat com update atômico e lista de pontos limitada | **F-04** | 🔴 Pendente |
+| **SEG-01** | Prova de presença para a avaliação contar no indicador | **F-05**, **F-06** | 🔴 Pendente (parte de código; atestação do aparelho depende do console) |
+| **SOL-02** | Seed e reconciliações sem corrida entre instâncias | Cross | 🔴 Pendente |
+| **ARQ-02** | Rate limit por identidade, renovação de token fora do limite por IP | **F-02** | 🔴 Pendente |
+| **ARQ-01** | Catálogo público versionado com ETag e cache (lado servidor) | **F-01**, **F-07** | 🔴 Pendente |
+| **ARQ-03** | Cache curto do usuário no filtro JWT | Cross | 🔴 Pendente |
+| **SOL-05** | Jobs como endpoints internos idempotentes, com log | Cross | 🔴 Pendente |
+| **ARQ-08** | Recálculo do indicador coberto pelo job confiável | **F-06** | 🔴 Pendente |
+| **SOL-09** | E-mail de confirmação e de senha sem depender de `@Async` | **F-02** | 🔴 Pendente |
+| **SEG-03** | Limite por e-mail de destino e login sem canal de tempo | **F-02** | 🔴 Pendente |
+| **ARQ-05** | Timeouts, 503 com `Retry-After` e modo evento | Cross | 🔴 Pendente |
+| **SOL-07** | Pool e timeouts do MongoDB explícitos | Cross | 🔴 Pendente |
+| **ARQ-09** | Flags simples no backend (modo evento, versão mínima) | Cross | 🔴 Pendente |
+| **SEG-07** | Swagger fora de produção e seed de admin sem senha padrão | Cross | 🔴 Pendente |
+| **APP-01** | Recálculo de geofence no aparelho com catálogo local | **F-04** | 🔴 Pendente |
+| **APP-03** | Versão mínima suportada com tela de atualização | Cross | 🔴 Pendente |
 
 ---
 

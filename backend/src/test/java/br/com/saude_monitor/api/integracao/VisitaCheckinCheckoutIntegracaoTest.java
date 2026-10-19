@@ -62,9 +62,12 @@ class VisitaCheckinCheckoutIntegracaoTest extends IntegracaoTestBase {
         mockMvc.perform(get("/api/v1/visitas/ativas").param("dispositivoId", dispositivoId))
                 .andExpect(status().isOk());
 
+        // Visita anônima: o checkout prova o aparelho dono (SEG-02).
         String respostaCheckout = mockMvc.perform(post("/api/v1/visitas/" + visitaId + "/checkout")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
+                        .content("""
+                                { "dispositivoId": "%s" }
+                                """.formatted(dispositivoId)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         JsonNode visitaFinalizada = objectMapper.readTree(respostaCheckout);

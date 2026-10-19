@@ -2583,6 +2583,61 @@ Até aqui nenhuma `release/` tinha sido criada, então o defeito não tinha apar
 
 ---
 
+## M-047 — Visita e feedback anônimos só para o aparelho dono (SEG-02)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0, gap SEG-02 (Alto), achado por
+leitura de código: o dono só era conferido quando a visita tinha `usuarioId`. Para visita
+anônima, quem tivesse o id fazia checkout e heartbeat, e o feedback era aceito para qualquer
+visita encerrada, inclusive a de usuário logado. Os ids são `ObjectId` (carimbo de tempo e
+contador), então o id de uma visita própria leva aos vizinhos. Com isso dava para encerrar a
+visita de outra pessoa ou avaliá-la primeiro e bloquear a avaliação legítima (RN-12 aceita uma
+só). O pentest de 23/09/2026 cobriu só o BOLA de usuário logado.
+
+### O que mudou
+
+- Backend: `VisitaDono` concentra a regra. Visita logada pertence ao `usuarioId`; visita
+  anônima pertence ao `dispositivoId` do check-in (comparado em tempo constante). Checkout,
+  heartbeat e `POST /feedbacks` recebem `dispositivoId` no corpo e respondem 403 a quem não é
+  dono. No feedback a recusa vem antes da checagem de duplicidade.
+- No feedback, a conferência de dono vem logo depois de achar a visita, antes das regras de
+  status, janela e duplicidade: um estranho recebe o mesmo 403 para visita em andamento,
+  encerrada ou já avaliada.
+- Estar logado não dá posse de visita anônima alheia (antes, qualquer usuário logado podia
+  sinalizar internação numa visita anônima). A sinalização de internação também aceita o
+  `dispositivoId`, para quem começou a visita anônima e fez login depois.
+- App: checkout, heartbeat e feedback mandam o `dispositivoId` sempre, também com login (para
+  quem entrou na conta no meio de uma visita anônima). Checkout guardado na fila offline antes
+  desta versão ganha o `dispositivoId` no reenvio. Se o armazenamento do aparelho falhar ao
+  ler o id, o pedido sai sem ele, em vez de perder o checkout e a fila offline.
+- `DispositivoId.obter()` compartilha a leitura em andamento: duas chamadas na primeira
+  execução geravam ids diferentes, e o checkout podia levar um id diferente do check-in.
+- Das opções do relatório, ficou a B (dono pelo usuário ou pelo aparelho). A A (token secreto
+  devolvido no check-in) não foi feita: o `dispositivoId` já é um UUID v4 aleatório que a API
+  nunca devolve, então cumpre o mesmo papel sem guardar mais um segredo no aparelho e na fila.
+
+### Efeito para quem usa
+
+APK antigo que faz visita anônima recebe 403 no checkout, no heartbeat e no feedback. Não há
+produção; a homologação precisa do APK novo.
+
+Efeito aceito: quem fez check-in logado e perdeu a sessão antes de avaliar recebe 403 ao
+avaliar sem login (antes a avaliação entrava como anônima). Era exatamente esse caminho que
+deixava avaliar a visita de outra pessoa. A visita logada não guarda o aparelho, de propósito,
+para não ligar o `dispositivoId` à conta.
+
+### Verificação
+
+- Backend: 388 testes (integração com Mongo real incluída), 0 falhas; `VisitaAnonimaDonoIntegracaoTest`
+  cobre heartbeat, checkout e feedback por intruso sem e com outro aparelho, e confirma que a
+  tentativa não consome a avaliação do dono. Cobertura das linhas alteradas: 100%.
+- App: 55 suítes, 616 testes; cobertura das linhas alteradas: 100%.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

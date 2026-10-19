@@ -5,6 +5,12 @@
 
 ---
 
+## 📌 Revisão 18/10/2026 — Épico 9: visita e feedback anônimos só para o dono (SEG-02)
+
+**O que mudou:** primeiro PR do Épico 9 (Escala, Segurança e Privacidade), que entra no `De-Para-Backlog-Features.md` com os gaps de código da análise de 17/10. Checkout, heartbeat e feedback de visita anônima passam a exigir o `dispositivoId` do aparelho que fez o check-in, e o feedback de visita logada exige o mesmo usuário (403 caso contrário). `Especificacao-API-v2.4.md` atualizada nos três endpoints. Registro em `Historico-Melhorias.md` (M-047).
+
+---
+
 ## 📌 Revisão 18/10/2026 — Contexto da análise de escala para o projeto Radar Saude
 
 **O que entrou:** o [`Contexto-Sessao-Analise-Escala-Seguranca-2026-10-18.md`](./02-arquitetura-tecnica/Contexto-Sessao-Analise-Escala-Seguranca-2026-10-18.md), um resumo da análise de escalabilidade, segurança e custo (item 3d), feito para servir de conhecimento do projeto "Radar Saude" no Claude. Ele reúne em um arquivo curto o produto, as conclusões, os 46 gaps com a correção dos críticos, as 15 perguntas pendentes ao PO com a sugestão e o efeito de cada resposta, o roteiro por fase e onde está cada documento. Em caso de divergência, vale o relatório.

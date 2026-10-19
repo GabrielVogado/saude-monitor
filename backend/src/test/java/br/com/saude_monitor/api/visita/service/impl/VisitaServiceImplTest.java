@@ -14,6 +14,9 @@ import br.com.saude_monitor.api.visita.dto.CheckinRequest;
 import br.com.saude_monitor.api.visita.dto.CheckinResponse;
 import br.com.saude_monitor.api.visita.dto.CheckoutRequest;
 import br.com.saude_monitor.api.visita.dto.CheckoutResponse;
+import br.com.saude_monitor.api.visita.dto.HeartbeatResponse;
+import br.com.saude_monitor.api.visita.dto.TipoPermanenciaRequest;
+import br.com.saude_monitor.api.visita.document.TipoPermanencia;
 import br.com.saude_monitor.api.visita.dto.VisitaAtivaResponse;
 import br.com.saude_monitor.api.visita.dto.VisitaResponse;
 import br.com.saude_monitor.api.visita.repository.VisitaRepository;
@@ -31,6 +34,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -191,7 +195,7 @@ class VisitaServiceImplTest {
 
         Instant saidaReal = entrada.plus(Duration.ofMinutes(45));
         CheckoutResponse resposta =
-                visitaService.checkout("v9", new CheckoutRequest(null, null, null, saidaReal), "u1");
+                visitaService.checkout("v9", new CheckoutRequest(null, null, null, saidaReal, null), "u1");
 
         assertEquals(saidaReal, resposta.saida());
         assertEquals(45, resposta.duracaoMinutos());
@@ -210,8 +214,8 @@ class VisitaServiceImplTest {
                 .build();
         when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaDeOutro));
 
-        assertThrows(AcessoNegadoException.class,
-                () -> visitaService.checkout("v9", new CheckoutRequest(null, null, null, null), "invasor"));
+        CheckoutRequest semAparelho = new CheckoutRequest(null, null, null, null, null);
+        assertThrows(AcessoNegadoException.class, () -> visitaService.checkout("v9", semAparelho, "invasor"));
         verify(visitaRepository, never()).save(any(VisitaDocument.class));
     }
 
@@ -233,10 +237,91 @@ class VisitaServiceImplTest {
         // envenenaria a mediana de permanência (RN-15).
         Instant saidaImpossivel = entrada.minus(Duration.ofMinutes(30));
         CheckoutResponse resposta =
-                visitaService.checkout("v9", new CheckoutRequest(null, null, null, saidaImpossivel), "u1");
+                visitaService.checkout("v9", new CheckoutRequest(null, null, null, saidaImpossivel, null), "u1");
 
         assertEquals(entrada, resposta.saida());
         assertEquals(0, resposta.duracaoMinutos());
+    }
+
+    // ------------------------------------------------ dono da visita anônima (SEG-02) --------------------------
+
+    @Test
+    void heartbeatDeVisitaAnonimaSemODispositivoDonoLancaAcessoNegado() {
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaAtivaAnonima("anon-dono")));
+
+        assertThrows(AcessoNegadoException.class, () -> visitaService.heartbeat("v9", null, null, null));
+        assertThrows(AcessoNegadoException.class,
+                () -> visitaService.heartbeat("v9", null, "anon-intruso", null));
+        // Estar logado não dá posse de visita anônima alheia.
+        assertThrows(AcessoNegadoException.class,
+                () -> visitaService.heartbeat("v9", "u-qualquer", null, null));
+        verify(visitaRepository, never()).save(any(VisitaDocument.class));
+    }
+
+    @Test
+    void heartbeatDeVisitaAnonimaComODispositivoDonoRenovaSinal() {
+        VisitaDocument visita = visitaAtivaAnonima("anon-dono");
+        visita.setStatus(StatusVisita.SUSPEITA);
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visita));
+        when(visitaRepository.save(any(VisitaDocument.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Usuário que fez login no meio de uma visita anônima continua dono pelo aparelho.
+        HeartbeatResponse resposta = visitaService.heartbeat("v9", "u-logou-depois", "anon-dono", null);
+
+        assertEquals(StatusVisita.EM_ATENDIMENTO, resposta.status());
+        assertNotNull(resposta.ultimoHeartbeat());
+    }
+
+    @Test
+    void checkoutDeVisitaAnonimaExigeODispositivoDono() {
+        VisitaDocument visita = visitaAtivaAnonima("anon-dono");
+        visita.setPontosAmostrais(new java.util.ArrayList<>());
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visita));
+        when(visitaRepository.save(any(VisitaDocument.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CheckoutRequest doIntruso = new CheckoutRequest(null, null, null, null, "anon-x");
+        assertThrows(AcessoNegadoException.class, () -> visitaService.checkout("v9", doIntruso, null));
+
+        CheckoutResponse resposta =
+                visitaService.checkout("v9", new CheckoutRequest(null, null, null, null, "anon-dono"), null);
+        assertEquals(StatusVisita.FINALIZADA, resposta.status());
+    }
+
+    @Test
+    void sinalizarTipoPermanenciaDoDonoLogadoApos12h() {
+        VisitaDocument visita = VisitaDocument.builder()
+                .id("v9").usuarioId("u1").hospitalId("h1")
+                .entrada(Instant.now().minus(Duration.ofHours(13)))
+                .status(StatusVisita.EM_ATENDIMENTO)
+                .build();
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visita));
+        when(visitaRepository.save(any(VisitaDocument.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertEquals(TipoPermanencia.INTERNACAO, visitaService.sinalizarTipoPermanencia(
+                "v9", new TipoPermanenciaRequest(TipoPermanencia.INTERNACAO, null), "u1").tipoPermanencia());
+    }
+
+    @Test
+    void sinalizarTipoPermanenciaEmVisitaAnonimaAlheiaLancaAcessoNegado() {
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaAtivaAnonima("anon-dono")));
+
+        TipoPermanenciaRequest semAparelho = new TipoPermanenciaRequest(TipoPermanencia.INTERNACAO, null);
+        TipoPermanenciaRequest doIntruso = new TipoPermanenciaRequest(TipoPermanencia.INTERNACAO, "anon-x");
+        assertThrows(AcessoNegadoException.class,
+                () -> visitaService.sinalizarTipoPermanencia("v9", semAparelho, "u-qualquer"));
+        assertThrows(AcessoNegadoException.class,
+                () -> visitaService.sinalizarTipoPermanencia("v9", doIntruso, "u-qualquer"));
+    }
+
+    @Test
+    void sinalizarTipoPermanenciaDeVisitaAnonimaPeloAparelhoDonoAposLogin() {
+        VisitaDocument visita = visitaAtivaAnonima("anon-dono");
+        visita.setEntrada(Instant.now().minus(Duration.ofHours(13)));
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visita));
+        when(visitaRepository.save(any(VisitaDocument.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertEquals(TipoPermanencia.OBSERVACAO, visitaService.sinalizarTipoPermanencia(
+                "v9", new TipoPermanenciaRequest(TipoPermanencia.OBSERVACAO, "anon-dono"), "u1").tipoPermanencia());
     }
 
     @Test

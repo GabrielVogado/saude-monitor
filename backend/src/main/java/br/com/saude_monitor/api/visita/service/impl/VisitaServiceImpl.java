@@ -26,6 +26,7 @@ import br.com.saude_monitor.api.visita.dto.VisitaAtivaResponse;
 import br.com.saude_monitor.api.visita.dto.VisitaResponse;
 import br.com.saude_monitor.api.visita.repository.VisitaRepository;
 import br.com.saude_monitor.api.visita.service.ConflitoGeofenceException;
+import br.com.saude_monitor.api.visita.service.VisitaDono;
 import br.com.saude_monitor.api.visita.service.VisitaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -140,7 +141,7 @@ public class VisitaServiceImpl implements VisitaService {
 
     @Override
     public CheckoutResponse checkout(String id, CheckoutRequest request, String usuarioId) {
-        VisitaDocument visita = obterAtivaOu409(id, usuarioId);
+        VisitaDocument visita = obterVisitaAtivaDoDono(id, usuarioId, request.dispositivoId());
 
         Instant agora = Instant.now();
         boolean gpsIndisponivel = Boolean.TRUE.equals(request.gpsIndisponivel());
@@ -173,8 +174,8 @@ public class VisitaServiceImpl implements VisitaService {
     }
 
     @Override
-    public HeartbeatResponse heartbeat(String id, String usuarioId, PosicaoDto posicao) {
-        VisitaDocument visita = obterAtivaOu409(id, usuarioId);
+    public HeartbeatResponse heartbeat(String id, String usuarioId, String dispositivoId, PosicaoDto posicao) {
+        VisitaDocument visita = obterVisitaAtivaDoDono(id, usuarioId, dispositivoId);
 
         Instant agora = Instant.now();
         visita.setUltimoHeartbeat(agora);
@@ -192,7 +193,7 @@ public class VisitaServiceImpl implements VisitaService {
 
     @Override
     public TipoPermanenciaResponse sinalizarTipoPermanencia(String id, TipoPermanenciaRequest request, String usuarioId) {
-        VisitaDocument visita = obterAtivaOu409(id, usuarioId);
+        VisitaDocument visita = obterVisitaAtivaDoDono(id, usuarioId, request.dispositivoId());
 
         if (request.tipoPermanencia() == TipoPermanencia.ATENDIMENTO) {
             throw new ValidacaoNegocioException("tipoPermanencia deve ser OBSERVACAO ou INTERNACAO.");
@@ -378,16 +379,18 @@ public class VisitaServiceImpl implements VisitaService {
     // Autorização / consultas auxiliares
     // ------------------------------------------------------------------
 
-    /** Busca a visita e garante que está ativa e pertence ao usuário autenticado (quando não anônima). */
-    private VisitaDocument obterAtivaOu409(String id, String usuarioId) {
+    /**
+     * Busca a visita e garante que está ativa e pertence a quem chama: o usuário autenticado,
+     * quando a visita tem dono logado, ou o aparelho que fez o check-in, quando é anônima.
+     */
+    private VisitaDocument obterVisitaAtivaDoDono(String id, String usuarioId, String dispositivoId) {
         VisitaDocument visita = visitaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Visita não encontrada para o id informado."));
 
-        // 403, não 401 (achado F-02 do pentest de 23/09/2026): quem chama já está
-        // autenticado (tem um JWT válido) — só não é dono desta visita (BOLA). 401
-        // significaria "não autenticado", o que não é o caso.
-        if (visita.getUsuarioId() != null && !visita.getUsuarioId().equals(usuarioId)) {
-            throw new AcessoNegadoException("Visita não pertence ao usuário autenticado.");
+        if (!VisitaDono.isDonoDaVisita(visita, usuarioId, dispositivoId)) {
+            // 403, não 401 (achado F-02 do pentest de 23/09/2026): quem chama pode até estar
+            // autenticado; só não é dono desta visita (BOLA).
+            throw new AcessoNegadoException("Visita não pertence ao usuário ou aparelho informado.");
         }
         if (visita.getStatus() != StatusVisita.EM_ATENDIMENTO && visita.getStatus() != StatusVisita.SUSPEITA) {
             throw new ConflitoException("Visita já encerrada (status " + visita.getStatus() + ").");

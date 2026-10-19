@@ -26,17 +26,45 @@ function gerarId() {
   return `anon-${uuid.v4()}`;
 }
 
+async function lerOuCriar() {
+  const existente = await AsyncStorage.getItem(CHAVE_DISPOSITIVO);
+  if (existente) {
+    return existente;
+  }
+
+  const novo = gerarId();
+  await AsyncStorage.setItem(CHAVE_DISPOSITIVO, novo);
+  return novo;
+}
+
+/**
+ * Leitura em andamento, compartilhada por chamadas simultâneas. Sem isso, duas chamadas
+ * na primeira execução podiam gerar ids diferentes; com o id virando a prova de dono da
+ * visita anônima (SEG-02), o check-in gravaria um e o checkout mandaria o outro (403).
+ */
+let leituraEmAndamento = null;
+
 class DispositivoId {
   /** Retorna o id anônimo do dispositivo, gerando e persistindo se ainda não existir. */
-  static async obter() {
-    const existente = await AsyncStorage.getItem(CHAVE_DISPOSITIVO);
-    if (existente) {
-      return existente;
+  static obter() {
+    if (!leituraEmAndamento) {
+      leituraEmAndamento = lerOuCriar().finally(() => {
+        leituraEmAndamento = null;
+      });
     }
+    return leituraEmAndamento;
+  }
 
-    const novo = gerarId();
-    await AsyncStorage.setItem(CHAVE_DISPOSITIVO, novo);
-    return novo;
+  /**
+   * Como `obter`, mas devolve `undefined` se o armazenamento falhar. Para chamadas em que
+   * o id só complementa o pedido e a falha não pode impedir o envio nem a fila offline.
+   */
+  static async obterSeDisponivel() {
+    try {
+      return await DispositivoId.obter();
+    } catch {
+      return undefined;
+    }
   }
 }
 

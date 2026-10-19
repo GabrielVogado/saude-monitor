@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 19/10/2026 — Plano de marketing e vendas
+
+**O que entrou:** [`13-marketing/Plano-Marketing-Vendas-v1.1.md`](./13-marketing/Plano-Marketing-Vendas-v1.1.md), que complementa o `Plano-Divulgacao-v1.0.md` (continua ativo) com a frente de receita decidida pelo PO em 19/10/2026 (poder público, cupons de comércios após o feedback e anúncios), as regras que protegem o indicador e a LGPD, o funil de venda e o calendário até o lançamento público de março de 2027. Conferido contra `develop@42e90d8`: registra que a política de privacidade atual proíbe uso para publicidade (precisa ser revista antes de qualquer cupom ou anúncio), que a explicação "Como calculamos" da F-06 não existe no app e que o cupom pós-feedback ainda não tem item de produto.
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória entregue) e `Historico-Melhorias.md` (não é correção nem mudança de processo).
+
+---
+
 ## 📌 Revisão 19/10/2026 — Homologação v1.0.0-rc.6
 
 **O que entrou:** registro da rc que leva o Épico 9 (adequação em código) da `develop` de 19/10/2026 para a homologação: o que entrou desde a rc.5 (PRs #203, #205 e #206 a #216, M-047 a M-058), o que fica de fora (infraestrutura do Épico 9), rollback e o roteiro de teste no aparelho, que repete os itens da rc.5 ainda não validados. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.6.md`](./10-git-flow/homologacoes/v1.0.0-rc.6.md).

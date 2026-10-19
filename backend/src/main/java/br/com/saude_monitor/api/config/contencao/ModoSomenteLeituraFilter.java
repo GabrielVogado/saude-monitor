@@ -54,7 +54,7 @@ public class ModoSomenteLeituraFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        ConfiguracaoRemotaResponse configuracao = configuracaoRemotaService.obter();
+        ConfiguracaoRemotaResponse configuracao = configuracaoRemotaService.obterConfiguracao();
         if (!configuracao.modoSomenteLeitura()) {
             filterChain.doFilter(request, response);
             return;
@@ -62,7 +62,7 @@ public class ModoSomenteLeituraFilter extends OncePerRequestFilter {
         String mensagem = configuracao.mensagem() == null || configuracao.mensagem().isBlank()
                 ? MENSAGEM_PADRAO
                 : configuracao.mensagem();
-        RespostaIndisponivel.escrever(response, objectMapper, CODIGO, mensagem,
+        RespostaIndisponivel.escreverResposta(response, objectMapper, CODIGO, mensagem,
                 properties.retryAfterSomenteLeituraSegundos());
     }
 }

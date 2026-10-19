@@ -15,12 +15,12 @@ const CAMINHO = "/api/v1/configuracao";
 const PACOTE_PADRAO = "com.gabrielvogado.saudemonitor";
 
 /** Versão instalada (ex.: `1.0.0`), a do `app.json` embutida no build. */
-export function versaoDoApp() {
+export function obterVersaoDoApp() {
   return Constants.expoConfig?.version || null;
 }
 
 /** Lê `1.2.3` (com ou sem sufixo, como `-rc.5`) como três números, ou `null` se não der. */
-function partes(versao) {
+function extrairPartesDaVersao(versao) {
   const casamento = /^(\d+)\.(\d+)\.(\d+)/.exec(String(versao || "").trim());
   return casamento ? casamento.slice(1).map(Number) : null;
 }
@@ -33,8 +33,8 @@ function partes(versao) {
  *   não puder ser lida.
  */
 export function compararVersoes(a, b) {
-  const pa = partes(a);
-  const pb = partes(b);
+  const pa = extrairPartesDaVersao(a);
+  const pb = extrairPartesDaVersao(b);
   if (!pa || !pb) {
     return null;
   }
@@ -50,7 +50,7 @@ export function compararVersoes(a, b) {
  * O app instalado está abaixo da versão mínima. Na dúvida (sem mínima, versão ilegível),
  * não bloqueia: impedir o uso por um dado ruim seria pior do que deixar passar.
  */
-export function precisaAtualizar(configuracao, versaoInstalada = versaoDoApp()) {
+export function isAtualizacaoObrigatoria(configuracao, versaoInstalada = obterVersaoDoApp()) {
   const minima = configuracao?.versaoMinimaApp;
   if (!minima) {
     return false;
@@ -60,7 +60,7 @@ export function precisaAtualizar(configuracao, versaoInstalada = versaoDoApp()) 
 }
 
 /** Endereços da página do app na loja: o do app da Play Store e o da web, nessa ordem. */
-export function enderecosDaLoja() {
+export function obterEnderecosDaLoja() {
   const pacote = Constants.expoConfig?.android?.package || PACOTE_PADRAO;
   return [
     `market://details?id=${pacote}`,
@@ -70,7 +70,7 @@ export function enderecosDaLoja() {
 
 class ConfiguracaoRemota {
   /** Configuração em vigor; falha de rede chega a quem chamou. */
-  static obter() {
+  static obterConfiguracao() {
     return apiRequest(CAMINHO);
   }
 }

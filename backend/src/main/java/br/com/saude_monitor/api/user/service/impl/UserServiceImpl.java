@@ -203,7 +203,7 @@ public class UserServiceImpl implements UserService {
         // como hash neste mesmo documento — não há coleção de autenticação separada.
         userRepository.delete(user);
         // O token ainda válido desta conta deixa de autenticar já nesta instância (ARQ-03).
-        usuarioAutenticadoCache.esquecer(user.getEmail());
+        usuarioAutenticadoCache.removerDoCache(user.getEmail());
 
         log.info("Conta do usuário {} excluída (LGPD). Dados pessoais removidos; visitas/feedbacks anonimizados.",
                 usuarioId);

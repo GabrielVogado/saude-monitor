@@ -45,7 +45,7 @@ public class LimiteEnvioEmail {
     }
 
     /** Registra um envio para o destino e diz se ele ainda cabe na janela. */
-    public boolean permitir(String destino) {
+    public boolean tentarRegistrarEnvio(String destino) {
         long agora = clock.millis();
         long janelaInicio = agora - (agora % JANELA.toMillis());
         long[] estado = contadores.asMap().compute(EmailNormalizer.normalizar(destino), (k, atual) -> {

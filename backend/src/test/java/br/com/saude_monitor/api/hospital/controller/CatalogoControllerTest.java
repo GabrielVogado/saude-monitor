@@ -32,7 +32,7 @@ class CatalogoControllerTest {
     void setup() {
         HospitalResumoResponse item = new HospitalResumoResponse("h1", "Hospital Um", TipoEstabelecimento.PUBLICO,
                 null, null, null, null, 150, true, null, IndicadoresResponse.indisponivel());
-        when(catalogoService.obter()).thenReturn(new CatalogoResponse(VERSAO, 1, List.of(item)));
+        when(catalogoService.obterCatalogo()).thenReturn(new CatalogoResponse(VERSAO, 1, List.of(item)));
         mockMvc = MockMvcBuilders.standaloneSetup(new CatalogoController(catalogoService)).build();
     }
 

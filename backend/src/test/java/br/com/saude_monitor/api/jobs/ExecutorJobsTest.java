@@ -37,7 +37,7 @@ class ExecutorJobsTest {
     private final ExecutorJobs executor =
             new ExecutorJobs(trava, configuracao, indicadores, expiracao, gps, semResposta, retencao);
 
-    private void travaLivre() {
+    private void simularTravaLivre() {
         when(trava.executar(anyString(), any(Duration.class), any(Runnable.class))).thenAnswer(inv -> {
             inv.<Runnable>getArgument(2).run();
             return true;
@@ -46,13 +46,13 @@ class ExecutorJobsTest {
 
     @Test
     void conheceOsCincoJobs() {
-        assertThat(executor.nomes()).containsExactly("indicadores", "expiracao-visitas", "gps-interrompido",
+        assertThat(executor.listarNomes()).containsExactly("indicadores", "expiracao-visitas", "gps-interrompido",
                 "feedback-sem-resposta", "retencao-dados");
     }
 
     @Test
     void executaCadaJobPeloNomeSobATravaDoProprioJob() {
-        travaLivre();
+        simularTravaLivre();
 
         assertThat(executor.executar("indicadores")).contains(ExecutorJobs.Resultado.EXECUTADO);
         executor.executar("expiracao-visitas");
@@ -78,7 +78,7 @@ class ExecutorJobsTest {
 
     @Test
     void pulaNoModoSomenteLeituraSemPegarATrava() {
-        when(configuracao.modoSomenteLeitura()).thenReturn(true);
+        when(configuracao.isModoSomenteLeitura()).thenReturn(true);
 
         assertThat(executor.executar("retencao-dados")).contains(ExecutorJobs.Resultado.PULADO);
         verifyNoInteractions(trava, retencao);
@@ -92,7 +92,7 @@ class ExecutorJobsTest {
 
     @Test
     void falhaDoJobSobeParaQuemDisparou() {
-        travaLivre();
+        simularTravaLivre();
         doThrow(new IllegalStateException("Mongo fora")).when(gps).executar();
 
         assertThatThrownBy(() -> executor.executar("gps-interrompido"))

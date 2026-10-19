@@ -12,17 +12,17 @@ const IDADE_MAXIMA_POSICAO_MS = 2 * 60 * 1000;
  */
 const TIMEOUT_LEITURA_GPS_MS = 5 * 1000;
 
-function comTimeout(promise, ms) {
+function aguardarComTimeout(promise, timeoutEmMs) {
   let timer;
   return Promise.race([
     promise,
     new Promise((_resolve, reject) => {
-      timer = setTimeout(() => reject(new Error("timeout")), ms);
+      timer = setTimeout(() => reject(new Error("timeout")), timeoutEmMs);
     }),
   ]).finally(() => clearTimeout(timer));
 }
 
-function paraGeoJson(coords) {
+function converterParaGeoJson(coords) {
   return { type: "Point", coordinates: [coords.longitude, coords.latitude] };
 }
 
@@ -34,7 +34,7 @@ function paraGeoJson(coords) {
  * público. Nunca pede permissão: o check-in manual é justamente o caminho de quem negou
  * a localização, e um diálogo aqui atrasaria o toque.
  */
-export async function posicaoParaCheckinManual() {
+export async function obterPosicaoParaCheckinManual() {
   try {
     const { granted } = await Location.getForegroundPermissionsAsync();
     if (!granted) {
@@ -42,13 +42,13 @@ export async function posicaoParaCheckinManual() {
     }
     const recente = await Location.getLastKnownPositionAsync({ maxAge: IDADE_MAXIMA_POSICAO_MS });
     if (recente) {
-      return paraGeoJson(recente.coords);
+      return converterParaGeoJson(recente.coords);
     }
-    const atual = await comTimeout(
+    const atual = await aguardarComTimeout(
       Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
       TIMEOUT_LEITURA_GPS_MS
     );
-    return paraGeoJson(atual.coords);
+    return converterParaGeoJson(atual.coords);
   } catch {
     return undefined;
   }

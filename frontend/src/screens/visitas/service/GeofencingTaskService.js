@@ -739,7 +739,7 @@ export async function iniciarGeofencing({ interativo = true } = {}) {
   try {
     // Com o app aberto, o catálogo é conferido se tiver mais de 5 min; no recálculo em
     // segundo plano, a cópia de até um dia vale sem rede nenhuma.
-    lista = await CatalogoLocal.estabelecimentos({
+    lista = await CatalogoLocal.obterEstabelecimentos({
       idadeMaximaMs: interativo ? IDADE_MAXIMA_PRIMEIRO_PLANO_MS : IDADE_MAXIMA_SEGUNDO_PLANO_MS,
     });
   } catch {

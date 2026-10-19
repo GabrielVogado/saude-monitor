@@ -204,7 +204,7 @@ public class SeedRunner implements ApplicationRunner {
     private Set<String> gravarComCnes(List<DocPendente> pendentes, Contagem contagem) {
         return pendentes.stream()
                 .map(DocPendente::doc)
-                .filter(doc -> doc.getCodigoCnes() != null && contagem.registrar(salvarUpsert(doc)))
+                .filter(doc -> doc.getCodigoCnes() != null && contagem.registrarResultado(salvarUpsert(doc)))
                 .map(SeedRunner::chaveGemea)
                 .collect(Collectors.toSet());
     }
@@ -231,7 +231,7 @@ public class SeedRunner implements ApplicationRunner {
                 log.info("[Seed] Gêmeo sem CNES ignorado (versão CNES importada): {} [{}].",
                         pendente.doc().getNome(), pendente.origem());
             } else {
-                contagem.registrar(salvarUpsert(pendente.doc()));
+                contagem.registrarResultado(salvarUpsert(pendente.doc()));
             }
         }
     }
@@ -245,7 +245,7 @@ public class SeedRunner implements ApplicationRunner {
         private int camadas;
 
         /** Soma o resultado da gravação; devolve se o documento foi gravado. */
-        private boolean registrar(ResultadoUpsert resultado) {
+        private boolean registrarResultado(ResultadoUpsert resultado) {
             switch (resultado) {
                 case NOVO -> novos++;
                 case ATUALIZADO -> atualizados++;

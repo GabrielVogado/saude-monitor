@@ -66,7 +66,7 @@ class ResendEmailServiceTest {
         // SOL-09: o envio é síncrono; conexão mais leitura precisam caber nos 2 s do piso.
         assertThat(ResendEmailService.TIMEOUT_CONEXAO.plus(ResendEmailService.TIMEOUT_LEITURA))
                 .isLessThan(br.com.saude_monitor.api.auth.service.TempoMinimoResposta.PISO);
-        assertThat(ResendEmailService.fabricaComTeto()).isNotNull();
+        assertThat(ResendEmailService.criarFabricaComTimeout()).isNotNull();
     }
 
     @Test

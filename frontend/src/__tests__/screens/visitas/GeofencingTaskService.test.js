@@ -27,7 +27,7 @@ jest.mock("../../../services/CatalogoLocal", () => ({
   __esModule: true,
   IDADE_MAXIMA_PRIMEIRO_PLANO_MS: 300000,
   IDADE_MAXIMA_SEGUNDO_PLANO_MS: 86400000,
-  default: { estabelecimentos: jest.fn() },
+  default: { obterEstabelecimentos: jest.fn() },
 }));
 
 jest.mock("../../../screens/visitas/service/VisitaService", () => ({
@@ -106,7 +106,7 @@ describe("regiões monitoradas", () => {
   beforeEach(permitirTudo);
 
   it("usa o raio de cada hospital, com piso de 100 m para o disparo nativo", async () => {
-    CatalogoLocal.estabelecimentos.mockResolvedValue([hospital("ubs", 75), hospital("upa", 100), hospital("hospital", 150)]);
+    CatalogoLocal.obterEstabelecimentos.mockResolvedValue([hospital("ubs", 75), hospital("upa", 100), hospital("hospital", 150)]);
     const { iniciarGeofencing } = carregarServico();
 
     await iniciarGeofencing();
@@ -116,7 +116,7 @@ describe("regiões monitoradas", () => {
   });
 
   it("cai no piso quando o hospital não informa raio", async () => {
-    CatalogoLocal.estabelecimentos.mockResolvedValue([hospital("sem-raio", undefined), hospital("raio-invalido", 0)]);
+    CatalogoLocal.obterEstabelecimentos.mockResolvedValue([hospital("sem-raio", undefined), hospital("raio-invalido", 0)]);
     const { iniciarGeofencing } = carregarServico();
 
     await iniciarGeofencing();
@@ -138,7 +138,7 @@ describe("regiões monitoradas", () => {
 
   it("explica o uso da localização antes de pedir a permissão \"o tempo todo\"", async () => {
     Location.getBackgroundPermissionsAsync.mockResolvedValue({ status: "denied", canAskAgain: true });
-    CatalogoLocal.estabelecimentos.mockResolvedValue([hospital("h1", 150)]);
+    CatalogoLocal.obterEstabelecimentos.mockResolvedValue([hospital("h1", 150)]);
     const alerta = jest
       .spyOn(Alert, "alert")
       .mockImplementation((_t, _m, botoes) => botoes[1].onPress());
@@ -201,7 +201,7 @@ describe("regiões monitoradas", () => {
       ...hospital(`h${24 - i}`, 150),
       localizacao: { latitude: HOSPITAL_LAT + (24 - i) * 0.001, longitude: HOSPITAL_LON },
     }));
-    CatalogoLocal.estabelecimentos.mockResolvedValue(lista);
+    CatalogoLocal.obterEstabelecimentos.mockResolvedValue(lista);
     const { iniciarGeofencing, REGIAO_RECALCULO } = carregarServico();
 
     await iniciarGeofencing();
@@ -225,7 +225,7 @@ describe("regiões monitoradas", () => {
   });
 
   it("fica só com os estabelecimentos a até 5 km, calculados no aparelho (APP-01)", async () => {
-    CatalogoLocal.estabelecimentos.mockResolvedValue([
+    CatalogoLocal.obterEstabelecimentos.mockResolvedValue([
       hospital("perto", 150),
       // ~5,5 km ao norte: fora da busca, mesmo sendo o único outro do catálogo.
       { ...hospital("longe", 150), localizacao: { latitude: HOSPITAL_LAT + 0.05, longitude: HOSPITAL_LON } },
@@ -236,22 +236,22 @@ describe("regiões monitoradas", () => {
 
     const [, regioes] = Location.startGeofencingAsync.mock.calls[0];
     expect(regioes.slice(0, -1).map((r) => r.identifier)).toEqual(["perto"]);
-    expect(CatalogoLocal.estabelecimentos).toHaveBeenCalledWith({ idadeMaximaMs: 300000 });
+    expect(CatalogoLocal.obterEstabelecimentos).toHaveBeenCalledWith({ idadeMaximaMs: 300000 });
   });
 
   it("no recálculo em segundo plano aceita o catálogo de até um dia, sem ir à rede", async () => {
-    CatalogoLocal.estabelecimentos.mockResolvedValue([hospital("h1", 150)]);
+    CatalogoLocal.obterEstabelecimentos.mockResolvedValue([hospital("h1", 150)]);
     const { executarTask, REGIAO_RECALCULO } = carregarServico();
 
     await executarTask({
       data: { eventType: Location.GeofencingEventType.Exit, region: { identifier: REGIAO_RECALCULO } },
     });
 
-    expect(CatalogoLocal.estabelecimentos).toHaveBeenCalledWith({ idadeMaximaMs: 86400000 });
+    expect(CatalogoLocal.obterEstabelecimentos).toHaveBeenCalledWith({ idadeMaximaMs: 86400000 });
   });
 
   it("ao sair da região de recálculo, refaz a lista em segundo plano sem pedir permissão", async () => {
-    CatalogoLocal.estabelecimentos.mockResolvedValue([hospital("h1", 150)]);
+    CatalogoLocal.obterEstabelecimentos.mockResolvedValue([hospital("h1", 150)]);
     const { executarTask, REGIAO_RECALCULO } = carregarServico();
 
     await executarTask({
@@ -511,7 +511,7 @@ describe("segundo plano com o app fechado", () => {
     await executarTask({ data: { eventType: Location.GeofencingEventType.Enter, region: REGIAO } });
     // Sem o acompanhamento (ex.: o SO recusou o serviço em primeiro plano).
     processoEncerrado(10 * 60 * 1000);
-    CatalogoLocal.estabelecimentos.mockResolvedValue([]);
+    CatalogoLocal.obterEstabelecimentos.mockResolvedValue([]);
 
     await carregarServico().iniciarGeofencing();
 
@@ -699,14 +699,14 @@ describe("falhas e casos de borda", () => {
     await iniciarGeofencing();
     Location.getCurrentPositionAsync.mockRejectedValueOnce(new Error("sem gps"));
     await iniciarGeofencing();
-    CatalogoLocal.estabelecimentos.mockRejectedValueOnce(new Error("500"));
+    CatalogoLocal.obterEstabelecimentos.mockRejectedValueOnce(new Error("500"));
     await iniciarGeofencing();
 
     expect(Location.startGeofencingAsync).not.toHaveBeenCalled();
   });
 
   it("sem hospital por perto, monitora só a região de recálculo, com o raio máximo", async () => {
-    CatalogoLocal.estabelecimentos.mockResolvedValue([{ id: "sem-local" }]);
+    CatalogoLocal.obterEstabelecimentos.mockResolvedValue([{ id: "sem-local" }]);
     const { iniciarGeofencing, REGIAO_RECALCULO } = carregarServico();
 
     await iniciarGeofencing();
@@ -716,7 +716,7 @@ describe("falhas e casos de borda", () => {
   });
 
   it("recálculo em segundo plano sem internet ainda registra uma região de recálculo curta", async () => {
-    CatalogoLocal.estabelecimentos.mockRejectedValue(new Error("sem internet"));
+    CatalogoLocal.obterEstabelecimentos.mockRejectedValue(new Error("sem internet"));
     const { executarTask, REGIAO_RECALCULO } = carregarServico();
 
     await executarTask({

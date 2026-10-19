@@ -13,11 +13,11 @@ class AgendamentoInternoJobsTest {
 
     @Test
     void cadaAgendamentoDisparaSeuJobPeloExecutor() {
-        agendamento.indicadores();
-        agendamento.expiracaoVisitas();
-        agendamento.gpsInterrompido();
-        agendamento.feedbackSemResposta();
-        agendamento.retencaoDados();
+        agendamento.executarIndicadores();
+        agendamento.executarExpiracaoVisitas();
+        agendamento.executarGpsInterrompido();
+        agendamento.executarFeedbackSemResposta();
+        agendamento.executarRetencaoDados();
 
         verify(executor).executar(NomeJob.INDICADORES);
         verify(executor).executar(NomeJob.EXPIRACAO_VISITAS);

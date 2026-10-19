@@ -4,9 +4,9 @@
 import Constants from "expo-constants";
 import ConfiguracaoRemota, {
   compararVersoes,
-  enderecosDaLoja,
-  precisaAtualizar,
-  versaoDoApp,
+  obterEnderecosDaLoja,
+  isAtualizacaoObrigatoria,
+  obterVersaoDoApp,
 } from "../../services/ConfiguracaoRemota";
 import { apiRequest } from "../../core/api/apiClient";
 
@@ -24,7 +24,7 @@ describe("ConfiguracaoRemota", () => {
   test("lê a configuração do servidor", async () => {
     apiRequest.mockResolvedValue({ modoSomenteLeitura: false, versaoMinimaApp: "1.0.0" });
 
-    await expect(ConfiguracaoRemota.obter()).resolves.toEqual({ modoSomenteLeitura: false, versaoMinimaApp: "1.0.0" });
+    await expect(ConfiguracaoRemota.obterConfiguracao()).resolves.toEqual({ modoSomenteLeitura: false, versaoMinimaApp: "1.0.0" });
     expect(apiRequest).toHaveBeenCalledWith("/api/v1/configuracao");
   });
 
@@ -37,24 +37,24 @@ describe("ConfiguracaoRemota", () => {
   });
 
   test("pede atualização só abaixo da mínima", () => {
-    expect(precisaAtualizar({ versaoMinimaApp: "1.1.0" }, "1.0.9")).toBe(true);
-    expect(precisaAtualizar({ versaoMinimaApp: "1.1.0" }, "1.1.0")).toBe(false);
-    expect(precisaAtualizar({ versaoMinimaApp: "1.1.0" }, "2.0.0")).toBe(false);
+    expect(isAtualizacaoObrigatoria({ versaoMinimaApp: "1.1.0" }, "1.0.9")).toBe(true);
+    expect(isAtualizacaoObrigatoria({ versaoMinimaApp: "1.1.0" }, "1.1.0")).toBe(false);
+    expect(isAtualizacaoObrigatoria({ versaoMinimaApp: "1.1.0" }, "2.0.0")).toBe(false);
   });
 
   test("na dúvida não bloqueia", () => {
-    expect(precisaAtualizar({ versaoMinimaApp: null }, "0.0.1")).toBe(false);
-    expect(precisaAtualizar(null, "0.0.1")).toBe(false);
-    expect(precisaAtualizar({ versaoMinimaApp: "1.0.0" }, null)).toBe(false);
+    expect(isAtualizacaoObrigatoria({ versaoMinimaApp: null }, "0.0.1")).toBe(false);
+    expect(isAtualizacaoObrigatoria(null, "0.0.1")).toBe(false);
+    expect(isAtualizacaoObrigatoria({ versaoMinimaApp: "1.0.0" }, null)).toBe(false);
   });
 
   test("usa a versão embutida no build", () => {
-    expect(versaoDoApp()).toBe("1.0.0");
-    expect(precisaAtualizar({ versaoMinimaApp: "1.0.1" })).toBe(true);
+    expect(obterVersaoDoApp()).toBe("1.0.0");
+    expect(isAtualizacaoObrigatoria({ versaoMinimaApp: "1.0.1" })).toBe(true);
   });
 
   test("aponta para o app da loja e para a página web do pacote", () => {
-    expect(enderecosDaLoja()).toEqual([
+    expect(obterEnderecosDaLoja()).toEqual([
       "market://details?id=com.exemplo.app",
       "https://play.google.com/store/apps/details?id=com.exemplo.app",
     ]);
@@ -64,8 +64,8 @@ describe("ConfiguracaoRemota", () => {
     const original = Constants.expoConfig;
     Constants.expoConfig = undefined;
     try {
-      expect(versaoDoApp()).toBeNull();
-      expect(enderecosDaLoja()[0]).toBe("market://details?id=com.gabrielvogado.saudemonitor");
+      expect(obterVersaoDoApp()).toBeNull();
+      expect(obterEnderecosDaLoja()[0]).toBe("market://details?id=com.gabrielvogado.saudemonitor");
     } finally {
       Constants.expoConfig = original;
     }

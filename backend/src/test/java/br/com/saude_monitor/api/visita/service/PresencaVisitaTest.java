@@ -16,22 +16,22 @@ class PresencaVisitaTest {
 
     @Test
     void checkinComPosicaoNoHospitalNoMomentoComprova() {
-        assertTrue(PresencaVisita.noCheckin(true, AGORA, AGORA));
+        assertTrue(PresencaVisita.isComprovadaNoCheckin(true, AGORA, AGORA));
     }
 
     @Test
     void checkinSemPosicaoNoHospitalNaoComprova() {
-        assertFalse(PresencaVisita.noCheckin(false, AGORA, AGORA));
+        assertFalse(PresencaVisita.isComprovadaNoCheckin(false, AGORA, AGORA));
     }
 
     @Test
     void checkinRetroativoAte45MinutosComprova() {
-        assertTrue(PresencaVisita.noCheckin(true, AGORA.minusSeconds(45 * 60), AGORA));
+        assertTrue(PresencaVisita.isComprovadaNoCheckin(true, AGORA.minusSeconds(45 * 60), AGORA));
     }
 
     @Test
     void checkinRetroativoAlemDe45MinutosNaoComprova() {
-        assertFalse(PresencaVisita.noCheckin(true, AGORA.minusSeconds(46 * 60), AGORA));
+        assertFalse(PresencaVisita.isComprovadaNoCheckin(true, AGORA.minusSeconds(46 * 60), AGORA));
     }
 
     @Test
@@ -41,8 +41,8 @@ class PresencaVisitaTest {
         VisitaDocument geofenceNaoComprovada = VisitaDocument.builder()
                 .origem(OrigemVisita.GEOFENCE).entrada(AGORA).criadoEm(AGORA).presencaComprovada(false).build();
 
-        assertTrue(PresencaVisita.comprovada(manualComprovada));
-        assertFalse(PresencaVisita.comprovada(geofenceNaoComprovada));
+        assertTrue(PresencaVisita.isComprovada(manualComprovada));
+        assertFalse(PresencaVisita.isComprovada(geofenceNaoComprovada));
     }
 
     @Test
@@ -50,7 +50,7 @@ class PresencaVisitaTest {
         VisitaDocument antiga = VisitaDocument.builder()
                 .origem(OrigemVisita.GEOFENCE).entrada(AGORA.minusSeconds(60)).criadoEm(AGORA).build();
 
-        assertTrue(PresencaVisita.comprovada(antiga));
+        assertTrue(PresencaVisita.isComprovada(antiga));
     }
 
     @Test
@@ -58,7 +58,7 @@ class PresencaVisitaTest {
         VisitaDocument antiga = VisitaDocument.builder()
                 .origem(OrigemVisita.MANUAL).entrada(AGORA).criadoEm(AGORA).build();
 
-        assertFalse(PresencaVisita.comprovada(antiga));
+        assertFalse(PresencaVisita.isComprovada(antiga));
     }
 
     @Test
@@ -70,8 +70,8 @@ class PresencaVisitaTest {
         VisitaDocument semEntrada = VisitaDocument.builder()
                 .origem(OrigemVisita.GEOFENCE).criadoEm(AGORA).build();
 
-        assertFalse(PresencaVisita.comprovada(retroativa));
-        assertFalse(PresencaVisita.comprovada(semCriadoEm));
-        assertFalse(PresencaVisita.comprovada(semEntrada));
+        assertFalse(PresencaVisita.isComprovada(retroativa));
+        assertFalse(PresencaVisita.isComprovada(semCriadoEm));
+        assertFalse(PresencaVisita.isComprovada(semEntrada));
     }
 }

@@ -3,7 +3,7 @@ import { AppState, Linking, StyleSheet, View } from "react-native";
 import { Download } from "lucide-react-native";
 import { CSEmptyState } from "../../components";
 import { colors } from "../../theme";
-import ConfiguracaoRemota, { enderecosDaLoja, precisaAtualizar } from "../../services/ConfiguracaoRemota";
+import ConfiguracaoRemota, { obterEnderecosDaLoja, isAtualizacaoObrigatoria } from "../../services/ConfiguracaoRemota";
 
 /**
  * Tela de atualização obrigatória (APP-03).
@@ -16,27 +16,27 @@ import ConfiguracaoRemota, { enderecosDaLoja, precisaAtualizar } from "../../ser
 export default function AtualizacaoObrigatoria({ children }) {
   const [bloqueado, setBloqueado] = useState(false);
 
-  const conferir = useCallback(async () => {
+  const conferirVersao = useCallback(async () => {
     try {
-      const configuracao = await ConfiguracaoRemota.obter();
-      setBloqueado(precisaAtualizar(configuracao));
+      const configuracao = await ConfiguracaoRemota.obterConfiguracao();
+      setBloqueado(isAtualizacaoObrigatoria(configuracao));
     } catch {
       // Mantém o que já se sabia: sem rede, nem bloqueia nem libera quem já estava bloqueado.
     }
   }, []);
 
   useEffect(() => {
-    void conferir();
+    void conferirVersao();
     const inscricao = AppState.addEventListener("change", (estado) => {
       if (estado === "active") {
-        void conferir();
+        void conferirVersao();
       }
     });
     return () => inscricao.remove();
-  }, [conferir]);
+  }, [conferirVersao]);
 
   const abrirLoja = useCallback(async () => {
-    const [app, web] = enderecosDaLoja();
+    const [app, web] = obterEnderecosDaLoja();
     try {
       await Linking.openURL(app);
     } catch {

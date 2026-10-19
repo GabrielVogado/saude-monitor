@@ -44,7 +44,7 @@ async function guardar(catalogo) {
   }
 }
 
-async function conferir(guardado, agora) {
+async function conferirComServidor(guardado, agora) {
   const headers = guardado?.versao ? { "If-None-Match": `W/"${guardado.versao}"` } : {};
   let resposta;
   try {
@@ -85,13 +85,13 @@ class CatalogoLocal {
    * @returns {Promise<object[]>}
    * @throws quando não há cópia guardada e o servidor não respondeu.
    */
-  static async estabelecimentos({ idadeMaximaMs = IDADE_MAXIMA_PRIMEIRO_PLANO_MS, agora = Date.now() } = {}) {
+  static async obterEstabelecimentos({ idadeMaximaMs = IDADE_MAXIMA_PRIMEIRO_PLANO_MS, agora = Date.now() } = {}) {
     const guardado = await lerGuardado();
     if (guardado && agora - (guardado.conferidoEm || 0) < idadeMaximaMs) {
       return guardado.estabelecimentos;
     }
     if (!conferenciaEmAndamento) {
-      conferenciaEmAndamento = conferir(guardado, agora).finally(() => {
+      conferenciaEmAndamento = conferirComServidor(guardado, agora).finally(() => {
         conferenciaEmAndamento = null;
       });
     }

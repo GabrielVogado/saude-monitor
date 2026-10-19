@@ -83,7 +83,7 @@ public class AuthServiceImpl implements AuthService {
         if (conta.isEmpty()) {
             // SEG-03: sem isto, o login de e-mail inexistente respondia sem rodar o BCrypt e
             // o tempo de resposta revelava quais e-mails têm conta. Gasta o mesmo BCrypt.
-            passwordEncoder.matches(request.password(), hashDescartavel());
+            passwordEncoder.matches(request.password(), obterHashDescartavel());
             throw new NaoAutorizadoException(CREDENCIAIS_INVALIDAS);
         }
         UserDocument user = conta
@@ -150,7 +150,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public Map<String, Object> esqueciSenha(EsqueciSenhaRequest request) {
         // SOL-09: o envio agora é síncrono; o piso iguala o tempo de quem tem e de quem não tem conta.
-        return tempoMinimoResposta.garantir(() -> processarEsqueciSenha(request));
+        return tempoMinimoResposta.executarComTempoMinimo(() -> processarEsqueciSenha(request));
     }
 
     private Map<String, Object> processarEsqueciSenha(EsqueciSenhaRequest request) {
@@ -257,7 +257,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public Map<String, Object> reenviarConfirmacaoEmail(ReenviarConfirmacaoRequest request) {
-        return tempoMinimoResposta.garantir(() -> processarReenvioConfirmacao(request));
+        return tempoMinimoResposta.executarComTempoMinimo(() -> processarReenvioConfirmacao(request));
     }
 
     private Map<String, Object> processarReenvioConfirmacao(ReenviarConfirmacaoRequest request) {
@@ -296,7 +296,7 @@ public class AuthServiceImpl implements AuthService {
     private void gerarEEnviarCodigo(String email, Proposito proposito) {
         // SEG-03: teto de códigos por destino. Passou dele, nada é gerado nem enviado, e a
         // resposta ao cliente não muda (o código anterior, se houver, continua valendo).
-        if (!limiteEnvioEmail.permitir(email)) {
+        if (!limiteEnvioEmail.tentarRegistrarEnvio(email)) {
             logger.warn("Pedido de código ({}) ignorado: destino acima de {} códigos por hora.",
                     proposito, LimiteEnvioEmail.MAXIMO_POR_JANELA);
             return;
@@ -323,7 +323,7 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    private String hashDescartavel() {
+    private String obterHashDescartavel() {
         String hash = hashDescartavel;
         if (hash == null) {
             hash = passwordEncoder.encode(CODIGO_DUMMY_TEMPO_CONSTANTE);

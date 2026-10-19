@@ -106,7 +106,7 @@ class HospitalControllerTest {
                 .andExpect(jsonPath("$.id").value("1"))
                 .andExpect(jsonPath("$.nome").value("Hospital Teste"));
         // O catálogo público guardado nesta instância é descartado (ARQ-01).
-        verify(catalogoService).invalidar();
+        verify(catalogoService).invalidarCache();
     }
 
     @Test
@@ -206,7 +206,7 @@ class HospitalControllerTest {
                         .content("{\"ativo\":false}"))
                 .andExpect(status().isOk());
 
-        verify(catalogoService, times(2)).invalidar();
+        verify(catalogoService, times(2)).invalidarCache();
     }
 
     /** Stub manual do serviço, evita dependência de Mockito/MongoDB. */

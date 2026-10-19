@@ -60,7 +60,7 @@ public class LimiteConcorrenciaFilter extends OncePerRequestFilter {
                 log.warn("[Contencao] {} requisições simultâneas atingidas; respondendo 503.",
                         properties.requisicoesSimultaneas());
             }
-            RespostaIndisponivel.escrever(response, objectMapper, CODIGO, MENSAGEM, properties.retryAfterSegundos());
+            RespostaIndisponivel.escreverResposta(response, objectMapper, CODIGO, MENSAGEM, properties.retryAfterSegundos());
             return;
         }
         try {
@@ -75,7 +75,7 @@ public class LimiteConcorrenciaFilter extends OncePerRequestFilter {
     }
 
     /** Vagas livres agora (para teste). */
-    int vagasLivres() {
+    int contarVagasLivres() {
         return vagas.availablePermits();
     }
 }

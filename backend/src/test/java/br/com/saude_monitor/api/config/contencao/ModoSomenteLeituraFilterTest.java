@@ -25,11 +25,11 @@ class ModoSomenteLeituraFilterTest {
     private final ModoSomenteLeituraFilter filter = new ModoSomenteLeituraFilter(
             configuracao, new ContencaoProperties(80, 5, 300, false), objectMapper);
 
-    private void modo(boolean ligado, String mensagem) {
-        when(configuracao.obter()).thenReturn(new ConfiguracaoRemotaResponse(ligado, null, mensagem));
+    private void configurarModo(boolean ligado, String mensagem) {
+        when(configuracao.obterConfiguracao()).thenReturn(new ConfiguracaoRemotaResponse(ligado, null, mensagem));
     }
 
-    private boolean passou(String metodo, String uri, MockHttpServletResponse resposta) throws Exception {
+    private boolean isRequisicaoAceita(String metodo, String uri, MockHttpServletResponse resposta) throws Exception {
         AtomicBoolean passou = new AtomicBoolean();
         filter.doFilter(new MockHttpServletRequest(metodo, uri), resposta, (req, res) -> passou.set(true));
         return passou.get();
@@ -37,10 +37,10 @@ class ModoSomenteLeituraFilterTest {
 
     @Test
     void ligadoRecusaGravacaoCom503ERetryAfter() throws Exception {
-        modo(true, null);
+        configurarModo(true, null);
         MockHttpServletResponse resposta = new MockHttpServletResponse();
 
-        assertThat(passou("POST", "/api/v1/visitas/checkin", resposta)).isFalse();
+        assertThat(isRequisicaoAceita("POST", "/api/v1/visitas/checkin", resposta)).isFalse();
 
         assertThat(resposta.getStatus()).isEqualTo(503);
         assertThat(resposta.getHeader("Retry-After")).isEqualTo("300");
@@ -51,10 +51,10 @@ class ModoSomenteLeituraFilterTest {
 
     @Test
     void usaAMensagemDaConfiguracaoQuandoHa() throws Exception {
-        modo(true, "Troca do banco até 23h.");
+        configurarModo(true, "Troca do banco até 23h.");
         MockHttpServletResponse resposta = new MockHttpServletResponse();
 
-        passou("POST", "/api/v1/feedbacks", resposta);
+        isRequisicaoAceita("POST", "/api/v1/feedbacks", resposta);
 
         assertThat(objectMapper.readTree(resposta.getContentAsString()).get("message").asText())
                 .isEqualTo("Troca do banco até 23h.");
@@ -62,10 +62,10 @@ class ModoSomenteLeituraFilterTest {
 
     @Test
     void mensagemEmBrancoCaiNoTextoPadrao() throws Exception {
-        modo(true, "  ");
+        configurarModo(true, "  ");
         MockHttpServletResponse resposta = new MockHttpServletResponse();
 
-        passou("DELETE", "/api/v1/contas/eu", resposta);
+        isRequisicaoAceita("DELETE", "/api/v1/contas/eu", resposta);
 
         assertThat(objectMapper.readTree(resposta.getContentAsString()).get("message").asText())
                 .isEqualTo(ModoSomenteLeituraFilter.MENSAGEM_PADRAO);
@@ -73,9 +73,9 @@ class ModoSomenteLeituraFilterTest {
 
     @Test
     void desligadoDeixaAGravacaoPassar() throws Exception {
-        modo(false, null);
+        configurarModo(false, null);
 
-        assertThat(passou("PUT", "/api/v1/feedbacks/1", new MockHttpServletResponse())).isTrue();
+        assertThat(isRequisicaoAceita("PUT", "/api/v1/feedbacks/1", new MockHttpServletResponse())).isTrue();
     }
 
     @ParameterizedTest
@@ -89,8 +89,8 @@ class ModoSomenteLeituraFilterTest {
             "POST, /internal/jobs/indicadores"
     })
     void consultasSessaoEConfiguracaoSeguemNoModoLigado(String metodo, String uri) throws Exception {
-        modo(true, null);
+        configurarModo(true, null);
 
-        assertThat(passou(metodo, uri, new MockHttpServletResponse())).isTrue();
+        assertThat(isRequisicaoAceita(metodo, uri, new MockHttpServletResponse())).isTrue();
     }
 }

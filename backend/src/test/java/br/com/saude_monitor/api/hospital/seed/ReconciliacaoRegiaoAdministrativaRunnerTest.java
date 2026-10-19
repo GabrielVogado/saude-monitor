@@ -48,7 +48,7 @@ class ReconciliacaoRegiaoAdministrativaRunnerTest {
     private final BulkOperations bulkOps = mock(BulkOperations.class);
 
     private final ReconciliacaoRegiaoAdministrativaRunner runner =
-            new ReconciliacaoRegiaoAdministrativaRunner(repository, resolver, mongoTemplate, TravasDeTeste.livre());
+            new ReconciliacaoRegiaoAdministrativaRunner(repository, resolver, mongoTemplate, TravasDeTeste.criarTravaLivre());
 
     {
         when(mongoTemplate.bulkOps(eq(BulkOperations.BulkMode.UNORDERED), eq(HospitalDocument.class)))

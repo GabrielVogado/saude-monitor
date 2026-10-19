@@ -29,11 +29,11 @@ class ConfiguracaoRemotaServiceTest {
     private final ConfiguracaoRemotaRepository repository = mock(ConfiguracaoRemotaRepository.class);
     private final RelogioAjustavel relogio = new RelogioAjustavel();
 
-    private ConfiguracaoRemotaService servico(ContencaoProperties props) {
+    private ConfiguracaoRemotaService criarServico(ContencaoProperties props) {
         return new ConfiguracaoRemotaService(repository, props, relogio);
     }
 
-    private static Optional<ConfiguracaoRemotaDocument> gravada(boolean somenteLeitura, String versao) {
+    private static Optional<ConfiguracaoRemotaDocument> criarConfiguracaoGravada(boolean somenteLeitura, String versao) {
         return Optional.of(ConfiguracaoRemotaDocument.builder()
                 .id(ConfiguracaoRemotaDocument.ID_UNICO).modoSomenteLeitura(somenteLeitura)
                 .versaoMinimaApp(versao).mensagem("aviso").build());
@@ -43,48 +43,48 @@ class ConfiguracaoRemotaServiceTest {
     void semDocumentoValeOPadrao() {
         when(repository.findById(ConfiguracaoRemotaDocument.ID_UNICO)).thenReturn(Optional.empty());
 
-        assertThat(servico(NORMAL).obter()).isEqualTo(ConfiguracaoRemotaResponse.PADRAO);
+        assertThat(criarServico(NORMAL).obterConfiguracao()).isEqualTo(ConfiguracaoRemotaResponse.PADRAO);
     }
 
     @Test
     void leODocumentoUmaVezPorValidade() {
-        when(repository.findById(ConfiguracaoRemotaDocument.ID_UNICO)).thenReturn(gravada(true, "1.2.0"));
-        ConfiguracaoRemotaService servico = servico(NORMAL);
+        when(repository.findById(ConfiguracaoRemotaDocument.ID_UNICO)).thenReturn(criarConfiguracaoGravada(true, "1.2.0"));
+        ConfiguracaoRemotaService servico = criarServico(NORMAL);
 
-        assertThat(servico.obter()).isEqualTo(new ConfiguracaoRemotaResponse(true, "1.2.0", "aviso"));
+        assertThat(servico.obterConfiguracao()).isEqualTo(new ConfiguracaoRemotaResponse(true, "1.2.0", "aviso"));
         relogio.avancarSegundos(29);
-        assertThat(servico.modoSomenteLeitura()).isTrue();
+        assertThat(servico.isModoSomenteLeitura()).isTrue();
         verify(repository, times(1)).findById(ConfiguracaoRemotaDocument.ID_UNICO);
 
         relogio.avancarSegundos(1);
-        servico.obter();
+        servico.obterConfiguracao();
         verify(repository, times(2)).findById(ConfiguracaoRemotaDocument.ID_UNICO);
     }
 
     @Test
     void bancoForaMantemOUltimoValorLido() {
         when(repository.findById(ConfiguracaoRemotaDocument.ID_UNICO))
-                .thenReturn(gravada(true, null))
+                .thenReturn(criarConfiguracaoGravada(true, null))
                 .thenThrow(new DataAccessResourceFailureException("fora"));
-        ConfiguracaoRemotaService servico = servico(NORMAL);
-        servico.obter();
+        ConfiguracaoRemotaService servico = criarServico(NORMAL);
+        servico.obterConfiguracao();
         relogio.avancarSegundos(31);
 
-        assertThat(servico.modoSomenteLeitura()).isTrue();
+        assertThat(servico.isModoSomenteLeitura()).isTrue();
     }
 
     @Test
     void bancoForaSemNadaLidoCaiNoPadrao() {
         when(repository.findById(ConfiguracaoRemotaDocument.ID_UNICO)).thenThrow(new DataAccessResourceFailureException("fora"));
 
-        assertThat(servico(NORMAL).obter()).isEqualTo(ConfiguracaoRemotaResponse.PADRAO);
+        assertThat(criarServico(NORMAL).obterConfiguracao()).isEqualTo(ConfiguracaoRemotaResponse.PADRAO);
     }
 
     @Test
     void variavelDeAmbienteForcaOModoSomenteLeitura() {
-        when(repository.findById(ConfiguracaoRemotaDocument.ID_UNICO)).thenReturn(gravada(false, "1.0.0"));
+        when(repository.findById(ConfiguracaoRemotaDocument.ID_UNICO)).thenReturn(criarConfiguracaoGravada(false, "1.0.0"));
 
-        ConfiguracaoRemotaResponse resposta = servico(new ContencaoProperties(80, 5, 300, true)).obter();
+        ConfiguracaoRemotaResponse resposta = criarServico(new ContencaoProperties(80, 5, 300, true)).obterConfiguracao();
 
         assertThat(resposta).isEqualTo(new ConfiguracaoRemotaResponse(true, "1.0.0", "aviso"));
     }
@@ -92,8 +92,8 @@ class ConfiguracaoRemotaServiceTest {
     @Test
     void atualizarGravaQuemAlterouEValeNaHoraNestaInstancia() {
         when(repository.findById(ConfiguracaoRemotaDocument.ID_UNICO)).thenReturn(Optional.empty());
-        ConfiguracaoRemotaService servico = servico(NORMAL);
-        servico.obter();
+        ConfiguracaoRemotaService servico = criarServico(NORMAL);
+        servico.obterConfiguracao();
 
         ConfiguracaoRemotaResponse resposta = servico.atualizar(
                 new ConfiguracaoRemotaRequest(true, "1.1.0", "Manutenção"), "admin-1");
@@ -104,7 +104,7 @@ class ConfiguracaoRemotaServiceTest {
         assertThat(gravado.getValue().getAtualizadoPor()).isEqualTo("admin-1");
         assertThat(gravado.getValue().getAtualizadoEm()).isEqualTo(AGORA);
         assertThat(resposta).isEqualTo(new ConfiguracaoRemotaResponse(true, "1.1.0", "Manutenção"));
-        assertThat(servico.modoSomenteLeitura()).isTrue();
+        assertThat(servico.isModoSomenteLeitura()).isTrue();
         verify(repository, times(1)).findById(ConfiguracaoRemotaDocument.ID_UNICO);
     }
 

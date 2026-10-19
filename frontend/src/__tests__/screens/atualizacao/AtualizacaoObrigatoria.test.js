@@ -12,8 +12,8 @@ jest.mock("../../../services/ConfiguracaoRemota", () => {
   return {
     __esModule: true,
     ...real,
-    precisaAtualizar: (config) => real.precisaAtualizar(config, "1.0.0"),
-    default: { obter: jest.fn() },
+    isAtualizacaoObrigatoria: (config) => real.isAtualizacaoObrigatoria(config, "1.0.0"),
+    default: { obterConfiguracao: jest.fn() },
   };
 });
 
@@ -29,7 +29,7 @@ describe("AtualizacaoObrigatoria", () => {
   let ouvinteAppState;
 
   beforeEach(() => {
-    ConfiguracaoRemota.obter.mockReset();
+    ConfiguracaoRemota.obterConfiguracao.mockReset();
     jest.spyOn(AppState, "addEventListener").mockImplementation((_evento, ouvinte) => {
       ouvinteAppState = ouvinte;
       return { remove: jest.fn() };
@@ -41,7 +41,7 @@ describe("AtualizacaoObrigatoria", () => {
   });
 
   test("versão aceita segue para o app", async () => {
-    ConfiguracaoRemota.obter.mockResolvedValue({ versaoMinimaApp: "1.0.0" });
+    ConfiguracaoRemota.obterConfiguracao.mockResolvedValue({ versaoMinimaApp: "1.0.0" });
 
     renderizar();
 
@@ -50,7 +50,7 @@ describe("AtualizacaoObrigatoria", () => {
   });
 
   test("abaixo da mínima mostra a tela de atualização no lugar do app", async () => {
-    ConfiguracaoRemota.obter.mockResolvedValue({ versaoMinimaApp: "1.1.0" });
+    ConfiguracaoRemota.obterConfiguracao.mockResolvedValue({ versaoMinimaApp: "1.1.0" });
 
     renderizar();
 
@@ -59,7 +59,7 @@ describe("AtualizacaoObrigatoria", () => {
   });
 
   test("o botão abre a página do app na loja", async () => {
-    ConfiguracaoRemota.obter.mockResolvedValue({ versaoMinimaApp: "9.0.0" });
+    ConfiguracaoRemota.obterConfiguracao.mockResolvedValue({ versaoMinimaApp: "9.0.0" });
     const abrir = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     renderizar();
 
@@ -70,7 +70,7 @@ describe("AtualizacaoObrigatoria", () => {
   });
 
   test("sem o app da loja, abre a página web", async () => {
-    ConfiguracaoRemota.obter.mockResolvedValue({ versaoMinimaApp: "9.0.0" });
+    ConfiguracaoRemota.obterConfiguracao.mockResolvedValue({ versaoMinimaApp: "9.0.0" });
     const abrir = jest
       .spyOn(Linking, "openURL")
       .mockRejectedValueOnce(new Error("sem Play Store"))
@@ -84,7 +84,7 @@ describe("AtualizacaoObrigatoria", () => {
   });
 
   test("sem rede o app segue normal", async () => {
-    ConfiguracaoRemota.obter.mockRejectedValue(new Error("sem internet"));
+    ConfiguracaoRemota.obterConfiguracao.mockRejectedValue(new Error("sem internet"));
 
     renderizar();
     await act(async () => {});
@@ -93,10 +93,10 @@ describe("AtualizacaoObrigatoria", () => {
   });
 
   test("confere de novo quando o app volta ao primeiro plano", async () => {
-    ConfiguracaoRemota.obter.mockResolvedValueOnce({ versaoMinimaApp: null });
+    ConfiguracaoRemota.obterConfiguracao.mockResolvedValueOnce({ versaoMinimaApp: null });
     renderizar();
     await screen.findByText("Conteúdo do app");
-    ConfiguracaoRemota.obter.mockResolvedValueOnce({ versaoMinimaApp: "2.0.0" });
+    ConfiguracaoRemota.obterConfiguracao.mockResolvedValueOnce({ versaoMinimaApp: "2.0.0" });
 
     await act(async () => {
       ouvinteAppState("background");
@@ -104,6 +104,6 @@ describe("AtualizacaoObrigatoria", () => {
     });
 
     expect(await screen.findByText("Atualize o Radar Saúde")).toBeTruthy();
-    expect(ConfiguracaoRemota.obter).toHaveBeenCalledTimes(2);
+    expect(ConfiguracaoRemota.obterConfiguracao).toHaveBeenCalledTimes(2);
   });
 });

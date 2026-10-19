@@ -203,9 +203,9 @@ public class SeedRunner implements ApplicationRunner {
      */
     private Set<String> gravarComCnes(List<DocPendente> pendentes, Contagem contagem) {
         return pendentes.stream()
-                .filter(pendente -> pendente.doc().getCodigoCnes() != null)
-                .filter(pendente -> contagem.registrarResultado(salvarUpsert(pendente.doc())))
-                .map(pendente -> chaveGemea(pendente.doc()))
+                .map(DocPendente::doc)
+                .filter(doc -> doc.getCodigoCnes() != null && contagem.registrarResultado(salvarUpsert(doc)))
+                .map(SeedRunner::chaveGemea)
                 .collect(Collectors.toSet());
     }
 

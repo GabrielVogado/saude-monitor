@@ -3090,6 +3090,58 @@ release. Mexem na esteira e geram PRs automáticos, então ficam para a fase de 
 
 ---
 
+## M-057 — Catálogo local no geofencing e versão mínima do app (APP-01, APP-03)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0. **APP-01 (Crítico)**: a cada
+saída da região de recálculo, com o app fechado, o geofencing pedia ao servidor os hospitais num
+raio de 5 km da posição exata. Na meta de uso do DF, estimado em ~333 req/s só disso, mais que todo
+o resto do tráfego, e nada cacheável. **APP-03 (Médio)**: não havia versão mínima: uma correção
+de escala ou de segurança dependia de cada pessoa atualizar o app.
+
+### O que mudou (comportamento)
+
+- **Catálogo no aparelho** (`CatalogoLocal`): o app baixa `GET /api/v1/catalogo` (ARQ-01) e guarda
+  no armazenamento local, com a versão. Com o app aberto, a cópia mais velha que 5 min é conferida
+  com `If-None-Match` (304 sem corpo quando nada mudou); no recálculo em segundo plano, a cópia de
+  até um dia vale sem rede. Sem rede, vale a cópia guardada, por mais velha que seja.
+- **Geofencing**: a escolha dos 19 estabelecimentos monitorados (a até 5 km, mais próximos
+  primeiro) é feita no aparelho sobre o catálogo. O recálculo em segundo plano deixa de fazer
+  requisição quase sempre. Mesmo comportamento de antes quando não há catálogo nenhum (primeiro uso
+  sem internet): na abertura mantém as regiões registradas; em segundo plano registra só a região de
+  recálculo curta.
+- **Versão mínima**: ao abrir e ao voltar ao primeiro plano, o app lê `GET /api/v1/configuracao`
+  (ARQ-09). Se a versão instalada estiver abaixo de `versaoMinimaApp`, a navegação dá lugar à tela
+  "Atualize o Radar Saúde", com o botão para a Play Store (app da loja, ou a página web). O sufixo de
+  homologação não conta (`1.0.0-rc.5` vale como `1.0.0`). Sem rede, sem mínima ou com versão
+  ilegível, o app segue normal. O geofencing e a fila offline continuam rodando por baixo.
+- **Backend**: o CORS aceita o cabeçalho `If-None-Match`, para a versão web do app.
+
+### O que fica para depois
+
+As telas de lista, mapa e ranking continuam na listagem paginada: passá-las para o catálogo local é
+o próximo passo do ARQ-01. A borda (SOL-03) ainda não existe, então o 304 vem da origem. O aviso de
+manutenção do modo somente leitura aparece hoje só como a mensagem do 503 nas gravações; um aviso
+fixo na tela fica como item novo. Atualização OTA (EAS Update) não entrou.
+
+### Verificação
+
+- `CatalogoLocal`: baixa e guarda; cópia dentro da idade vale sem rede; cópia vencida conferida com
+  `If-None-Match`; 304 como erro ou como corpo vazio mantém a cópia; versão nova substitui; sem rede
+  vale a cópia; sem cópia e sem rede, falha; chamadas simultâneas fazem uma requisição.
+- Geofencing: só entra quem está a até 5 km; idade de 5 min no primeiro plano e de um dia no
+  recálculo em segundo plano; os testes de regiões, permissão e recálculo seguem verdes sobre o
+  catálogo.
+- Versão mínima: compara pelos três números; bloqueia só abaixo da mínima; botão abre a loja e cai
+  na página web; sem rede segue normal; confere de novo ao voltar ao primeiro plano.
+- App: 655 testes, lint com 11 avisos (teto 16), `tsc` limpo. Sonar local sem issue nas linhas
+  alteradas.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**
@@ -3120,3 +3172,46 @@ do usuário.
 - `quarkus` — o backend é **Spring Boot 4**, não Quarkus. Não ativar por semelhança de "backend Java".
 - `awesome-llm-apps-fullstack-developer` — o produto não tem camada de LLM.
 - `lobehub-react` — **removida da coluna de `frontend/` em 03/09/2026** ([OBS-003](../../skill-observations/OBS-003-skill-anunciada-nao-e-skill-ativada.md)). O conteúdo dela é `@lobehub/ui`, antd, Next.js App Router e `react-router-dom`; verificado no `package.json` que **nenhuma das cinco existe**. O projeto é Expo/React Native com React Navigation e componentes próprios (`CS*`).
+
+---
+
+## M-058 — Nomes de métodos do Épico 9 no padrão do Java
+
+**Data:** 19/10/2026 · **PR:** #206 a #216 (um commit em cada) · **Épico 9**
+
+### Como apareceu
+
+Revisão do PO sobre o código dos PRs #206 a #216: vários métodos tinham nome de substantivo
+(`obter()`, `nomes()`, `identidade()`, `etapa()`), booleano sem pergunta (`pertenceA`,
+`comprovada`, `permitir`, `endpointsHabilitados`) ou abreviação (`obterAtivaOu409`). A regra
+seguida é a convenção da Oracle mais Clean Code: lowerCamelCase, começar por verbo, booleano como
+pergunta (`is`/`has`), nome que diz o que faz e unidade no nome quando há medida.
+
+### O que mudou
+
+Só nomes, sem mudança de comportamento, nos métodos criados (ou com regra nova) no Épico 9, em
+backend, app e auxiliares de teste. Principais trocas:
+
+- Booleanos: `VisitaDono.pertenceA` → `isDonoDaVisita`; `PresencaVisita.comprovada`/`noCheckin` →
+  `isComprovada`/`isComprovadaNoCheckin`; `ConfiguracaoRemotaService.modoSomenteLeitura` →
+  `isModoSomenteLeitura`; `JobsProperties.endpointsHabilitados` → `isEndpointsHabilitados`;
+  `isAtualizacaoObrigatoria` no app (era `precisaAtualizar`).
+- Verbo e intenção: `CatalogoService.obter`/`invalidar` → `obterCatalogo`/`invalidarCache`;
+  `ConfiguracaoRemotaService.obter` → `obterConfiguracao`; `RateLimitFilter.identidade`/`excedeu` →
+  `identificarCliente`/`bloquearSeLimiteExcedido`; `UsuarioAutenticadoCache.carregar`/`esquecer` →
+  `carregarUsuario`/`removerDoCache`; `TempoMinimoResposta.garantir` → `executarComTempoMinimo`;
+  `LimiteEnvioEmail.permitir` → `tentarRegistrarEnvio`; `ExecutorJobs.nomes` → `listarNomes`;
+  agendamentos `indicadores()` etc. → `executarIndicadores()` etc.; `VisitaServiceImpl.obterAtivaOu409`
+  → `obterVisitaAtivaDoDono`; no app, `CatalogoLocal.estabelecimentos` → `obterEstabelecimentos`.
+- Unidade: `decorrido(inicio)` → `calcularMilissegundosDesde(inicioEmNanos)`; `comTimeout(promise, ms)`
+  → `aguardarComTimeout(promise, timeoutEmMs)`.
+
+Ficam como estão, por regra da linguagem ou do framework: métodos sobrescritos (`doFilterInternal`,
+`shouldNotFilter`), acessores de `record` (o Java usa o nome do componente, sem `get`), métodos `@Bean`
+(o nome é o nome do bean) e os `handleX` do `GlobalExceptionHandler`, no padrão do arquivo. Métodos que
+já existiam na `develop` antes do Épico 9 ficam para outro PR, se o PO quiser.
+
+### Verificação
+
+Backend compilado em cada um dos 11 PRs e suíte completa verde no último; app com 656 testes, lint
+com 11 avisos (teto 16), `tsc` limpo.

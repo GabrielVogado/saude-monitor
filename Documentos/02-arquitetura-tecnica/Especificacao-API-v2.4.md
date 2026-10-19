@@ -564,6 +564,7 @@ Todos os estabelecimentos ativos, com indicadores, em ordem de nome. É o mesmo 
 **Itens:** o mesmo `HospitalResumoResponse` de `GET /api/v1/hospitais` (sem CNPJ, contato nem polígono).
 **Cache:** `ETag: W/"<versao>"` (SHA-256 do conteúdo, igual em todas as instâncias) e `Cache-Control: max-age=60, public, s-maxage=300`. Com `If-None-Match` igual à versão atual, a resposta é **304** sem corpo. O servidor monta o catálogo no máximo uma vez a cada 5 min por instância (P8: até 5 min de atraso nos dados públicos); cadastro, edição e ativação feitos pelo admin descartam o catálogo da instância que os recebeu.
 **Compressão:** respostas JSON acima de 2 KB saem com gzip quando o cliente aceita (`server.compression`).
+**Uso no app (APP-01, 18/10/2026):** o app guarda o catálogo e escolhe no aparelho os estabelecimentos monitorados pelo geofencing. Confere com `If-None-Match` a cópia mais velha que 5 min (app aberto) ou que 1 dia (recálculo em segundo plano). CORS aceita o cabeçalho `If-None-Match`.
 
 **Ranking (`GET /api/v1/hospitais/ranking`):** desde o ARQ-01 responde com `Cache-Control: max-age=0, public, s-maxage=300`. A borda pode guardar por 5 min; o aparelho sempre confere.
 
@@ -579,7 +580,7 @@ Dispara um job periódico. `nome` ∈ `indicadores` | `expiracao-visitas` | `gps
 ### 3.9 Configuração remota (ARQ-09, 18/10/2026)
 
 #### `GET /api/v1/configuracao` 🔓
-Lida pelo app ao abrir. **200** `{ "modoSomenteLeitura": false, "versaoMinimaApp": "1.0.0", "mensagem": null }`. `versaoMinimaApp` e `mensagem` podem ser `null`.
+Lida pelo app ao abrir e ao voltar ao primeiro plano (APP-03): abaixo de `versaoMinimaApp`, o app mostra a tela de atualização. **200** `{ "modoSomenteLeitura": false, "versaoMinimaApp": "1.0.0", "mensagem": null }`. `versaoMinimaApp` e `mensagem` podem ser `null`.
 **Cache:** `Cache-Control: max-age=60, public`. Cada instância relê a configuração no banco no máximo a cada 30 s; uma alteração chega ao app em até cerca de 1 min e meio. Se o banco falhar na releitura, a instância mantém o último valor lido.
 
 #### `PUT /api/v1/admin/configuracao` 🛡️

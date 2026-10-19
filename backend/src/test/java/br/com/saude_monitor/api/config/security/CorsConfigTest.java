@@ -73,6 +73,17 @@ class CorsConfigTest {
     }
 
     @Test
+    void preflightAceitaIfNoneMatchParaConferirOCatalogo() throws Exception {
+        // APP-01: a versão web do app confere o catálogo guardado pela versão.
+        mockMvc.perform(options("/api/v1/catalogo")
+                        .header("Origin", ORIGEM_PAINEL)
+                        .header("Access-Control-Request-Method", "GET")
+                        .header("Access-Control-Request-Headers", "If-None-Match"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Headers", containsString("If-None-Match")));
+    }
+
+    @Test
     void preflightDeOrigemNaoAutorizadaNaoRecebeAccessControlAllowOrigin() throws Exception {
         mockMvc.perform(options(ENDPOINT_LOGIN)
                         .header("Origin", ORIGEM_NAO_AUTORIZADA)

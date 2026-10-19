@@ -5,6 +5,12 @@
 
 ---
 
+## 📌 Revisão 18/10/2026 — Épico 9: e-mail de código síncrono e limite por destino (SOL-09, SEG-03)
+
+**O que mudou:** os códigos de cadastro, reenvio e "esqueci a senha" saem dentro da requisição, com teto de 1,5 s para o Resend, em vez de `@Async` (que no Cloud Run podia ficar sem CPU). Reenvio e "esqueci a senha" respondem sempre em 2 s, cada endereço recebe no máximo 5 códigos por hora e o login de e-mail sem conta gasta o mesmo BCrypt. `Especificacao-API-v2.4.md` (§3.1), `De-Para-Backlog-Features.md` (SOL-09 e SEG-03 entregues) e `Historico-Melhorias.md` (M-054).
+
+---
+
 ## 📌 Revisão 18/10/2026 — Épico 9: jobs disparáveis pelo Cloud Scheduler (SOL-05, ARQ-08)
 
 **O que mudou:** os 5 jobs periódicos ganham `POST /internal/jobs/{nome}`, aceito só com o token OIDC da conta de serviço do Cloud Scheduler, e passam a rodar uma vez por vez entre instâncias (trava distribuída), com log de início, fim e erro. O `@Scheduled` interno segue ligado até a infraestrutura criar os agendamentos. `Especificacao-API-v2.4.md` (§3.8), `De-Para-Backlog-Features.md` (SOL-05 parcial, ARQ-08 entregue) e `Historico-Melhorias.md` (M-053, com o passo a passo para ativar).

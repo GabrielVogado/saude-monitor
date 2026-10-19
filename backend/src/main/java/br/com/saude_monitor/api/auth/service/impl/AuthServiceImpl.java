@@ -15,6 +15,8 @@ import br.com.saude_monitor.api.auth.verificacao.Proposito;
 import br.com.saude_monitor.api.auth.revogacao.RefreshTokenRevogadoDocument;
 import br.com.saude_monitor.api.auth.revogacao.RefreshTokenRevogadoRepository;
 import br.com.saude_monitor.api.auth.service.AuthService;
+import br.com.saude_monitor.api.auth.service.LimiteEnvioEmail;
+import br.com.saude_monitor.api.auth.service.TempoMinimoResposta;
 import br.com.saude_monitor.api.config.exception.EmailNaoConfirmadoException;
 import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.security.JwtService;
@@ -67,12 +69,24 @@ public class AuthServiceImpl implements AuthService {
     private final CodigoVerificacaoRepository codigoVerificacaoRepository;
     private final EmailService emailService;
     private final MongoTemplate mongoTemplate;
+    private final LimiteEnvioEmail limiteEnvioEmail;
+    private final TempoMinimoResposta tempoMinimoResposta;
     private final SecureRandom secureRandom = new SecureRandom();
+
+    /** Hash BCrypt descartável, calculado uma vez, para o login de e-mail inexistente (SEG-03). */
+    private volatile String hashDescartavel;
 
     @Override
     public AuthResponse login(LoginRequest request) {
-        UserDocument user = userRepository.findByEmail(normalizeEmail(request.email()))
-                .filter(u -> u.getSenhaHash() != null)
+        Optional<UserDocument> conta = userRepository.findByEmail(normalizeEmail(request.email()))
+                .filter(u -> u.getSenhaHash() != null);
+        if (conta.isEmpty()) {
+            // SEG-03: sem isto, o login de e-mail inexistente respondia sem rodar o BCrypt e
+            // o tempo de resposta revelava quais e-mails têm conta. Gasta o mesmo BCrypt.
+            passwordEncoder.matches(request.password(), obterHashDescartavel());
+            throw new NaoAutorizadoException(CREDENCIAIS_INVALIDAS);
+        }
+        UserDocument user = conta
                 .filter(u -> passwordEncoder.matches(request.password(), u.getSenhaHash()))
                 .orElseThrow(() -> new NaoAutorizadoException(CREDENCIAIS_INVALIDAS));
 
@@ -135,6 +149,11 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public Map<String, Object> esqueciSenha(EsqueciSenhaRequest request) {
+        // SOL-09: o envio agora é síncrono; o piso iguala o tempo de quem tem e de quem não tem conta.
+        return tempoMinimoResposta.executarComTempoMinimo(() -> processarEsqueciSenha(request));
+    }
+
+    private Map<String, Object> processarEsqueciSenha(EsqueciSenhaRequest request) {
         String email = normalizeEmail(request.email());
         boolean existe = userRepository.findByEmail(email).filter(UserDocument::isActive).isPresent();
 
@@ -238,6 +257,10 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public Map<String, Object> reenviarConfirmacaoEmail(ReenviarConfirmacaoRequest request) {
+        return tempoMinimoResposta.executarComTempoMinimo(() -> processarReenvioConfirmacao(request));
+    }
+
+    private Map<String, Object> processarReenvioConfirmacao(ReenviarConfirmacaoRequest request) {
         String email = normalizeEmail(request.email());
         boolean enviar = userRepository.findByEmail(email)
                 .filter(UserDocument::isActive)
@@ -271,6 +294,13 @@ public class AuthServiceImpl implements AuthService {
      * no próprio banco — não há mais dois inserts concorrentes para capturar.
      */
     private void gerarEEnviarCodigo(String email, Proposito proposito) {
+        // SEG-03: teto de códigos por destino. Passou dele, nada é gerado nem enviado, e a
+        // resposta ao cliente não muda (o código anterior, se houver, continua valendo).
+        if (!limiteEnvioEmail.tentarRegistrarEnvio(email)) {
+            logger.warn("Pedido de código ({}) ignorado: destino acima de {} códigos por hora.",
+                    proposito, LimiteEnvioEmail.MAXIMO_POR_JANELA);
+            return;
+        }
         String codigo = "%06d".formatted(secureRandom.nextInt(1_000_000));
         Instant agora = Instant.now();
 
@@ -291,6 +321,15 @@ public class AuthServiceImpl implements AuthService {
             case REDEFINIR_SENHA -> emailService.enviarCodigoRedefinicaoSenha(email, codigo);
             case CONFIRMAR_EMAIL -> emailService.enviarCodigoConfirmacaoEmail(email, codigo);
         }
+    }
+
+    private String obterHashDescartavel() {
+        String hash = hashDescartavel;
+        if (hash == null) {
+            hash = passwordEncoder.encode(CODIGO_DUMMY_TEMPO_CONSTANTE);
+            hashDescartavel = hash;
+        }
+        return hash;
     }
 
     /**

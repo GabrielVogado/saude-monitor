@@ -16,7 +16,7 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | Painel Administrativo Web (Épico 7) | 9 | 9 | 100% (✅ E7-01 a E7-09 entregues; E2E com login ADMIN pendente para E7-06 e E7-09) |
 | **Total do backlog** | **51** | **52** | **98%** |
 | Épico 8 — Estabilização e Desempenho (novo, v2.1) | 8 | 15 | 53% |
-| Épico 9 — Escala, Segurança e Privacidade (novo, 18/10/2026) | 7 | 19 | 37% |
+| Épico 9 — Escala, Segurança e Privacidade (novo, 18/10/2026) | 9 | 19 | 47% |
 
 > ⚠️ **Entregue ≠ utilizável.** As 42 estórias abaixo estão implementadas e cobertas por teste em CI, mas o sistema **não passou por validação em campo** e apresenta lentidão transversal de origem confirmada na infraestrutura — o **cold start** na primeira abertura após ociosidade (503 no Cloud Run, ver E8-01). O "1–5 s por requisição com o serviço quente" descrito aqui era o Render antigo: re-medido em 24/09/2026 sobre o Cloud Run quente, os GET ficam em **p95 ~195–245 ms** (ver E8-02). Ver `Features-MVP-v2.1.md` §2.1 e o **Épico 8** do `Backlog-MVP-v2.1.md`.
 
@@ -152,8 +152,8 @@ Este documento estabelece o mapeamento direto entre as **Estórias de Usuário (
 | **ARQ-03** | Cache curto do usuário no filtro JWT | Cross | ✅ Entregue (18/10/2026) — a conta do access token fica 60 s na memória da instância (Caffeine, até 10 mil contas) em vez de uma leitura no Mongo por requisição; a exclusão da conta descarta a entrada na instância que a recebeu. Ver [M-052](09-melhoria-continua/Historico-Melhorias.md). |
 | **SOL-05** | Jobs como endpoints internos idempotentes, com log | Cross | 🟡 Parcial (18/10/2026) — código pronto: os 5 jobs rodam por `POST /internal/jobs/{nome}` com token OIDC da conta de serviço do Cloud Scheduler (assinatura do Google, audiência e e-mail conferidos), sob trava distribuída (uma execução por vez entre instâncias), com log de início, fim e erro. O `@Scheduled` interno continua ligado por padrão. Falta a infraestrutura: criar os agendamentos no Cloud Scheduler e desligar o interno (`APP_JOBS_AGENDAMENTO_INTERNO=false`). Ver [M-053](09-melhoria-continua/Historico-Melhorias.md). |
 | **ARQ-08** | Recálculo do indicador coberto pelo job confiável | **F-06** | ✅ Entregue (18/10/2026) — opção A da análise: o recálculo em `@Async` continua, e a rede de segurança é o job `indicadores`, agora disparável de fora e com log (SOL-05). Cloud Tasks só se o atraso medido do indicador passar de 15 min. Ver [M-053](09-melhoria-continua/Historico-Melhorias.md). |
-| **SOL-09** | E-mail de confirmação e de senha sem depender de `@Async` | **F-02** | 🔴 Pendente |
-| **SEG-03** | Limite por e-mail de destino e login sem canal de tempo | **F-02** | 🔴 Pendente |
+| **SOL-09** | E-mail de confirmação e de senha sem depender de `@Async` | **F-02** | ✅ Entregue (18/10/2026) — opções E + B da análise: envio síncrono no cadastro, no reenvio e no "esqueci a senha", com teto de 1,5 s para o Resend; reenvio e "esqueci a senha" respondem sempre em 2 s, exista ou não a conta; no desligamento o Spring espera as tarefas `@Async` por até 8 s. Ver [M-054](09-melhoria-continua/Historico-Melhorias.md). |
+| **SEG-03** | Limite por e-mail de destino e login sem canal de tempo | **F-02** | ✅ Entregue (18/10/2026) — no máximo 5 códigos por hora para o mesmo endereço (o excedente é ignorado com a mesma resposta) e BCrypt descartável no login de e-mail sem conta. O 409 do cadastro fica, por decisão de produto. Limite por aparelho, regras de bot e alerta de envio dependem da borda (SOL-03) e da atestação (SEG-01 A). Ver [M-054](09-melhoria-continua/Historico-Melhorias.md). |
 | **ARQ-05** | Timeouts, 503 com `Retry-After` e modo evento | Cross | 🔴 Pendente |
 | **SOL-07** | Pool e timeouts do MongoDB explícitos | Cross | 🔴 Pendente |
 | **ARQ-09** | Flags simples no backend (modo evento, versão mínima) | Cross | 🔴 Pendente |

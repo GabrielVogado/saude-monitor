@@ -289,6 +289,7 @@ Cria conta (opcional no MVP — jornada principal funciona sem login). Substitui
 }
 ```
 **Regras:** `expiraEm` = 900s (15min); rate limit 10 req/min por IP e 10 req/min por conta no login; no refresh, 10 req/min pelo próprio refresh token e nenhum limite por IP (ARQ-02, 18/10/2026).
+**E-mail e códigos (SOL-09 e SEG-03, 18/10/2026):** o login com e-mail sem conta roda o mesmo BCrypt de uma senha errada (o tempo não revela a conta). Os códigos de 6 dígitos (cadastro, `reenviar-confirmacao`, `esqueci-senha`) são enviados dentro da requisição, com teto de 1,5 s para o Resend; `esqueci-senha` e `reenviar-confirmacao` respondem sempre depois de **2 s** contados da chegada, exista ou não a conta. Cada endereço recebe no máximo 5 códigos por hora; acima disso o pedido é ignorado com a mesma resposta genérica. O cadastro continua respondendo 409 para e-mail já cadastrado.
 
 #### `POST /api/v1/auth/refresh` 🔓
 **Request:** `{ "refreshToken": "..." }` → **200** `{ "accessToken": "...", "refreshToken": "...", "expiraEm": 900 }`

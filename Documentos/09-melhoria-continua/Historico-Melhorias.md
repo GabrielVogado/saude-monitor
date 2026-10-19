@@ -2939,6 +2939,56 @@ depende desse job como rede de segurança.
 
 ---
 
+## M-054 — E-mail de código dentro da requisição, piso de tempo e limite por destino (SOL-09, SEG-03)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0. **SOL-09 (Médio)**: os e-mails de
+código saíam em `@Async`. No Cloud Run com cobrança por requisição, a tarefa em segundo plano
+fica sem CPU e o código podia atrasar até a próxima requisição de qualquer pessoa, ou se perder
+sem log; o "Reenviar código" podia piorar. **SEG-03 (Médio)**: cadastro, reenvio e "esqueci a
+senha" só tinham limite por IP, e o login revelava pelo tempo de resposta se o e-mail tinha conta
+(só rodava o BCrypt quando a conta existia).
+
+### O que mudou (comportamento)
+
+- **Envio síncrono** dos códigos (cadastro, reenvio e "esqueci a senha"), com teto de 500 ms
+  para conectar e 1 s para a resposta do Resend. Envio que estoura o teto é registrado em log e
+  o usuário toca em "Reenviar".
+- **Piso de 2 s** no `esqueci-senha` e no `reenviar-confirmacao`: a resposta sai 2 s depois da
+  chegada, exista ou não a conta. Fecha o canal de tempo que o `@Async` fechava e também o resto
+  que ele deixava (a gravação do código só acontecia com conta). Essas duas telas ficam ~2 s mais
+  lentas.
+- **Cadastro** envia o código na própria requisição, sem piso: ele já responde 409 para e-mail
+  cadastrado (opção E da análise), então o tempo não revela nada novo.
+- **Limite por destino**: no máximo 5 códigos por hora para o mesmo endereço, somando os três
+  fluxos. O excedente não gera nem envia código, e a resposta não muda; o código anterior
+  continua valendo. Contagem por instância, em memória.
+- **Login de e-mail sem conta** roda o mesmo BCrypt de uma senha errada, sobre um hash
+  descartável calculado uma vez.
+- **Desligamento**: o Spring espera as tarefas `@Async` pendentes (ex.: recálculo de indicador)
+  por até 8 s, dentro dos 10 s em que o Cloud Run ainda dá CPU.
+
+### O que fica para depois
+
+Limite por aparelho, regra de bot e alerta de envio anômalo dependem da borda (SOL-03) e da
+atestação do aparelho (SEG-01 A). Fechar a enumeração no cadastro é decisão de produto: o 409
+continua, porque ajuda quem esqueceu que já tem conta. Conferir nos logs do Resend se já houve
+código atrasado ou perdido (verificação aberta da análise).
+
+### Verificação
+
+- Piso: espera o que falta, não espera quando a operação passou do piso, espera também em erro e
+  preserva a interrupção da thread.
+- Limite: 5 por hora, o sexto recusado mesmo com o e-mail em outra caixa, outro destino livre,
+  nova janela zera; no serviço, o sexto "esqueci a senha" responde igual e não envia.
+- Login de e-mail inexistente chama o BCrypt com o hash descartável, calculado uma vez.
+- Resend: teto menor que o piso; o construtor da aplicação põe o teto numa cópia do builder.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

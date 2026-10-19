@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.user.service.impl;
 
+import br.com.saude_monitor.api.config.security.UsuarioAutenticadoCache;
 import br.com.saude_monitor.api.indicador.service.IndicadorService;
 import br.com.saude_monitor.api.auth.service.AuthService;
 import br.com.saude_monitor.api.config.exception.ConflitoException;
@@ -62,6 +63,7 @@ public class UserServiceImpl implements UserService {
     private final MongoTemplate mongoTemplate;
     private final IndicadorService indicadorService;
     private final AuthService authService;
+    private final UsuarioAutenticadoCache usuarioAutenticadoCache;
 
     @Override
     public UserResponse saveUser(UserRequest request) {
@@ -200,6 +202,8 @@ public class UserServiceImpl implements UserService {
         // Remove o documento de usuário (dado pessoal identificável). A senha vive apenas
         // como hash neste mesmo documento — não há coleção de autenticação separada.
         userRepository.delete(user);
+        // O token ainda válido desta conta deixa de autenticar já nesta instância (ARQ-03).
+        usuarioAutenticadoCache.removerDoCache(user.getEmail());
 
         log.info("Conta do usuário {} excluída (LGPD). Dados pessoais removidos; visitas/feedbacks anonimizados.",
                 usuarioId);

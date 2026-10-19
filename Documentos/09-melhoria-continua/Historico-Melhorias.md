@@ -2838,6 +2838,57 @@ maior. Para limite por pessoa isso é aceitável; o teto global por IP fica para
 
 ---
 
+## M-052 — Catálogo público com cache HTTP e cache curto do usuário no filtro JWT (ARQ-01 servidor, ARQ-03)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0. **ARQ-01 (Crítico)**: a lista por
+raio recebe a posição exata de cada pessoa, então nenhuma resposta serve para outra, e o ranking
+lê todos os hospitais a cada chamada; nada tinha `ETag` nem `Cache-Control` público. É a maior
+parte do tráfego, igual para todo usuário, batendo na origem e no banco. **ARQ-03 (Médio)**: o
+filtro JWT lia a conta no Mongo a cada requisição autenticada.
+
+### O que mudou (comportamento)
+
+- **Novo `GET /api/v1/catalogo`** (público): todos os estabelecimentos ativos, com indicadores,
+  em ordem de nome, no mesmo formato da listagem. Traz `versao` (SHA-256 do conteúdo) e responde
+  com `ETag: W/"<versao>"`; quem manda `If-None-Match` com a versão atual recebe **304** sem
+  corpo. `Cache-Control: max-age=60, public, s-maxage=300`.
+- O servidor monta o catálogo **no máximo uma vez a cada 5 min por instância** (P8, atraso
+  aceito nos dados públicos). Nota, tempo e cadastro novos aparecem no catálogo dentro dessa
+  janela; cadastro, edição e ativação pelo admin descartam o catálogo da instância que recebeu a
+  alteração. A listagem por raio e o detalhe continuam lendo do banco, como antes.
+- **Ranking** responde com `Cache-Control: max-age=0, public, s-maxage=300`: uma borda pode
+  guardá-lo por 5 min; o aparelho sempre confere, então quem acabou de avaliar não vê lista velha.
+  Sem borda (hoje), nada muda na prática.
+- **gzip** nas respostas JSON acima de 2 KB, quando o cliente aceita. O `ETag` é fraco (`W/`)
+  justamente porque os bytes mudam com a compressão e o conteúdo não.
+- **Conta do token em memória por 60 s** (Caffeine, até 10 mil contas por instância). O access
+  token já vale 15 min, então papel e situação desatualizados por até 1 min não mudam o risco. A
+  exclusão da conta (LGPD) descarta a entrada na hora na instância que a recebeu; nas outras, o
+  token da conta excluída para de autenticar em até 60 s (antes parava na hora).
+- Rate limit: `GET /api/v1/catalogo` entra no grupo público.
+
+### O que fica para depois
+
+O app ainda não usa o catálogo (APP-01, último PR desta série) e não há borda (SOL-03). A opção
+B do ARQ-01 (arredondar a posição para a lista por raio ficar cacheável) não foi feita: o app
+ainda não foi publicado na loja, então não há versão antiga instalada a manter.
+
+### Verificação
+
+- Catálogo: reaproveitamento dentro de 5 min, nova leitura depois disso e depois de alteração do
+  admin, versão estável para o mesmo conteúdo e diferente quando um indicador muda, 200 com
+  `ETag` e `Cache-Control`, 304 com a versão atual e 200 com uma versão velha; consulta só de
+  ativos, ordenada por nome e id.
+- Cache de conta: uma leitura no banco dentro da validade (inclusive com o e-mail em outra
+  caixa), nova leitura depois da validade e depois da exclusão, conta inexistente não guardada.
+- Contrato OpenAPI: 39 operações, 21 públicas.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

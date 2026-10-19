@@ -159,6 +159,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if ("GET".equals(method) && uri.startsWith("/api/v1/hospitais")) {
             return true;
         }
+        // Catálogo público de estabelecimentos (ARQ-01).
+        if ("GET".equals(method) && "/api/v1/catalogo".equals(uri)) {
+            return true;
+        }
         // GET de camadas geográficas (F-11, §5): leitura pública de recurso estático.
         if ("GET".equals(method) && uri.startsWith("/api/v1/camadas")) {
             return true;

@@ -62,6 +62,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class HospitalServiceImpl implements HospitalService {
 
+    private static final String CAMPO_ATIVO = "ativo";
     private static final double RAIO_KM_PADRAO = 10.0;
     private static final int CAP_PROXIMOS = 1000;
     private static final double METROS_POR_KM = 1000.0;
@@ -185,10 +186,21 @@ public class HospitalServiceImpl implements HospitalService {
     }
 
     @Override
+    public List<HospitalResumoResponse> listarCatalogo() {
+        Query query = new Query(Criteria.where(CAMPO_ATIVO).is(true))
+                .with(Sort.by(Sort.Direction.ASC, "nome").and(Sort.by(Sort.Direction.ASC, "id")));
+        List<HospitalDocument> ativos = mongoTemplate.find(query, HospitalDocument.class);
+        Map<String, IndicadoresResponse> porId = mapaIndicadores(ativos);
+        return ativos.stream()
+                .map(d -> toResumo(d, porId.get(d.getId())))
+                .toList();
+    }
+
+    @Override
     public PageResponse<HospitalResumoResponse> ranking(OrdemRanking ordem, TipoEstabelecimento tipo, int page, int size) {
         // Busca TODOS os hospitais ativos (filtro opcional por tipo), sem paginar ainda,
         // para ordenar globalmente pelo indicador antes de fatiar a página (E4-05).
-        Query query = new Query(Criteria.where("ativo").is(true));
+        Query query = new Query(Criteria.where(CAMPO_ATIVO).is(true));
         if (tipo != null) {
             query.addCriteria(Criteria.where("tipo").is(tipo));
         }
@@ -333,7 +345,7 @@ public class HospitalServiceImpl implements HospitalService {
      */
     private List<HospitalDocument> buscarProximos(double latitude, double longitude, double raioKm,
                                                   TipoEstabelecimento tipo) {
-        Query filtro = new Query(Criteria.where("ativo").is(true));
+        Query filtro = new Query(Criteria.where(CAMPO_ATIVO).is(true));
         if (tipo != null) {
             filtro.addCriteria(Criteria.where("tipo").is(tipo));
         }
@@ -361,8 +373,8 @@ public class HospitalServiceImpl implements HospitalService {
      */
     private static Criteria criterioStatus(StatusHospital status) {
         return switch (status) {
-            case ATIVOS -> Criteria.where("ativo").is(true);
-            case INATIVOS -> Criteria.where("ativo").is(false);
+            case ATIVOS -> Criteria.where(CAMPO_ATIVO).is(true);
+            case INATIVOS -> Criteria.where(CAMPO_ATIVO).is(false);
             case TODOS -> null;
         };
     }

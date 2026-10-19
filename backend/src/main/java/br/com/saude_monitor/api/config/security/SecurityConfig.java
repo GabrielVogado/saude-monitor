@@ -99,6 +99,8 @@ public class SecurityConfig {
                         // Camadas geográficas (F-11, §5): divisão administrativa/de saúde é
                         // dado público — mesmo regime dos GET de hospitais.
                         .requestMatchers(HttpMethod.GET, "/api/v1/camadas/**").permitAll()
+                        // Catálogo público de estabelecimentos (ARQ-01).
+                        .requestMatchers(HttpMethod.GET, "/api/v1/catalogo").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/hospitais/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/hospitais/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/hospitais/**").hasRole("ADMIN")

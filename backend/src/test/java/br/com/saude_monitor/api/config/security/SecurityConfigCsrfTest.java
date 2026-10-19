@@ -193,8 +193,13 @@ class SecurityConfigCsrfTest {
         }
 
         @Bean
-        JwtAuthenticationFilter jwtAuthenticationFilter(JwtService jwt, CustomUserDetailsService uds) {
-            return new JwtAuthenticationFilter(jwt, uds);
+        UsuarioAutenticadoCache usuarioAutenticadoCache(CustomUserDetailsService uds) {
+            return new UsuarioAutenticadoCache(uds);
+        }
+
+        @Bean
+        JwtAuthenticationFilter jwtAuthenticationFilter(JwtService jwt, UsuarioAutenticadoCache usuarios) {
+            return new JwtAuthenticationFilter(jwt, usuarios);
         }
 
         @Bean

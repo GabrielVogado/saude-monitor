@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * geográficas (F-11, §5 — `GET /api/v1/camadas/{tipo}`) somam 36; a listagem
  * administrativa (E7-02/E7-07 — `GET /api/v1/admin/hospitais`, restrita a ADMIN) soma
  * 37; as avaliações pendentes do titular (M-029 — `GET /api/v1/contas/feedbacks/pendentes`)
- * somam **38**. Este teste mede o total de operações que o springdoc realmente gera, não
+ * somam 38; o catálogo público (ARQ-01 — `GET /api/v1/catalogo`) soma **39**. Este teste mede o total de operações que o springdoc realmente gera, não
  * presume que bateu.</p>
  */
 @Testcontainers
@@ -81,7 +81,7 @@ class OpenApiContratoTest {
             }
         }
 
-        assertThat(operacoes).isEqualTo(38);
+        assertThat(operacoes).isEqualTo(39);
     }
 
     /**
@@ -92,8 +92,9 @@ class OpenApiContratoTest {
  * `permitAll` recebem {@code @SecurityRequirements} vazio para sobrepor o global;
  * este teste mede que a sobreposição chegou ao contrato publicado — e que nenhum
  * dos demais ganhou a mesma isenção por engano. Lista ampliada em 10/09/2026 com os
- * 2 endpoints de "esqueci minha senha" e os 2 de confirmação de e-mail (19 públicos
- * ao todo), e com `GET /api/v1/camadas/{tipo}` (F-11, §5 — 20 públicos ao todo).
+ * 2 endpoints de "esqueci minha senha" e os 2 de confirmação de e-mail (19 públicos),
+ * com `GET /api/v1/camadas/{tipo}` (F-11, §5, 20 públicos) e com
+ * `GET /api/v1/catalogo` (ARQ-01, 21 públicos).
      */
     @Test
     void devePublicarSegurancaCoerenteComOSecurityConfig() throws Exception {
@@ -117,7 +118,8 @@ class OpenApiContratoTest {
                 "GET /api/v1/hospitais/{id}/geofence",
                 "GET /api/v1/hospitais/{id}/indicadores",
                 "POST /api/v1/hospitais/sugestoes",
-                "GET /api/v1/camadas/{tipo}");
+                "GET /api/v1/camadas/{tipo}",
+                "GET /api/v1/catalogo");
 
         String corpo = mockMvc.perform(get("/v3/api-docs").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())

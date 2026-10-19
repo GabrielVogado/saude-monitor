@@ -5,6 +5,12 @@
 
 ---
 
+## 📌 Revisão 18/10/2026 — Épico 9: Swagger fora de produção, admin sem senha padrão e contêiner sem root (SEG-07, SEG-06)
+
+**O que mudou:** o perfil `prod` deixa de servir `/v3/api-docs` e o Swagger UI; o seed de admin fica desligado por padrão, sem e-mail nem senha no código, e derruba o boot se ligado sem credencial forte; a imagem do backend roda como usuário sem privilégio e sem `curl`. `Especificacao-API-v2.4.md` (§5), `De-Para-Backlog-Features.md` (SEG-07 entregue, SEG-06 parcial), `deploy/google/README.md` e `Historico-Melhorias.md` (M-056).
+
+---
+
 ## 📌 Revisão 18/10/2026 — Épico 9: contenção de falhas, pool do banco e configuração remota (ARQ-05, SOL-07, ARQ-09)
 
 **O que mudou:** cada instância atende no máximo 80 requisições ao mesmo tempo e responde 503 com `Retry-After` acima disso; falha passageira do banco vira 503 em vez de 500; o pool do MongoDB fica limitado a 20 conexões com prazos explícitos; e nasce a configuração remota (modo somente leitura e versão mínima do app), lida em `GET /api/v1/configuracao` e alterada pelo ADMIN. `Especificacao-API-v2.4.md` (§1.2 e §3.9), `De-Para-Backlog-Features.md` (ARQ-05, SOL-07 e ARQ-09 entregues) e `Historico-Melhorias.md` (M-055).

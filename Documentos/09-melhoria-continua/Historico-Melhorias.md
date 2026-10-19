@@ -3050,6 +3050,46 @@ como item novo (hoje é pelo `PUT`).
 
 ---
 
+## M-056 — Swagger fora de produção, admin sem senha padrão e contêiner sem root (SEG-07, SEG-06)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0. **SEG-07 (Baixo)**: Swagger UI e
+`/v3/api-docs` públicos em qualquer ambiente, e a senha padrão de admin (`admin123`) no
+`application.properties`, neutralizada só pelo `APP_SEEDADMIN_ENABLED=false` do deploy. Um deploy
+sem a flag criaria um admin com senha conhecida num serviço público. **SEG-06 (Médio)**: a imagem
+do backend rodava como root e trazia `curl`.
+
+### O que mudou (comportamento)
+
+- **Perfil `prod`** (`application-prod.properties`, ativado pelo `cd-backend-google.yml` em
+  `release/**`): `/v3/api-docs` e `/swagger-ui.html` respondem 404. Desenvolvimento e homologação
+  não mudam.
+- **Seed de admin desligado por padrão** (`APP_SEEDADMIN_ENABLED`, antes ligado), sem e-mail nem
+  senha padrão no código. Ligado sem `ADMIN_EMAIL`, sem `ADMIN_SENHA` ou com senha de menos de
+  12 caracteres, **a aplicação não sobe** (antes pulava o seed com uma linha de log, ou criava o
+  admin com `admin123`). Nenhum deploy muda: todos já passam `APP_SEEDADMIN_ENABLED=false`. Quem
+  roda o backend local e ainda não tem admin na base precisa ligar o seed com as duas variáveis
+  (`backend/.env.example`); um admin já existente não é afetado.
+- **Contêiner**: a aplicação roda como o usuário `app` (UID 10001), sem privilégio, e o `curl`
+  saiu da imagem final (servia só ao deploy da Oracle Cloud, que não existe mais).
+
+### O que fica para depois
+
+Do SEG-06: base fixada por *digest*, Trivy na imagem e nas dependências, Dependabot e SBOM na
+release. Mexem na esteira e geram PRs automáticos, então ficam para a fase de infraestrutura.
+
+### Verificação
+
+- `OpenApiProducaoTest`: com o perfil `prod`, contrato e Swagger UI respondem 404 (Mongo real).
+- Seed: boot falha sem senha, com senha em branco, com `admin123` e sem e-mail; não duplica
+  quando já há admin; cria com credencial válida.
+- A imagem não foi construída nesta sessão (sem Docker para build); o build do CD confirma.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

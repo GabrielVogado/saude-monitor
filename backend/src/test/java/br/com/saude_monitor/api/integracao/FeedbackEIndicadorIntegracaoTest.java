@@ -95,11 +95,15 @@ class FeedbackEIndicadorIntegracaoTest extends IntegracaoTestBase {
         return objectMapper.readTree(resposta).get("accessToken").asText();
     }
 
-    /** Visita FINALIZADA, dona do {@code token}, no hospital informado. */
+    /**
+     * Visita FINALIZADA, dona do {@code token}, no hospital informado, com check-in manual
+     * feito de dentro do hospital (prova de presença, SEG-01).
+     */
     private String visitaFinalizada(String hospitalId, String token) throws Exception {
         String corpoCheckin = """
-                { "hospitalId": "%s", "origem": "MANUAL" }
-                """.formatted(hospitalId);
+                { "hospitalId": "%s", "origem": "MANUAL",
+                  "posicao": { "type": "Point", "coordinates": [%s, %s] } }
+                """.formatted(hospitalId, LON, LAT);
         String respostaCheckin = mockMvc.perform(post("/api/v1/visitas/checkin")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -201,6 +205,42 @@ class FeedbackEIndicadorIntegracaoTest extends IntegracaoTestBase {
             assertThat(indicador).isPresent();
             assertThat(indicador.get().getNAvaliacoes()).isEqualTo(1);
             assertThat(indicador.get().getNotaMedia()).isEqualTo(5.0);
+        });
+    }
+
+    @Test
+    void feedbackDeCheckinManualSemPosicaoNaoEntraNoIndicador() throws Exception {
+        // Anônimo, como no ataque do SEG-01, e sem gastar mais um cadastro do limite de taxa.
+        String hospitalId = hospitalAtivo();
+        String dispositivoId = "dispositivo-sem-prova-" + System.nanoTime();
+        String respostaCheckin = mockMvc.perform(post("/api/v1/visitas/checkin")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "hospitalId": "%s", "origem": "MANUAL", "dispositivoId": "%s" }
+                                """.formatted(hospitalId, dispositivoId)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String visitaId = objectMapper.readTree(respostaCheckin).get("id").asText();
+        mockMvc.perform(post("/api/v1/visitas/" + visitaId + "/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "dispositivoId": "%s" }
+                                """.formatted(dispositivoId)))
+                .andExpect(status().isOk());
+
+        // A avaliação continua aceita (RN-20); só não conta no indicador público (SEG-01).
+        mockMvc.perform(post("/api/v1/feedbacks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "visitaId": "%s", "nota": 1, "dispositivoId": "%s" }
+                                """.formatted(visitaId, dispositivoId)))
+                .andExpect(status().isCreated());
+
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+            var indicador = indicadorHospitalRepository.findByHospitalId(hospitalId);
+            assertThat(indicador).isPresent();
+            assertThat(indicador.get().getNAvaliacoes()).isZero();
+            assertThat(indicador.get().getNotaMedia()).isNull();
         });
     }
 }

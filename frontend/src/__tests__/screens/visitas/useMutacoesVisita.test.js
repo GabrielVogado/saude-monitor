@@ -11,11 +11,15 @@ import { definirUsuarioDaSessao } from "../../../core/stores/sessaoStore";
 import { ErroSemInternet } from "../../../config/http";
 import VisitaService from "../../../screens/visitas/service/VisitaService";
 import FeedbackService from "../../../screens/feedback/service/FeedbackService";
+import { obterPosicaoParaCheckinManual } from "../../../screens/visitas/service/PosicaoAparelho";
 import { useCheckinManual, useCheckoutManual } from "../../../screens/visitas/hooks/useMutacoesVisita";
 import { useVisitaAtivaDaTela } from "../../../screens/visitas/hooks/useVisitaAtivaDaTela";
 import { useEnviarFeedback } from "../../../screens/feedback/hooks/useEnviarFeedback";
 
 jest.mock("../../../screens/visitas/service/VisitaService");
+jest.mock("../../../screens/visitas/service/PosicaoAparelho", () => ({
+  obterPosicaoParaCheckinManual: jest.fn(async () => undefined),
+}));
 jest.mock("../../../screens/feedback/service/FeedbackService");
 
 let callbackDeFoco = null;
@@ -62,6 +66,19 @@ describe("mutações de visita (Fase 4)", () => {
     });
     expect(cliente.getQueryData([...queryKeys.visitas.all, "outra"])).toBe(historico);
     expect(cliente.getQueryState(queryKeys.visitas.ativa("u1")).isInvalidated).toBe(true);
+  });
+
+  test("check-in manual leva a posição do aparelho quando houver (SEG-01)", async () => {
+    const posicao = { type: "Point", coordinates: [-48.07, -15.9] };
+    obterPosicaoParaCheckinManual.mockResolvedValueOnce(posicao);
+    VisitaService.checkin.mockResolvedValue({ id: "v1", hospitalId: "h1" });
+
+    const { result } = renderizarHook(() => useCheckinManual());
+    await act(async () => {
+      await result.current.mutateAsync({ hospitalId: "h1" });
+    });
+
+    expect(VisitaService.checkin).toHaveBeenCalledWith({ hospitalId: "h1", origem: "MANUAL", posicao });
   });
 
   test("checkout grava 'sem visita' e repassa o encerramento manual", async () => {

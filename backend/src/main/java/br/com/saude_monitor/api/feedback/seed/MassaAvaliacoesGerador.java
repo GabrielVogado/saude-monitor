@@ -234,6 +234,9 @@ public final class MassaAvaliacoesGerador {
                 .status(StatusVisita.FINALIZADA)
                 .tipoPermanencia(tipo)
                 .origem(random.nextInt(100) < 80 ? OrigemVisita.GEOFENCE : OrigemVisita.MANUAL)
+                // A massa simula visitas com prova de presença: sem isso o indicador do dev
+                // perderia as avaliações das visitas manuais (SEG-01).
+                .presencaComprovada(true)
                 .notas(NOTA_AUDITORIA)
                 .criadoEm(entrada)
                 .build();

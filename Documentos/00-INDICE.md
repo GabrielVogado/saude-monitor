@@ -5,6 +5,12 @@
 
 ---
 
+## 📌 Revisão 18/10/2026 — Épico 9: só avaliação com prova de presença conta no indicador (SEG-01)
+
+**O que mudou:** o indicador público (nota e tempo) passa a contar só visitas cujo check-in trouxe posição dentro do geofence do hospital, recebido até 45 min depois da entrada, e os feedbacks delas. O check-in manual sem posição e o retroativo continuam aceitos, mas ficam fora do indicador. `Especificacao-API-v2.4.md` (check-in e indicadores), `De-Para-Backlog-Features.md` (SEG-01 parcial) e `Historico-Melhorias.md` (M-049).
+
+---
+
 ## 📌 Revisão 18/10/2026 — Épico 9: GPS apagado ao encerrar a visita e vínculo pessoal só por 90 dias (DAD-01, ARQ-04)
 
 **O que mudou:** os pontos de GPS de uma visita são apagados quando ela termina, e visitas e avaliações com mais de 90 dias perdem o vínculo com a conta e o aparelho, como promete o Documento Negocial §11. O heartbeat e o checkout viram update atômico, sem regravar a visita inteira nem desfazer um encerramento do job. `Especificacao-API-v2.4.md` e a política de privacidade (`site/`, versão 1.1) atualizadas. `De-Para-Backlog-Features.md` (DAD-01 e ARQ-04 entregues) e `Historico-Melhorias.md` (M-048).

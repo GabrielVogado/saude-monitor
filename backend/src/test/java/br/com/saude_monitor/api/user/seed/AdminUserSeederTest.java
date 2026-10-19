@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.user.seed;
 
+import br.com.saude_monitor.api.config.trava.TravasDeTeste;
 import br.com.saude_monitor.api.user.document.Papel;
 import br.com.saude_monitor.api.user.document.UserDocument;
 import br.com.saude_monitor.api.user.repository.UserRepository;
@@ -31,7 +32,7 @@ class AdminUserSeederTest {
     }
 
     private AdminUserSeeder seederCom(AdminSeedProperties properties) {
-        return new AdminUserSeeder(userRepository, new BCryptPasswordEncoder(), properties);
+        return new AdminUserSeeder(userRepository, new BCryptPasswordEncoder(), properties, TravasDeTeste.criarTravaLivre());
     }
 
     @Test
@@ -62,5 +63,18 @@ class AdminUserSeederTest {
         seeder.run(mock(ApplicationArguments.class));
 
         verify(userRepository).save(any(UserDocument.class));
+    }
+
+    @Test
+    void naoFazNadaQuandoOutraInstanciaEstaSemeando() {
+        // SOL-02: duas instâncias subindo juntas não criam dois admins.
+        seeder = new AdminUserSeeder(userRepository, new BCryptPasswordEncoder(),
+                new AdminSeedProperties(true, "admin@saude-monitor.com", "S3nh@Forte!", "Admin"),
+                TravasDeTeste.criarTravaOcupada());
+
+        seeder.run(mock(ApplicationArguments.class));
+
+        verify(userRepository, never()).existsByPapel(any());
+        verify(userRepository, never()).save(any(UserDocument.class));
     }
 }

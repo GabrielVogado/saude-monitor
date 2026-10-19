@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.hospital.seed;
 
+import br.com.saude_monitor.api.config.trava.TravaDistribuida;
 import br.com.saude_monitor.api.hospital.document.HospitalDocument;
 import br.com.saude_monitor.api.hospital.repository.HospitalRepository;
 import br.com.saude_monitor.api.regiao.service.RegiaoAdministrativaResolver;
@@ -21,6 +22,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -50,6 +52,12 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ReconciliacaoRegiaoAdministrativaRunner implements ApplicationRunner {
 
+    /** Nome da trava desta tarefa ({@link TravaDistribuida}). */
+    static final String NOME_TRAVA = "reconciliacao-regiao-administrativa";
+
+    /** Folga para a tarefa terminar; se a instância morrer no meio, a trava vence e outra refaz. */
+    private static final Duration VALIDADE_TRAVA = Duration.ofMinutes(10);
+
     /** Depois da reconciliação de raio ({@link ReconciliacaoRaioGeofenceRunner#ORDEM}). */
     public static final int ORDEM = 30;
 
@@ -59,8 +67,15 @@ public class ReconciliacaoRegiaoAdministrativaRunner implements ApplicationRunne
     private final RegiaoAdministrativaResolver resolver;
     private final MongoTemplate mongoTemplate;
 
+    /** Uma instância por vez (SOL-02): as outras pulam enquanto esta executa. */
+    private final TravaDistribuida trava;
+
     @Override
     public void run(ApplicationArguments args) {
+        trava.executar(NOME_TRAVA, VALIDADE_TRAVA, this::executar);
+    }
+
+    private void executar() {
         int preenchidos = 0;
         int foraDeTodaRegiao = 0;
         int semLocalizacao = 0;
@@ -76,25 +91,12 @@ public class ReconciliacaoRegiaoAdministrativaRunner implements ApplicationRunne
 
             for (HospitalDocument hospital : page.getContent()) {
                 total++;
-                if (hospital.getRegiaoAdministrativa() != null && !hospital.getRegiaoAdministrativa().isBlank()) {
-                    continue; // já preenchido — não recalcula (ver Javadoc da classe)
+                switch (preencher(hospital, bulkOps)) {
+                    case PREENCHIDO -> naPagina++;
+                    case FORA_DE_TODA_REGIAO -> foraDeTodaRegiao++;
+                    case SEM_LOCALIZACAO -> semLocalizacao++;
+                    case JA_PREENCHIDO -> { /* não recalcula (ver Javadoc da classe) */ }
                 }
-                GeoJsonPoint centro = hospital.getLocalizacao();
-                if (centro == null) {
-                    semLocalizacao++;
-                    continue;
-                }
-
-                Optional<String> regiao = resolver.resolver(centro.getX(), centro.getY());
-                if (regiao.isEmpty()) {
-                    foraDeTodaRegiao++;
-                    continue;
-                }
-
-                bulkOps.updateOne(
-                        Query.query(Criteria.where("id").is(hospital.getId())),
-                        Update.update("regiaoAdministrativa", regiao.get()).set("atualizadoEm", Instant.now()));
-                naPagina++;
             }
 
             if (naPagina > 0) {
@@ -113,5 +115,29 @@ public class ReconciliacaoRegiaoAdministrativaRunner implements ApplicationRunne
                     + "{} fora de toda RA mapeada, {} sem localização.",
                     total, preenchidos, foraDeTodaRegiao, semLocalizacao);
         }
+    }
+
+    /** O que a reconciliação fez com um estabelecimento. */
+    private enum Situacao { PREENCHIDO, FORA_DE_TODA_REGIAO, SEM_LOCALIZACAO, JA_PREENCHIDO }
+
+    /** Decide o caso de um estabelecimento e, se for o caso, agenda a gravação da região. */
+    private Situacao preencher(HospitalDocument hospital, BulkOperations bulkOps) {
+        if (hospital.getRegiaoAdministrativa() != null && !hospital.getRegiaoAdministrativa().isBlank()) {
+            return Situacao.JA_PREENCHIDO;
+        }
+        GeoJsonPoint centro = hospital.getLocalizacao();
+        if (centro == null) {
+            return Situacao.SEM_LOCALIZACAO;
+        }
+
+        Optional<String> regiao = resolver.resolver(centro.getX(), centro.getY());
+        if (regiao.isEmpty()) {
+            return Situacao.FORA_DE_TODA_REGIAO;
+        }
+
+        bulkOps.updateOne(
+                Query.query(Criteria.where("id").is(hospital.getId())),
+                Update.update("regiaoAdministrativa", regiao.get()).set("atualizadoEm", Instant.now()));
+        return Situacao.PREENCHIDO;
     }
 }

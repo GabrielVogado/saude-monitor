@@ -1,5 +1,6 @@
 package br.com.saude_monitor.api.user.seed;
 
+import br.com.saude_monitor.api.config.trava.TravaDistribuida;
 import br.com.saude_monitor.api.user.document.Papel;
 import br.com.saude_monitor.api.user.document.UserDocument;
 import br.com.saude_monitor.api.user.repository.UserRepository;
@@ -12,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -26,12 +28,25 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class AdminUserSeeder implements ApplicationRunner {
 
+    /** Nome da trava desta tarefa ({@link TravaDistribuida}). */
+    static final String NOME_TRAVA = "seed-admin";
+
+    /** Folga para a tarefa terminar; se a instância morrer no meio, a trava vence e outra refaz. */
+    private static final Duration VALIDADE_TRAVA = Duration.ofMinutes(2);
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AdminSeedProperties properties;
 
+    /** Uma instância por vez (SOL-02): as outras pulam enquanto esta executa. */
+    private final TravaDistribuida trava;
+
     @Override
     public void run(ApplicationArguments args) {
+        trava.executar(NOME_TRAVA, VALIDADE_TRAVA, this::executar);
+    }
+
+    private void executar() {
         if (properties.email() == null || properties.email().isBlank()) {
             log.warn("[AdminSeed] E-mail de admin não configurado (app.seed-admin.email). Seed ignorado.");
             return;

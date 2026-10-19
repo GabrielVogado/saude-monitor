@@ -2749,6 +2749,49 @@ de teste deixam de contar.
 
 ---
 
+## M-050 — Seed e tarefas de inicialização com trava distribuída (SOL-02)
+
+**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+
+### Como apareceu
+
+Análise de Escalabilidade, Segurança e Custo para o DF v1.0, **SOL-02 (Crítico)**: o backend
+roda com `--max-instances=1` no Cloud Run, e o próprio workflow explica por quê: o `SeedRunner`
+lê `count()` e só depois grava, então duas instâncias subindo juntas contra o banco vazio
+importariam tudo duas vezes. O mesmo vale para o seed do admin (dois admins, ou falha de chave
+duplicada no boot) e para a massa de avaliações do dev. Com uma instância só, o teto do sistema
+é 1 vCPU.
+
+### O que mudou
+
+- Nova `TravaDistribuida` (pacote `config.trava`): cada tarefa tem um documento na coleção
+  `travas_execucao` com `_id` igual ao nome da tarefa. Adquirir é um único upsert condicionado
+  a "não existe ou já venceu"; se outra instância tem a trava válida, o índice único do `_id`
+  recusa a inserção. A trava tem validade e só a instância dona a libera, sempre no fim da
+  tarefa, com ou sem erro.
+- Passam a rodar sob a trava: seed de hospitais, reconciliação de raio de geofence,
+  reconciliação de região administrativa, importação CNES, seed do admin e massa de avaliações
+  do dev. A instância que não consegue a trava pula a tarefa em vez de esperar, porque outra já
+  está fazendo o mesmo trabalho.
+- Se a instância dona morrer no meio, a trava vence (2 a 15 min, conforme a tarefa) e a próxima
+  subida refaz o trabalho. As tarefas já eram idempotentes (upsert por `codigoCnes`/`importKey`
+  com índice único, update condicionado), então refazer não duplica nada.
+- A `TravaDistribuida` serve também aos jobs agendados, que entram no SOL-05.
+
+### O que fica para a infraestrutura
+
+Subir `--max-instances` no `cd-backend-google.yml` (a análise sugere 10 na homologação e 20 em
+produção). O comentário do workflow que trava o limite em 1 deixa de ter motivo com este PR.
+
+### Verificação
+
+- Backend: 429 testes. `TravaDistribuidaIntegracaoTest` com Mongo real: segunda instância não
+  adquire trava válida, só a dona libera, trava vencida é retomada, a tarefa libera a trava
+  mesmo com erro, e oito instâncias disputando a mesma tarefa executam uma vez só. Cobertura das
+  linhas alteradas: 100%.
+
+---
+
 ## Anexo A — Matriz de roteamento de skills (transcrição)
 
 > O arquivo operacional é `.claude/skills-roteamento.md`, que **não é versionado**

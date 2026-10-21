@@ -24,7 +24,12 @@ jest.mock("../../../screens/visitas/service/VisitaService");
 jest.mock("../../../screens/visitas/service/GeofencingTaskService");
 jest.mock("../../../screens/visitas/service/HeartbeatService");
 
-const VISITA = { id: "v1", entrada: "2026-09-28T10:00:00.000Z", hospitalId: "h1" };
+const VISITA = {
+  id: "v1",
+  entrada: "2026-09-28T10:00:00.000Z",
+  hospitalId: "h1",
+  origem: "GEOFENCE",
+};
 
 function montar() {
   return renderComProviders(<VisitaAtivaSync />);
@@ -52,16 +57,16 @@ describe("VisitaAtivaSync", () => {
     montar();
 
     await waitFor(() => expect(iniciarGeofencing).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(sincronizarVisitaAtiva).toHaveBeenCalledWith(null, null, null));
+    await waitFor(() => expect(sincronizarVisitaAtiva).toHaveBeenCalledWith(null, null, null, null));
   });
 
-  test("repassa id, entrada e hospital ao geofencing e liga o heartbeat", async () => {
+  test("repassa id, entrada, hospital e origem ao geofencing e liga o heartbeat", async () => {
     VisitaService.buscarAtiva.mockResolvedValue({ visita: VISITA });
 
     montar();
 
     await waitFor(() =>
-      expect(sincronizarVisitaAtiva).toHaveBeenCalledWith("v1", "2026-09-28T10:00:00.000Z", "h1")
+      expect(sincronizarVisitaAtiva).toHaveBeenCalledWith("v1", "2026-09-28T10:00:00.000Z", "h1", "GEOFENCE")
     );
     expect(iniciarHeartbeat).toHaveBeenCalledWith("v1");
   });
@@ -77,7 +82,7 @@ describe("VisitaAtivaSync", () => {
     await recarregar(queryClient);
 
     await waitFor(() => expect(iniciarHeartbeat).toHaveBeenCalledWith("v1"));
-    expect(sincronizarVisitaAtiva).toHaveBeenLastCalledWith("v1", "2026-09-28T10:00:00.000Z", "h1");
+    expect(sincronizarVisitaAtiva).toHaveBeenLastCalledWith("v1", "2026-09-28T10:00:00.000Z", "h1", "GEOFENCE");
   });
 
   test("checkout manual para o heartbeat da visita encerrada", async () => {
@@ -89,7 +94,7 @@ describe("VisitaAtivaSync", () => {
     await recarregar(queryClient);
 
     await waitFor(() => expect(pararHeartbeat).toHaveBeenCalled());
-    expect(sincronizarVisitaAtiva).toHaveBeenLastCalledWith(null, null, null);
+    expect(sincronizarVisitaAtiva).toHaveBeenLastCalledWith(null, null, null, null);
   });
 
   test("não sincroniza antes da primeira resposta do servidor (não apaga a visita guardada)", async () => {
@@ -102,7 +107,7 @@ describe("VisitaAtivaSync", () => {
     expect(sincronizarVisitaAtiva).not.toHaveBeenCalled();
     expect(pararHeartbeat).not.toHaveBeenCalled();
     await act(async () => responder({ visita: null }));
-    await waitFor(() => expect(sincronizarVisitaAtiva).toHaveBeenCalledWith(null, null, null));
+    await waitFor(() => expect(sincronizarVisitaAtiva).toHaveBeenCalledWith(null, null, null, null));
   });
 
   test("não consulta antes de ler a sessão do aparelho", async () => {
@@ -115,7 +120,7 @@ describe("VisitaAtivaSync", () => {
 
     await act(async () => definirUsuarioDaSessao({ id: "u1" }));
     await waitFor(() => expect(VisitaService.buscarAtiva).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(sincronizarVisitaAtiva).toHaveBeenCalledWith(null, null, null));
+    await waitFor(() => expect(sincronizarVisitaAtiva).toHaveBeenCalledWith(null, null, null, null));
   });
 
   test("uma recarga sem internet não para o heartbeat nem mexe no geofencing", async () => {

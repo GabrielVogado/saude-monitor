@@ -85,27 +85,29 @@ export default function HospitalDetalheScreen({ navigation, route }) {
     void consultaIndicadores.refetch();
   };
 
-  // Navegação revisada: visita ativa do modo MANUAL deste hospital — exibe temporizador
-  // hh:mm:ss + botão de checkout ("Não estou aqui"). Só é mostrada quando a visita ativa
-  // veio do check-in manual (§ específico), jamais para visitas GEOFENCE ou de outro hospital.
+  // Visita ativa deste hospital: o temporizador hh:mm:ss aparece para qualquer origem
+  // (antes só no check-in manual; no teste de campo da rc.6, em 21/10/2026, a visita
+  // automática abria este detalhe sem nada). O botão de checkout ("Não estou aqui") fica
+  // só no check-in manual: a visita automática é encerrada pelo geofence (decisão do PO
+  // em 21/10/2026). Visita de outro hospital nunca aparece aqui.
   //
   // Lida da visita ativa compartilhada com o observador global e recarregada ao focar a
   // tela (ex.: ao voltar do check-in da lista Hospital → este detalhe). Modo anônimo usa
   // `dispositivoId` (§3.3). Sem conexão não é "sem visita ativa".
   const { visita: visitaAtiva, definirLocal: definirVisitaLocal } = useVisitaAtivaDaTela();
-  const visitaManual =
-    visitaAtiva?.origem === "MANUAL" && visitaAtiva.hospitalId === id ? visitaAtiva : null;
+  const visitaDoHospital = visitaAtiva?.hospitalId === id ? visitaAtiva : null;
+  const visitaManual = visitaDoHospital?.origem === "MANUAL" ? visitaDoHospital : null;
   const [agora, setAgora] = useState(Date.now());
   const { mutateAsync: registrarCheckout, isPending: enviandoCheckout } = useCheckoutManual();
 
-  // Temporizador hh:mm:ss atualizado a cada segundo enquanto houver visita manual ativa.
+  // Temporizador hh:mm:ss atualizado a cada segundo enquanto houver visita ativa aqui.
   useEffect(() => {
-    if (!visitaManual) {
+    if (!visitaDoHospital) {
       return undefined;
     }
     const timer = setInterval(() => setAgora(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [visitaManual]);
+  }, [visitaDoHospital]);
 
   const encerrarVisitaManual = async () => {
     if (!visitaManual) return;
@@ -193,20 +195,20 @@ export default function HospitalDetalheScreen({ navigation, route }) {
   // condicionais, junto dos demais hooks.
   const cameraDaRegiao = useMemo(() => getInitialViewState(region), [region]);
 
-  // Formata o tempo decorrido como hh:mm:ss (temporizador do check-in manual).
+  // Formata o tempo decorrido como hh:mm:ss (temporizador da visita ativa).
   // IMPORTANTE: precisa ficar antes dos `return` condicionais abaixo — hooks não podem
   // ser chamados condicionalmente (Regras de Hooks). Estar depois deles fazia o número
   // de hooks variar entre a renderização de "carregando" e a renderização com dados
   // prontos, derrubando o app com "Rendered more hooks than during the previous render".
   const temporizadorTexto = useMemo(() => {
-    if (!visitaManual?.entrada) return "00:00:00";
-    const decorrido = Math.max(0, Math.floor((agora - new Date(visitaManual.entrada).getTime()) / 1000));
+    if (!visitaDoHospital?.entrada) return "00:00:00";
+    const decorrido = Math.max(0, Math.floor((agora - new Date(visitaDoHospital.entrada).getTime()) / 1000));
     const h = Math.floor(decorrido / 3600);
     const m = Math.floor((decorrido % 3600) / 60);
     const s = decorrido % 60;
     const pad = (n) => String(n).padStart(2, "0");
     return `${pad(h)}:${pad(m)}:${pad(s)}`;
-  }, [visitaManual, agora]);
+  }, [visitaDoHospital, agora]);
 
   if (carregando) {
     return (
@@ -258,10 +260,10 @@ export default function HospitalDetalheScreen({ navigation, route }) {
       <CSHeader title={hospital.nome} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {visitaManual && (
+        {visitaDoHospital && (
           <CSCard style={styles.section}>
             <Text style={styles.checkinActiveTitle}>
-              Check-in manual ativo
+              {visitaManual ? "Check-in manual ativo" : "Check-in automático ativo"}
             </Text>
             <Text style={styles.checkinSubtitle}>
               Você está em {hospital.nome}
@@ -273,14 +275,16 @@ export default function HospitalDetalheScreen({ navigation, route }) {
               {temporizadorTexto}
             </Text>
             <Text style={styles.temporizadorLabel}>tempo de permanência</Text>
-            <CSButton
-              label="Não estou aqui"
-              onPress={encerrarVisitaManual}
-              loading={enviandoCheckout}
-              disabled={enviandoCheckout}
-              variant="tertiary"
-              style={styles.checkoutButton}
-            />
+            {visitaManual && (
+              <CSButton
+                label="Não estou aqui"
+                onPress={encerrarVisitaManual}
+                loading={enviandoCheckout}
+                disabled={enviandoCheckout}
+                variant="tertiary"
+                style={styles.checkoutButton}
+              />
+            )}
           </CSCard>
         )}
 

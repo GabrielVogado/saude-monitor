@@ -16,9 +16,14 @@ import HospitaisScreen from "../../../screens/hospitais/view/HospitaisScreen";
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
 import VisitaService from "../../../screens/visitas/service/VisitaService";
 import { ErroSemInternet } from "../../../config/http";
+import CatalogoLocal from "../../../services/CatalogoLocal";
 
 jest.mock("../../../screens/hospitais/service/HospitalService");
 jest.mock("../../../screens/visitas/service/VisitaService");
+jest.mock("../../../services/CatalogoLocal", () => ({
+  __esModule: true,
+  default: { lerCopiaGuardada: jest.fn(), obterEstabelecimentos: jest.fn() },
+}));
 
 // Guarda o callback de foco mais recente para o teste poder simular um segundo
 // foco da aba (ex.: voltar de outra tela) sem desmontar o componente — é
@@ -58,6 +63,8 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
     definirUsuarioDaSessao(null);
     HospitalService.listar.mockResolvedValue({ content: [HOSPITAL_A, HOSPITAL_B] });
     HospitalService.buscarPorId.mockResolvedValue(null);
+    CatalogoLocal.lerCopiaGuardada.mockResolvedValue(null);
+    CatalogoLocal.obterEstabelecimentos.mockResolvedValue([]);
     VisitaService.buscarAtiva.mockResolvedValue({ visita: null });
     jest.spyOn(Alert, "alert").mockImplementation(() => {});
   });
@@ -415,5 +422,129 @@ describe("HospitaisScreen (E1-03) — check-in manual não derruba mais o app", 
       expect(await screen.findByText("Hospital A")).toBeTruthy();
       expect(screen.getByText("Hospital B")).toBeTruthy();
     });
+  });
+});
+
+describe("HospitaisScreen — lista do catálogo guardado (teste de campo da rc.6, 21/10/2026)", () => {
+  const UPA = { id: "hU", nome: "Upa Riacho Fundo", tipo: "PUBLICO", categoria: "UPA" };
+  const CLINICA = { id: "hC", nome: "Clínica Água", tipo: "PRIVADO", categoria: "OUTRO" };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    definirUsuarioDaSessao(null);
+    HospitalService.buscarPorId.mockResolvedValue(null);
+    VisitaService.buscarAtiva.mockResolvedValue({ visita: null });
+    CatalogoLocal.obterEstabelecimentos.mockResolvedValue([]);
+    CatalogoLocal.lerCopiaGuardada.mockResolvedValue([UPA, CLINICA]);
+  });
+
+  test("mostra a cópia guardada, em ordem de nome, enquanto o servidor não responde", async () => {
+    HospitalService.listar.mockReturnValue(new Promise(() => {}));
+
+    renderizar();
+
+    expect(await screen.findByText("Upa Riacho Fundo")).toBeTruthy();
+    const nomes = screen.getAllByText(/^(Upa Riacho Fundo|Clínica Água)$/).map((n) => n.props.children);
+    expect(nomes).toEqual(["Clínica Água", "Upa Riacho Fundo"]);
+  });
+
+  test("a resposta do servidor substitui a cópia guardada assim que chega", async () => {
+    HospitalService.listar.mockResolvedValue({ content: [HOSPITAL_A] });
+
+    renderizar();
+
+    expect(await screen.findByText("Hospital A")).toBeTruthy();
+    expect(screen.queryByText("Upa Riacho Fundo")).toBeNull();
+  });
+
+  test("com o servidor fora, a cópia guardada fica na tela em vez do erro", async () => {
+    HospitalService.listar.mockRejectedValue(new Error("Servidor indisponível"));
+
+    renderizar();
+
+    expect(await screen.findByText("Upa Riacho Fundo")).toBeTruthy();
+    expect(screen.queryByText("Algo deu errado")).toBeNull();
+  });
+
+  test("com o servidor fora, avisa que a lista é a guardada e pode estar desatualizada", async () => {
+    HospitalService.listar.mockRejectedValue(new Error("Servidor indisponível"));
+
+    renderizar();
+
+    expect(await screen.findByText(/Mostrando a lista guardada no aparelho/)).toBeTruthy();
+  });
+
+  test("enquanto o servidor só demora, não mostra o aviso de lista guardada", async () => {
+    HospitalService.listar.mockReturnValue(new Promise(() => {}));
+
+    renderizar();
+    await screen.findByText("Upa Riacho Fundo");
+
+    expect(screen.queryByText(/Mostrando a lista guardada no aparelho/)).toBeNull();
+  });
+
+  test("ordena como o backend (binário), sem trocar de ordem quando o servidor responde", async () => {
+    const UBS = { id: "hX", nome: "Ubs 1", tipo: "PUBLICO", categoria: "UBS" };
+    const UPA_MAIUSCULA = { id: "hY", nome: "UPA 2", tipo: "PUBLICO", categoria: "UPA" };
+    CatalogoLocal.lerCopiaGuardada.mockResolvedValue([UBS, UPA_MAIUSCULA]);
+    HospitalService.listar.mockReturnValue(new Promise(() => {}));
+
+    renderizar();
+    await screen.findByText("UPA 2");
+
+    const nomes = screen.getAllByText(/^(Ubs 1|UPA 2)$/).map((n) => n.props.children);
+    expect(nomes).toEqual(["UPA 2", "Ubs 1"]);
+  });
+
+  test("o filtro de tipo vale também para a cópia guardada", async () => {
+    HospitalService.listar.mockReturnValue(new Promise(() => {}));
+    renderizar();
+    await screen.findByText("Upa Riacho Fundo");
+
+    // O chip de filtro vem antes da lista; o selo "Privado" do card repete o texto.
+    fireEvent.press(screen.getAllByRole("button", { name: "Privado" })[0]);
+
+    expect(await screen.findByText("Clínica Água")).toBeTruthy();
+    expect(screen.queryByText("Upa Riacho Fundo")).toBeNull();
+  });
+
+  test("a busca ignora acento e caixa também na cópia guardada", async () => {
+    HospitalService.listar.mockReturnValue(new Promise(() => {}));
+    renderizar();
+    await screen.findByText("Upa Riacho Fundo");
+
+    fireEvent.changeText(screen.getByPlaceholderText("Buscar hospital por nome"), "AGUA");
+
+    await waitFor(() => expect(screen.queryByText("Upa Riacho Fundo")).toBeNull());
+    expect(screen.getByText("Clínica Água")).toBeTruthy();
+  });
+
+  test("sem cópia guardada, usa o catálogo baixado assim que ele chega", async () => {
+    CatalogoLocal.lerCopiaGuardada.mockResolvedValue(null);
+    CatalogoLocal.obterEstabelecimentos.mockResolvedValue([UPA]);
+    HospitalService.listar.mockReturnValue(new Promise(() => {}));
+
+    renderizar();
+
+    expect(await screen.findByText("Upa Riacho Fundo")).toBeTruthy();
+  });
+
+  test("sem cópia e sem catálogo, espera o servidor sem quebrar", async () => {
+    CatalogoLocal.lerCopiaGuardada.mockResolvedValue(null);
+    CatalogoLocal.obterEstabelecimentos.mockRejectedValue(new Error("sem rede"));
+    HospitalService.listar.mockResolvedValue({ content: [HOSPITAL_A] });
+
+    renderizar();
+
+    expect(await screen.findByText("Hospital A")).toBeTruthy();
+  });
+
+  test("com cópia guardada, confere o catálogo em segundo plano para a próxima leitura", async () => {
+    HospitalService.listar.mockResolvedValue({ content: [HOSPITAL_A] });
+
+    renderizar();
+    await screen.findByText("Hospital A");
+
+    expect(CatalogoLocal.obterEstabelecimentos).toHaveBeenCalledTimes(1);
   });
 });

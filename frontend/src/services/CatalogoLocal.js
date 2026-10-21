@@ -105,6 +105,18 @@ class CatalogoLocal {
     }
   }
 
+  /**
+   * Estabelecimentos da cópia guardada, sem rede nenhuma, ou `null` se não há cópia.
+   * Para a tela mostrar algo na hora enquanto o servidor responde (teste de campo da
+   * rc.6, 21/10/2026: com o backend frio, a lista demorava a aparecer).
+   *
+   * @returns {Promise<object[]|null>}
+   */
+  static async lerCopiaGuardada() {
+    const guardado = await lerGuardado();
+    return guardado ? guardado.estabelecimentos : null;
+  }
+
   /** Apaga a cópia guardada (ex.: teste ou troca de ambiente). */
   static async limpar() {
     await AsyncStorage.removeItem(CHAVE);

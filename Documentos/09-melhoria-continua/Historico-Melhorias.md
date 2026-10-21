@@ -3215,3 +3215,82 @@ já existiam na `develop` antes do Épico 9 ficam para outro PR, se o PO quiser.
 
 Backend compilado em cada um dos 11 PRs e suíte completa verde no último; app com 656 testes, lint
 com 11 avisos (teto 16), `tsc` limpo.
+
+---
+
+## M-059 — Teste de campo da rc.6: lista sem esperar o servidor, temporizador da visita automática e checkout na hora certa
+
+**Data:** 21/10/2026 · **PR:** (este PR) · **Origem:** teste de campo do PO na homologação v1.0.0-rc.6
+
+### Como apareceu
+
+O PO testou o APK `radar-saude-hom-1.0.0-rc.6.apk` na UPA Riacho Fundo II, sem login, em
+21/10/2026, e mandou capturas com os horários:
+
+1. A aba Hospitais demorou a mostrar a lista, dando a impressão de que nada estava guardado no
+   aparelho.
+2. O check-in automático já estava ativo quando a lista abriu (notificação "Visita em andamento"
+   às 17:02), mas o detalhe do hospital não mostrava o temporizador.
+3. Depois de sair da UPA, o checkout só aconteceu mais de 10 minutos depois, com o PO já em
+   Samambaia. A notificação "Confirmando sua chegada ou saída" (sinal de que o app soube da saída)
+   só apareceu às 17:34.
+
+### Causa
+
+1. A lista vinha sempre do servidor, página a página, e o cache do TanStack Query fica só na
+   memória. Com o app recém-aberto e o backend de homologação frio (Cloud Run com
+   `--min-instances=0`), a primeira página demorava. O catálogo completo, com os mesmos campos da
+   lista, já estava guardado no aparelho desde a M-057, mas só o geofencing o usava.
+2. O cartão com o temporizador só aparecia para check-in **manual**, por escolha antiga
+   ("jamais para visitas GEOFENCE"). A visita automática abria o detalhe sem nada.
+3. A saída dependia só do evento de "saiu da região" do Android, que em segundo plano chega com
+   muito atraso. As leituras de GPS da visita aberta (a cada 5 min, para o sinal da RN-06) nunca
+   conferiam se a pessoa continuava perto do hospital. E o checkout ia ao servidor sem o instante
+   da saída: a visita registrava a hora do envio, contando os 5 min de tolerância da RN-03 e o
+   atraso do SO como tempo de permanência.
+
+### O que mudou (comportamento)
+
+- **Lista na hora:** a aba Hospitais mostra a cópia do catálogo guardada no aparelho, com o mesmo
+  filtro de tipo, a mesma busca sem acento e a mesma ordem por nome, enquanto a primeira página do
+  servidor não chega e quando o servidor falha. A resposta do servidor substitui a cópia assim que
+  chega. Com o servidor fora, a tela avisa que a lista é a guardada no aparelho e pode estar
+  desatualizada (as notas e tempos da cópia podem ter horas). Sem cópia guardada (primeiro uso), a
+  tela usa o catálogo assim que ele termina de baixar.
+- **Temporizador na visita automática:** o detalhe do hospital mostra "Check-in automático ativo"
+  com o tempo de permanência. O botão "Não estou aqui" continua só no check-in manual (decisão do
+  PO em 21/10/2026): a visita automática é encerrada pelo geofence.
+- **Saída pela posição:** na visita automática, cada leitura do acompanhamento confere a distância
+  até o hospital (centro e raio lidos uma vez da cópia do catálogo, sem rede, e guardados na
+  visita). Fora da região mesmo descontando a precisão da leitura, a saída passa a contar dali (a
+  RN-03 continua exigindo 5 min fora); dentro mesmo somando a precisão, uma saída pendente de um
+  Exit falso é desfeita. Leitura ambígua, com mais de 2 min ou anterior à entrada não decide nada,
+  e o Exit do SO continua valendo. O check-in manual fica de fora: ele é aceito de qualquer lugar e
+  quem o encerra é a pessoa. A leitura da visita aberta passa de 5 para 2 min (o sinal ao backend
+  continua a cada ~10 min).
+- **Horário real da saída:** o checkout automático manda `ocorridoEm` com o instante em que a
+  saída foi vista (Exit do SO ou leitura fora). O backend já aceitava o campo (OPS-05); sem rede,
+  a fila guarda o mesmo instante. A duração calculada no aparelho, sem rede, também vai só até a
+  saída. O convite de feedback continua partindo do momento do checkout, para não cair no passado.
+  Limite conhecido: o instante vem do relógio do aparelho, como já acontece na fila offline; um
+  relógio muito atrasado em relação ao servidor encurta a visita (o backend nunca grava saída antes
+  da entrada).
+
+### Efeito esperado
+
+Na mesma ida à UPA, a lista aparece ao abrir a aba, o detalhe mostra o tempo de permanência, e o
+checkout sai entre ~5 e ~7 min depois de deixar a área (no máximo 2 min para a leitura notar, mais
+os 5 min da RN-03), com a hora real da saída gravada no servidor.
+
+### Verificação
+
+Testes novos no app: saída pela leitura com o horário dela, espera dos 5 min, Exit falso desfeito
+por leitura no hospital, leitura ambígua, velha ou anterior à entrada ignorada, check-in manual
+fora da regra, centro do hospital guardado na visita, hospital fora do catálogo, catálogo
+indisponível, checkout pelo Exit com o horário do Exit, convite de feedback a partir de agora,
+`ocorridoEm` no checkout online e na fila, leitura da cópia do catálogo, lista da cópia enquanto o
+servidor não responde, com o servidor fora (com o aviso), com filtro, com busca e na ordem do
+backend, e temporizador da visita automática sem o "Não estou aqui". Duas mutações conferidas
+(tirar a conferência da tarefa e tirar a exceção do check-in manual), cada uma derrubando os testes
+correspondentes. Suíte do app em 60 suítes / 687 testes, lint com 11 avisos (teto 16), `tsc` limpo.
+Falta o PO repetir o trajeto no aparelho com o APK que sair deste PR.

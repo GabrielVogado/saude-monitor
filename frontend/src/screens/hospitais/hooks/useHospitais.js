@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { queryKeys } from "../../../core/query/queryKeys";
 import { normalizeText } from "../../../utils/normalize";
 import HospitalService from "../service/HospitalService";
+import CatalogoLocal from "../../../services/CatalogoLocal";
 
 // O backend limita `size` a 100 por chamada (HospitalController) e a base tem ~340
 // hospitais ativos — uma única página nunca traz o catálogo inteiro. 50 é o meio-termo
@@ -60,6 +61,61 @@ export function useHospitaisLista({ busca, tipo }) {
       HospitalService.listar({ busca: termo, tipo, page: pageParam, size: TAMANHO_PAGINA_LISTA, signal }),
     initialPageParam: 0,
     getNextPageParam: proximaPaginaPorTotal(TAMANHO_PAGINA_LISTA),
+    select: filtrar,
+  });
+}
+
+/**
+ * Ordem da listagem do backend (nome, depois id), em comparação binária como a do
+ * MongoDB: com `localeCompare` a lista trocaria de ordem quando a página do servidor
+ * substituísse a cópia (ex.: "UPA" e "Ubs").
+ */
+function compararComoOBackend(a, b) {
+  const chaveA = [String(a?.nome ?? ""), String(a?.id ?? "")];
+  const chaveB = [String(b?.nome ?? ""), String(b?.id ?? "")];
+  if (chaveA[0] !== chaveB[0]) {
+    return chaveA[0] < chaveB[0] ? -1 : 1;
+  }
+  if (chaveA[1] !== chaveB[1]) {
+    return chaveA[1] < chaveB[1] ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
+ * Lista da cópia do catálogo guardada no aparelho (APP-01), com o mesmo filtro e a
+ * mesma ordem da lista do servidor. A tela a mostra enquanto a primeira página não
+ * chega e quando o servidor falha (teste de campo da rc.6, 21/10/2026: no modo anônimo,
+ * com o backend frio, a lista demorava e parecia não ter cache).
+ *
+ * Com cópia guardada, ela volta na hora e o catálogo é conferido em segundo plano (304
+ * quando nada mudou) para a próxima leitura. Sem cópia (primeiro uso), espera o download.
+ */
+export function useHospitaisCatalogoLocal({ busca, tipo }) {
+  const termo = normalizeText(busca);
+  const filtrar = useCallback(
+    (lista) => {
+      if (!lista) {
+        return null;
+      }
+      return lista
+        .filter((hospital) => hospital?.ativo !== false)
+        .filter((hospital) => !tipo || hospital?.tipo === tipo)
+        .filter((hospital) => !termo || normalizeText(hospital?.nome).includes(termo))
+        .sort(compararComoOBackend);
+    },
+    [termo, tipo]
+  );
+  return useQuery({
+    queryKey: queryKeys.hospitais.catalogoLocal(),
+    queryFn: async () => {
+      const guardada = await CatalogoLocal.lerCopiaGuardada();
+      if (guardada) {
+        CatalogoLocal.obterEstabelecimentos().catch(() => {});
+        return guardada;
+      }
+      return CatalogoLocal.obterEstabelecimentos().catch(() => null);
+    },
     select: filtrar,
   });
 }

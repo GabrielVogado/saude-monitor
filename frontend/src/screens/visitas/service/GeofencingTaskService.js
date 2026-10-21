@@ -669,7 +669,7 @@ export async function conferirPosicaoDaVisita(locations, agora = Date.now()) {
     }
     return null;
   });
-  if (tolerancia !== null) {
+  if (Number.isFinite(tolerancia)) {
     agendarAvaliacao(Math.max(0, tolerancia));
   }
 }

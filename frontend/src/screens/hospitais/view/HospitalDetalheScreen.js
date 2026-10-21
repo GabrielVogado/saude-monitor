@@ -260,7 +260,7 @@ export default function HospitalDetalheScreen({ navigation, route }) {
       <CSHeader title={hospital.nome} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {visitaDoHospital && (
+        {visitaDoHospital ? (
           <CSCard style={styles.section}>
             <Text style={styles.checkinActiveTitle}>
               {visitaManual ? "Check-in manual ativo" : "Check-in automático ativo"}
@@ -275,7 +275,7 @@ export default function HospitalDetalheScreen({ navigation, route }) {
               {temporizadorTexto}
             </Text>
             <Text style={styles.temporizadorLabel}>tempo de permanência</Text>
-            {visitaManual && (
+            {visitaManual ? (
               <CSButton
                 label="Não estou aqui"
                 onPress={encerrarVisitaManual}
@@ -284,9 +284,9 @@ export default function HospitalDetalheScreen({ navigation, route }) {
                 variant="tertiary"
                 style={styles.checkoutButton}
               />
-            )}
+            ) : null}
           </CSCard>
-        )}
+        ) : null}
 
         {haloGeoJson ? (
           <View style={styles.mapContainer}>

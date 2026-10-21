@@ -418,10 +418,12 @@ export async function processarPendencias(agora = Date.now()) {
   });
 
   // Saídas antes das entradas: quem deixa um hospital e entra em outro encerra a visita
-  // anterior antes de abrir a nova.
-  for (const { hospitalId, desde } of vencidas.saidas) {
-    await confirmarSaida(hospitalId, desde);
-  }
+  // anterior antes de abrir a nova. Uma de cada vez, encadeadas: em paralelo, duas saídas
+  // leriam o mesmo estado e uma apagaria o que a outra gravou.
+  await vencidas.saidas.reduce(
+    (anterior, { hospitalId, desde }) => anterior.then(() => confirmarSaida(hospitalId, desde)),
+    Promise.resolve()
+  );
   for (const { hospitalId, desde } of vencidas.entradas) {
     const tentarDeNovo = await confirmarEntrada(hospitalId);
     if (tentarDeNovo && agora - desde < LIMITE_NOVA_TENTATIVA_ENTRADA_MS) {

@@ -11,7 +11,7 @@ import java.util.Optional;
 /**
  * Serviço de feedback pós-saída (Épico 03 / F-05). Responsabilidades: criar feedback
  * com dedupe (RN-12) e suporte anônimo (RN-13), consultar feedback de uma visita,
- * editar comentário/nota dentro da janela de 24h (RN-09) e prover o histórico do
+ * editar a avaliação até 15 dias após a criação (RN-09) e prover o histórico do
  * titular (Épico 05/RN-22).
  */
 public interface FeedbackService {

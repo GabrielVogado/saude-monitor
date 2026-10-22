@@ -34,10 +34,11 @@ class FeedbackControllerTest {
         public FeedbackResponse criar(FeedbackRequest request, String usuarioId) {
             chamadas++;
             return new FeedbackResponse(
-                    "fb-1", request.visitaId(), "hosp-1",
+                    "fb-1", request.visitaId(), "hosp-1", "Hospital 1",
                     request.foiAtendido(), null, request.teveMedico(), request.fezTriagem(),
                     request.medicacaoReceita(), request.especialidadeProcurada(), request.nota(),
-                    request.tratamentoEquipe(), request.comentario(), usuarioId == null, Instant.now(), true);
+                    request.tratamentoEquipe(), request.comentario(), usuarioId == null, Instant.now(),
+                    null, true);
         }
 
         @Override

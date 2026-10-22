@@ -12,6 +12,13 @@
 
 ---
 
+## 📌 Revisão 22/10/2026 — Editar avaliação em até 15 dias
+
+**O que mudou:** a pedido do PO, a aba Avaliações do Histórico mostra o hospital de cada avaliação e um botão Editar até 15 dias depois de criada (antes o backend aceitava edição por 24h e o app não tinha como chegar nela). O prazo e a regra de dono ficam no backend. Atualizados RN-09 no `Documento-Negocial-v2.1.md` e `PUT /feedbacks/{id}` e `GET /contas/feedbacks` na `Especificacao-API-v2.4.md`. Registro em `Historico-Melhorias.md` (M-063).
+**Também:** `De-Para-Backlog-Features.md` atualiza E5-03.
+
+---
+
 ## 📌 Revisão 22/10/2026 — Homologação v1.0.0-rc.8
 
 **O que entrou:** registro da rc que leva a lista e o mapa de hospitais pela cópia do catálogo no aparelho (PRs #224 e #225, M-061 e M-062) para a homologação, com o backend novo (`versaoCatalogo` na configuração e `GET /api/v1/catalogo/indicadores`). O roteiro começa pelo que é novo e remete ao teste de campo da rc.7 e ao roteiro da rc.6, que não foram feitos. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.8.md`](./10-git-flow/homologacoes/v1.0.0-rc.8.md).

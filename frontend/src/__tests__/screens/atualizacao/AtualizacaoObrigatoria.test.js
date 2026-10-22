@@ -6,6 +6,12 @@ import { AppState, Linking, Text } from "react-native";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import AtualizacaoObrigatoria from "../../../screens/atualizacao/AtualizacaoObrigatoria";
 import ConfiguracaoRemota from "../../../services/ConfiguracaoRemota";
+import { atualizarCatalogoSeMudou } from "../../../screens/hospitais/hooks/useHospitais";
+
+jest.mock("../../../screens/hospitais/hooks/useHospitais", () => ({
+  __esModule: true,
+  atualizarCatalogoSeMudou: jest.fn(),
+}));
 
 jest.mock("../../../services/ConfiguracaoRemota", () => {
   const real = jest.requireActual("../../../services/ConfiguracaoRemota");
@@ -30,6 +36,8 @@ describe("AtualizacaoObrigatoria", () => {
 
   beforeEach(() => {
     ConfiguracaoRemota.obterConfiguracao.mockReset();
+    atualizarCatalogoSeMudou.mockReset();
+    atualizarCatalogoSeMudou.mockResolvedValue(false);
     jest.spyOn(AppState, "addEventListener").mockImplementation((_evento, ouvinte) => {
       ouvinteAppState = ouvinte;
       return { remove: jest.fn() };
@@ -105,5 +113,24 @@ describe("AtualizacaoObrigatoria", () => {
 
     expect(await screen.findByText("Atualize o Radar Saúde")).toBeTruthy();
     expect(ConfiguracaoRemota.obterConfiguracao).toHaveBeenCalledTimes(2);
+  });
+
+  test("a versão do catálogo que veio na configuração é conferida com a cópia do aparelho", async () => {
+    ConfiguracaoRemota.obterConfiguracao.mockResolvedValue({ versaoMinimaApp: "1.0.0", versaoCatalogo: "v9" });
+
+    renderizar();
+    await screen.findByText("Conteúdo do app");
+
+    expect(atualizarCatalogoSeMudou).toHaveBeenCalledWith("v9");
+  });
+
+  test("falha ao atualizar o catálogo não afeta o app", async () => {
+    ConfiguracaoRemota.obterConfiguracao.mockResolvedValue({ versaoCatalogo: "v9" });
+    atualizarCatalogoSeMudou.mockRejectedValue(new Error("disco cheio"));
+
+    renderizar();
+
+    expect(await screen.findByText("Conteúdo do app")).toBeTruthy();
+    expect(screen.queryByText("Atualize o Radar Saúde")).toBeNull();
   });
 });

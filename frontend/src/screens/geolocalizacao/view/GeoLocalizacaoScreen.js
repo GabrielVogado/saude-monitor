@@ -22,9 +22,8 @@ import { useHospitaisMapa } from "../../hospitais/hooks/useHospitais";
 import { CSChip, CSHospitalCard, CSIconButton, CSOptionSheet } from "../../../components";
 import { colors, typography, spacing, radii, shadows } from "../../../theme";
 
-// F-07: filtro geo por raio. "Todos" mantém o comportamento anterior (catálogo
-// completo); os demais dependem do GPS e são resolvidos pelo backend
-// (GET /api/v1/hospitais?latitude&longitude&raioKm).
+// F-07: filtro geo por raio. "Todos" mostra o catálogo completo; os demais dependem do
+// GPS e são calculados no aparelho, sobre a cópia do catálogo (M-062).
 const RAIOS_KM = [
   { value: null, label: "Todos" },
   { value: 1, label: "1 km" },
@@ -32,6 +31,9 @@ const RAIOS_KM = [
   { value: 10, label: "10 km" },
   { value: 25, label: "25 km" },
 ];
+
+/** Marcadores adicionados ao mapa por quadro (antes, o tamanho da página do servidor). */
+const LOTE_DE_MARCADORES = 100;
 
 const BRASIL_REGION = {
   latitude: -14.235,
@@ -53,9 +55,7 @@ function GeolocalizacaoContent({ navigation }) {
   const [raioKm, setRaioKm] = useState(null);
 
   // Item 05 (revisão de UX) + F-07: o mapa exibe todos os hospitais ativos e, quando
-  // há um raio selecionado com GPS disponível, delega o recorte geográfico ao backend
-  // (`raioKm`) em vez de baixar o catálogo inteiro — mitigação do risco de performance
-  // com muitos polígonos (§21.6 do Plano de Sprints).
+  // há um raio selecionado com GPS disponível, só os que estão dentro dele.
   const posicaoRef = useRef(null);
   posicaoRef.current = coordenadas;
   const temGps = coordenadas !== null;
@@ -68,32 +68,32 @@ function GeolocalizacaoContent({ navigation }) {
     setOrigemRaio(raioKm !== null && posicaoRef.current ? { ...posicaoRef.current } : null);
   }, [raioKm, temGps]);
 
-  // "Todos": o catálogo (~340 hospitais) excede o `size` máximo aceito pelo backend
-  // (100, ver HospitalController). As páginas vêm em sequência e o mapa é atualizado
-  // lote a lote — mostrar todas as unidades (item 05) sem voltar a montar centenas de
-  // marcadores numa única leva, que era o risco de ANR já mitigado
-  // (Plano-Sprints-v2.1 §21.6 / BUG-04 no topo deste arquivo). Trocar o raio muda a
-  // chave, e a carga antiga deixa de escrever na tela (antes: `cargaEmAndamentoRef`).
-  const consultaHospitais = useHospitaisMapa({ raioKm, origem: origemRaio });
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = consultaHospitais;
-  const hospitais = useMemo(() => consultaHospitais.data ?? [], [consultaHospitais.data]);
-  // O erro aparece sem lista ou quando uma página do meio falhou (o mapa fica com os
-  // lotes que já vieram); a falha de uma atualização com o mapa completo não alarma.
-  const mostrarErroHospitais =
-    Boolean(consultaHospitais.error) && (!consultaHospitais.data || consultaHospitais.isFetchNextPageError);
-  const erroHospitais = mostrarErroHospitais
-    ? consultaHospitais.error.message || "Não foi possível carregar os hospitais."
-    : null;
-
-  // Busca a página seguinte assim que a anterior chega, até o fim do catálogo. Parar
-  // numa falha evita repetir sem fim a mesma página. `hospitais` entra nas
-  // dependências porque o render de "buscando a próxima" pode não acontecer: sem ele,
-  // a chegada de uma página não reexecutaria o efeito e a carga pararia no segundo lote.
+  // Os hospitais vêm da cópia do catálogo no aparelho, a mesma da lista (M-061, M-062):
+  // abrir o mapa não vai ao servidor. Os marcadores entram em lotes, um por quadro, em
+  // vez de centenas numa leva só, que era o risco de ANR já mitigado
+  // (Plano-Sprints-v2.1 §21.6 / BUG-04 no topo deste arquivo).
+  const {
+    catalogo,
+    hospitais: hospitaisDoRaio,
+    indicadoresPorHospital,
+  } = useHospitaisMapa({ raioKm, origem: origemRaio });
+  const [quantidadeVisivel, setQuantidadeVisivel] = useState(LOTE_DE_MARCADORES);
   useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage && !consultaHospitais.isFetchNextPageError) {
-      fetchNextPage({ cancelRefetch: false }).catch(() => {});
+    if (quantidadeVisivel >= hospitaisDoRaio.length) {
+      return undefined;
     }
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage, consultaHospitais.isFetchNextPageError, hospitais]);
+    const proximoLote = setTimeout(() => setQuantidadeVisivel((atual) => atual + LOTE_DE_MARCADORES), 0);
+    return () => clearTimeout(proximoLote);
+  }, [quantidadeVisivel, hospitaisDoRaio.length]);
+  const hospitais = useMemo(
+    () => hospitaisDoRaio.slice(0, quantidadeVisivel),
+    [hospitaisDoRaio, quantidadeVisivel]
+  );
+  // Só sem cópia guardada e sem rede o mapa fica sem hospitais e mostra o erro.
+  const erroHospitais =
+    catalogo.error && !catalogo.data
+      ? catalogo.error.message || "Não foi possível carregar os hospitais."
+      : null;
 
   const regionAtual = useMemo(() => {
     if (!coordenadas) {
@@ -150,10 +150,12 @@ function GeolocalizacaoContent({ navigation }) {
   // dado que já não está no mapa. Trocar o raio fecha o card de propósito (ver o chip):
   // só derivar deixava o `id` guardado, e o card voltava sozinho ao restaurar o raio.
   const [hospitalSelecionadoId, setHospitalSelecionadoId] = useState(null);
-  const hospitalSelecionado = useMemo(
-    () => hospitais.find((h) => h.id === hospitalSelecionadoId) || null,
-    [hospitais, hospitalSelecionadoId]
-  );
+  // Nota e tempo entram só no hospital do card, do mapa de indicadores do servidor; a
+  // nota que uma cópia antiga do catálogo ainda traga não aparece.
+  const hospitalSelecionado = useMemo(() => {
+    const hospital = hospitais.find((h) => h.id === hospitalSelecionadoId);
+    return hospital ? { ...hospital, indicadores: indicadoresPorHospital?.[hospital.id] ?? null } : null;
+  }, [hospitais, hospitalSelecionadoId, indicadoresPorHospital]);
 
   // Distância do GPS até o hospital do card (F-07, critério 3). Sem GPS, `null` — o
   // card omite a linha em vez de mostrar um valor inventado.

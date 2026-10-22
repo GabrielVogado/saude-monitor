@@ -5,6 +5,34 @@
 
 ---
 
+## 📌 Revisão 22/10/2026 — Homologação v1.0.0-rc.8
+
+**O que entrou:** registro da rc que leva a lista e o mapa de hospitais pela cópia do catálogo no aparelho (PRs #224 e #225, M-061 e M-062) para a homologação, com o backend novo (`versaoCatalogo` na configuração e `GET /api/v1/catalogo/indicadores`). O roteiro começa pelo que é novo e remete ao teste de campo da rc.7 e ao roteiro da rc.6, que não foram feitos. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.8.md`](./10-git-flow/homologacoes/v1.0.0-rc.8.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
+
+---
+
+## 📌 Revisão 22/10/2026 — Mapa pela cópia do catálogo
+
+**O que mudou:** segunda etapa da revisão abaixo. O mapa passa a ler a mesma cópia do catálogo guardada no aparelho, com o filtro por raio calculado no próprio app e nota e tempo de `GET /api/v1/catalogo/indicadores`; deixa de pedir `GET /api/v1/hospitais` em páginas. Registro em `Historico-Melhorias.md` (M-062).
+**Também:** `De-Para-Backlog-Features.md` atualiza ARQ-01.
+
+---
+
+## 📌 Revisão 22/10/2026 — Lista de hospitais pela versão do catálogo
+
+**O que mudou:** a pedido do PO, a lista de hospitais deixa de ir ao servidor de tempos em tempos. O catálogo passa a vir sem nota e tempo, e a versão dele (que só muda quando um hospital muda pelo painel) chega ao app pela configuração remota; nota e tempo vêm de `GET /api/v1/catalogo/indicadores`. Registro em `Historico-Melhorias.md` (M-061), com o motivo de não usar um evento do painel por push.
+**Também:** `De-Para-Backlog-Features.md` atualiza ARQ-01 e APP-01.
+
+---
+
+## 📌 Revisão 22/10/2026 — Render aposentado
+
+**O que mudou:** por decisão do PO, o Render sai de vez. Removidos `cd-backend-render.yml`, `keep-alive-backend.yml` e os dois `render.yaml`; `.github/DEPLOY.md`, `10-git-flow/MANUAL.md`, `deploy/google/README.md`, `backend/README.md` e `backend/.env.example` passam a descrever só o Cloud Run; o ADR-011 ganha a nota da aposentadoria. Registro em `Historico-Melhorias.md` (M-060).
+**Sem mudança:** `De-Para-Backlog-Features.md` (limpeza de infraestrutura, sem estória entregue).
+
+---
+
 ## 📌 Revisão 22/10/2026 — Homologação v1.0.0-rc.7
 
 **O que entrou:** registro da rc que leva as correções do teste de campo da rc.6 (PR #220, M-059) para a homologação: lista da cópia do catálogo, temporizador na visita automática e checkout pela posição na hora da saída. O roteiro começa pela repetição do teste de campo e depois remete ao roteiro da rc.6, que ficou incompleto. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.7.md`](./10-git-flow/homologacoes/v1.0.0-rc.7.md).

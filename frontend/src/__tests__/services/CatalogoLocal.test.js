@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import CatalogoLocal, {
   IDADE_MAXIMA_PRIMEIRO_PLANO_MS,
   IDADE_MAXIMA_SEGUNDO_PLANO_MS,
+  INTERVALO_MINIMO_GRAVACAO_MS,
 } from "../../services/CatalogoLocal";
 import { apiRequest } from "../../core/api/apiClient";
 import { ApiError } from "../../core/api/apiError";
@@ -138,6 +139,118 @@ describe("CatalogoLocal", () => {
 
     await expect(CatalogoLocal.obterEstabelecimentos()).resolves.toEqual([HOSPITAL]);
     expect(apiRequest).not.toHaveBeenCalled();
+  });
+
+  test("um dia é a idade aceita com o app aberto: quem avisa a mudança é a versão", () => {
+    expect(IDADE_MAXIMA_PRIMEIRO_PLANO_MS).toBe(24 * 60 * 60 * 1000);
+  });
+
+  describe("sincronizarVersao (versão da configuração remota)", () => {
+    test("mesma versão não vai à rede e conta a cópia como conferida agora", async () => {
+      await salvarCatalogoGuardado(AGORA - INTERVALO_MINIMO_GRAVACAO_MS, "v1");
+
+      await expect(CatalogoLocal.sincronizarVersao("v1", { agora: AGORA })).resolves.toBe(false);
+
+      expect(apiRequest).not.toHaveBeenCalled();
+      expect(JSON.parse(await AsyncStorage.getItem(CHAVE)).conferidoEm).toBe(AGORA);
+    });
+
+    test("mesma versão conferida há pouco não regrava a cópia", async () => {
+      await salvarCatalogoGuardado(AGORA - 1000, "v1");
+
+      await expect(CatalogoLocal.sincronizarVersao("v1", { agora: AGORA })).resolves.toBe(false);
+
+      expect(JSON.parse(await AsyncStorage.getItem(CHAVE)).conferidoEm).toBe(AGORA - 1000);
+    });
+
+    test("versão diferente baixa o catálogo e troca a cópia", async () => {
+      const NOVO = { ...HOSPITAL, id: "h2" };
+      await salvarCatalogoGuardado(AGORA - 1000, "v1");
+      apiRequest.mockResolvedValue({ versao: "v2", total: 1, estabelecimentos: [NOVO] });
+
+      await expect(CatalogoLocal.sincronizarVersao("v2", { agora: AGORA })).resolves.toBe(true);
+
+      expect(apiRequest).toHaveBeenCalledWith("/api/v1/catalogo", { headers: { "If-None-Match": 'W/"v1"' } });
+      expect(await CatalogoLocal.lerCopiaGuardada()).toEqual([NOVO]);
+    });
+
+    test("sem cópia guardada, baixa o catálogo", async () => {
+      apiRequest.mockResolvedValue({ versao: "v1", total: 1, estabelecimentos: [HOSPITAL] });
+
+      await expect(CatalogoLocal.sincronizarVersao("v1", { agora: AGORA })).resolves.toBe(true);
+    });
+
+    test("servidor ainda com a versão antiga (304) não troca nada", async () => {
+      await salvarCatalogoGuardado(AGORA - 1000, "v1");
+      apiRequest.mockRejectedValue(new ApiError("Não modificado", 304));
+
+      await expect(CatalogoLocal.sincronizarVersao("v2", { agora: AGORA })).resolves.toBe(false);
+      expect(await CatalogoLocal.lerCopiaGuardada()).toEqual([HOSPITAL]);
+    });
+
+    test("sem rede, mantém a cópia e não lança", async () => {
+      await salvarCatalogoGuardado(AGORA - 1000, "v1");
+      apiRequest.mockRejectedValue(new Error("sem rede"));
+
+      await expect(CatalogoLocal.sincronizarVersao("v2", { agora: AGORA })).resolves.toBe(false);
+      expect(await CatalogoLocal.lerCopiaGuardada()).toEqual([HOSPITAL]);
+    });
+
+    test("sem versão informada (servidor antigo ou banco fora), não faz nada", async () => {
+      await expect(CatalogoLocal.sincronizarVersao(null)).resolves.toBe(false);
+      await expect(CatalogoLocal.sincronizarVersao(undefined)).resolves.toBe(false);
+
+      expect(apiRequest).not.toHaveBeenCalled();
+    });
+
+    test("sem opções, usa o instante atual", async () => {
+      await salvarCatalogoGuardado(1, "v1");
+
+      await expect(CatalogoLocal.sincronizarVersao("v1")).resolves.toBe(false);
+      expect(JSON.parse(await AsyncStorage.getItem(CHAVE)).conferidoEm).toBeGreaterThan(1);
+    });
+  });
+
+  describe("conferirSeVencida (lista aberta sem a versão da configuração)", () => {
+    test("cópia dentro da idade não vai à rede", async () => {
+      await salvarCatalogoGuardado(AGORA - 1000, "v1");
+
+      await expect(CatalogoLocal.conferirSeVencida({ agora: AGORA })).resolves.toBe(false);
+
+      expect(apiRequest).not.toHaveBeenCalled();
+    });
+
+    test("sem cópia não vai à rede: quem baixa é a própria lista", async () => {
+      await expect(CatalogoLocal.conferirSeVencida({ agora: AGORA })).resolves.toBe(false);
+
+      expect(apiRequest).not.toHaveBeenCalled();
+    });
+
+    test("cópia vencida e catálogo novo no servidor troca a cópia", async () => {
+      const NOVO = { ...HOSPITAL, id: "h2" };
+      await salvarCatalogoGuardado(AGORA - IDADE_MAXIMA_PRIMEIRO_PLANO_MS, "v1");
+      apiRequest.mockResolvedValue({ versao: "v2", total: 1, estabelecimentos: [NOVO] });
+
+      await expect(CatalogoLocal.conferirSeVencida({ agora: AGORA })).resolves.toBe(true);
+
+      expect(await CatalogoLocal.lerCopiaGuardada()).toEqual([NOVO]);
+    });
+
+    test("cópia vencida e servidor com a mesma versão (304) não troca nada", async () => {
+      await salvarCatalogoGuardado(AGORA - IDADE_MAXIMA_PRIMEIRO_PLANO_MS, "v1");
+      apiRequest.mockRejectedValue(new ApiError("Não modificado", 304));
+
+      await expect(CatalogoLocal.conferirSeVencida({ agora: AGORA })).resolves.toBe(false);
+
+      expect(JSON.parse(await AsyncStorage.getItem(CHAVE)).conferidoEm).toBe(AGORA);
+    });
+
+    test("cópia vencida e sem rede não lança", async () => {
+      await salvarCatalogoGuardado(1, "v1");
+      apiRequest.mockRejectedValue(new Error("sem rede"));
+
+      await expect(CatalogoLocal.conferirSeVencida()).resolves.toBe(false);
+    });
   });
 
   test("limpar apaga a cópia", async () => {

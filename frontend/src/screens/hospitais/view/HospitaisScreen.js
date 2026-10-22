@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   RefreshControl,
@@ -9,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useQueryClient } from "@tanstack/react-query";
 import { MapPinOff, Search, Trophy } from "lucide-react-native";
 import {
   CSHeader,
@@ -21,13 +21,12 @@ import {
 } from "../../../components";
 import { colors, spacing, typography } from "../../../theme/tokens";
 import {
+  recarregarListaDeHospitais,
   useHospital,
-  useHospitaisCatalogoLocal,
-  useHospitaisLista,
+  useListaDeHospitais,
 } from "../hooks/useHospitais";
 import { useCheckinManual } from "../../visitas/hooks/useMutacoesVisita";
 import { useVisitaAtivaDaTela } from "../../visitas/hooks/useVisitaAtivaDaTela";
-import { useAcoesListaPaginada } from "../../../core/query/useAcoesListaPaginada";
 import { avisarSemConexao } from "../../../utils/alertas";
 
 const TIPO_FILTROS = [
@@ -48,8 +47,8 @@ const TIPO_FILTROS = [
  */
 export default function HospitaisScreen({ navigation }) {
   const [busca, setBusca] = useState("");
-  // Termo que de fato vai para a consulta, 400 ms depois da última tecla: sem isso,
-  // cada letra digitada abriria uma chave nova e uma requisição.
+  // Termo que de fato filtra a lista, 400 ms depois da última tecla: sem isso, cada letra
+  // digitada refaria o filtro e a ordenação do catálogo inteiro.
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [tipo, setTipo] = useState("");
 
@@ -60,38 +59,27 @@ export default function HospitaisScreen({ navigation }) {
     return () => clearTimeout(espera);
   }, [busca]);
 
-  // Paginação incremental (E1-03 / bug relatado em 09/09/2026): sem isso, a lista
-  // pública mostrava só os primeiros 20 hospitais e o usuário nunca via os ~320
-  // restantes a menos que buscasse pelo nome exato. Cada busca/tipo é uma chave
-  // própria, então uma página pedida sob o critério anterior é descartada pela
-  // biblioteca (antes: `geracaoRef` e `buscandoMaisRef`).
-  const { data, error, isPending, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } =
-    useHospitaisLista({ busca: buscaAplicada, tipo });
-  // Enquanto a primeira página não chega (backend frio, rede lenta) ou quando o servidor
-  // falha, a lista sai da cópia do catálogo guardada no aparelho, com o mesmo filtro e
-  // a mesma ordem (teste de campo da rc.6, 21/10/2026). A resposta do servidor a
-  // substitui assim que chega.
-  const { data: catalogoLocal } = useHospitaisCatalogoLocal({ busca: buscaAplicada, tipo });
-  const usandoCatalogo = !data && Array.isArray(catalogoLocal) && catalogoLocal.length > 0;
-  const dados = useMemo(() => {
-    if (data) {
-      return data;
-    }
-    return usandoCatalogo ? catalogoLocal : [];
-  }, [data, usandoCatalogo, catalogoLocal]);
-  const erro =
-    error && !data && !usandoCatalogo
-      ? error.message || "Não foi possível carregar os hospitais."
-      : null;
-
-  // `carregarMais` é chamado pela FlatList ao chegar perto do fim (`onEndReached`):
-  // busca a próxima página e concatena, sem recarregar nem perder a posição do scroll.
-  const { atualizando, atualizar, carregarMais } = useAcoesListaPaginada({
-    refetch,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
+  // A lista sai da cópia do catálogo guardada no aparelho, filtrada e ordenada aqui, sem
+  // ir ao servidor (pedido do PO de 22/10/2026). O catálogo só é baixado de novo quando a
+  // versão dele muda na configuração remota. Nota e tempo vêm numa resposta só, válida por
+  // 5 minutos.
+  const { catalogo, indicadores, hospitais: dados } = useListaDeHospitais({
+    busca: buscaAplicada,
+    tipo,
   });
+  const recarregarCatalogo = catalogo.refetch;
+  const erro =
+    catalogo.error && !catalogo.data
+      ? catalogo.error.message || "Não foi possível carregar os hospitais."
+      : null;
+  const semIndicadores = Boolean(indicadores.error) && Boolean(catalogo.data);
+
+  const cliente = useQueryClient();
+  const [atualizando, setAtualizando] = useState(false);
+  const atualizar = useCallback(() => {
+    setAtualizando(true);
+    void recarregarListaDeHospitais(cliente).finally(() => setAtualizando(false));
+  }, [cliente]);
 
   // Visita ativa compartilhada com o observador global, recarregada ao focar a aba (e
   // ao voltar do detalhe) para refletir o botão de check-in de cada hospital (modo
@@ -100,14 +88,13 @@ export default function HospitaisScreen({ navigation }) {
   const { mutateAsync: registrarCheckin } = useCheckinManual();
 
   // Pedido do PO (10/09/2026): o hospital do check-in ativo aparece no topo, sem
-  // precisar procurá-lo na lista paginada (pode estar numa página ainda não carregada).
+  // precisar procurá-lo na lista.
   // Buscado à parte e compartilhado com o detalhe pela mesma chave. Falha silenciosa
   // de propósito (ex.: sem conexão): a lista continua, só sem o destaque.
   const { data: hospitalDoCheckin } = useHospital(visitaAtiva?.hospitalId);
   const hospitalCheckinAtivo = visitaAtiva?.hospitalId ? hospitalDoCheckin ?? null : null;
 
-  // Hospital do check-in ativo primeiro, sem duplicá-lo caso já esteja em `dados`
-  // (página carregada por acaso contém o mesmo hospital, ordem alfabética).
+  // Hospital do check-in ativo primeiro, sem duplicá-lo caso já esteja em `dados`.
   const dadosComDestaque = useMemo(() => {
     if (!hospitalCheckinAtivo) {
       return dados;
@@ -237,7 +224,7 @@ export default function HospitaisScreen({ navigation }) {
           title="Algo deu errado"
           message={erro}
           actionLabel="Tentar novamente"
-          onAction={() => refetch()}
+          onAction={() => recarregarCatalogo()}
         />
       );
     }
@@ -261,7 +248,7 @@ export default function HospitaisScreen({ navigation }) {
         onAction={() => navigation.navigate("SugerirHospital")}
       />
     );
-  }, [busca, tipo, erro, refetch, navigation]);
+  }, [busca, tipo, erro, recarregarCatalogo, navigation]);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -296,15 +283,15 @@ export default function HospitaisScreen({ navigation }) {
         </View>
       </View>
 
-      {error && usandoCatalogo ? (
-        // A cópia pode ter horas: sem o aviso, notas e tempos dela pareceriam atuais.
+      {semIndicadores ? (
+        // Sem o aviso, a falta de nota (ou uma nota de antes da queda) pareceria atual.
         <Text style={styles.avisoCopia} accessibilityRole="alert">
-          Sem conexão com o servidor. Mostrando a lista guardada no aparelho, que pode estar
-          desatualizada. Puxe para tentar de novo.
+          Sem conexão com o servidor. Mostrando a lista guardada no aparelho, sem notas e
+          tempos atualizados. Puxe para tentar de novo.
         </Text>
       ) : null}
 
-      {isPending && !usandoCatalogo ? (
+      {catalogo.isPending ? (
         <CSLoadingList count={3} />
       ) : (
         <FlatList
@@ -314,18 +301,6 @@ export default function HospitaisScreen({ navigation }) {
           renderItem={renderItem}
           ListEmptyComponent={renderVazio}
           contentContainerStyle={styles.listContent}
-          onEndReached={carregarMais}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={
-            isFetchingNextPage ? (
-              <ActivityIndicator
-                style={styles.rodapeCarregando}
-                size="small"
-                color={colors.primary}
-                accessibilityLabel="Carregando mais hospitais"
-              />
-            ) : null
-          }
           refreshControl={
             <RefreshControl
               refreshing={atualizando}
@@ -355,9 +330,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.s6,
     gap: spacing.s4,
     flexGrow: 1,
-  },
-  rodapeCarregando: {
-    paddingVertical: spacing.s4,
   },
   avisoCopia: {
     ...typography.bodySm,

@@ -947,6 +947,12 @@ Adotar a **Migração Incremental para TypeScript** com `strict: true`.
 **Status:** Aceito — implementado em 04/09/2026 (PR #79)
 **Área:** Infraestrutura e Deploy do Backend
 
+> **Atualização 22/10/2026 (M-060):** o PO decidiu que o Render não será mais usado. O
+> caminho de rollback descrito abaixo (`cd-backend-render.yml` acionável por
+> `workflow_dispatch`) e o `keep-alive-backend.yml` foram removidos do repositório, junto
+> com os dois `render.yaml`. O rollback do backend passa a ser voltar o tráfego para uma
+> revisão anterior do próprio Cloud Run. O texto abaixo fica como registro da decisão.
+
 > Primeiro ADR desta lista que **não** trata do frontend, e o primeiro fora do status
 > `Proposto`. Está aqui, e não num documento próprio, porque `adrs.md` é o único
 > registro de decisão arquitetural do projeto — criar um segundo lugar para o mesmo

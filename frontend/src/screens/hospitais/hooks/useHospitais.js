@@ -1,17 +1,16 @@
-import { useCallback } from "react";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo } from "react";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryClient } from "../../../core/query/queryClient";
 import { queryKeys } from "../../../core/query/queryKeys";
 import { normalizeText } from "../../../utils/normalize";
+import { haversineMetros } from "../../../utils/distancia";
+import { centroDoHospital } from "../../../utils/geojson";
 import HospitalService from "../service/HospitalService";
 import CatalogoLocal from "../../../services/CatalogoLocal";
 
-// O backend limita `size` a 100 por chamada (HospitalController) e a base tem ~340
-// hospitais ativos — uma única página nunca traz o catálogo inteiro. 50 é o meio-termo
-// entre poucas chamadas e uma resposta que ainda cabe confortavelmente numa página.
-export const TAMANHO_PAGINA_LISTA = 50;
 export const TAMANHO_PAGINA_RANKING = 20;
-// Maior página aceita pelo backend: o mapa precisa do catálogo inteiro.
-export const TAMANHO_PAGINA_MAPA = 100;
+
+const METROS_POR_KM = 1000;
 
 /** Itens de uma página: o backend devolve `Page`, mas versões antigas devolviam array. */
 function itensDaPagina(pagina) {
@@ -21,48 +20,6 @@ function itensDaPagina(pagina) {
 /** Junta as páginas carregadas numa lista só (`select` do `useInfiniteQuery`). */
 function juntarPaginas(dados) {
   return dados.pages.flatMap(itensDaPagina);
-}
-
-/** Próxima página enquanto o que já veio não alcança `totalElements`. */
-function proximaPaginaPorTotal(tamanho) {
-  return (ultimaPagina, _paginas, ultimoParametro) => {
-    const lista = itensDaPagina(ultimaPagina);
-    const carregado = ultimoParametro * tamanho + lista.length;
-    const total = ultimaPagina?.totalElements ?? carregado;
-    return lista.length > 0 && carregado < total ? ultimoParametro + 1 : undefined;
-  };
-}
-
-/**
- * Lista pública de hospitais com paginação incremental (E1-03).
- *
- * Cada combinação de busca e tipo é uma chave própria: uma página que chega depois de
- * o usuário mudar a busca é descartada pela própria biblioteca (e cancelada pelo
- * `signal`), o que dispensa as refs manuais de geração e de reentrância.
- *
- * A busca é normalizada (acento/caixa) antes de ir ao backend e filtrada de novo no
- * cliente: garante consistência mesmo que o backend devolva itens fora do critério
- * (ex.: dados legados sem normalização).
- */
-export function useHospitaisLista({ busca, tipo }) {
-  const termo = normalizeText(busca);
-  // Estável por termo: um `select` novo a cada render recriaria a lista e, com ela, o
-  // `renderItem` memoizado da tela.
-  const filtrar = useCallback(
-    (dados) => {
-      const lista = juntarPaginas(dados);
-      return termo ? lista.filter((hospital) => normalizeText(hospital?.nome).includes(termo)) : lista;
-    },
-    [termo]
-  );
-  return useInfiniteQuery({
-    queryKey: queryKeys.hospitais.lista({ busca: termo, tipo }),
-    queryFn: ({ pageParam, signal }) =>
-      HospitalService.listar({ busca: termo, tipo, page: pageParam, size: TAMANHO_PAGINA_LISTA, signal }),
-    initialPageParam: 0,
-    getNextPageParam: proximaPaginaPorTotal(TAMANHO_PAGINA_LISTA),
-    select: filtrar,
-  });
 }
 
 /**
@@ -82,42 +39,119 @@ function compararComoOBackend(a, b) {
   return 0;
 }
 
+/** Nota e tempo do servidor ficam frescos por 5 minutos, o mesmo atraso do backend (P8). */
+export const STALE_TIME_INDICADORES_MS = 5 * 60 * 1000;
+
 /**
- * Lista da cópia do catálogo guardada no aparelho (APP-01), com o mesmo filtro e a
- * mesma ordem da lista do servidor. A tela a mostra enquanto a primeira página não
- * chega e quando o servidor falha (teste de campo da rc.6, 21/10/2026: no modo anônimo,
- * com o backend frio, a lista demorava e parecia não ter cache).
+ * Lista de hospitais (E1-03), da cópia do catálogo guardada no aparelho (APP-01), com filtro
+ * de tipo, busca por nome e a mesma ordem da listagem do servidor. A tela não pagina mais no
+ * servidor: o catálogo inteiro (~340 estabelecimentos) já está no aparelho.
  *
- * Com cópia guardada, ela volta na hora e o catálogo é conferido em segundo plano (304
- * quando nada mudou) para a próxima leitura. Sem cópia (primeiro uso), espera o download.
+ * A consulta nunca vence sozinha (`staleTime: Infinity`): quem avisa que o catálogo mudou é
+ * a versão da configuração remota (`atualizarCatalogoSeMudou`), que descarta esta consulta
+ * só quando a cópia foi trocada. Com cópia guardada, ela volta na hora; sem cópia (primeiro
+ * uso), espera o download; sem cópia e sem rede, a consulta falha e a tela mostra o erro.
  */
 export function useHospitaisCatalogoLocal({ busca, tipo }) {
+  const cliente = useQueryClient();
   const termo = normalizeText(busca);
   const filtrar = useCallback(
-    (lista) => {
-      if (!lista) {
-        return null;
-      }
-      return lista
+    (lista) =>
+      lista
         .filter((hospital) => hospital?.ativo !== false)
         .filter((hospital) => !tipo || hospital?.tipo === tipo)
         .filter((hospital) => !termo || normalizeText(hospital?.nome).includes(termo))
-        .sort(compararComoOBackend);
-    },
+        .sort(compararComoOBackend),
     [termo, tipo]
   );
-  return useQuery({
+  const consulta = useQuery({
     queryKey: queryKeys.hospitais.catalogoLocal(),
     queryFn: async () => {
+      // Com cópia guardada, a tela não espera a rede (teste de campo da rc.6, 21/10/2026:
+      // com o backend frio, a lista demorava). Sem cópia (primeiro uso), espera o download.
       const guardada = await CatalogoLocal.lerCopiaGuardada();
-      if (guardada) {
-        CatalogoLocal.obterEstabelecimentos().catch(() => {});
-        return guardada;
-      }
-      return CatalogoLocal.obterEstabelecimentos().catch(() => null);
+      return guardada ?? CatalogoLocal.obterEstabelecimentos();
     },
+    staleTime: Infinity,
     select: filtrar,
   });
+  const carregou = consulta.isSuccess;
+  useEffect(() => {
+    if (!carregou) {
+      return undefined;
+    }
+    // Passado um dia sem a versão da configuração, confere em segundo plano e, se a cópia
+    // mudou, relê; antes disso, nem vai à rede. Fica fora da consulta para a releitura não
+    // concorrer com a leitura que ainda está terminando.
+    let montado = true;
+    CatalogoLocal.conferirSeVencida()
+      .then((mudou) => {
+        if (mudou && montado) {
+          void cliente.invalidateQueries({ queryKey: queryKeys.hospitais.catalogoLocal() });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      montado = false;
+    };
+  }, [carregou, cliente]);
+  return consulta;
+}
+
+/**
+ * Nota e tempo de todos os hospitais numa resposta só, por id (`{ [hospitalId]: indicadores }`).
+ * Só é buscada com a tela aberta e vale por 5 minutos; voltar à aba depois disso busca de novo.
+ */
+export function useIndicadoresDoCatalogo() {
+  return useQuery({
+    queryKey: queryKeys.hospitais.indicadoresDoCatalogo(),
+    queryFn: ({ signal }) => HospitalService.listarIndicadoresDoCatalogo({ signal }),
+    staleTime: STALE_TIME_INDICADORES_MS,
+    select: (resposta) => resposta?.porHospital ?? {},
+  });
+}
+
+/**
+ * Hospitais da cópia do catálogo com os indicadores do servidor. Enquanto os indicadores
+ * não chegam (ou sem rede), cada hospital fica sem nota, em vez de mostrar uma nota antiga:
+ * inclusive a que vinha embutida nas cópias do catálogo gravadas antes da M-061.
+ */
+export function useListaDeHospitais({ busca, tipo }) {
+  const catalogo = useHospitaisCatalogoLocal({ busca, tipo });
+  const indicadores = useIndicadoresDoCatalogo();
+  const porHospital = indicadores.data;
+  const hospitais = useMemo(() => {
+    const lista = catalogo.data ?? [];
+    return lista.map((hospital) => ({ ...hospital, indicadores: porHospital?.[hospital.id] ?? null }));
+  }, [catalogo.data, porHospital]);
+  return { catalogo, indicadores, hospitais };
+}
+
+/**
+ * Baixa o catálogo de novo se a versão informada pela configuração remota é outra, e só
+ * então descarta a lista em memória para a tela reler a cópia nova.
+ *
+ * @returns {Promise<boolean>} `true` quando o catálogo mudou.
+ */
+export async function atualizarCatalogoSeMudou(versao, cliente = queryClient) {
+  const mudou = await CatalogoLocal.sincronizarVersao(versao);
+  if (mudou) {
+    await cliente.invalidateQueries({ queryKey: queryKeys.hospitais.catalogoLocal() });
+  }
+  return mudou;
+}
+
+/**
+ * "Puxar para atualizar" da lista: confere o catálogo com o servidor (304 quando nada
+ * mudou) e busca os indicadores de novo. Falhas ficam no `error` de cada consulta.
+ */
+export async function recarregarListaDeHospitais(cliente = queryClient) {
+  await Promise.allSettled([
+    CatalogoLocal.obterEstabelecimentos({ idadeMaximaMs: 0 }).then(() =>
+      cliente.invalidateQueries({ queryKey: queryKeys.hospitais.catalogoLocal() })
+    ),
+    cliente.invalidateQueries({ queryKey: queryKeys.hospitais.indicadoresDoCatalogo() }),
+  ]);
 }
 
 /**
@@ -160,27 +194,28 @@ export function useIndicadoresHospital(id) {
 }
 
 /**
- * Hospitais do mapa (item 05 + F-07).
+ * Hospitais do mapa (item 05 + F-07), da mesma cópia do catálogo da lista. Com `origem`
+ * (posição do GPS) e `raioKm`, o recorte por distância é feito no aparelho, a partir do
+ * centro de cada estabelecimento, em vez de uma consulta ao servidor por raio.
  *
- * Com `origem` (posição do GPS) e `raioKm`, o recorte geográfico é do backend e cabe
- * numa página. Sem raio, o catálogo inteiro vem em páginas de 100 que o mapa vai
- * buscando em sequência (`fetchNextPage`), atualizando lote a lote em vez de montar
- * centenas de marcadores numa leva só (BUG-04).
+ * Os indicadores vêm à parte (`indicadoresPorHospital`), e não dentro de cada hospital:
+ * assim a chegada de nota e tempo novos não troca a lista de marcadores, que redesenharia
+ * centenas deles e reenquadraria a câmera enquanto a pessoa navega no mapa.
  */
 export function useHospitaisMapa({ raioKm, origem }) {
+  const catalogo = useHospitaisCatalogoLocal({ busca: "", tipo: "" });
+  const indicadoresPorHospital = useIndicadoresDoCatalogo().data ?? null;
   const comRaio = raioKm !== null && Boolean(origem);
-  const filtros = comRaio
-    ? { raioKm, latitude: origem.latitude, longitude: origem.longitude }
-    : { raioKm: null };
-
-  return useInfiniteQuery({
-    queryKey: queryKeys.hospitais.mapa(filtros),
-    queryFn: ({ pageParam, signal }) =>
-      comRaio
-        ? HospitalService.listar({ ...filtros, size: TAMANHO_PAGINA_MAPA, signal })
-        : HospitalService.listar({ page: pageParam, size: TAMANHO_PAGINA_MAPA, signal }),
-    initialPageParam: 0,
-    getNextPageParam: comRaio ? () => undefined : proximaPaginaPorTotal(TAMANHO_PAGINA_MAPA),
-    select: juntarPaginas,
-  });
+  const hospitais = useMemo(() => {
+    const lista = catalogo.data ?? [];
+    if (!comRaio) {
+      return lista;
+    }
+    const limiteEmMetros = raioKm * METROS_POR_KM;
+    return lista.filter((hospital) => {
+      const distanciaEmMetros = haversineMetros(origem, centroDoHospital(hospital));
+      return distanciaEmMetros !== null && distanciaEmMetros <= limiteEmMetros;
+    });
+  }, [catalogo.data, comRaio, raioKm, origem]);
+  return { catalogo, hospitais, indicadoresPorHospital };
 }

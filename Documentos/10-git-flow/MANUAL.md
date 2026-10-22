@@ -6,8 +6,8 @@ Manual operacional do sistema de monitoramento hospitalar por geolocalização, 
 > passou a ser **homologação (HML)**: cada push nela publica o backend
 > `saude-monitor-backend-hom`, gera o APK "Radar Saúde HML" e cria a tag
 > `vX.Y.Z-rc.N` com uma GitHub Release. Produção fica para `release/<tag>`. O backend
-> está no **Google Cloud Run** desde 04/09/2026 — as menções ao Render abaixo que não
-> foram reescritas descrevem o caminho de rollback, não o vigente. Versão anterior
+> está no **Google Cloud Run** desde 04/09/2026; o Render, que ficou como rollback, foi
+> aposentado em 22/10/2026 (M-060), com o keep-alive. Versão anterior
 > deste manual: histórico do git.
 
 ---
@@ -145,9 +145,7 @@ feature/* ──► develop ──► master ──► release/<tag>
 | `cd-homologacao.yml` | push em `master` + manual | **Homologação:** versão `vX.Y.Z-rc.N` → backend HML → APK HML → tag + GitHub Release (§3.3) |
 | `cd-mobile-apk.yml` | push em `develop` (caminho `frontend/**`) + manual + `workflow_call` | Build do APK (ou do AAB, com `formato: aab`) com Gradle no próprio Actions. Artefato do run (30 dias). Pacote, nome e versão por ambiente |
 | `cd-producao.yml` | push em `release/**` + manual (disparado pelo `release.yml` desde 14/10/2026) | **Produção:** AAB do pacote de produção, assinado com a chave de release, anexado à GitHub Release `vX.Y.Z` para envio à Play Console (§3.4) |
-| `cd-backend-render.yml` | só manual | Rollback para o Render (desativado desde 04/09/2026) |
 | `cd-mobile-eas.yml` | **só manual** (`workflow_dispatch`, a partir de `release/*`) | Build do **AAB de loja** no EAS |
-| `keep-alive-backend.yml` | cron a cada 10 min, 07h–22h + manual | Ping em `/actuator/health` para impedir a hibernação do Render (E8-01) |
 | `release.yml` | manual (workflow_dispatch) | Cria branch `release/<versão>` a partir da rc homologada e dispara o backend de produção (`cd-backend-google.yml`) e o AAB (`cd-producao.yml`) |
 
 > **Removidas em 03/09/2026** (PR de limpeza de esteiras mortas):
@@ -226,7 +224,6 @@ Actions se autentica por Workload Identity Federation, sem chave. No GitHub:
 |--------|-----------|
 | `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_STORE_PASSWORD`, `ANDROID_RELEASE_KEY_ALIAS`, `ANDROID_RELEASE_KEY_PASSWORD` | Chave de release do APK. Obrigatórios para homologação — ver [`deploy/android/README.md`](../../deploy/android/README.md) |
 | `EXPO_PUBLIC_MAPBOX_TOKEN` | Token público do Mapbox embutido no APK |
-| `RENDER_API_KEY_DEV`, `RENDER_SERVICE_ID_DEV` | Só para o rollback manual do Render |
 | `SONAR_TOKEN` | Token do SonarQube Cloud (§4.4). Sem ele, a análise é pulada e o CI segue |
 
 ### 4.4 Qualidade: trava de testes, cobertura e SonarQube Cloud
@@ -289,7 +286,7 @@ Configuração inicial (uma vez, pelo dono do repositório):
 ### 5.1 MongoDB Atlas
 1. Crie um cluster **M0** (free tier).
 2. Crie um usuário com senha.
-3. Libere o IP `0.0.0.0/0` (ou o IP do Render).
+3. Libere o IP `0.0.0.0/0` (o Cloud Run não tem IP de saída fixo sem conector VPC).
 4. Crie os bancos por ambiente: `saude_monitor_dev` (existe), `saude_monitor_hom`
    (homologação) e, quando houver produção, `saude_monitor_prod`.
 5. **Um usuário por ambiente**, com papel `readWrite` **só** no banco dele
@@ -311,7 +308,8 @@ criar os secrets — o serviço nasce no primeiro deploy:
   gera `JWT_SECRET_HOM` aleatório e cria `RESEND_API_KEY_HOM`).
 - **Produção:** o mesmo, com `_PROD`, quando for criada.
 
-O Render ficou só como rollback manual (`cd-backend-render.yml`).
+O Render foi aposentado em 22/10/2026 (M-060): o rollback é voltar o tráfego para uma
+revisão anterior do próprio Cloud Run.
 
 ### 5.3 Frontend web — sem provedor definido
 
@@ -371,6 +369,6 @@ curl -X POST http://localhost:8080/api/v1/visitas/<ID>/checkout \
 
 ## 7. Observações
 
-- O **Render free** "dorme" após ~15 min de inatividade e acorda na primeira requisição (~30s).
+- O **Cloud Run** com `--min-instances=0` recolhe a instância ociosa; a primeira requisição depois disso pode devolver 503 enquanto a instância sobe (ADR-011).
 - O **frontend web** é o build do Expo. O **APK mobile** sai do `cd-mobile-apk.yml` (Actions, manual) ou, localmente, de `npm run build:apk` / `expo run:android --variant release`.
 - Para o frontend web apontar para o backend correto, configure `expo.extra.apiBaseUrlWeb` em `frontend/app.json` (o `api.js` já lê essa variável).

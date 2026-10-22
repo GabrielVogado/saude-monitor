@@ -137,7 +137,7 @@ class FeedbackBloqueioAdminIntegracaoTest extends IntegracaoTestBase {
                 .andExpect(status().isForbidden());
         assertThat(feedbackRepository.findById(feedbackId).orElseThrow().getNota()).isEqualTo(3);
 
-        // A regra não pode custar a edição do dono dentro da janela de 24h (RN-09).
+        // A regra não pode custar a edição do dono dentro do prazo de 15 dias (RN-09).
         mockMvc.perform(put("/api/v1/feedbacks/" + feedbackId)
                         .header("Authorization", "Bearer " + tokenUsuario)
                         .contentType(MediaType.APPLICATION_JSON)

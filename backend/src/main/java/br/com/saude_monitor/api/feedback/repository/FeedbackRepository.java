@@ -33,6 +33,12 @@ public interface FeedbackRepository extends MongoRepository<FeedbackDocument, St
     List<FeedbackDocument> findByCriadoEmAfter(Instant criadoEm);
 
     /**
+     * Feedbacks editados após {@code editadoEm} — a edição de uma avaliação de até 15 dias
+     * muda a nota sem mudar {@code criadoEm}, e {@code recalcularPendentes} precisa vê-la.
+     */
+    List<FeedbackDocument> findByEditadoEmAfter(Instant editadoEm);
+
+    /**
      * Feedbacks das visitas informadas, em lote — evita N+1 de
      * {@code existsByVisitaId} chamado dentro de um loop.
      */

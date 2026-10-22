@@ -41,7 +41,7 @@ public class FeedbackController {
         return ResponseEntity.status(HttpStatus.CREATED).body(feedbackService.criar(request, usuarioId));
     }
 
-    /** 🔒 Feedback da visita (dono), para edição de comentário (RN-09). */
+    /** 🔒 Feedback da visita (dono), para pré-preencher a edição (RN-09). */
     @GetMapping("/api/v1/visitas/{id}/feedback")
     public ResponseEntity<FeedbackResponse> buscarPorVisita(@PathVariable String id) {
         String usuarioId = exigirUsuarioAutenticado();
@@ -49,7 +49,7 @@ public class FeedbackController {
         return feedback.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    /** 🔒 Edita feedback dentro da janela de 24h (dono, RN-09). */
+    /** 🔒 Edita feedback até 15 dias após a criação (dono, RN-09). */
     @PutMapping("/api/v1/feedbacks/{id}")
     public ResponseEntity<FeedbackResponse> atualizar(@PathVariable String id,
                                                       @Valid @RequestBody FeedbackRequest request) {

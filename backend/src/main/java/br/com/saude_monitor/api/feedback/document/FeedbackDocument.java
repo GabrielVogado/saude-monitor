@@ -83,4 +83,12 @@ public class FeedbackDocument {
      */
     @Indexed
     private Instant criadoEm;
+
+    /**
+     * Última edição pelo dono, dentro dos 15 dias após a criação (RN-09). Nulo enquanto
+     * nunca foi editado. Permite à rede de segurança do indicador ({@code recalcularPendentes})
+     * achar a nota alterada de uma avaliação antiga, que {@code criadoEm} não acha.
+     */
+    @Indexed(sparse = true)
+    private Instant editadoEm;
 }

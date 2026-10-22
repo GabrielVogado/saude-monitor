@@ -276,6 +276,21 @@ describe("FeedbackFormScreen (Épico 03)", () => {
       expect(await screen.findByText("Esta avaliação não pode mais ser editada.")).toBeTruthy();
     });
 
+    test("avaliação gravada só com a nota abre sem respostas e mantém os campos vazios", async () => {
+      FeedbackService.atualizar.mockResolvedValue({ id: "fb9" });
+      renderizar({ feedbackId: "fb9", avaliacao: { id: "fb9", nota: 3, comentario: null } });
+
+      expect(screen.getByText("Etapa 1 de 3")).toBeTruthy();
+      ["Pular", "Pular"].forEach((label) => fireEvent.press(screen.getByText(label)));
+      fireEvent.press(screen.getByText("Salvar alterações"));
+
+      expect(await screen.findByText("Avaliação atualizada!")).toBeTruthy();
+      expect(FeedbackService.atualizar).toHaveBeenCalledWith(
+        "fb9",
+        expect.objectContaining({ nota: 3, fezTriagem: undefined, comentario: undefined })
+      );
+    });
+
     test("prazo encerrado (409 na edição) explica o prazo em vez de 'já avaliou'", async () => {
       FeedbackService.atualizar.mockRejectedValue(
         Object.assign(new Error("O prazo de 15 dias para editar esta avaliação já encerrou."), { status: 409 })

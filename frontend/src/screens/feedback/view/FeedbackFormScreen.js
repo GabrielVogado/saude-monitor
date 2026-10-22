@@ -116,7 +116,7 @@ function formDaAvaliacao(avaliacao) {
     motivoNaoAtendido: avaliacao.motivoNaoAtendido ?? null,
     medicacaoReceita: avaliacao.medicacaoReceita ?? null,
     tratamentoEquipe: avaliacao.tratamentoEquipe ?? null,
-    nota: avaliacao.nota ?? null,
+    nota: avaliacao.nota,
     comentario: avaliacao.comentario ?? "",
   };
 }

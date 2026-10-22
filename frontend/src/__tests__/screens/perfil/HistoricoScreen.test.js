@@ -196,6 +196,14 @@ describe("HistoricoScreen (E5-03/RN-22)", () => {
       });
     });
 
+    test("avaliação editável de hospital sem nome ainda oferece Editar", async () => {
+      await abrirAbaAvaliacoes([
+        avaliacao({ hospitalNome: null, editavelAte: new Date(Date.now() + DIA_EM_MS).toISOString() }),
+      ]);
+
+      expect(await screen.findByRole("button", { name: "Editar avaliação de hospital" })).toBeTruthy();
+    });
+
     test("prazo vencido ou avaliação sem prazo (anônima) não oferece edição", async () => {
       await abrirAbaAvaliacoes([
         avaliacao({ id: "fb1", editavelAte: new Date(Date.now() - DIA_EM_MS).toISOString() }),

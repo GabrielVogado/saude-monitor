@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 21/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 22/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 22/10/2026 — Homologação v1.0.0-rc.7
+
+**O que entrou:** registro da rc que leva as correções do teste de campo da rc.6 (PR #220, M-059) para a homologação: lista da cópia do catálogo, temporizador na visita automática e checkout pela posição na hora da saída. O roteiro começa pela repetição do teste de campo e depois remete ao roteiro da rc.6, que ficou incompleto. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.7.md`](./10-git-flow/homologacoes/v1.0.0-rc.7.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova; só o PR da M-059 passa a constar como #220).
 
 ---
 

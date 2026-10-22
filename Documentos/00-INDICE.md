@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 22/10/2026 — Homologação v1.0.0-rc.9
+
+**O que entrou:** registro da rc que corrige o mapa com o filtro de 1 km, que reprovou a rc.8 (PR #229, M-064), e leva a edição da avaliação em até 15 dias com o nome do hospital no Histórico (PR #228, M-063, backend e app). O roteiro começa pelo que é novo e remete ao roteiro da rc.8 inteiro. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.9.md`](./10-git-flow/homologacoes/v1.0.0-rc.9.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
+
+---
+
 ## 📌 Revisão 22/10/2026 — Mapa com um hospital só
 
 **O que mudou:** o enquadramento do mapa ganha área mínima (com um hospital só no filtro de 1 km, o mapa ia ao zoom máximo e ficava cinza) e, com raio, inclui a posição do GPS. A rc.8 fica reprovada no roteiro 3.1. Registro em `Historico-Melhorias.md` (M-064) e resultado em [`10-git-flow/homologacoes/v1.0.0-rc.8.md`](./10-git-flow/homologacoes/v1.0.0-rc.8.md).

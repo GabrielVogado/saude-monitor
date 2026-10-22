@@ -74,19 +74,22 @@ describe("useHospitais (Fase 3 da SDD)", () => {
     expect(result.current.hasNextPage).toBe(false);
   });
 
-  test("mapa com raio e posição faz uma consulta só, recortada pelo backend", async () => {
-    HospitalService.listar.mockResolvedValue({ content: [{ id: "h1" }], totalElements: 500 });
+  test("mapa com raio e posição recorta a cópia do catálogo no aparelho", async () => {
+    const PERTO = { id: "h1", nome: "Perto", localizacao: { latitude: -15.7, longitude: -47.8 } };
+    const LONGE = { id: "h2", nome: "Longe", localizacao: { latitude: -15.9, longitude: -47.8 } };
+    CatalogoLocal.lerCopiaGuardada.mockResolvedValue([PERTO, LONGE]);
+    CatalogoLocal.conferirSeVencida.mockResolvedValue(false);
+    HospitalService.listarIndicadoresDoCatalogo.mockResolvedValue({ porHospital: { h1: { notaMedia: 4 } } });
 
     const { result } = renderizarHook(() =>
       useHospitaisMapa({ raioKm: 5, origem: { latitude: -15.7, longitude: -47.8 } })
     );
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(HospitalService.listar).toHaveBeenCalledWith(
-      expect.objectContaining({ raioKm: 5, latitude: -15.7, longitude: -47.8, size: 100 })
-    );
-    expect(result.current.hasNextPage).toBe(false);
+    await waitFor(() => expect(result.current.indicadoresPorHospital).toEqual({ h1: { notaMedia: 4 } }));
+    expect(result.current.hospitais.map((h) => h.id)).toEqual(["h1"]);
+    expect(HospitalService.listar).not.toHaveBeenCalled();
   });
+
 });
 
 describe("versão do catálogo (pedido do PO de 22/10/2026)", () => {

@@ -3,12 +3,14 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import { queryClient } from "../../../core/query/queryClient";
 import { queryKeys } from "../../../core/query/queryKeys";
 import { normalizeText } from "../../../utils/normalize";
+import { haversineMetros } from "../../../utils/distancia";
+import { centroDoHospital } from "../../../utils/geojson";
 import HospitalService from "../service/HospitalService";
 import CatalogoLocal from "../../../services/CatalogoLocal";
 
 export const TAMANHO_PAGINA_RANKING = 20;
-// Maior página aceita pelo backend: o mapa precisa do catálogo inteiro.
-export const TAMANHO_PAGINA_MAPA = 100;
+
+const METROS_POR_KM = 1000;
 
 /** Itens de uma página: o backend devolve `Page`, mas versões antigas devolviam array. */
 function itensDaPagina(pagina) {
@@ -18,16 +20,6 @@ function itensDaPagina(pagina) {
 /** Junta as páginas carregadas numa lista só (`select` do `useInfiniteQuery`). */
 function juntarPaginas(dados) {
   return dados.pages.flatMap(itensDaPagina);
-}
-
-/** Próxima página enquanto o que já veio não alcança `totalElements`. */
-function proximaPaginaPorTotal(tamanho) {
-  return (ultimaPagina, _paginas, ultimoParametro) => {
-    const lista = itensDaPagina(ultimaPagina);
-    const carregado = ultimoParametro * tamanho + lista.length;
-    const total = ultimaPagina?.totalElements ?? carregado;
-    return lista.length > 0 && carregado < total ? ultimoParametro + 1 : undefined;
-  };
 }
 
 /**
@@ -202,27 +194,28 @@ export function useIndicadoresHospital(id) {
 }
 
 /**
- * Hospitais do mapa (item 05 + F-07).
+ * Hospitais do mapa (item 05 + F-07), da mesma cópia do catálogo da lista. Com `origem`
+ * (posição do GPS) e `raioKm`, o recorte por distância é feito no aparelho, a partir do
+ * centro de cada estabelecimento, em vez de uma consulta ao servidor por raio.
  *
- * Com `origem` (posição do GPS) e `raioKm`, o recorte geográfico é do backend e cabe
- * numa página. Sem raio, o catálogo inteiro vem em páginas de 100 que o mapa vai
- * buscando em sequência (`fetchNextPage`), atualizando lote a lote em vez de montar
- * centenas de marcadores numa leva só (BUG-04).
+ * Os indicadores vêm à parte (`indicadoresPorHospital`), e não dentro de cada hospital:
+ * assim a chegada de nota e tempo novos não troca a lista de marcadores, que redesenharia
+ * centenas deles e reenquadraria a câmera enquanto a pessoa navega no mapa.
  */
 export function useHospitaisMapa({ raioKm, origem }) {
+  const catalogo = useHospitaisCatalogoLocal({ busca: "", tipo: "" });
+  const indicadoresPorHospital = useIndicadoresDoCatalogo().data ?? null;
   const comRaio = raioKm !== null && Boolean(origem);
-  const filtros = comRaio
-    ? { raioKm, latitude: origem.latitude, longitude: origem.longitude }
-    : { raioKm: null };
-
-  return useInfiniteQuery({
-    queryKey: queryKeys.hospitais.mapa(filtros),
-    queryFn: ({ pageParam, signal }) =>
-      comRaio
-        ? HospitalService.listar({ ...filtros, size: TAMANHO_PAGINA_MAPA, signal })
-        : HospitalService.listar({ page: pageParam, size: TAMANHO_PAGINA_MAPA, signal }),
-    initialPageParam: 0,
-    getNextPageParam: comRaio ? () => undefined : proximaPaginaPorTotal(TAMANHO_PAGINA_MAPA),
-    select: juntarPaginas,
-  });
+  const hospitais = useMemo(() => {
+    const lista = catalogo.data ?? [];
+    if (!comRaio) {
+      return lista;
+    }
+    const limiteEmMetros = raioKm * METROS_POR_KM;
+    return lista.filter((hospital) => {
+      const distanciaEmMetros = haversineMetros(origem, centroDoHospital(hospital));
+      return distanciaEmMetros !== null && distanciaEmMetros <= limiteEmMetros;
+    });
+  }, [catalogo.data, comRaio, raioKm, origem]);
+  return { catalogo, hospitais, indicadoresPorHospital };
 }

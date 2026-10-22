@@ -3413,3 +3413,46 @@ que a borda pode servir a todos.
 - O detalhe do hospital continua lendo o próprio hospital e os indicadores dele no servidor.
 - O APK da rc.7 ainda usa a listagem paginada: a lista dele continua funcionando, mas a cópia do
   catálogo deixa de trazer nota até o próximo APK.
+
+---
+
+## M-062 — Mapa lê a cópia do catálogo no aparelho
+
+**Data:** 22/10/2026 · **PR:** #225 · **Origem:** segunda etapa da M-061, pedida pelo PO
+
+### Como era
+
+- Com "Todos", o mapa pedia `GET /api/v1/hospitais` em páginas de 100, em sequência, até
+  completar o catálogo (~340 estabelecimentos, cerca de 4 chamadas). Com um raio, pedia ao
+  servidor os hospitais em volta da posição do GPS.
+- A resposta valia 2 min no app: voltar à aba depois disso buscava tudo de novo, mesmo sem
+  nenhum hospital ter mudado.
+
+### O que mudou (comportamento)
+
+- **Mesma cópia da lista:** o mapa lê a cópia do catálogo guardada no aparelho (M-061), que só
+  é baixada de novo quando a versão da configuração remota muda. Abrir o mapa não vai ao
+  servidor para os hospitais.
+- **Raio calculado no aparelho:** 1, 5, 10 ou 25 km filtram pela distância entre o GPS e o
+  centro de cada estabelecimento, sem chamada ao servidor. Estabelecimento sem posição
+  conhecida fica fora do recorte.
+- **Nota e tempo:** o card do hospital selecionado usa `GET /api/v1/catalogo/indicadores`, a
+  mesma chamada única da lista, válida por 5 min. Sem servidor, o mapa continua com os
+  hospitais da cópia, sem nota.
+- **Câmera parada:** a nota e o tempo entram só no card, e não na lista de marcadores, então
+  uma atualização deles não redesenha os marcadores nem reenquadra o mapa enquanto a pessoa
+  navega.
+- **Marcadores em lotes:** os marcadores entram 100 por quadro, como antes entravam por página,
+  para não montar centenas de uma vez (risco de ANR, BUG-04).
+- **Erro:** só aparece quando não há cópia guardada e o download falha.
+
+### Efeito esperado
+
+Com a lista e o mapa na cópia local, a leitura de hospitais deixa de ser repetida: o catálogo é
+baixado uma vez por mudança no painel, e nota e tempo custam uma chamada a cada 5 min de uso.
+`GET /api/v1/hospitais` continua no servidor para versões antigas do app.
+
+### A conferir no aparelho
+
+- Desempenho do mapa com os ~340 marcadores em "Todos" (rolagem e zoom).
+- Troca de raio com o GPS ligado: os marcadores de fora somem na hora.

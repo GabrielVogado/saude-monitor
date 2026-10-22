@@ -35,6 +35,27 @@ const RAIOS_KM = [
 /** Marcadores adicionados ao mapa por quadro (antes, o tamanho da página do servidor). */
 const LOTE_DE_MARCADORES = 100;
 
+/**
+ * Meia largura mínima do enquadramento, em graus (~550 m de latitude). Um hospital só,
+ * ou vários no mesmo ponto, formam uma caixa de área zero: o `fitBounds` ia ao zoom
+ * máximo e o mapa ficava cinza, sem tiles (filtro de 1 km na rc.8).
+ */
+const MEIA_LARGURA_MINIMA_GRAUS = 0.005;
+
+/** Cantos nordeste e sudoeste (`[lng, lat]`) que cobrem os pontos, com área mínima. */
+function calcularLimitesDoEnquadramento(pontos) {
+  const lats = pontos.map((p) => p.latitude);
+  const lngs = pontos.map((p) => p.longitude);
+  const centroLat = (Math.max(...lats) + Math.min(...lats)) / 2;
+  const centroLng = (Math.max(...lngs) + Math.min(...lngs)) / 2;
+  const meiaAltura = Math.max((Math.max(...lats) - Math.min(...lats)) / 2, MEIA_LARGURA_MINIMA_GRAUS);
+  const meiaLargura = Math.max((Math.max(...lngs) - Math.min(...lngs)) / 2, MEIA_LARGURA_MINIMA_GRAUS);
+  return [
+    [centroLng + meiaLargura, centroLat + meiaAltura],
+    [centroLng - meiaLargura, centroLat - meiaAltura],
+  ];
+}
+
 const BRASIL_REGION = {
   latitude: -14.235,
   longitude: -51.9253,
@@ -320,7 +341,9 @@ function GeolocalizacaoContent({ navigation }) {
   const cameraInicial = useMemo(() => getInitialViewState(BRASIL_REGION), []);
 
   // Enquadra a câmera para cobrir todos os hospitais cadastrados (item 05) sempre
-  // que a lista carregar — assim o "todos os hospitais" é visível de imediato.
+  // que a lista carregar — assim o "todos os hospitais" é visível de imediato. Com um
+  // raio, a posição usada no recorte entra no enquadramento: o usuário vê onde está em
+  // relação aos hospitais próximos.
   const enquadrarHospitais = useCallback(() => {
     const pontos = hospitais
       .map((h) => centroDoHospital(h))
@@ -328,16 +351,13 @@ function GeolocalizacaoContent({ navigation }) {
     if (pontos.length === 0) {
       return;
     }
+    if (origemRaio) {
+      pontos.push(origemRaio);
+    }
 
-    const lats = pontos.map((p) => p.latitude);
-    const lngs = pontos.map((p) => p.longitude);
-    cameraRef.current?.fitBounds(
-      [Math.max(...lngs), Math.max(...lats)],
-      [Math.min(...lngs), Math.min(...lats)],
-      48,
-      600
-    );
-  }, [hospitais]);
+    const [nordeste, sudoeste] = calcularLimitesDoEnquadramento(pontos);
+    cameraRef.current?.fitBounds(nordeste, sudoeste, 48, 600);
+  }, [hospitais, origemRaio]);
 
   // `mapaMontado` entra nas dependências porque o remonte cria uma `<Camera>` NOVA, com
   // a posição inicial de volta em BRASIL_REGION (zoom 3, o país inteiro). Sem re-rodar

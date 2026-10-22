@@ -3456,3 +3456,25 @@ baixado uma vez por mudança no painel, e nota e tempo custam uma chamada a cada
 
 - Desempenho do mapa com os ~340 marcadores em "Todos" (rolagem e zoom).
 - Troca de raio com o GPS ligado: os marcadores de fora somem na hora.
+
+## M-064 — Mapa com um hospital só não vai ao zoom máximo
+
+**Data:** 22/10/2026 · **PR:** bugfix/mapa-zoom-um-hospital · **Origem:** teste da rc.8 pelo PO
+
+### Como era
+
+- O mapa enquadrava a câmera na caixa que cobre os hospitais exibidos. Com o filtro de 1 km
+  sobrou um hospital só: a caixa tinha área zero, o `fitBounds` levou o mapa ao zoom máximo e
+  ele ficou cinza, sem tiles, com a escala marcando 0,4 m. O mesmo acontecia com vários
+  estabelecimentos no mesmo ponto.
+
+### O que mudou (comportamento)
+
+- **Área mínima:** a caixa do enquadramento tem pelo menos ~1,1 km de lado, em volta do centro
+  dos hospitais. Com mais hospitais espalhados, o enquadramento continua igual.
+- **Posição do GPS no enquadramento:** com um raio selecionado, a posição usada no recorte
+  entra na caixa, então a pessoa vê onde está em relação aos hospitais próximos.
+
+### A conferir no aparelho
+
+- Filtro de 1 km com um hospital só: o mapa mostra as ruas em volta, com o marcador e a posição.

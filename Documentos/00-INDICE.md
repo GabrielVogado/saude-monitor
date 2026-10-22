@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 22/10/2026 — Mapa com um hospital só
+
+**O que mudou:** o enquadramento do mapa ganha área mínima (com um hospital só no filtro de 1 km, o mapa ia ao zoom máximo e ficava cinza) e, com raio, inclui a posição do GPS. A rc.8 fica reprovada no roteiro 3.1. Registro em `Historico-Melhorias.md` (M-064) e resultado em [`10-git-flow/homologacoes/v1.0.0-rc.8.md`](./10-git-flow/homologacoes/v1.0.0-rc.8.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` (correção de defeito, sem estória nova).
+
+---
+
 ## 📌 Revisão 22/10/2026 — Homologação v1.0.0-rc.8
 
 **O que entrou:** registro da rc que leva a lista e o mapa de hospitais pela cópia do catálogo no aparelho (PRs #224 e #225, M-061 e M-062) para a homologação, com o backend novo (`versaoCatalogo` na configuração e `GET /api/v1/catalogo/indicadores`). O roteiro começa pelo que é novo e remete ao teste de campo da rc.7 e ao roteiro da rc.6, que não foram feitos. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.8.md`](./10-git-flow/homologacoes/v1.0.0-rc.8.md).

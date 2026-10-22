@@ -372,7 +372,9 @@ class FeedbackServiceImplTest {
         when(feedbackRepository.findById("f1"))
                 .thenReturn(Optional.of(feedbackDoDono(Instant.now().minus(Duration.ofDays(15).plusMinutes(1)))));
 
-        assertThatThrownBy(() -> service.atualizar("f1", request("v1"), "u1"))
+        FeedbackRequest pedido = request("v1");
+
+        assertThatThrownBy(() -> service.atualizar("f1", pedido, "u1"))
                 .isInstanceOf(ConflitoException.class)
                 .hasMessageContaining("15 dias");
         verify(feedbackRepository, never()).save(any());
@@ -383,7 +385,9 @@ class FeedbackServiceImplTest {
     void atualizarFeedbackSemDataDeCriacaoRecusaComConflitoEmVezDeErroInterno() {
         when(feedbackRepository.findById("f1")).thenReturn(Optional.of(feedbackDoDono(null)));
 
-        assertThatThrownBy(() -> service.atualizar("f1", request("v1"), "u1"))
+        FeedbackRequest pedido = request("v1");
+
+        assertThatThrownBy(() -> service.atualizar("f1", pedido, "u1"))
                 .isInstanceOf(ConflitoException.class);
         verify(feedbackRepository, never()).save(any());
     }
@@ -392,7 +396,9 @@ class FeedbackServiceImplTest {
     void atualizarFeedbackDeOutroUsuarioRecusaAntesDoPrazo() {
         when(feedbackRepository.findById("f1")).thenReturn(Optional.of(feedbackDoDono(Instant.now())));
 
-        assertThatThrownBy(() -> service.atualizar("f1", request("v1"), "invasor"))
+        FeedbackRequest pedido = request("v1");
+
+        assertThatThrownBy(() -> service.atualizar("f1", pedido, "invasor"))
                 .isInstanceOf(AcessoNegadoException.class);
         verify(feedbackRepository, never()).save(any());
     }
@@ -403,7 +409,9 @@ class FeedbackServiceImplTest {
         anonimo.setUsuarioId(null);
         when(feedbackRepository.findById("f1")).thenReturn(Optional.of(anonimo));
 
-        assertThatThrownBy(() -> service.atualizar("f1", request("v1"), "u1"))
+        FeedbackRequest pedido = request("v1");
+
+        assertThatThrownBy(() -> service.atualizar("f1", pedido, "u1"))
                 .isInstanceOf(AcessoNegadoException.class);
     }
 
@@ -411,7 +419,9 @@ class FeedbackServiceImplTest {
     void atualizarFeedbackInexistenteRespondeNaoEncontrado() {
         when(feedbackRepository.findById("f1")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.atualizar("f1", request("v1"), "u1"))
+        FeedbackRequest pedido = request("v1");
+
+        assertThatThrownBy(() -> service.atualizar("f1", pedido, "u1"))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
     }
 

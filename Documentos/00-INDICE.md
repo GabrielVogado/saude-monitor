@@ -1,7 +1,28 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 19/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 22/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 22/10/2026 — Homologação v1.0.0-rc.7
+
+**O que entrou:** registro da rc que leva as correções do teste de campo da rc.6 (PR #220, M-059) para a homologação: lista da cópia do catálogo, temporizador na visita automática e checkout pela posição na hora da saída. O roteiro começa pela repetição do teste de campo e depois remete ao roteiro da rc.6, que ficou incompleto. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.7.md`](./10-git-flow/homologacoes/v1.0.0-rc.7.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova; só o PR da M-059 passa a constar como #220).
+
+---
+
+## 📌 Revisão 21/10/2026 — Teste de campo da rc.6
+
+**O que mudou:** o resultado do teste do PO na UPA Riacho Fundo II entra no registro da rc ([`10-git-flow/homologacoes/v1.0.0-rc.6.md`](./10-git-flow/homologacoes/v1.0.0-rc.6.md), §4.1), e as três correções no app viram a M-059 do `Historico-Melhorias.md`: a aba Hospitais abre da cópia do catálogo guardada no aparelho, o detalhe mostra o temporizador também na visita automática, e o checkout automático percebe a saída pela posição e grava a hora real dela.
+**Sem mudança:** `De-Para-Backlog-Features.md` (correção de comportamento de estórias já entregues, sem estória nova).
+
+---
+
+## 📌 Revisão 19/10/2026 — Plano de marketing e vendas
+
+**O que entrou:** [`13-marketing/Plano-Marketing-Vendas-v1.1.md`](./13-marketing/Plano-Marketing-Vendas-v1.1.md), que complementa o `Plano-Divulgacao-v1.0.md` (continua ativo) com a frente de receita decidida pelo PO em 19/10/2026 (poder público, cupons de comércios após o feedback e anúncios), as regras que protegem o indicador e a LGPD, o funil de venda e o calendário até o lançamento público de março de 2027. Conferido contra `develop@42e90d8`: registra que a política de privacidade atual proíbe uso para publicidade (precisa ser revista antes de qualquer cupom ou anúncio), que a explicação "Como calculamos" da F-06 não existe no app e que o cupom pós-feedback ainda não tem item de produto.
+**Sem mudança:** `De-Para-Backlog-Features.md` (nenhuma estória entregue) e `Historico-Melhorias.md` (não é correção nem mudança de processo).
 
 ---
 

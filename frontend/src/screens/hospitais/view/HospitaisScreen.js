@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MapPinOff, Search, Trophy } from "lucide-react-native";
 import {
@@ -11,8 +19,12 @@ import {
   CSTextField,
   CSIconButton,
 } from "../../../components";
-import { colors, spacing } from "../../../theme/tokens";
-import { useHospital, useHospitaisLista } from "../hooks/useHospitais";
+import { colors, spacing, typography } from "../../../theme/tokens";
+import {
+  useHospital,
+  useHospitaisCatalogoLocal,
+  useHospitaisLista,
+} from "../hooks/useHospitais";
 import { useCheckinManual } from "../../visitas/hooks/useMutacoesVisita";
 import { useVisitaAtivaDaTela } from "../../visitas/hooks/useVisitaAtivaDaTela";
 import { useAcoesListaPaginada } from "../../../core/query/useAcoesListaPaginada";
@@ -55,8 +67,22 @@ export default function HospitaisScreen({ navigation }) {
   // biblioteca (antes: `geracaoRef` e `buscandoMaisRef`).
   const { data, error, isPending, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } =
     useHospitaisLista({ busca: buscaAplicada, tipo });
-  const dados = useMemo(() => data ?? [], [data]);
-  const erro = error && !data ? error.message || "Não foi possível carregar os hospitais." : null;
+  // Enquanto a primeira página não chega (backend frio, rede lenta) ou quando o servidor
+  // falha, a lista sai da cópia do catálogo guardada no aparelho, com o mesmo filtro e
+  // a mesma ordem (teste de campo da rc.6, 21/10/2026). A resposta do servidor a
+  // substitui assim que chega.
+  const { data: catalogoLocal } = useHospitaisCatalogoLocal({ busca: buscaAplicada, tipo });
+  const usandoCatalogo = !data && Array.isArray(catalogoLocal) && catalogoLocal.length > 0;
+  const dados = useMemo(() => {
+    if (data) {
+      return data;
+    }
+    return usandoCatalogo ? catalogoLocal : [];
+  }, [data, usandoCatalogo, catalogoLocal]);
+  const erro =
+    error && !data && !usandoCatalogo
+      ? error.message || "Não foi possível carregar os hospitais."
+      : null;
 
   // `carregarMais` é chamado pela FlatList ao chegar perto do fim (`onEndReached`):
   // busca a próxima página e concatena, sem recarregar nem perder a posição do scroll.
@@ -270,7 +296,15 @@ export default function HospitaisScreen({ navigation }) {
         </View>
       </View>
 
-      {isPending ? (
+      {error && usandoCatalogo ? (
+        // A cópia pode ter horas: sem o aviso, notas e tempos dela pareceriam atuais.
+        <Text style={styles.avisoCopia} accessibilityRole="alert">
+          Sem conexão com o servidor. Mostrando a lista guardada no aparelho, que pode estar
+          desatualizada. Puxe para tentar de novo.
+        </Text>
+      ) : null}
+
+      {isPending && !usandoCatalogo ? (
         <CSLoadingList count={3} />
       ) : (
         <FlatList
@@ -324,5 +358,11 @@ const styles = StyleSheet.create({
   },
   rodapeCarregando: {
     paddingVertical: spacing.s4,
+  },
+  avisoCopia: {
+    ...typography.bodySm,
+    color: colors.onSurfaceVariant,
+    paddingHorizontal: spacing.s4,
+    paddingBottom: spacing.s3,
   },
 });

@@ -36,12 +36,13 @@ export default function VisitaAtivaSync() {
   const visitaId = visita?.id || null;
   const entrada = visita?.entrada || null;
   const hospitalId = visita?.hospitalId || null;
+  const origem = visita?.origem || null;
 
   useEffect(() => {
     if (!conhecida) {
       return;
     }
-    sincronizarVisitaAtiva(visitaId, entrada, hospitalId).catch(() => {});
+    sincronizarVisitaAtiva(visitaId, entrada, hospitalId, origem).catch(() => {});
     if (visitaId) {
       iniciarHeartbeat(visitaId);
     } else {
@@ -49,7 +50,7 @@ export default function VisitaAtivaSync() {
     }
     // `dataUpdatedAt` reaplica a cada resposta nova do servidor, como a Home fazia a
     // cada foco: o estado do geofencing pode ter mudado em segundo plano.
-  }, [conhecida, visitaId, entrada, hospitalId, dataUpdatedAt]);
+  }, [conhecida, visitaId, entrada, hospitalId, origem, dataUpdatedAt]);
 
   // Erro real do servidor (não falta de conexão) para o heartbeat, como a Home fazia,
   // mas não apaga a visita guardada para o checkout automático: erro não é resposta

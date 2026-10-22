@@ -10,8 +10,8 @@ import VisitaService from "./VisitaService";
 import { invalidarVisitaAtiva } from "../../../core/query/queryClient";
 import { agendarFeedback } from "../../feedback/service/FeedbackNotificationService";
 import { centroDoHospital } from "../../../utils/geojson";
-import { duracaoMinutosDesde } from "../../../utils/format";
 import { haversineMetros } from "../../../utils/distancia";
+import { duracaoMinutosDesde } from "../../../utils/format";
 
 /**
  * Geofencing nativo (F-03/ADR-002): substitui o GPS contínuo (que não funciona em
@@ -112,15 +112,19 @@ const OPCOES_ACOMPANHAMENTO = {
   },
   [MODO_VISITA]: {
     // Mesma precisão de quarteirão (~100 m) do outro modo, que vira ponto amostral da
-    // visita no backend; a economia de bateria vem do intervalo de 5 min.
+    // visita no backend. Cada leitura também confere se a pessoa ainda está perto do
+    // hospital (`conferirPosicaoDaVisita`): o intervalo é o atraso máximo para notar a
+    // saída quando o Exit do SO não chega. Era 5 min; no teste de campo da rc.6
+    // (21/10/2026) o Exit só chegou ~30 min depois e o checkout saiu com a pessoa em
+    // outra cidade. O sinal ao backend continua a cada ~10 min.
     accuracy: Location.Accuracy.Balanced,
-    timeInterval: 5 * 60 * 1000,
+    timeInterval: 2 * 60 * 1000,
     notificationBody: "Visita em andamento. Registrando que você continua no hospital.",
   },
 };
 
 /**
- * Intervalo mínimo entre dois sinais da mesma visita. Com leituras a cada 5 min, o sinal
+ * Intervalo mínimo entre dois sinais da mesma visita. Com leituras a cada 2 min, o sinal
  * sai a cada ~10 min, bem dentro da janela de 45 min do `VisitaGpsInterrompidoJob`.
  */
 const INTERVALO_SINAL_VISITA_MS = 9 * 60 * 1000;
@@ -159,7 +163,8 @@ const INTERVALO_NOVA_EXPLICACAO_MS = 3 * 24 * 60 * 60 * 1000;
  * quando o SO encerra o processo: a saída chegava num processo novo, sem visita ativa
  * em memória, e o checkout automático não acontecia.
  *
- * - `visita`: `{ id, hospitalId, entrada }` da visita ativa conhecida;
+ * - `visita`: `{ id, hospitalId, entrada, origem, regiao }` da visita ativa conhecida
+ *   (`regiao` é o centro e o raio do hospital, guardados na primeira conferência de posição);
  * - `entradas` / `saidas`: `{ [hospitalId]: instante do evento em ms }` aguardando a
  *   tolerância da RN-01 (2 min) ou da RN-03 (5 min);
  * - `sinal`: `{ visitaId, em }` do último heartbeat enviado em segundo plano;
@@ -297,6 +302,7 @@ async function confirmarEntrada(hospitalId) {
           id: resposta.id,
           hospitalId,
           entrada: resposta?.entrada || new Date().toISOString(),
+          origem: "GEOFENCE",
         };
       });
     }
@@ -326,11 +332,15 @@ async function confirmarEntrada(hospitalId) {
 // O checkout usa a visita ativa guardada no estado: quem manda é o registro aberto. A
 // região só confere que a saída é do hospital dessa visita — uma saída antiga de A,
 // vencendo depois de um check-in em B, não pode encerrar a visita de B.
-async function confirmarSaida(hospitalId) {
+// `desde` é o instante em que a saída foi vista (Exit do SO ou leitura fora da região):
+// vai ao backend como `ocorridoEm`, para os 5 min de tolerância e o atraso do SO não
+// entrarem no tempo de permanência.
+async function confirmarSaida(hospitalId, desde) {
   const { visita } = await lerEstado();
   if (!visita || (visita.hospitalId && visita.hospitalId !== hospitalId)) {
     return;
   }
+  const saidaEm = new Date(Number.isFinite(desde) ? desde : Date.now()).toISOString();
 
   const encerrarLocalmente = async (duracaoMinutos) => {
     // Épico 03 — E3-01: pede o feedback após a saída automática por geofence, só se a
@@ -340,6 +350,8 @@ async function confirmarSaida(hospitalId) {
       visitaId: visita.id,
       hospitalId: visita.hospitalId,
       hospitalNome: null,
+      // Base do convite de feedback, que sai ~1 min depois dela: é o agora, não o
+      // instante da saída, que já tem ao menos os 5 min da RN-03 e cairia no passado.
       saidaEm: new Date().toISOString(),
       duracaoMinutos,
     }).catch((erro) => {
@@ -355,7 +367,7 @@ async function confirmarSaida(hospitalId) {
   };
 
   try {
-    const resposta = await VisitaService.checkout(visita.id, {});
+    const resposta = await VisitaService.checkout(visita.id, { ocorridoEm: saidaEm });
     await encerrarLocalmente(resposta?.duracaoMinutos);
     void invalidarVisitaAtiva();
   } catch (erro) {
@@ -363,7 +375,7 @@ async function confirmarSaida(hospitalId) {
     // da saída: a entrega está garantida, então o app pode encerrar a visita
     // localmente. Insistir aqui só reenfileiraria o mesmo evento.
     if (erro?.enfileirado) {
-      await encerrarLocalmente(duracaoMinutosDesde(visita.entrada));
+      await encerrarLocalmente(duracaoMinutosDesde(visita.entrada, new Date(saidaEm).getTime()));
       return;
     }
 
@@ -399,16 +411,19 @@ export async function processarPendencias(agora = Date.now()) {
       (id) => agora - estado.entradas[id] >= TOLERANCIA_ENTRADA_MS
     );
     const comInstante = entradas.map((id) => ({ hospitalId: id, desde: estado.entradas[id] }));
+    const saidasComInstante = saidas.map((id) => ({ hospitalId: id, desde: estado.saidas[id] }));
     saidas.forEach((id) => delete estado.saidas[id]);
     entradas.forEach((id) => delete estado.entradas[id]);
-    return { saidas, entradas: comInstante };
+    return { saidas: saidasComInstante, entradas: comInstante };
   });
 
   // Saídas antes das entradas: quem deixa um hospital e entra em outro encerra a visita
-  // anterior antes de abrir a nova.
-  for (const hospitalId of vencidas.saidas) {
-    await confirmarSaida(hospitalId);
-  }
+  // anterior antes de abrir a nova. Uma de cada vez, encadeadas: em paralelo, duas saídas
+  // leriam o mesmo estado e uma apagaria o que a outra gravou.
+  await vencidas.saidas.reduce(
+    (anterior, { hospitalId, desde }) => anterior.then(() => confirmarSaida(hospitalId, desde)),
+    Promise.resolve()
+  );
   for (const { hospitalId, desde } of vencidas.entradas) {
     const tentarDeNovo = await confirmarEntrada(hospitalId);
     if (tentarDeNovo && agora - desde < LIMITE_NOVA_TENTATIVA_ENTRADA_MS) {
@@ -595,11 +610,93 @@ export async function enviarSinalDaVisita(locations, agora = Date.now()) {
   }
 }
 
+/**
+ * Confere, a cada leitura do acompanhamento, se a posição ainda é do hospital da visita
+ * aberta (teste de campo da rc.6, 21/10/2026). Antes, a saída dependia só do Exit do SO,
+ * que o Android entrega com muito atraso em segundo plano: na UPA Riacho Fundo II ele
+ * chegou ~30 min depois, com a pessoa já em Samambaia.
+ *
+ * Só decide quando a leitura é conclusiva com a sua precisão: fora da região mesmo
+ * descontando o erro da leitura, a saída passa a contar a partir dela (a RN-03 continua
+ * exigindo 5 min fora); dentro mesmo somando o erro, uma saída pendente é desfeita, como
+ * faria um Enter. Leitura ambígua, velha ou anterior à entrada não muda nada, e o Exit do
+ * SO continua valendo.
+ *
+ * Vale só para a visita automática: o check-in manual é aceito de qualquer lugar e quem o
+ * encerra é a pessoa ("Não estou aqui"); uma leitura no estacionamento não pode fechá-lo.
+ */
+export async function conferirPosicaoDaVisita(locations, agora = Date.now()) {
+  const ultima = Array.isArray(locations) ? locations.at(-1) : null;
+  const coords = ultima?.coords;
+  if (!coords) {
+    return;
+  }
+  // Sem horário, a leitura é deste disparo; com horário, precisa ser recente e da visita.
+  const instante = Number.isFinite(ultima.timestamp) ? Math.min(ultima.timestamp, agora) : agora;
+  if (agora - instante > IDADE_MAXIMA_POSICAO_MS) {
+    return;
+  }
+
+  const { visita } = await lerEstado();
+  if (visita?.origem !== "GEOFENCE" || !visita.hospitalId) {
+    return;
+  }
+  const entradaMs = visita.entrada ? new Date(visita.entrada).getTime() : Number.NaN;
+  if (Number.isFinite(entradaMs) && instante < entradaMs) {
+    return;
+  }
+
+  const regiao = visita.regiao || (await buscarRegiaoDoHospital(visita.hospitalId));
+  if (!regiao) {
+    return;
+  }
+  const distancia = haversineMetros(coords, regiao);
+  if (distancia === null) {
+    return;
+  }
+  const precisao = Number.isFinite(coords.accuracy) ? coords.accuracy : 0;
+  const fora = distancia - precisao > regiao.raio;
+  const dentro = distancia + precisao <= regiao.raio;
+
+  const tolerancia = await alterarEstado((estado) => {
+    if (estado.visita?.id !== visita.id) {
+      return null;
+    }
+    estado.visita.regiao = regiao;
+    if (dentro) {
+      delete estado.saidas[visita.hospitalId];
+    } else if (fora && !estado.saidas[visita.hospitalId]) {
+      estado.saidas[visita.hospitalId] = instante;
+      return TOLERANCIA_SAIDA_MS - (agora - instante);
+    }
+    return null;
+  });
+  if (Number.isFinite(tolerancia)) {
+    agendarAvaliacao(Math.max(0, tolerancia));
+  }
+}
+
+/**
+ * Centro e raio da região do hospital, da cópia do catálogo no aparelho, sem rede: a
+ * conferência roda a cada leitura em segundo plano e não pode esperar o servidor.
+ */
+async function buscarRegiaoDoHospital(hospitalId) {
+  try {
+    const lista = await CatalogoLocal.lerCopiaGuardada();
+    const hospital = (lista || []).find((item) => item?.id === hospitalId);
+    const centro = hospital ? centroDoHospital(hospital) : null;
+    return centro ? { ...centro, raio: raioDaRegiao(hospital) } : null;
+  } catch {
+    return null;
+  }
+}
+
 TaskManager.defineTask(ACOMPANHAMENTO_TASK, async ({ data, error }) => {
   if (error) {
     return;
   }
   try {
+    await conferirPosicaoDaVisita(data?.locations);
     await processarPendencias();
     await enviarSinalDaVisita(data?.locations);
   } catch {
@@ -809,7 +906,12 @@ export async function iniciarGeofencing({ interativo = true } = {}) {
  * Informa a este serviço qual visita está ativa (para confirmar o checkout automático).
  * Chamado com o resultado de `buscarAtiva()` sempre que a Home ganha foco.
  */
-export async function sincronizarVisitaAtiva(visitaId, entrada = null, hospitalId = null) {
+export async function sincronizarVisitaAtiva(
+  visitaId,
+  entrada = null,
+  hospitalId = null,
+  origem = null
+) {
   await alterarEstado((estado) => {
     if (!visitaId) {
       estado.visita = null;
@@ -825,7 +927,11 @@ export async function sincronizarVisitaAtiva(visitaId, entrada = null, hospitalI
       id: visitaId,
       hospitalId: hospitalId || anterior?.hospitalId || null,
       entrada: entrada || anterior?.entrada || null,
+      origem: origem || anterior?.origem || null,
     };
+    if (anterior?.regiao) {
+      estado.visita.regiao = anterior.regiao;
+    }
   });
   await ajustarAcompanhamento();
 }

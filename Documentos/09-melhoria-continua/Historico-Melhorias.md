@@ -3459,7 +3459,7 @@ baixado uma vez por mudança no painel, e nota e tempo custam uma chamada a cada
 
 ## M-063 — Editar a avaliação em até 15 dias e ver o hospital no Histórico
 
-**Data:** 22/10/2026 · **PR:** #PRNUM · **Origem:** pedido do PO, com print da aba Avaliações do Histórico
+**Data:** 22/10/2026 · **PR:** #228 · **Origem:** pedido do PO, com print da aba Avaliações do Histórico
 
 ### Como era
 

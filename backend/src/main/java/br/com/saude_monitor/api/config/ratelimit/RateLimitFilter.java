@@ -17,6 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -148,6 +149,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return null;
     }
 
+    /** Caminhos de leitura pública que valem só exatos, sem subcaminhos. */
+    private static final Set<String> GET_PUBLICOS_EXATOS =
+            Set.of("/api/v1/catalogo", "/api/v1/catalogo/indicadores", "/api/v1/configuracao");
+
     private boolean isPublico(String method, String uri) {
         // Móderação de sugestões (E1-06): GET/POST em /hospitais/sugestoes/** são ADMIN
         // (autenticados em SecurityConfig) — não contam como público genérico.
@@ -159,13 +164,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if ("GET".equals(method) && uri.startsWith("/api/v1/hospitais")) {
             return true;
         }
-        // Catálogo público de estabelecimentos (ARQ-01) e os indicadores dele.
-        if ("GET".equals(method)
-                && ("/api/v1/catalogo".equals(uri) || "/api/v1/catalogo/indicadores".equals(uri))) {
-            return true;
-        }
-        // Configuração remota lida pelo app ao abrir (ARQ-09).
-        if ("GET".equals(method) && "/api/v1/configuracao".equals(uri)) {
+        // Catálogo público (ARQ-01), os indicadores dele e a configuração remota (ARQ-09).
+        if ("GET".equals(method) && GET_PUBLICOS_EXATOS.contains(uri)) {
             return true;
         }
         // GET de camadas geográficas (F-11, §5): leitura pública de recurso estático.

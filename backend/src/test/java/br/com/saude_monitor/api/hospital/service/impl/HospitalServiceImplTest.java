@@ -104,8 +104,8 @@ class HospitalServiceImplTest {
                 org.mockito.ArgumentMatchers.eq(HospitalDocument.class));
         assertThat(captor.getValue().getQueryObject()).containsEntry("ativo", true);
         assertThat(captor.getValue().getSortObject().keySet()).containsExactly("nome", "id");
-        assertThat(catalogo).hasSize(6);
-        assertThat(catalogo).allSatisfy(item -> assertThat(item.indicadores()).isNull());
+        assertThat(catalogo).hasSize(6)
+                .allSatisfy(item -> assertThat(item.indicadores()).isNull());
     }
 
     @Test

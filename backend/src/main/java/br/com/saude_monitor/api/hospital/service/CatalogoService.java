@@ -65,7 +65,7 @@ public class CatalogoService {
         });
     }
 
-    /** Indicadores atuais de todo o catálogo, montados de novo só quando o guardado venceu. */
+    /** Indicadores atuais de cada estabelecimento do catálogo, montados de novo só quando o guardado venceu. */
     public IndicadoresCatalogoResponse obterIndicadores() {
         return indicadores.obterOuMontar(clock, () -> {
             Map<String, IndicadoresResponse> porHospital = hospitalService.listarIndicadoresDoCatalogo();

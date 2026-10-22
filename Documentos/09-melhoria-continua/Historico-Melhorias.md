@@ -3418,7 +3418,7 @@ que a borda pode servir a todos.
 
 ## M-062 — Mapa lê a cópia do catálogo no aparelho
 
-**Data:** 22/10/2026 · **PR:** (este PR) · **Origem:** segunda etapa da M-061, pedida pelo PO
+**Data:** 22/10/2026 · **PR:** #225 · **Origem:** segunda etapa da M-061, pedida pelo PO
 
 ### Como era
 

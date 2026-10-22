@@ -11,7 +11,6 @@ export const queryKeys = {
     detalhes: () => [...queryKeys.hospitais.all, "detalhe"],
     detalhe: (id) => [...queryKeys.hospitais.detalhes(), id],
     indicadores: (id) => [...queryKeys.hospitais.detalhe(id), "indicadores"],
-    mapa: (filtros) => [...queryKeys.hospitais.all, "mapa", filtros],
     ranking: (filtros) => [...queryKeys.hospitais.all, "ranking", filtros],
     catalogoLocal: () => [...queryKeys.hospitais.all, "catalogoLocal"],
     indicadoresDoCatalogo: () => [...queryKeys.hospitais.all, "indicadoresDoCatalogo"],

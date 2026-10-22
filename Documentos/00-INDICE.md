@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 22/10/2026 — Mapa pela cópia do catálogo
+
+**O que mudou:** segunda etapa da revisão abaixo. O mapa passa a ler a mesma cópia do catálogo guardada no aparelho, com o filtro por raio calculado no próprio app e nota e tempo de `GET /api/v1/catalogo/indicadores`; deixa de pedir `GET /api/v1/hospitais` em páginas. Registro em `Historico-Melhorias.md` (M-062).
+**Também:** `De-Para-Backlog-Features.md` atualiza ARQ-01.
+
+---
+
 ## 📌 Revisão 22/10/2026 — Lista de hospitais pela versão do catálogo
 
 **O que mudou:** a pedido do PO, a lista de hospitais deixa de ir ao servidor de tempos em tempos. O catálogo passa a vir sem nota e tempo, e a versão dele (que só muda quando um hospital muda pelo painel) chega ao app pela configuração remota; nota e tempo vêm de `GET /api/v1/catalogo/indicadores`. Registro em `Historico-Melhorias.md` (M-061), com o motivo de não usar um evento do painel por push.

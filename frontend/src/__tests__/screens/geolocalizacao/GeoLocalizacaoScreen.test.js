@@ -2,8 +2,8 @@
  * Mapa de hospitais (F-07 — Sprint S8).
  *
  * Cobre os dois entregáveis da estória: os polígonos das geofences renderizados
- * numa fonte GeoJSON única e o filtro geográfico por raio, que delega o recorte
- * ao backend (`GET /api/v1/hospitais?latitude&longitude&raioKm`) quando há GPS.
+ * numa fonte GeoJSON única e o filtro geográfico por raio. Desde a M-062, os hospitais
+ * vêm da cópia do catálogo no aparelho e o recorte por raio é feito ali, sem servidor.
  */
 import React from "react";
 import {
@@ -16,9 +16,25 @@ import {
 import { renderComProviders } from "../../helpers/renderComProviders";
 import GeoLocalizacaoScreen from "../../../screens/geolocalizacao/view/GeoLocalizacaoScreen";
 import HospitalService from "../../../screens/hospitais/service/HospitalService";
+import CatalogoLocal from "../../../services/CatalogoLocal";
+import { queryKeys } from "../../../core/query/queryKeys";
 import { useGeolocalizacao } from "../../../screens/geolocalizacao/service/GeoLocalizacaoService";
 
 jest.mock("../../../screens/hospitais/service/HospitalService");
+jest.mock("../../../services/CatalogoLocal", () => ({
+  __esModule: true,
+  default: {
+    lerCopiaGuardada: jest.fn(),
+    obterEstabelecimentos: jest.fn(),
+    sincronizarVersao: jest.fn(),
+    conferirSeVencida: jest.fn(),
+  },
+}));
+
+/** Cópia do catálogo guardada no aparelho, de onde o mapa lê os hospitais. */
+function comCatalogo(hospitais) {
+  CatalogoLocal.lerCopiaGuardada.mockResolvedValue(hospitais);
+}
 
 // @rnmapbox/maps: componentes nativos não suportados pelo Jest;
 // substituídos por Views que preservam os props (mesmo padrão do App.test.js).
@@ -144,7 +160,9 @@ function tocarNoMarcador(elemento) {
 describe("GeoLocalizacaoScreen (F-07)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    HospitalService.listar.mockResolvedValue({ content: [HOSPITAL] });
+    comCatalogo([HOSPITAL]);
+    CatalogoLocal.conferirSeVencida.mockResolvedValue(false);
+    HospitalService.listarIndicadoresDoCatalogo.mockResolvedValue({ porHospital: {} });
     comGps({ latitude: -15.785, longitude: -47.885, accuracy: 10 });
   });
 
@@ -156,56 +174,60 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     expect(fonte.props.shape.features[0].properties).toEqual({ id: "h1", nome: "Hospital Alfa" });
   });
 
-  test("sem raio selecionado, carrega o catálogo completo", async () => {
+  test("sem raio selecionado, mostra o catálogo completo do aparelho sem ir ao servidor", async () => {
+    comCatalogo([hospitalTeste("h1", "Hospital Alfa"), hospitalTeste("h2", "Hospital Beta")]);
+
     renderizar();
 
-    await waitFor(() => {
-      expect(HospitalService.listar).toHaveBeenCalledWith({ page: 0, size: 100, signal: expect.anything() });
-    });
+    expect(await screen.findByTestId("marcador-hospital-h2")).toBeTruthy();
+    expect(screen.getByTestId("marcador-hospital-h1")).toBeTruthy();
+    expect(HospitalService.listar).not.toHaveBeenCalled();
   });
 
-  test("BUG-09: 'Todos' percorre todas as páginas até completar o catálogo, não só a primeira", async () => {
-    // Regressão relatada em 09/09/2026: com 340 hospitais ativos e o backend limitando
-    // `size` a 100, uma única chamada com "Todos" selecionado só trazia os 100 primeiros
-    // (por ordem "natural" do Mongo) — as UBS do Recanto das Emas, entre outras, ficavam
-    // de fora do mapa mesmo estando ativas, e só apareciam com um raio selecionado
-    // porque o recorte geográfico reduzia o total a poucos itens.
-    const p0 = Array.from({ length: 100 }, (_, i) => ({ id: `a${i}`, nome: `Hospital ${i}` }));
-    const p1 = Array.from({ length: 100 }, (_, i) => ({ id: `b${i}`, nome: `Hospital ${100 + i}` }));
-    const p2 = [{ id: "ubs-05", nome: "Ubs 05 Recanto das Emas" }];
-
-    HospitalService.listar.mockImplementation(({ page }) => {
-      const paginas = [p0, p1, p2];
-      return Promise.resolve({ content: paginas[page], totalElements: 201 });
-    });
+  test("BUG-09: 'Todos' mostra o catálogo inteiro, não só os 100 primeiros", async () => {
+    // Regressão relatada em 09/09/2026: com 340 hospitais ativos, só os 100 primeiros
+    // apareciam (as UBS do Recanto das Emas ficavam de fora). Com a cópia local não há
+    // página, mas os marcadores entram em lotes de 100: o último lote também tem de entrar.
+    const catalogo = Array.from({ length: 200 }, (_, i) => hospitalTeste(`a${i}`, `Hospital ${i}`));
+    catalogo.push(hospitalTeste("ubs-05", "Ubs 05 Recanto das Emas"));
+    comCatalogo(catalogo);
 
     renderizar();
 
-    await waitFor(() => {
-      expect(HospitalService.listar).toHaveBeenLastCalledWith({ page: 2, size: 100, signal: expect.anything() });
-    });
-    expect(HospitalService.listar).toHaveBeenNthCalledWith(1, { page: 0, size: 100, signal: expect.anything() });
-    expect(HospitalService.listar).toHaveBeenNthCalledWith(2, { page: 1, size: 100, signal: expect.anything() });
+    expect(await screen.findByTestId("marcador-hospital-ubs-05")).toBeTruthy();
+    expect(screen.getAllByTestId(/^marcador-hospital-/)).toHaveLength(201);
   });
 
-  test("selecionar um raio envia latitude, longitude e raioKm ao backend", async () => {
+  test("selecionar um raio filtra no aparelho pela distância até o GPS", async () => {
+    // Centro do ANEL a ~278 m do GPS; o "Longe" fica a ~11 km.
+    const LONGE = { id: "h9", nome: "Hospital Longe", localizacao: { latitude: -15.685, longitude: -47.885 } };
+    comCatalogo([HOSPITAL, LONGE]);
     renderizar();
-    await screen.findByText("5 km");
+    await screen.findByTestId("marcador-hospital-h9");
 
     fireEvent.press(screen.getByText("5 km"));
 
-    await waitFor(() => {
-      expect(HospitalService.listar).toHaveBeenLastCalledWith({
-        latitude: -15.785,
-        longitude: -47.885,
-        raioKm: 5,
-        size: 100,
-        signal: expect.anything(),
-      });
-    });
+    await waitFor(() => expect(screen.queryByTestId("marcador-hospital-h9")).toBeNull());
+    expect(screen.getByTestId("marcador-hospital-h1")).toBeTruthy();
+    fireEvent.press(screen.getByText("25 km"));
+    expect(await screen.findByTestId("marcador-hospital-h9")).toBeTruthy();
+    expect(HospitalService.listar).not.toHaveBeenCalled();
+  });
+
+  test("hospital sem posição conhecida fica fora do recorte por raio", async () => {
+    comCatalogo([HOSPITAL, { id: "h8", nome: "Sem posição" }]);
+    renderizar();
+    await screen.findByTestId("marcador-hospital-h1");
+
+    fireEvent.press(screen.getByText("1 km"));
+
+    await waitFor(() => expect(screen.queryByTestId("marcador-hospital-h8")).toBeNull());
+    expect(screen.getByTestId("marcador-hospital-h1")).toBeTruthy();
   });
 
   test("raio selecionado sem GPS avisa o usuário e mantém o catálogo completo", async () => {
+    const LONGE = { id: "h9", nome: "Hospital Longe", localizacao: { latitude: -15.685, longitude: -47.885 } };
+    comCatalogo([HOSPITAL, LONGE]);
     comGps(null);
     renderizar();
     await screen.findByText("10 km");
@@ -215,7 +237,21 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     expect(
       await screen.findByText("Aguardando o GPS para filtrar hospitais num raio de 10 km.")
     ).toBeTruthy();
-    expect(HospitalService.listar).toHaveBeenLastCalledWith({ page: 0, size: 100, signal: expect.anything() });
+    expect(screen.getByTestId("marcador-hospital-h9")).toBeTruthy();
+  });
+
+  test("a nota do card vem dos indicadores do servidor, não da cópia do catálogo", async () => {
+    comCatalogo([hospitalTeste("h1", "Hospital Alfa", { indicadores: { notaMedia: 1, nAvaliacoes: 3 } })]);
+    HospitalService.listarIndicadoresDoCatalogo.mockResolvedValue({
+      porHospital: { h1: { notaMedia: 4.2, nAvaliacoes: 12, tempoMedianoMinutos: 95 } },
+    });
+    renderizar();
+
+    tocarNoMarcador(await screen.findByLabelText("Ver informações de Hospital Alfa"));
+
+    const card = await screen.findByTestId("card-hospital-mapa");
+    expect(await within(card).findByText("12 avaliações")).toBeTruthy();
+    expect(within(card).queryByText("3 avaliações")).toBeNull();
   });
 
   test("tocar no card do hospital selecionado abre o detalhe na própria pilha do Mapa", async () => {
@@ -268,13 +304,11 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     // Usa `CSOptionSheet` em vez de `Alert.alert`: no Android, `Alert.alert` só
     // exibe os 3 primeiros botões — insuficiente para o cenário de 5+ unidades
     // que motivou o bug.
-    HospitalService.listar.mockResolvedValue({
-      content: [
+    comCatalogo([
         hospitalTeste("h1", "Hospital Alfa"),
         hospitalTeste("h2", "Hospital Beta"),
         hospitalTeste("h3", "Hospital Gama"),
-      ],
-    });
+      ]);
     renderizar();
     const fonte = await screen.findByTestId("geofences-hospitais");
 
@@ -490,15 +524,8 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     const INDICADORES = { notaMedia: 4.2, nAvaliacoes: 12, tempoMedianoMinutos: 95 };
 
     test("tocar no marcador seleciona o hospital e mostra o card com as informações básicas", async () => {
-      HospitalService.listar.mockResolvedValue({
-        content: [
-          hospitalTeste("h1", "Hospital Alfa", {
-            categoria: "UPA",
-            tipo: "PUBLICO",
-            indicadores: INDICADORES,
-          }),
-        ],
-      });
+      comCatalogo([hospitalTeste("h1", "Hospital Alfa", { categoria: "UPA", tipo: "PUBLICO" })]);
+      HospitalService.listarIndicadoresDoCatalogo.mockResolvedValue({ porHospital: { h1: INDICADORES } });
       renderizar();
 
       const marcador = await screen.findByLabelText("Ver informações de Hospital Alfa");
@@ -541,9 +568,7 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     });
 
     test("o marcador selecionado é destacado e desenhado por último, acima dos demais", async () => {
-      HospitalService.listar.mockResolvedValue({
-        content: [hospitalTeste("h1", "Hospital Alfa"), hospitalTeste("h2", "Hospital Beta")],
-      });
+      comCatalogo([hospitalTeste("h1", "Hospital Alfa"), hospitalTeste("h2", "Hospital Beta")]);
       renderizar();
 
       tocarNoMarcador(await screen.findByLabelText("Ver informações de Hospital Alfa"));
@@ -558,7 +583,7 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     });
 
     test("selecionar centraliza a câmera no hospital, sem alterar o zoom", async () => {
-      HospitalService.listar.mockResolvedValue({ content: [hospitalTeste("h1", "Hospital Alfa")] });
+      comCatalogo([hospitalTeste("h1", "Hospital Alfa")]);
       renderizar();
 
       const marcador = await screen.findByLabelText("Ver informações de Hospital Alfa");
@@ -587,9 +612,7 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     });
 
     test("tocar em outro marcador troca o hospital do card", async () => {
-      HospitalService.listar.mockResolvedValue({
-        content: [hospitalTeste("h1", "Hospital Alfa"), hospitalTeste("h2", "Hospital Beta")],
-      });
+      comCatalogo([hospitalTeste("h1", "Hospital Alfa"), hospitalTeste("h2", "Hospital Beta")]);
       renderizar();
 
       tocarNoMarcador(await screen.findByLabelText("Ver informações de Hospital Alfa"));
@@ -609,9 +632,8 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
       tocarNoMarcador(await screen.findByLabelText("Ver informações de Hospital Alfa"));
       await screen.findByTestId("card-hospital-mapa");
 
-      // Resposta que nunca chega: se o card só sumisse quando o resultado novo excluísse o
-      // hospital (em vez de fechar no toque), ele ficaria na tela enquanto o mapa carrega.
-      HospitalService.listar.mockReturnValue(new Promise(() => {}));
+      // O hospital continua dentro do raio: se o card só sumisse quando o resultado novo
+      // excluísse o hospital (em vez de fechar no toque), ele ficaria na tela.
       fireEvent.press(screen.getByText("5 km"));
 
       expect(screen.queryByTestId("card-hospital-mapa")).toBeNull();
@@ -633,26 +655,44 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     });
   });
 
-  test("falha ao carregar hospitais exibe mensagem sem derrubar o mapa", async () => {
-    HospitalService.listar.mockRejectedValueOnce(new Error("Backend indisponível."));
+  test("sem cópia guardada e sem rede, exibe a mensagem sem derrubar o mapa", async () => {
+    comCatalogo(null);
+    CatalogoLocal.obterEstabelecimentos.mockRejectedValueOnce(new Error("Backend indisponível."));
 
     renderizar();
 
     expect(await screen.findByText("Backend indisponível.")).toBeTruthy();
   });
 
-  test("falha numa página do meio mantém os lotes já carregados, avisa e não repete sem fim", async () => {
-    HospitalService.listar.mockImplementation(({ page }) =>
-      page === 0
-        ? Promise.resolve({ content: [hospitalTeste("h1", "Hospital Alfa")], totalElements: 2 })
-        : Promise.reject(new Error(""))
-    );
+  test("falha sem mensagem usa o texto padrão", async () => {
+    comCatalogo(null);
+    CatalogoLocal.obterEstabelecimentos.mockRejectedValueOnce(new Error(""));
 
     renderizar();
 
     expect(await screen.findByText("Não foi possível carregar os hospitais.")).toBeTruthy();
-    const fonte = screen.getByTestId("geofences-hospitais");
-    expect(fonte.props.shape.features).toHaveLength(1);
-    expect(HospitalService.listar).toHaveBeenCalledTimes(2);
+  });
+
+  test("nota nova do servidor não reenquadra a câmera", async () => {
+    const { queryClient } = renderizar();
+    await screen.findByTestId("marcador-hospital-h1");
+    await waitFor(() => expect(mockCamera.fitBounds).toHaveBeenCalled());
+    const enquadramentos = mockCamera.fitBounds.mock.calls.length;
+    HospitalService.listarIndicadoresDoCatalogo.mockResolvedValue({ porHospital: { h1: { notaMedia: 3 } } });
+
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.hospitais.indicadoresDoCatalogo() });
+    });
+
+    expect(mockCamera.fitBounds).toHaveBeenCalledTimes(enquadramentos);
+  });
+
+  test("sem servidor para os indicadores, o mapa continua com os hospitais da cópia", async () => {
+    HospitalService.listarIndicadoresDoCatalogo.mockRejectedValue(new Error("Servidor indisponível"));
+
+    renderizar();
+
+    expect(await screen.findByTestId("marcador-hospital-h1")).toBeTruthy();
+    expect(screen.queryByText("Servidor indisponível")).toBeNull();
   });
 });

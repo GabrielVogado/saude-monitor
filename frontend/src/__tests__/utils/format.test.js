@@ -25,6 +25,13 @@ describe("utils/format — duracaoMinutosDesde", () => {
     Date.now.mockRestore();
   });
 
+  test("conta até o instante informado, e não até agora (checkout automático, rc.6)", () => {
+    const entrada = "2026-10-21T19:00:00.000Z";
+    const saida = new Date("2026-10-21T19:30:00.000Z").getTime();
+
+    expect(duracaoMinutosDesde(entrada, saida)).toBe(30);
+  });
+
   test("devolve undefined para entrada inválida", () => {
     expect(duracaoMinutosDesde(undefined)).toBeUndefined();
     expect(duracaoMinutosDesde("data-invalida")).toBeUndefined();

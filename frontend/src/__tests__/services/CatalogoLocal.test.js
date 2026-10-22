@@ -97,6 +97,17 @@ describe("CatalogoLocal", () => {
     await expect(CatalogoLocal.obterEstabelecimentos({ agora: AGORA })).rejects.toThrow("Catálogo sem estabelecimentos.");
   });
 
+  test("lerCopiaGuardada devolve a cópia sem ir ao servidor, por mais velha que esteja", async () => {
+    await salvarCatalogoGuardado(0);
+
+    expect(await CatalogoLocal.lerCopiaGuardada()).toEqual([HOSPITAL]);
+    expect(apiRequest).not.toHaveBeenCalled();
+  });
+
+  test("lerCopiaGuardada sem cópia devolve null", async () => {
+    expect(await CatalogoLocal.lerCopiaGuardada()).toBeNull();
+  });
+
   test("chamadas simultâneas fazem uma requisição só", async () => {
     apiRequest.mockResolvedValue({ versao: "abc", total: 1, estabelecimentos: [HOSPITAL] });
 

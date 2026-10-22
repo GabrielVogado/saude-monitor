@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 19/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 21/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 21/10/2026 — Teste de campo da rc.6
+
+**O que mudou:** o resultado do teste do PO na UPA Riacho Fundo II entra no registro da rc ([`10-git-flow/homologacoes/v1.0.0-rc.6.md`](./10-git-flow/homologacoes/v1.0.0-rc.6.md), §4.1), e as três correções no app viram a M-059 do `Historico-Melhorias.md`: a aba Hospitais abre da cópia do catálogo guardada no aparelho, o detalhe mostra o temporizador também na visita automática, e o checkout automático percebe a saída pela posição e grava a hora real dela.
+**Sem mudança:** `De-Para-Backlog-Features.md` (correção de comportamento de estórias já entregues, sem estória nova).
 
 ---
 

@@ -70,6 +70,12 @@ describe("VisitaService (Épico 02)", () => {
     expect(JSON.parse(c.body).encerramentoManual).toBe(true);
   });
 
+  test("checkout leva o momento real da saída quando o aparelho informa (rc.6)", async () => {
+    await VisitaService.checkout("v1", { ocorridoEm: "2026-10-21T20:05:00.000Z" });
+
+    expect(JSON.parse(chamadas[0].body).ocorridoEm).toBe("2026-10-21T20:05:00.000Z");
+  });
+
   test("heartbeat envia posição quando disponível", async () => {
     const posicao = { type: "Point", coordinates: [-47.88, -15.79] };
     await VisitaService.heartbeat("v1", posicao);
@@ -217,6 +223,17 @@ describe("VisitaService (Épico 02)", () => {
       expect(item).toMatchObject({ chave: "checkout:v1", tipo: "checkout" });
       expect(item.corpo.visitaId).toBe("v1");
       expect(item.corpo.dispositivoId).toContain("anon-");
+    });
+
+    test("checkout sem internet guarda o momento em que a pessoa saiu, não o do envio", async () => {
+      semInternet();
+
+      await expect(
+        VisitaService.checkout("v1", { ocorridoEm: "2026-10-21T20:05:00.000Z" })
+      ).rejects.toMatchObject({ enfileirado: true });
+
+      const [item] = await itensDaFila();
+      expect(item.ocorridoEm).toBe("2026-10-21T20:05:00.000Z");
     });
 
     test("a mensagem promete o que a fila cumpre, em vez de anunciar falha", async () => {

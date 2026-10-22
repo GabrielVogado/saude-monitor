@@ -166,14 +166,37 @@ describe("HospitalDetalheScreen (F-03/F-04) — crash do check-in manual", () =>
     expect(screen.queryByText("Check-in manual ativo")).toBeNull();
   });
 
-  test("visita GEOFENCE ativa no mesmo hospital não mostra o cronômetro manual", async () => {
+  test("visita GEOFENCE ativa no mesmo hospital mostra o cronômetro (teste de campo da rc.6)", async () => {
     VisitaService.buscarAtiva.mockResolvedValue({
       visita: { id: "v3", origem: "GEOFENCE", hospitalId: "h1", entrada: new Date().toISOString() },
     });
 
     renderizar();
+
+    expect(await screen.findByText("Check-in automático ativo")).toBeTruthy();
+    expect(screen.getByLabelText(/^Tempo de permanência \d{2}:\d{2}:\d{2}$/)).toBeTruthy();
+  });
+
+  test("visita GEOFENCE ativa não oferece o 'Não estou aqui' (decisão do PO, 21/10/2026)", async () => {
+    VisitaService.buscarAtiva.mockResolvedValue({
+      visita: { id: "v3", origem: "GEOFENCE", hospitalId: "h1", entrada: new Date().toISOString() },
+    });
+
+    renderizar();
+    await screen.findByText("Check-in automático ativo");
+
+    expect(screen.queryByText("Não estou aqui")).toBeNull();
+  });
+
+  test("visita GEOFENCE de outro hospital não mostra o cronômetro", async () => {
+    VisitaService.buscarAtiva.mockResolvedValue({
+      visita: { id: "v4", origem: "GEOFENCE", hospitalId: "h9", entrada: new Date().toISOString() },
+    });
+
+    renderizar();
     await screen.findByText("Hospital Central");
-    expect(screen.queryByText("Check-in manual ativo")).toBeNull();
+
+    expect(screen.queryByText("Check-in automático ativo")).toBeNull();
   });
 
   test("'Não estou aqui' finaliza o check-out e repassa a duração ao feedback (RN-01/RN-07)", async () => {

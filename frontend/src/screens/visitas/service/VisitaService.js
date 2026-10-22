@@ -14,8 +14,8 @@ const BASE_PATH = "/api/v1/visitas";
  * requisição não chegou a sair do aparelho. Nesse caso o reenvio é seguro: não
  * existe a dúvida de "o servidor chegou a receber?" que impediria repetir.
  */
-async function guardarOffline({ chave, tipo, corpo }) {
-  await enfileirar({ chave, tipo, corpo });
+async function guardarOffline({ chave, tipo, corpo, ocorridoEm }) {
+  await enfileirar({ chave, tipo, corpo, ocorridoEm });
 
   return new ErroEnfileirado();
 }
@@ -64,12 +64,17 @@ class VisitaService {
    * O `dispositivoId` vai sempre: numa visita anônima ele é a prova de que este é o
    * aparelho que fez o check-in, e o backend recusa (403) quem não o tem. Vale também
    * para quem fez login no meio de uma visita que começou anônima.
+   *
+   * `ocorridoEm` (ISO) é o momento em que o aparelho viu a pessoa sair, que chega aqui
+   * depois da tolerância da RN-03: sem ele a visita contaria esses minutos como
+   * permanência (teste de campo da rc.6, 21/10/2026).
    */
-  static async checkout(id, { posicao, gpsIndisponivel, encerramentoManual } = {}) {
+  static async checkout(id, { posicao, gpsIndisponivel, encerramentoManual, ocorridoEm } = {}) {
     const corpo = {
       posicao,
       gpsIndisponivel,
       encerramentoManual,
+      ocorridoEm,
       dispositivoId: await DispositivoId.obterSeDisponivel(),
     };
 
@@ -87,6 +92,7 @@ class VisitaService {
           chave: `checkout:${id}`,
           tipo: "checkout",
           corpo: { visitaId: id, ...corpo },
+          ocorridoEm,
         });
       }
       throw erro;

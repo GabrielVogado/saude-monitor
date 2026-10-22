@@ -27,7 +27,7 @@ jest.mock("../../../services/CatalogoLocal", () => ({
   __esModule: true,
   IDADE_MAXIMA_PRIMEIRO_PLANO_MS: 300000,
   IDADE_MAXIMA_SEGUNDO_PLANO_MS: 86400000,
-  default: { obterEstabelecimentos: jest.fn() },
+  default: { obterEstabelecimentos: jest.fn(), lerCopiaGuardada: jest.fn() },
 }));
 
 jest.mock("../../../screens/visitas/service/VisitaService", () => ({
@@ -381,7 +381,7 @@ describe("confirmação de entrada", () => {
     });
     await jest.advanceTimersByTimeAsync(5 * 60 * 1000); // +5min → checkout
 
-    expect(VisitaService.checkout).toHaveBeenCalledWith("v1", {});
+    expect(VisitaService.checkout).toHaveBeenCalledWith("v1", { ocorridoEm: expect.any(String) });
     expect(agendarFeedback).toHaveBeenCalledWith(
       expect.objectContaining({ visitaId: "v1", duracaoMinutos: 12 })
     );
@@ -468,7 +468,7 @@ describe("segundo plano com o app fechado", () => {
     expect(acompanhamentoLigado).toBe(true);
     expect(Location.startLocationUpdatesAsync).toHaveBeenLastCalledWith(
       novoProcesso.ACOMPANHAMENTO_TASK,
-      expect.objectContaining({ timeInterval: 5 * 60 * 1000 })
+      expect.objectContaining({ timeInterval: 2 * 60 * 1000 })
     );
   });
 
@@ -502,7 +502,7 @@ describe("segundo plano com o app fechado", () => {
     processoEncerrado(5 * 60 * 1000);
     await carregarServico().executarAcompanhamento({ data: { locations: [] } });
 
-    expect(VisitaService.checkout).toHaveBeenCalledWith("v1", {});
+    expect(VisitaService.checkout).toHaveBeenCalledWith("v1", { ocorridoEm: expect.any(String) });
     expect(VisitaService.checkout).toHaveBeenCalledTimes(1);
   });
 
@@ -605,7 +605,7 @@ describe("falhas e casos de borda", () => {
     );
   });
 
-  it("checkout sem internet encerra a visita localmente com a duração calculada", async () => {
+  it("checkout sem internet encerra a visita localmente com a duração até a saída", async () => {
     const { agendarFeedback } = require("../../../screens/feedback/service/FeedbackNotificationService");
     VisitaService.checkout.mockRejectedValue(Object.assign(new Error("offline"), { enfileirado: true }));
     const { executarTask, sincronizarVisitaAtiva } = carregarServico();
@@ -615,7 +615,8 @@ describe("falhas e casos de borda", () => {
     await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
 
     expect(agendarFeedback).toHaveBeenCalledWith(
-      expect.objectContaining({ visitaId: "v9", hospitalId: "hospital-1", duracaoMinutos: 35 })
+      // 30 min até a saída: os 5 min de tolerância da RN-03 não são permanência.
+      expect.objectContaining({ visitaId: "v9", hospitalId: "hospital-1", duracaoMinutos: 30 })
     );
     expect(JSON.parse(await AsyncStorage.getItem("@saude_monitor:geofencing")).visita).toBeNull();
   });
@@ -645,7 +646,7 @@ describe("falhas e casos de borda", () => {
     await sair(executarTask);
     await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
 
-    expect(VisitaService.checkout).toHaveBeenCalledWith("v9", {});
+    expect(VisitaService.checkout).toHaveBeenCalledWith("v9", { ocorridoEm: expect.any(String) });
     expect(JSON.parse(await AsyncStorage.getItem("@saude_monitor:geofencing")).visita).toMatchObject({
       id: "v9",
     });
@@ -680,15 +681,16 @@ describe("falhas e casos de borda", () => {
     );
   });
 
-  it("sincronizar a mesma visita preserva hospital e entrada já conhecidos", async () => {
+  it("sincronizar a mesma visita preserva hospital, entrada e origem já conhecidos", async () => {
     const { sincronizarVisitaAtiva } = carregarServico();
-    await sincronizarVisitaAtiva("v1", "2026-10-03T10:00:00.000Z", "hospital-1");
+    await sincronizarVisitaAtiva("v1", "2026-10-03T10:00:00.000Z", "hospital-1", "GEOFENCE");
     await sincronizarVisitaAtiva("v1");
 
     expect(JSON.parse(await AsyncStorage.getItem("@saude_monitor:geofencing")).visita).toEqual({
       id: "v1",
       hospitalId: "hospital-1",
       entrada: "2026-10-03T10:00:00.000Z",
+      origem: "GEOFENCE",
     });
   });
 
@@ -781,7 +783,7 @@ describe("falhas e casos de borda", () => {
     // Segue ligado, agora só para o sinal da visita aberta.
     expect(Location.startLocationUpdatesAsync).toHaveBeenLastCalledWith(
       expect.any(String),
-      expect.objectContaining({ timeInterval: 5 * 60 * 1000 })
+      expect.objectContaining({ timeInterval: 2 * 60 * 1000 })
     );
   });
 
@@ -860,7 +862,7 @@ describe("sinal da visita em segundo plano (RN-06)", () => {
       ACOMPANHAMENTO_TASK,
       expect.objectContaining({
         accuracy: "Balanced",
-        timeInterval: 5 * 60 * 1000,
+        timeInterval: 2 * 60 * 1000,
         foregroundService: expect.objectContaining({
           notificationBody: expect.stringContaining("Visita em andamento"),
         }),
@@ -1010,8 +1012,180 @@ describe("sinal da visita em segundo plano (RN-06)", () => {
     expect(Location.stopLocationUpdatesAsync).not.toHaveBeenCalled();
     expect(Location.startLocationUpdatesAsync).toHaveBeenCalledWith(
       expect.any(String),
-      expect.objectContaining({ timeInterval: 5 * 60 * 1000 })
+      expect.objectContaining({ timeInterval: 2 * 60 * 1000 })
     );
     expect(JSON.parse(await AsyncStorage.getItem("@saude_monitor:geofencing")).modo).toBe("visita");
+  });
+});
+
+describe("saída pela posição da leitura (teste de campo da rc.6, 21/10/2026)", () => {
+  // ~1,1 km ao norte do hospital: fora de qualquer região, mesmo com o erro da leitura.
+  const LONGE = { latitude: HOSPITAL_LAT + 0.01, longitude: HOSPITAL_LON, accuracy: 50 };
+  const NO_HOSPITAL = { latitude: HOSPITAL_LAT, longitude: HOSPITAL_LON, accuracy: 10 };
+  const REGIAO = { identifier: "hospital-1", latitude: HOSPITAL_LAT, longitude: HOSPITAL_LON, radius: 100 };
+
+  beforeEach(() => {
+    permitirTudo();
+    jest.useFakeTimers();
+    CatalogoLocal.lerCopiaGuardada.mockReset();
+    CatalogoLocal.lerCopiaGuardada.mockResolvedValue([hospital("hospital-1", 100)]);
+    VisitaService.checkout.mockReset();
+    VisitaService.checkout.mockResolvedValue({ id: "v1", duracaoMinutos: 40 });
+    VisitaService.heartbeat.mockResolvedValue({ status: "EM_ATENDIMENTO" });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  function leitura(coords) {
+    return { data: { locations: [{ coords, timestamp: Date.now() }] } };
+  }
+
+  async function comVisitaAberta(origem = "GEOFENCE") {
+    const servico = carregarServico();
+    await servico.sincronizarVisitaAtiva(
+      "v1",
+      new Date(Date.now() - 40 * 60 * 1000).toISOString(),
+      "hospital-1",
+      origem
+    );
+    return servico;
+  }
+
+  it("leitura longe do hospital faz o checkout sem esperar o Exit do SO, com o horário da leitura", async () => {
+    const { executarAcompanhamento } = await comVisitaAberta();
+    const saiuEm = new Date(Date.now()).toISOString();
+
+    await executarAcompanhamento(leitura(LONGE));
+    await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    expect(VisitaService.checkout).toHaveBeenCalledWith("v1", { ocorridoEm: saiuEm });
+  });
+
+  it("a saída vista pela leitura ainda espera os 5 min da RN-03", async () => {
+    const { executarAcompanhamento } = await comVisitaAberta();
+
+    await executarAcompanhamento(leitura(LONGE));
+    await jest.advanceTimersByTimeAsync(4 * 60 * 1000);
+
+    expect(VisitaService.checkout).not.toHaveBeenCalled();
+  });
+
+  it("leitura no hospital desfaz a saída pendente de um Exit falso", async () => {
+    const { executarTask, executarAcompanhamento } = await comVisitaAberta();
+    await executarTask({ data: { eventType: Location.GeofencingEventType.Exit, region: REGIAO } });
+
+    await jest.advanceTimersByTimeAsync(60 * 1000);
+    await executarAcompanhamento(leitura(NO_HOSPITAL));
+    await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    expect(VisitaService.checkout).not.toHaveBeenCalled();
+  });
+
+  it("leitura ambígua para a precisão dela não decide nada", async () => {
+    const { executarAcompanhamento } = await comVisitaAberta();
+    // ~130 m do centro com 50 m de erro: pode estar dentro ou fora da região de 100 m.
+    const BEIRADA = { latitude: HOSPITAL_LAT + 0.0012, longitude: HOSPITAL_LON, accuracy: 50 };
+
+    await executarAcompanhamento(leitura(BEIRADA));
+    await jest.advanceTimersByTimeAsync(10 * 60 * 1000);
+
+    expect(VisitaService.checkout).not.toHaveBeenCalled();
+  });
+
+  it("sem o hospital no catálogo, a saída continua dependendo do Exit do SO", async () => {
+    CatalogoLocal.lerCopiaGuardada.mockResolvedValue([hospital("outro", 100)]);
+    const { executarAcompanhamento } = await comVisitaAberta();
+
+    await executarAcompanhamento(leitura(LONGE));
+    await jest.advanceTimersByTimeAsync(10 * 60 * 1000);
+
+    expect(VisitaService.checkout).not.toHaveBeenCalled();
+  });
+
+  it("catálogo indisponível não derruba a leitura nem o sinal da visita", async () => {
+    CatalogoLocal.lerCopiaGuardada.mockRejectedValue(new Error("sem catálogo"));
+    const { executarAcompanhamento } = await comVisitaAberta();
+
+    await executarAcompanhamento(leitura(LONGE));
+
+    expect(VisitaService.checkout).not.toHaveBeenCalled();
+    expect(VisitaService.heartbeat).toHaveBeenCalled();
+  });
+
+  it("o checkout pelo Exit do SO leva o horário do Exit, não o do envio", async () => {
+    const { executarTask } = await comVisitaAberta();
+    const saiuEm = new Date(Date.now()).toISOString();
+
+    await executarTask({ data: { eventType: Location.GeofencingEventType.Exit, region: REGIAO } });
+    await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    expect(VisitaService.checkout).toHaveBeenCalledWith("v1", { ocorridoEm: saiuEm });
+  });
+
+  it("check-in manual não é encerrado pela leitura: quem encerra é a pessoa", async () => {
+    const { executarAcompanhamento } = await comVisitaAberta("MANUAL");
+
+    await executarAcompanhamento(leitura(LONGE));
+    await jest.advanceTimersByTimeAsync(10 * 60 * 1000);
+
+    expect(VisitaService.checkout).not.toHaveBeenCalled();
+  });
+
+  it("leitura velha (posição em cache de antes) não decide a saída", async () => {
+    const { executarAcompanhamento } = await comVisitaAberta();
+    const velha = { data: { locations: [{ coords: LONGE, timestamp: Date.now() - 20 * 60 * 1000 }] } };
+
+    await executarAcompanhamento(velha);
+    await jest.advanceTimersByTimeAsync(10 * 60 * 1000);
+
+    expect(VisitaService.checkout).not.toHaveBeenCalled();
+  });
+
+  it("leitura anterior à entrada da visita não decide a saída", async () => {
+    const servico = carregarServico();
+    await servico.sincronizarVisitaAtiva("v1", new Date(Date.now() + 60 * 1000).toISOString(), "hospital-1", "GEOFENCE");
+
+    await servico.executarAcompanhamento(leitura(LONGE));
+    await jest.advanceTimersByTimeAsync(10 * 60 * 1000);
+
+    expect(VisitaService.checkout).not.toHaveBeenCalled();
+  });
+
+  it("guarda o centro do hospital na visita e não relê o catálogo a cada leitura", async () => {
+    const { executarAcompanhamento } = await comVisitaAberta();
+
+    await executarAcompanhamento(leitura(NO_HOSPITAL));
+    await jest.advanceTimersByTimeAsync(30 * 1000);
+    await executarAcompanhamento(leitura(NO_HOSPITAL));
+
+    expect(CatalogoLocal.lerCopiaGuardada).toHaveBeenCalledTimes(1);
+  });
+
+  it("o convite de feedback parte de agora, não do instante da saída (que já passou)", async () => {
+    const { agendarFeedback } = require("../../../screens/feedback/service/FeedbackNotificationService");
+    const { executarAcompanhamento } = await comVisitaAberta();
+
+    await executarAcompanhamento(leitura(LONGE));
+    await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    expect(agendarFeedback).toHaveBeenLastCalledWith(
+      expect.objectContaining({ visitaId: "v1", saidaEm: new Date(Date.now()).toISOString() })
+    );
+  });
+
+  it("check-in automático guarda a origem, e a sincronização da tela não a apaga", async () => {
+    Location.getCurrentPositionAsync.mockResolvedValue({ coords: NO_HOSPITAL });
+    VisitaService.checkin.mockResolvedValue({ id: "v7", entrada: new Date().toISOString() });
+    const { executarTask, executarAcompanhamento, sincronizarVisitaAtiva } = carregarServico();
+    await executarTask({ data: { eventType: Location.GeofencingEventType.Enter, region: REGIAO } });
+    await jest.advanceTimersByTimeAsync(2 * 60 * 1000);
+    await sincronizarVisitaAtiva("v7", null, "hospital-1");
+
+    await executarAcompanhamento(leitura(LONGE));
+    await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    expect(VisitaService.checkout).toHaveBeenCalledWith("v7", expect.any(Object));
   });
 });

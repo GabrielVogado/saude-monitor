@@ -121,6 +121,15 @@ function formDaAvaliacao(avaliacao) {
   };
 }
 
+/**
+ * Motivo do não atendimento como o backend espera: o label amigável quando o paciente
+ * escolhe "Casos mais graves" (F-05), que o backend normaliza para CLASSIFICACAO_RISCO.
+ */
+function motivoParaEnvio(motivo) {
+  if (motivo === "CLASSIFICACAO_RISCO") return "CASOS_MAIS_GRAVES_PRIORIDADE";
+  return motivo || undefined;
+}
+
 const ROTULOS_TRATAMENTO = ["Ruim", "Regular", "Bom", "Muito bom", "Excelente"];
 
 const OpcoesFezTriagem = ({ valor, aoSelecionar, rotulo, opcoes = OPCOES_SIM_NAO }) => (
@@ -267,14 +276,7 @@ export default function FeedbackFormScreen({ navigation, route }) {
       fezTriagem: form.fezTriagem || undefined,
       especialidadeProcurada: (comTela2 && form.especialidadeProcurada) || undefined,
       foiAtendido: foiAtendido || undefined,
-      // Frontend envia o label amigável quando o paciente escolhe "Casos mais graves" (F-05);
-      // o backend o normaliza para CLASSIFICACAO_RISCO.
-      motivoNaoAtendido:
-        foiAtendido === "NAO"
-          ? form.motivoNaoAtendido === "CLASSIFICACAO_RISCO"
-            ? "CASOS_MAIS_GRAVES_PRIORIDADE"
-            : form.motivoNaoAtendido || undefined
-          : undefined,
+      motivoNaoAtendido: foiAtendido === "NAO" ? motivoParaEnvio(form.motivoNaoAtendido) : undefined,
       teveMedico: (comTela2 && form.teveMedico) || undefined,
       medicacaoReceita: form.medicacaoReceita || undefined,
       tratamentoEquipe: form.tratamentoEquipe || undefined,

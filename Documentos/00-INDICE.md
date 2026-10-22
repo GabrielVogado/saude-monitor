@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 22/10/2026 — Homologação v1.0.0-rc.8
+
+**O que entrou:** registro da rc que leva a lista e o mapa de hospitais pela cópia do catálogo no aparelho (PRs #224 e #225, M-061 e M-062) para a homologação, com o backend novo (`versaoCatalogo` na configuração e `GET /api/v1/catalogo/indicadores`). O roteiro começa pelo que é novo e remete ao teste de campo da rc.7 e ao roteiro da rc.6, que não foram feitos. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.8.md`](./10-git-flow/homologacoes/v1.0.0-rc.8.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
+
+---
+
 ## 📌 Revisão 22/10/2026 — Mapa pela cópia do catálogo
 
 **O que mudou:** segunda etapa da revisão abaixo. O mapa passa a ler a mesma cópia do catálogo guardada no aparelho, com o filtro por raio calculado no próprio app e nota e tempo de `GET /api/v1/catalogo/indicadores`; deixa de pedir `GET /api/v1/hospitais` em páginas. Registro em `Historico-Melhorias.md` (M-062).

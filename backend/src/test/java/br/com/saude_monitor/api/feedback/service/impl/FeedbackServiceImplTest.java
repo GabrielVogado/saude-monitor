@@ -230,6 +230,9 @@ class FeedbackServiceImplTest {
 
         assertThat(resposta.visitaId()).isEqualTo("v1");
         assertThat(resposta.anonimizado()).isTrue();
+        // Sem dono logado não há quem edite: o app não oferece o botão.
+        assertThat(resposta.editavelAte()).isNull();
+        verify(hospitalRepository, never()).findById(any());
     }
 
     @Test
@@ -335,5 +338,143 @@ class FeedbackServiceImplTest {
 
         assertThat(service.pendentes("u1")).singleElement()
                 .satisfies(p -> assertThat(p.hospitalNome()).isNull());
+    }
+
+    // ------------------------------------------------ edição em até 15 dias e nome do hospital (22/10/2026) -------
+
+    private FeedbackDocument feedbackDoDono(Instant criadoEm) {
+        return FeedbackDocument.builder()
+                .id("f1").visitaId("v1").usuarioId("u1").hospitalId("h1").nota(2).criadoEm(criadoEm)
+                .build();
+    }
+
+    @Test
+    void atualizarDentroDos15DiasGravaNotaEdicaoERecalculaIndicador() {
+        Instant criadoEm = Instant.now().minus(Duration.ofDays(14));
+        when(feedbackRepository.findById("f1")).thenReturn(Optional.of(feedbackDoDono(criadoEm)));
+        when(feedbackRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(hospitalRepository.findById("h1"))
+                .thenReturn(Optional.of(HospitalDocument.builder().id("h1").nome("HRAN").build()));
+
+        FeedbackResponse resposta = service.atualizar("f1", request("v1"), "u1");
+
+        assertThat(resposta.nota()).isEqualTo(4);
+        assertThat(resposta.hospitalNome()).isEqualTo("HRAN");
+        assertThat(resposta.editavelAte()).isEqualTo(criadoEm.plus(Duration.ofDays(15)));
+        org.mockito.ArgumentCaptor<FeedbackDocument> salvo = org.mockito.ArgumentCaptor.forClass(FeedbackDocument.class);
+        verify(feedbackRepository).save(salvo.capture());
+        assertThat(salvo.getValue().getEditadoEm()).isNotNull();
+        verify(eventPublisher).publishEvent(any(br.com.saude_monitor.api.indicador.event.FeedbackSalvoEvent.class));
+    }
+
+    @Test
+    void atualizarDepoisDos15DiasRecusaComConflito() {
+        when(feedbackRepository.findById("f1"))
+                .thenReturn(Optional.of(feedbackDoDono(Instant.now().minus(Duration.ofDays(15).plusMinutes(1)))));
+
+        FeedbackRequest pedido = request("v1");
+
+        assertThatThrownBy(() -> service.atualizar("f1", pedido, "u1"))
+                .isInstanceOf(ConflitoException.class)
+                .hasMessageContaining("15 dias");
+        verify(feedbackRepository, never()).save(any());
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    void atualizarFeedbackSemDataDeCriacaoRecusaComConflitoEmVezDeErroInterno() {
+        when(feedbackRepository.findById("f1")).thenReturn(Optional.of(feedbackDoDono(null)));
+
+        FeedbackRequest pedido = request("v1");
+
+        assertThatThrownBy(() -> service.atualizar("f1", pedido, "u1"))
+                .isInstanceOf(ConflitoException.class);
+        verify(feedbackRepository, never()).save(any());
+    }
+
+    @Test
+    void atualizarFeedbackDeOutroUsuarioRecusaAntesDoPrazo() {
+        when(feedbackRepository.findById("f1")).thenReturn(Optional.of(feedbackDoDono(Instant.now())));
+
+        FeedbackRequest pedido = request("v1");
+
+        assertThatThrownBy(() -> service.atualizar("f1", pedido, "invasor"))
+                .isInstanceOf(AcessoNegadoException.class);
+        verify(feedbackRepository, never()).save(any());
+    }
+
+    @Test
+    void atualizarFeedbackAnonimoRecusaMesmoComUsuarioLogado() {
+        FeedbackDocument anonimo = feedbackDoDono(Instant.now());
+        anonimo.setUsuarioId(null);
+        when(feedbackRepository.findById("f1")).thenReturn(Optional.of(anonimo));
+
+        FeedbackRequest pedido = request("v1");
+
+        assertThatThrownBy(() -> service.atualizar("f1", pedido, "u1"))
+                .isInstanceOf(AcessoNegadoException.class);
+    }
+
+    @Test
+    void atualizarFeedbackInexistenteRespondeNaoEncontrado() {
+        when(feedbackRepository.findById("f1")).thenReturn(Optional.empty());
+
+        FeedbackRequest pedido = request("v1");
+
+        assertThatThrownBy(() -> service.atualizar("f1", pedido, "u1"))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    void historicoTrazNomeDoHospitalEPrazoDeEdicaoEmUmaConsultaSo() {
+        Instant criadoEm = Instant.now().minus(Duration.ofDays(1));
+        FeedbackDocument doHran = feedbackDoDono(criadoEm);
+        FeedbackDocument doHbase = FeedbackDocument.builder()
+                .id("f2").visitaId("v2").usuarioId("u1").hospitalId("h2").nota(5).criadoEm(criadoEm).build();
+        FeedbackDocument outroDoHran = FeedbackDocument.builder()
+                .id("f3").visitaId("v3").usuarioId("u1").hospitalId("h1").nota(3).criadoEm(criadoEm).build();
+        when(feedbackRepository.findByUsuarioIdOrderByCriadoEmDesc(eq("u1"), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(doHran, doHbase, outroDoHran)));
+        when(hospitalRepository.findAllById(List.of("h1", "h2"))).thenReturn(List.of(
+                HospitalDocument.builder().id("h1").nome("HRAN").build(),
+                HospitalDocument.builder().id("h2").nome("HBase").build()));
+
+        List<FeedbackResponse> itens = service.historico("u1", 0, 20).content();
+
+        assertThat(itens).extracting(FeedbackResponse::hospitalNome).containsExactly("HRAN", "HBase", "HRAN");
+        assertThat(itens).extracting(FeedbackResponse::editavelAte)
+                .containsOnly(criadoEm.plus(Duration.ofDays(15)));
+        verify(hospitalRepository, never()).findById(any());
+    }
+
+    @Test
+    void historicoVazioNaoConsultaHospitais() {
+        when(feedbackRepository.findByUsuarioIdOrderByCriadoEmDesc(eq("u1"), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        assertThat(service.historico("u1", 0, 20).content()).isEmpty();
+        verify(hospitalRepository, never()).findAllById(any());
+    }
+
+    @Test
+    void buscarPorVisitaDoDonoTrazNomeDoHospitalEPrazo() {
+        Instant criadoEm = Instant.now();
+        when(feedbackRepository.findByVisitaId("v1")).thenReturn(Optional.of(feedbackDoDono(criadoEm)));
+        when(hospitalRepository.findById("h1")).thenReturn(Optional.empty());
+
+        FeedbackResponse resposta = service.buscarPorVisita("v1", "u1").orElseThrow();
+
+        assertThat(resposta.hospitalNome()).isNull();
+        assertThat(resposta.editavelAte()).isEqualTo(criadoEm.plus(Duration.ofDays(15)));
+    }
+
+    @Test
+    void buscarPorVisitaSemHospitalNaoConsultaHospitais() {
+        FeedbackDocument semHospital = feedbackDoDono(Instant.now());
+        semHospital.setHospitalId(null);
+        when(feedbackRepository.findByVisitaId("v1")).thenReturn(Optional.of(semHospital));
+
+        assertThat(service.buscarPorVisita("v1", "u1").orElseThrow().hospitalNome()).isNull();
+        verify(hospitalRepository, never()).findById(any());
     }
 }

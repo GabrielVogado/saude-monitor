@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, Download, History, MessageSquareText, Star } from "lucide-react-native";
+import { Building2, Download, History, MessageSquareText, Pencil, Star } from "lucide-react-native";
 import CSHeader from "../../../components/CSHeader";
 import CSButton from "../../../components/CSButton";
 import CSEmptyState from "../../../components/CSEmptyState";
@@ -34,6 +34,15 @@ const ORIGEM_LABEL = {
 };
 
 /**
+ * A avaliação ainda aceita edição (RN-09: até 15 dias depois de criada). Sem
+ * `editavelAte` (avaliação anônima) não há edição.
+ */
+function isEditavel(avaliacao) {
+  const limite = Date.parse(avaliacao?.editavelAte ?? "");
+  return Number.isFinite(limite) && limite > Date.now();
+}
+
+/**
  * Histórico do usuário logado (E5-03/RN-22 — "apenas os seus").
  *
  * Tela dentro da aba Perfil (PerfilStack). Consome os endpoints já implementados
@@ -44,6 +53,9 @@ const ORIGEM_LABEL = {
  * apenas excluídas das estatísticas públicas.
  *
  * Daqui o titular também exporta o relatório completo em PDF (art. 18 da LGPD).
+ *
+ * Cada avaliação mostra o hospital avaliado e, até 15 dias depois de criada, o botão
+ * de editar (RN-09). O prazo vem do backend (`editavelAte`), que também o valida no PUT.
  */
 export default function HistoricoScreen({ navigation }) {
   const [aba, setAba] = useState(ABA_VISITAS);
@@ -140,18 +152,29 @@ export default function HistoricoScreen({ navigation }) {
     </View>
   );
 
+  const editarAvaliacao = (item) =>
+    navigation?.navigate?.("Feedback", {
+      screen: "FeedbackForm",
+      params: {
+        visitaId: item.visitaId,
+        hospitalNome: item.hospitalNome,
+        feedbackId: item.id,
+        avaliacao: item,
+      },
+    });
+
   const renderItemFeedback = ({ item }) => (
     <View style={styles.itemCard}>
       <View style={styles.itemIconRow}>
         <View style={styles.itemIconCircle}>
           <MessageSquareText size={18} color={colors.primary} />
         </View>
-        <Text style={styles.itemTitle} numberOfLines={1}>
-          Avaliação
+        <Text style={styles.itemTitle} numberOfLines={2}>
+          {item.hospitalNome || "Hospital"}
         </Text>
       </View>
 
-      <Text style={styles.itemDate}>{formatarData(item.criadoEm)}</Text>
+      <Text style={styles.itemDate}>Avaliação de {formatarData(item.criadoEm)}</Text>
 
       <View style={styles.feedbackMeta}>
         {typeof item.nota === "number" ? (
@@ -166,6 +189,19 @@ export default function HistoricoScreen({ navigation }) {
           </Text>
         ) : null}
       </View>
+
+      {isEditavel(item) ? (
+        <View style={styles.edicaoRow}>
+          <Text style={styles.edicaoPrazo}>Pode editar até {formatarData(item.editavelAte)}</Text>
+          <CSButton
+            label="Editar"
+            variant="tertiary"
+            icon={Pencil}
+            onPress={() => editarAvaliacao(item)}
+            accessibilityLabel={`Editar avaliação de ${item.hospitalNome || "hospital"}`}
+          />
+        </View>
+      ) : null}
     </View>
   );
 
@@ -360,4 +396,11 @@ const styles = StyleSheet.create({
   notaRow: { flexDirection: "row", alignItems: "center", gap: spacing.s1 },
   notaText: { ...typography.bodyMd, color: colors.onSurface, fontWeight: "600" },
   comentario: { ...typography.bodySm, color: colors.onSurfaceVariant, lineHeight: 18 },
+  edicaoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.s2,
+  },
+  edicaoPrazo: { ...typography.bodySm, color: colors.onSurfaceVariant, flex: 1 },
 });

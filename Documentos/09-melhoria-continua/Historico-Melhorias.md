@@ -3456,3 +3456,62 @@ baixado uma vez por mudança no painel, e nota e tempo custam uma chamada a cada
 
 - Desempenho do mapa com os ~340 marcadores em "Todos" (rolagem e zoom).
 - Troca de raio com o GPS ligado: os marcadores de fora somem na hora.
+
+## M-063 — Editar a avaliação em até 15 dias e ver o hospital no Histórico
+
+**Data:** 22/10/2026 · **PR:** #228 · **Origem:** pedido do PO, com print da aba Avaliações do Histórico
+
+### Como era
+
+- O card da aba Avaliações dizia só "Avaliação", a data, a nota e o comentário. Quem avaliou
+  mais de um hospital não sabia qual era qual.
+- O backend aceitava `PUT /api/v1/feedbacks/{id}` por 24h depois da criação, mas o app não
+  tinha nenhum caminho até a edição: o formulário só abria pela notificação ou pelo card de
+  pendências, sempre para criar.
+- O job de rede de segurança do indicador (`recalcularPendentes`) só olhava `criadoEm`: uma
+  nota alterada de avaliação antiga dependia apenas do evento.
+
+### O que mudou (comportamento)
+
+- **Prazo de 15 dias, no backend:** o dono edita a avaliação até 15 dias depois de criá-la,
+  quantas vezes quiser. Depois disso o `PUT` responde 409. A regra de dono não mudou: outra
+  conta, ou avaliação anônima, recebe 403. Responder continua limitado a 24h após a saída.
+- **Hospital e prazo na resposta:** `GET /contas/feedbacks` (e o `GET`/`PUT` do feedback)
+  trazem `hospitalNome` e `editavelAte`. Os nomes do histórico saem numa consulta só por página.
+  `editavelAte` é nulo na avaliação anônima, que não tem dono para editar.
+- **App:** o card mostra o nome do hospital como título, "Avaliação de dd/mm/aaaa" e, dentro do
+  prazo, "Pode editar até dd/mm/aaaa" com o botão Editar. O formulário abre com as respostas
+  gravadas, salva pelo `PUT` e mostra "Avaliação atualizada!". Se o prazo vencer com a tela
+  aberta, explica o prazo em vez de dizer que a visita já foi avaliada.
+- **Indicador:** a edição grava `editadoEm` e dispara o recálculo do hospital, como antes. O job
+  de 15 min passa a incluir os feedbacks editados desde a última passada. A visita não muda, então
+  a avaliação só conta no indicador se a visita tiver prova de presença (SEG-01), como na criação.
+  A nota nova aparece em `GET /catalogo/indicadores` depois do cache de até 5 min.
+
+### Decisões assumidas
+
+O prazo conta da criação da avaliação, a edição pode ser repetida dentro dele e avaliação anônima
+não é editável (não aparece no Histórico nem tem dono logado). Com o prazo de 15 dias, a
+avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 B).
+
+## M-064 — Mapa com um hospital só não vai ao zoom máximo
+
+**Data:** 22/10/2026 · **PR:** #229 · **Origem:** teste da rc.8 pelo PO
+
+### Como era
+
+- O mapa enquadrava a câmera na caixa que cobre os hospitais exibidos. Com o filtro de 1 km
+  sobrou um hospital só: a caixa tinha área zero, o `fitBounds` levou o mapa ao zoom máximo e
+  ele ficou cinza, sem tiles, com a escala marcando 0,4 m. O mesmo acontecia com vários
+  estabelecimentos no mesmo ponto.
+
+### O que mudou (comportamento)
+
+- **Área mínima:** a caixa do enquadramento tem pelo menos ~1,1 km de lado, em volta do centro
+  dos hospitais. Com mais hospitais espalhados, o enquadramento continua igual.
+- **Posição do GPS no enquadramento:** com um raio selecionado, a posição usada no recorte
+  entra na caixa, então a pessoa vê onde está em relação aos hospitais próximos.
+
+### A conferir no aparelho
+
+- Filtro de 1 km com um hospital só: o mapa mostra as ruas em volta, com o marcador e a posição.

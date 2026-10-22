@@ -384,6 +384,23 @@ class IndicadorServiceImplTest {
         verify(spyService).recalcular("h4");
     }
 
+    /**
+     * Avaliação editada pelo dono (até 15 dias após criar) muda a nota sem mudar
+     * {@code criadoEm}: se o evento se perder, só {@code editadoEm} leva o job ao hospital.
+     */
+    @Test
+    void recalcularPendentesIncluiHospitalDeFeedbackEditado() {
+        IndicadorServiceImpl spyService = spy((IndicadorServiceImpl) service);
+        doReturn(null).when(spyService).recalcular(anyString());
+
+        when(feedbackRepository.findByCriadoEmAfter(any())).thenReturn(List.of());
+        when(feedbackRepository.findByEditadoEmAfter(any())).thenReturn(List.of(feedback("h5", 1)));
+
+        spyService.recalcularPendentes();
+
+        verify(spyService).recalcular("h5");
+    }
+
     @Test
     void recalcularPendentesNaoDuplicaQuandoMesmoHospitalTemFeedbackEVisita() {
         IndicadorServiceImpl spyService = spy((IndicadorServiceImpl) service);

@@ -175,6 +175,9 @@ public class IndicadorServiceImpl implements IndicadorService {
         Set<String> candidatos = new HashSet<>();
         feedbackRepository.findByCriadoEmAfter(desde)
                 .forEach(f -> candidatos.add(f.getHospitalId()));
+        // Edição pelo dono (até 15 dias após criar) muda a nota de feedback antigo.
+        feedbackRepository.findByEditadoEmAfter(desde)
+                .forEach(f -> candidatos.add(f.getHospitalId()));
         // `processadoEm` (write time), não `saida` (business time, pode ser retroativo —
         // ver VisitaDocument.getProcessadoEm()). Achado do code-review de 09/09/2026.
         visitaRepository.findByStatusInAndProcessadoEmAfter(STATUS_TEMPO, desde)

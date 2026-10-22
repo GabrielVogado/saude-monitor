@@ -466,13 +466,13 @@ Registra feedback pós-saída. **Autenticação opcional** (se logado, vincula `
 **Erros:** `ACESSO_NEGADO` (403) se quem envia não é dono da visita: outro usuário, ou, em visita anônima, `dispositivoId` ausente ou diferente do check-in (SEG-02, 18/10/2026). A recusa vem antes das regras de status, janela e duplicidade, para não revelar a estranhos se a visita está em andamento, encerrada ou já avaliada, e para a tentativa não consumir a avaliação única. Feedback sem login de visita feita com login também recebe 403. `CONFLITO` se `visitaId` já tem feedback (RN-12); `RECURSO_NAO_ENCONTRADO` se a visita não existe, não está encerrada (`FINALIZADA` ou `GPS_INTERROMPIDO`) ou saiu há mais de 24h (RN-09). `GPS_INTERROMPIDO` aceita feedback desde a v2.4: é o status que o backend grava quando o celular descarrega ou desliga dentro do hospital (RN-06), e a pessoa esteve lá do mesmo jeito.
 
 #### `GET /api/v1/visitas/{id}/feedback` 🔒
-Retorna feedback da visita (se houver) — usado para edição de comentário (opcional).
+Retorna feedback da visita (se houver) — usado para pré-preencher a edição (opcional). Mesmo corpo do histórico abaixo, com `hospitalNome` e `editavelAte`.
 
 #### `PUT /api/v1/feedbacks/{id}` 🔒 (dono, papel USER)
-Permite editar comentário/nota dentro da janela de 24h (RN-09). **200**. O papel `ADMIN` recebe **403** mesmo sobre feedback da própria conta (E7-08): o painel administrativo não altera avaliação.
+Permite ao dono editar a avaliação (nota, comentário e demais respostas) até **15 dias** depois da criação (RN-09, decisão do PO em 22/10/2026; antes 24h), quantas vezes quiser dentro do prazo. **200**. Fora do prazo: `CONFLITO` (409). Feedback de outra conta ou anônimo: `ACESSO_NEGADO` (403). A visita não muda, então a prova de presença (SEG-01) da criação continua valendo; a edição grava `editadoEm` e dispara o recálculo do indicador do hospital (RN-18), visível em `GET /api/v1/catalogo/indicadores` depois do cache de até 5 min. O papel `ADMIN` recebe **403** mesmo sobre feedback da própria conta (E7-08): o painel administrativo não altera avaliação.
 
 #### `GET /api/v1/contas/feedbacks` 🔒
-Histórico de feedbacks do usuário (paginado, RN-22 — E5-03). Mesma paginação de `contas/visitas`; cada item traz o feedback e a visita/hospital de referência. **200** `PageResponse`.
+Histórico de feedbacks do usuário (paginado, RN-22 — E5-03). Mesma paginação de `contas/visitas`; cada item traz o feedback e a visita/hospital de referência, com `hospitalNome` (desde 22/10/2026, em uma só consulta de hospitais por página) e `editavelAte` (fim do prazo de 15 dias para editar; `null` em avaliação anônima). **200** `PageResponse`.
 
 #### `GET /api/v1/contas/feedbacks/pendentes` 🔒 (v2.4)
 Visitas do titular que ainda aceitam feedback: encerradas (`FINALIZADA` ou `GPS_INTERROMPIDO`) há menos de 24h (RN-09), com 2 min ou mais (RN-01/RN-07) e sem avaliação. O app usa a lista para mostrar a avaliação pendente mesmo quando a notificação se perdeu (celular descarregado, app reinstalado). Sem paginação: a janela de 24h limita o volume. **200**
@@ -657,7 +657,7 @@ No MVP, esses eventos são processados **in-process** (job/`@TransactionalEventL
 - [ ] Confirmar política de `origem=MANUAL` (check-in manual) e seus limites anti-abuso.
 - [ ] Confirmar `dispositivoId` anônimo: formato e duração de retenção (LGPD).
 - [ ] Confirmar política de heartbeat/expiração (RN-04/RN-23): intervalo de 30min, marcação `SUSPEITA` aos 2h, expiração aos 24h sem sinal — validar consumo de bateria e rede em teste de campo.
-- [x] Decisão (PR #22): **nota e demais campos editáveis dentro da janela de 24h** (RN-09); agregado recalcula no `PUT` via evento `FeedbackSalvoEvent`.
+- [x] Decisão (PR #22): **nota e demais campos editáveis dentro da janela de 24h** (RN-09); agregado recalcula no `PUT` via evento `FeedbackSalvoEvent`. **Revisto em 22/10/2026 (M-063):** prazo de edição passa a **15 dias** a partir da criação; responder continua limitado a 24h após a saída.
 - [ ] Spec OpenAPI 3.1 gerada e servida em `/v3/api-docs` — proposta na E8-09 (PR #88, aberto; `springdoc-openapi` ainda não está em `develop`), direto do código, não deste documento.
 - [ ] Testes de integração por recurso no Sprint 0 (F0-03).
 

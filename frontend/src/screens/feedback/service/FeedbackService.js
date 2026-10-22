@@ -27,12 +27,12 @@ class FeedbackService {
     return request(BASE_PATH, { method: "POST", body: corpo, idempotente: true });
   }
 
-  /** Feedback da visita (dono) — usado para pré-preencher a edição dentro da janela de 24h. */
+  /** Feedback da visita (dono) — usado para pré-preencher a edição (até 15 dias, RN-09). */
   static buscarPorVisita(visitaId) {
     return request(`/api/v1/visitas/${visitaId}/feedback`);
   }
 
-  /** Edita feedback dentro da janela de 24h (dono, RN-09). Mesma dedupe do `enviar` acima. */
+  /** Edita feedback até 15 dias após a criação (dono, RN-09). Mesma dedupe do `enviar` acima. */
   static atualizar(id, payload) {
     return request(`${BASE_PATH}/${id}`, { method: "PUT", body: payload, idempotente: true });
   }

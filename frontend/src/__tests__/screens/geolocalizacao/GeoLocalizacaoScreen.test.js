@@ -458,6 +458,38 @@ describe("GeoLocalizacaoScreen (F-07)", () => {
     expect(mockCamera.fitBounds).toHaveBeenCalledTimes(1);
   });
 
+  /** Largura e altura, em graus, da última caixa passada ao `fitBounds`. */
+  function ultimoEnquadramento() {
+    const [nordeste, sudoeste] = mockCamera.fitBounds.mock.calls.at(-1);
+    return { nordeste, sudoeste, largura: nordeste[0] - sudoeste[0], altura: nordeste[1] - sudoeste[1] };
+  }
+
+  test("um hospital só não leva o mapa ao zoom máximo: a caixa do enquadramento tem área mínima", async () => {
+    // rc.8: com o filtro de 1 km sobrou um hospital, a caixa tinha área zero e o mapa
+    // ficou cinza, sem tiles, com a escala em 0,4 m.
+    comCatalogo([hospitalTeste("h1", "Hospital Alfa")]);
+    renderizar();
+    await screen.findByTestId("marcador-hospital-h1");
+    await waitFor(() => expect(mockCamera.fitBounds).toHaveBeenCalled());
+
+    const { largura, altura } = ultimoEnquadramento();
+    expect(largura).toBeGreaterThanOrEqual(0.01);
+    expect(altura).toBeGreaterThanOrEqual(0.01);
+  });
+
+  test("com raio selecionado, o enquadramento inclui a posição do GPS", async () => {
+    // GPS em -15.785/-47.885; o hospital fica a ~5 km ao norte, dentro do raio de 10 km.
+    const PERTO = { id: "h5", nome: "Hospital Perto", localizacao: { latitude: -15.74, longitude: -47.885 } };
+    comCatalogo([PERTO]);
+    renderizar();
+    await screen.findByTestId("marcador-hospital-h5");
+
+    fireEvent.press(screen.getByText("10 km"));
+
+    await waitFor(() => expect(ultimoEnquadramento().sudoeste[1]).toBeLessThanOrEqual(-15.785));
+    expect(ultimoEnquadramento().nordeste[1]).toBeGreaterThanOrEqual(-15.74);
+  });
+
   test("BUG-04: sem `navigate`, o mapa NÃO é desmontado", async () => {
     // Desmontar antes de saber se há para onde ir deixaria a tela sem mapa e sem
     // conserto: quem remonta é o `focus`, e ele só vem se a tela tiver perdido o foco.

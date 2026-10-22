@@ -5,12 +5,16 @@ import br.com.saude_monitor.api.config.security.AutenticacaoHelper;
 import br.com.saude_monitor.api.configuracao.dto.ConfiguracaoRemotaRequest;
 import br.com.saude_monitor.api.configuracao.dto.ConfiguracaoRemotaResponse;
 import br.com.saude_monitor.api.configuracao.service.ConfiguracaoRemotaService;
+import br.com.saude_monitor.api.hospital.dto.CatalogoResponse;
+import br.com.saude_monitor.api.hospital.service.CatalogoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -29,12 +33,13 @@ class ConfiguracaoControllerTest {
 
     private final ConfiguracaoRemotaService servico = mock(ConfiguracaoRemotaService.class);
     private final AutenticacaoHelper autenticacao = mock(AutenticacaoHelper.class);
+    private final CatalogoService catalogoService = mock(CatalogoService.class);
     private MockMvc mockMvc;
 
     @BeforeEach
     void setup() {
         mockMvc = MockMvcBuilders.standaloneSetup(
-                        new ConfiguracaoController(servico),
+                        new ConfiguracaoController(servico, catalogoService),
                         new AdminConfiguracaoController(servico, autenticacao))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -43,12 +48,25 @@ class ConfiguracaoControllerTest {
     @Test
     void leituraPublicaComCacheDeUmMinuto() throws Exception {
         when(servico.obterConfiguracao()).thenReturn(new ConfiguracaoRemotaResponse(true, "1.0.0", null));
+        when(catalogoService.obterCatalogo()).thenReturn(new CatalogoResponse("versao-do-catalogo", 0, List.of()));
 
         mockMvc.perform(get("/api/v1/configuracao"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "max-age=60, public"))
                 .andExpect(jsonPath("$.modoSomenteLeitura").value(true))
-                .andExpect(jsonPath("$.versaoMinimaApp").value("1.0.0"));
+                .andExpect(jsonPath("$.versaoMinimaApp").value("1.0.0"))
+                .andExpect(jsonPath("$.versaoCatalogo").value("versao-do-catalogo"));
+    }
+
+    @Test
+    void semBancoParaOCatalogoAConfiguracaoChegaSemAVersao() throws Exception {
+        when(servico.obterConfiguracao()).thenReturn(new ConfiguracaoRemotaResponse(false, "1.0.0", null));
+        when(catalogoService.obterCatalogo()).thenThrow(new DataAccessResourceFailureException("Mongo fora"));
+
+        mockMvc.perform(get("/api/v1/configuracao"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.versaoMinimaApp").value("1.0.0"))
+                .andExpect(jsonPath("$.versaoCatalogo").doesNotExist());
     }
 
     @Test

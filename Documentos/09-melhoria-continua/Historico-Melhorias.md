@@ -877,7 +877,7 @@ autenticada só para fechar uma janela de 15 minutos.
 
 ## M-013 — Confirmação obrigatória de e-mail no cadastro
 
-**Data:** 10/09/2026 · **PR:** (este PR)
+**Data:** 10/09/2026 · **PR:** #224
 
 ### O que aconteceu
 
@@ -1646,7 +1646,7 @@ Relato do PO com quatro comportamentos do fluxo de feedback após check-in/check
 
 ## M-025 — Edição de geofence no painel (E7-06) e o reconciliador que a desfaria
 
-**Data:** 28/09/2026 · **PR:** (este PR)
+**Data:** 28/09/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -1693,7 +1693,7 @@ de salvo, sem erro nem log visível para quem editou.
 
 ## M-026 — Mapa do painel vazio após 15 min e divisões pouco legíveis
 
-**Data:** 28/09/2026 · **PR:** (este PR)
+**Data:** 28/09/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -1739,7 +1739,7 @@ chamada voltava 401 em silêncio e as telas ficavam vazias (o dashboard mostrava
 
 ## M-027 — Massa de dados de avaliações para o ambiente de desenvolvimento
 
-**Data:** 29/09/2026 · **PR:** (este PR)
+**Data:** 29/09/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -1787,7 +1787,7 @@ regressão garante que ela não volte a ser `ApplicationRunner`.
 
 ## M-028 — Check-in e check-out automáticos com o app fechado
 
-**Data:** 04/10/2026 · **PR:** (este PR)
+**Data:** 04/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -1848,7 +1848,7 @@ aconteceu quando o app foi aberto. O check-out tinha a mesma dependência.
 
 ## M-029 — Avaliação da visita pendente até 24h (sem depender da notificação)
 
-**Data:** 04/10/2026 · **PR:** (este PR)
+**Data:** 04/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -1905,7 +1905,7 @@ na hora ou ficou com o celular descarregado.
 
 ## M-030 — Trava de contagem de testes e SonarQube Cloud na esteira
 
-**Data:** 04/10/2026 · **PR:** (este PR)
+**Data:** 04/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -1957,7 +1957,7 @@ e no backend.
 
 ## M-031 — Cobertura mínima de 90% no código novo e cobertura total que não cai
 
-**Data:** 04/10/2026 · **PR:** (este PR)
+**Data:** 04/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -2363,7 +2363,7 @@ grupo de entidades com uma raiz), e o endpoint e os DTOs já falavam em indicado
 
 ## M-041 — Exclusão de conta passa a apagar aparelho, GPS e comentário
 
-**Data:** 14/10/2026 · **PR:** (este PR)
+**Data:** 14/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -2393,7 +2393,7 @@ telefone ou o caso da pessoa. Com isso a afirmação "anonimizado" não se suste
 
 ## M-042 — Site público com política de privacidade, termos e exclusão de conta
 
-**Data:** 14/10/2026 · **PR:** (este PR)
+**Data:** 14/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -2435,7 +2435,7 @@ sem identificar o controlador nem dar um contato; os Termos de Uso não existiam
 
 ## M-043 — Textos legais do app alinhados à política publicada
 
-**Data:** 14/10/2026 · **PR:** (este PR)
+**Data:** 14/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -2482,7 +2482,7 @@ Análise de prontidão para a Play Store (14/10/2026), bloqueador B3. Dentro do 
 
 ## M-044 — Aviso de localização em segundo plano no formato da Play Store
 
-**Data:** 14/10/2026 · **PR:** (este PR)
+**Data:** 14/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -2513,7 +2513,7 @@ enviado ao hospital: o sinal vai só para o backend do Radar Saúde.
 
 ## M-045 — Manifesto de release sem sobreposição de tela e sem HTTP aberto
 
-**Data:** 14/10/2026 · **PR:** (este PR)
+**Data:** 14/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -2548,7 +2548,7 @@ Análise de prontidão para a Play Store (14/10/2026), itens A4 e A5. O
 
 ## M-046 — AAB de produção para a Play Store
 
-**Data:** 14/10/2026 · **PR:** (este PR)
+**Data:** 14/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -2585,7 +2585,7 @@ Até aqui nenhuma `release/` tinha sido criada, então o defeito não tinha apar
 
 ## M-047 — Visita e feedback anônimos só para o aparelho dono (SEG-02)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2640,7 +2640,7 @@ para não ligar o `dispositivoId` à conta.
 
 ## M-048 — Pontos de GPS apagados ao encerrar a visita e vínculo pessoal só por 90 dias (DAD-01, ARQ-04)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2696,7 +2696,7 @@ indicadores públicos não mudam.
 
 ## M-049 — Só avaliação com prova de presença conta no indicador público (SEG-01, parte de código)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2751,7 +2751,7 @@ de teste deixam de contar.
 
 ## M-050 — Seed e tarefas de inicialização com trava distribuída (SOL-02)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2794,7 +2794,7 @@ produção). O comentário do workflow que trava o limite em 1 deixa de ter moti
 
 ## M-051 — Rate limit por identidade e renovação de sessão fora do limite por IP (ARQ-02)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2840,7 +2840,7 @@ maior. Para limite por pessoa isso é aceitável; o teto global por IP fica para
 
 ## M-052 — Catálogo público com cache HTTP e cache curto do usuário no filtro JWT (ARQ-01 servidor, ARQ-03)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2891,7 +2891,7 @@ ainda não foi publicado na loja, então não há versão antiga instalada a man
 
 ## M-053 — Jobs periódicos disparáveis pelo Cloud Scheduler, com trava e log (SOL-05, ARQ-08)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2941,7 +2941,7 @@ depende desse job como rede de segurança.
 
 ## M-054 — E-mail de código dentro da requisição, piso de tempo e limite por destino (SOL-09, SEG-03)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2991,7 +2991,7 @@ código atrasado ou perdido (verificação aberta da análise).
 
 ## M-055 — Contenção de falhas, pool do banco e configuração remota (ARQ-05, SOL-07, ARQ-09)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -3052,7 +3052,7 @@ como item novo (hoje é pelo `PUT`).
 
 ## M-056 — Swagger fora de produção, admin sem senha padrão e contêiner sem root (SEG-07, SEG-06)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -3092,7 +3092,7 @@ release. Mexem na esteira e geram PRs automáticos, então ficam para a fase de 
 
 ## M-057 — Catálogo local no geofencing e versão mínima do app (APP-01, APP-03)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -3299,7 +3299,7 @@ Falta o PO repetir o trajeto no aparelho com o APK que sair deste PR.
 
 ## M-060 — Render aposentado: sem rollback para o Render e sem keep-alive
 
-**Data:** 22/10/2026 · **PR:** (este PR) · **Origem:** decisão do PO ("não utilizaremos mais o Render")
+**Data:** 22/10/2026 · **PR:** #224 · **Origem:** decisão do PO ("não utilizaremos mais o Render")
 
 ### Como estava
 
@@ -3339,3 +3339,77 @@ ser voltar o tráfego para uma revisão anterior do Cloud Run.
 - Apagar os secrets `RENDER_API_KEY_DEV` e `RENDER_SERVICE_ID_DEV` do GitHub e revogar a API key no
   Render.
 - Opcional: apagar as imagens `ghcr.io/gabrielvogado/saude-monitor-backend`, que só o Render usava.
+
+---
+
+## M-061 — Lista de hospitais só baixa o catálogo quando ele muda
+
+**Data:** 22/10/2026 · **PR:** #224 · **Origem:** pedido do PO no thread de testes de campo
+
+### Como apareceu
+
+O PO pediu que a lista de hospitais deixasse de ir ao servidor repetidas vezes. A ideia dele era
+o painel admin disparar um evento para o app sempre que um hospital fosse incluído, alterado ou
+excluído, e o app trocar a cópia guardada só nesse caso. Avaliamos e o PO escolheu, pelo cartão
+de decisão, a alternativa com a versão do catálogo na configuração remota.
+
+### Por que não um evento do painel para o app
+
+1. A lista leva nota e tempo de espera, que mudam a cada avaliação, e não pelo painel. Só com o
+   evento, os números do app congelariam.
+2. Avisar todos os aparelhos exige push (FCM), que o app não tem. O Android atrasa ou descarta
+   esses avisos com o app fechado ou sem internet, então o app precisaria conferir a versão
+   sozinho de qualquer forma.
+3. Na meta do DF (~2 mi de instalações), um aviso faria todos os aparelhos baixarem a lista no
+   mesmo segundo, o pico que a análise de escala quer evitar.
+
+### Como era
+
+- A aba Hospitais pedia `GET /api/v1/hospitais` em páginas de 50, considerava a resposta fresca
+  por 2 min e buscava de novo ao voltar ao primeiro plano, ao puxar a tela e ao rolar até o fim.
+  Ao recarregar, refazia todas as páginas já abertas.
+- O catálogo guardado no aparelho (M-057) trazia os indicadores. A versão dele mudava a cada
+  avaliação, e o app o conferia a cada 5 min com o app aberto.
+
+### O que mudou (comportamento)
+
+- **Catálogo só com dados do painel:** `GET /api/v1/catalogo` vem sem indicadores
+  (`indicadores: null`). A versão (SHA-256 do conteúdo, também no `ETag`) só muda quando um
+  estabelecimento é criado, alterado, ativado ou desativado, pelo painel ou pela carga de dados.
+  O painel não precisou mudar: salvar um hospital já descarta o catálogo montado.
+- **Versão na configuração remota:** `GET /api/v1/configuracao`, que o app já lê ao abrir e ao
+  voltar ao primeiro plano, traz `versaoCatalogo`. Se ela difere da cópia do aparelho, o app
+  baixa o catálogo uma vez e a lista relê a cópia nova; se é igual, nada vai à rede. Sem banco
+  no momento, a configuração chega sem a versão e o app mantém a cópia.
+- **Lista e busca no aparelho:** a aba Hospitais não pagina mais no servidor. A lista, o filtro
+  de tipo e a busca sem acento saem da cópia guardada, na mesma ordem por nome e id.
+- **Indicadores numa resposta só:** nota e tempo de todos os estabelecimentos vêm de
+  `GET /api/v1/catalogo/indicadores` (mapa por id, `ETag` e o mesmo cache de 5 min na borda),
+  buscado só com a aba aberta e válido por 5 min no app. Sem servidor, a lista continua na tela,
+  sem nota, com o aviso "Sem conexão com o servidor".
+- **Puxar para atualizar:** confere o catálogo (304 quando nada mudou) e busca os indicadores.
+- **Rede de segurança:** se a configuração não chegar, a cópia vale por até um dia com o app
+  aberto (antes 5 min). Passado esse prazo, a lista confere em segundo plano e, se a cópia
+  mudou, mostra a nova sem precisar fechar a tela.
+- **Nota antiga nunca aparece:** cópias do catálogo gravadas antes desta mudança ainda trazem
+  nota. A lista ignora essa nota e mostra só a que veio de `/catalogo/indicadores`.
+- **Sem gravação à toa:** com a mesma versão, o aparelho regrava a data de conferência da cópia
+  no máximo uma vez por hora, e não a cada volta ao primeiro plano.
+- **Atraso de uma alteração do painel:** a instância que recebeu a alteração descarta na hora o
+  catálogo e os indicadores. As outras instâncias levam até 5 min, e a configuração tem cache de
+  1 min, então o app vê a versão nova em até cerca de 6 min.
+
+### Efeito esperado
+
+Abrir o app custa uma chamada pequena de configuração. A lista só é baixada quando alguém muda
+um hospital, e a mudança chega ao app na próxima vez em que ele é aberto ou volta ao primeiro
+plano. Nota e tempo custam uma chamada por aparelho a cada 5 min de uso da aba, com uma resposta
+que a borda pode servir a todos.
+
+### Fora desta mudança
+
+- O mapa continua lendo `GET /api/v1/hospitais` em páginas de 100: trocar pela cópia do catálogo
+  é o próximo passo natural.
+- O detalhe do hospital continua lendo o próprio hospital e os indicadores dele no servidor.
+- O APK da rc.7 ainda usa a listagem paginada: a lista dele continua funcionando, mas a cópia do
+  catálogo deixa de trazer nota até o próximo APK.

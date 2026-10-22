@@ -2,9 +2,10 @@
 
 Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gratuitos, com ambientes separados por branch: **dev** (`develop`) e **homologação** (`master`, desde 22/09/2026). Produção (`release/<tag>`) ainda não foi criada.
 
-> **Atencao (04/09/2026):** o backend migrou do Render para o **Google Cloud Run**.
-> Este guia ainda descreve o Render como caminho principal e sera revisado. A
-> referencia vigente para o backend e [`deploy/google/README.md`](../deploy/google/README.md).
+> O backend roda no **Google Cloud Run** desde 04/09/2026. O Render, que era o caminho de
+> rollback, foi aposentado em 22/10/2026 (M-060): os workflows `cd-backend-render.yml` e
+> `keep-alive-backend.yml` e os blueprints `render.yaml` saíram do repositório. A
+> referência do backend é [`deploy/google/README.md`](../deploy/google/README.md).
 
 ## Arquitetura
 
@@ -14,7 +15,7 @@ Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gr
 | Backend (Spring Boot) | **Google Cloud Run** (`southamerica-east1`) | Escala a zero — ver ADR-011 |
 | Banco (MongoDB) | MongoDB Atlas (M0) | Gratuito |
 | Frontend (Expo web) | — **sem provedor definido** | — |
-| Imagem Docker | GitHub Container Registry (GHCR) | Gratuito |
+| Imagem Docker | Google Artifact Registry | Cota gratuita do GCP |
 
 ## Ambientes
 
@@ -44,16 +45,13 @@ push em release/<tag> → CD prod (Docker → Artifact Registry:<tag> → Cloud 
 1. Crie conta em https://www.mongodb.com/atlas
 2. Crie um cluster **M0** (free tier) na região mais próxima.
 3. Em "Database Access", crie um usuário com senha.
-4. Em "Network Access", libere o IP `0.0.0.0/0` (ou o IP do Render).
+4. Em "Network Access", libere o IP `0.0.0.0/0` (o Cloud Run não tem IP de saída fixo sem conector VPC).
 5. Copie a string de conexão: `cluster0.xxxxx.mongodb.net`.
 6. Crie os bancos por ambiente. Hoje existe apenas `saude_monitor_dev`.
 
-### 2. Render (backend, gratuito)
-1. Crie conta em https://render.com
-2. Gere um **API Key** em Account Settings → API Keys.
-3. Crie um Web Service por ambiente (ou use o `render.yaml` via Blueprint) apontando para as imagens GHCR (`:dev`, `:prod`, `:<tag>`). Hoje existe apenas o de `dev`.
-4. Preencha as variáveis de ambiente de cada um (ver `backend/.env.example`).
-5. Anote os **Service IDs** de cada ambiente.
+### 2. Google Cloud Run (backend)
+Projeto, federação de identidade e Artifact Registry: [`deploy/google/README.md`](../deploy/google/README.md).
+Credenciais do backend ficam no Secret Manager do Google Cloud, não no GitHub.
 
 ### 3. Frontend web — sem provedor (03/09/2026)
 
@@ -64,23 +62,13 @@ sendo validado pelo `ci.yml`. A distribuição hoje é o **APK**, via `cd-mobile
 
 ### 4. Secrets no GitHub
 No repositório: **Settings → Secrets and variables → Actions → New repository secret**.
-Cada secret tem sufixo `_DEV` ou `_PROD`:
 
 | Secret | Valor |
 |--------|-------|
-| `RENDER_API_KEY_DEV` / `_PROD` | API Key do Render (pode ser a mesma). O sufixo `_HOM` deixou de existir: depois da P-004 o `resolve-env` só emite `dev` ou `prod`, e um secret `_HOM` nunca seria lido |
 | `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_STORE_PASSWORD`, `ANDROID_RELEASE_KEY_ALIAS`, `ANDROID_RELEASE_KEY_PASSWORD` | Chave de release do APK (22/09/2026). **Obrigatórios para homologação/produção** — sem eles o build desses ambientes falha. Em dev, sem eles, cada build gera uma chave e o APK não atualiza por cima do anterior. Como criar: `deploy/android/README.md` |
 | `ANDROID_KEYSTORE_BASE64` | *(legado, opcional)* debug.keystore estável para dev enquanto a chave de release não existe |
-| `RENDER_SERVICE_ID_DEV` / `_PROD` | ID do serviço do backend em cada ambiente. Hoje só `_DEV` está configurado |
 
-### 5. Variáveis de ambiente no Render
-Em cada Web Service, configure (ver `backend/.env.example`):
-- `MONGO_HOST`, `MONGO_PORT`, `MONGO_DATABASE`, `MONGO_AUTH_DB`, `MONGO_USER`, `MONGO_PASSWORD`
-- `JWT_SECRET` (chave aleatória ≥ 32 bytes, **diferente por ambiente**)
-- `ADMIN_EMAIL`, `ADMIN_SENHA`
-- `APP_SEED_ENABLED=false`
-
-### 6. Gerar release de produção
+### 5. Gerar release de produção
 1. Faça merge de `develop` → `master` e valide a rc em homologação (a tag e o APK saem sozinhos).
 2. Escolha a rc validada (ex.: `v1.0.0-rc.3`).
 3. No GitHub, **Actions → Release - Gerar branch de produção → Run workflow**, informando essa rc.
@@ -94,16 +82,14 @@ Em cada Web Service, configure (ver `backend/.env.example`):
 | `.github/workflows/ci.yml` | push/PR em develop/master | Build + testes backend e frontend |
 | `.github/workflows/cd-homologacao.yml` | push master + manual | Homologação: versão → backend HML → APK HML → tag + GitHub Release |
 | `.github/workflows/cd-backend-google.yml` | push develop/release **+ caminho `backend/**`**, manual e `workflow_call` (homologação) | Docker -> Artifact Registry -> deploy no Google Cloud Run (southamerica-east1). Autenticacao por Workload Identity Federation. Ver `deploy/google/README.md` |
-| `.github/workflows/cd-backend-render.yml` | **pausado** -- so `workflow_dispatch` | Docker → GHCR → deploy Render. Falha com mensagem explícita se o ambiente não tiver secrets |
 | `.github/workflows/cd-mobile-apk.yml` | push `develop` (caminho `frontend/**`) + manual + `workflow_call` | APK com Gradle no Actions — sem cota do EAS. Artefato do run, 30 dias. Reutilizável pelo orquestrador de homologação (ambiente, URL e versão) |
 | `.github/workflows/cd-mobile-eas.yml` | **só manual** (`workflow_dispatch`, **a partir de `release/*`** — outras refs são recusadas) | AAB de loja no EAS |
-| `.github/workflows/keep-alive-backend.yml` | **desligado** (04/09/2026) — só `workflow_dispatch` | Ping em `/actuator/health` contra a hibernação do Render. Perdeu o objeto com a virada para o Cloud Run; o `cron` está comentado. Ver ADR-011 |
 | `.github/workflows/release.yml` | manual (workflow_dispatch) | Cria branch `release/<tag>` a partir da `master` |
 
 ## Observações
 
-- **O backend não está mais no Render** (04/09/2026). O serviço vigente é `saude-monitor-backend-dev` no Cloud Run, `southamerica-east1`. O Render **continua no ar** — medido em 05/09/2026: `https://saude-monitor.onrender.com/actuator/health` respondeu 200 em 3,13 s — mas serve uma imagem congelada: o `cd-backend-render.yml` está pausado e não recebe mais deploy automático. Ele é o caminho de rollback, não o ambiente corrente.
-- O **Render free** "dorme" após ~15 min de inatividade. O **Cloud Run também** recolhe a instância quando ociosa, e a primeira requisição depois disso devolve **HTTP 503 em ~14,8 s** (medido no log do Cloud Run em 05/09/2026), porque `--min-instances=0`. A diferença em relação ao Render é de grau — 14,8 s contra 109 s —, não de natureza: nos dois casos o app vê uma requisição falhada. Ver ADR-011.
+- O backend roda só no Cloud Run, `southamerica-east1`. Não há mais caminho de rollback para o Render (aposentado em 22/10/2026, M-060); o rollback é voltar o tráfego para uma revisão anterior do próprio Cloud Run.
+- O **Cloud Run** recolhe a instância quando ociosa, e a primeira requisição depois disso devolve **HTTP 503 em ~14,8 s** (medido no log do Cloud Run em 05/09/2026), porque `--min-instances=0`. Ping periódico não é a correção: manter a instância acordada por fora é pagar a instância ociosa sem a medição que `--min-instances=1` deixaria explícita. Ver ADR-011.
 - O **frontend web** é o build do Expo (`react-native-web`). O APK mobile sai do `cd-mobile-apk.yml` (Actions, automático na `develop`, ou manual) e também localmente, via `expo run:android --variant release`.
 - Para o frontend web apontar para o backend correto por ambiente, ajuste em `frontend/app.json` → `expo.extra`:
   ```json

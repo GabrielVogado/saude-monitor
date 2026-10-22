@@ -3294,3 +3294,48 @@ backend, e temporizador da visita automática sem o "Não estou aqui". Duas muta
 (tirar a conferência da tarefa e tirar a exceção do check-in manual), cada uma derrubando os testes
 correspondentes. Suíte do app em 60 suítes / 687 testes, lint com 11 avisos (teto 16), `tsc` limpo.
 Falta o PO repetir o trajeto no aparelho com o APK que sair deste PR.
+
+---
+
+## M-060 — Render aposentado: sem rollback para o Render e sem keep-alive
+
+**Data:** 22/10/2026 · **PR:** (este PR) · **Origem:** decisão do PO ("não utilizaremos mais o Render")
+
+### Como estava
+
+Desde a virada para o Google Cloud Run (04/09/2026, ADR-011), o Render tinha ficado como caminho
+de rollback: `cd-backend-render.yml` sem gatilho `push`, só `workflow_dispatch`, construindo a
+imagem no GHCR e disparando o deploy pela API do Render. O `keep-alive-backend.yml`, que existia
+só para impedir a hibernação do plano free do Render, estava com o `cron` comentado e sem nenhuma
+URL de destino (as variáveis `BACKEND_HEALTH_URL_*` nunca foram criadas e o padrão foi esvaziado em
+05/09/2026). Os blueprints `render.yaml` (raiz) e `backend/render.yaml` continuavam no repositório,
+e os guias de deploy ainda ensinavam a criar o Web Service no Render.
+
+### O que mudou
+
+- Removidos `.github/workflows/cd-backend-render.yml`, `.github/workflows/keep-alive-backend.yml`,
+  `render.yaml` e `backend/render.yaml`.
+- O keep-alive não foi repontado para o Cloud Run: lá o cold start vem de `--min-instances=0`, e
+  manter a instância acordada por ping é pagar a instância ociosa por fora, sem a medição que
+  `--min-instances=1` deixaria explícita (mesma conclusão registrada no próprio workflow em
+  04/09/2026). Nenhum outro workflow chamava os dois arquivos removidos.
+- `.github/DEPLOY.md`, `Documentos/10-git-flow/MANUAL.md`, `deploy/google/README.md`,
+  `backend/README.md` e `backend/.env.example` deixam de descrever o Render (passo de criação do
+  serviço, variáveis no painel, secrets `RENDER_*`, linha dos workflows). A imagem Docker passa a
+  constar no Artifact Registry, que é o que o `cd-backend-google.yml` usa. O ADR-011 ganha a nota da
+  aposentadoria. Documentos de análise e históricos que citam o Render ficam como estão: registram
+  o que era verdade na data deles.
+
+### Efeito esperado
+
+Um único caminho de deploy do backend (Cloud Run) nos workflows e nos guias. O rollback passa a
+ser voltar o tráfego para uma revisão anterior do Cloud Run.
+
+### Pendente fora do repositório (PO)
+
+- Apagar o Web Service `saude-monitor-backend-dev` no painel do Render (em 05/09/2026 ele ainda
+  respondia em `saude-monitor.onrender.com`; não foi possível medir agora, o proxy da sessão bloqueia
+  o host).
+- Apagar os secrets `RENDER_API_KEY_DEV` e `RENDER_SERVICE_ID_DEV` do GitHub e revogar a API key no
+  Render.
+- Opcional: apagar as imagens `ghcr.io/gabrielvogado/saude-monitor-backend`, que só o Render usava.

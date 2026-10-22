@@ -149,6 +149,65 @@ describe("HistoricoScreen (E5-03/RN-22)", () => {
     expect(screen.getByText("4,0 / 5")).toBeTruthy();
   });
 
+  describe("avaliações: hospital avaliado e edição em até 15 dias (RN-09)", () => {
+    const DIA_EM_MS = 24 * 60 * 60 * 1000;
+
+    function avaliacao(extras) {
+      return {
+        id: "fb1",
+        visitaId: "v1",
+        hospitalNome: "Hospital Regional da Asa Norte",
+        criadoEm: "2026-10-20T12:00:00Z",
+        nota: 5,
+        ...extras,
+      };
+    }
+
+    async function abrirAbaAvaliacoes(itens) {
+      definirUsuarioDaSessao({ id: "u1", nome: "Marina" });
+      VisitaService.listarHistorico.mockResolvedValue({ content: [] });
+      FeedbackService.listarHistorico.mockResolvedValue({ content: itens });
+      renderizar();
+      fireEvent.press(await screen.findByText("Avaliações"));
+    }
+
+    test("o card mostra o nome do hospital avaliado", async () => {
+      await abrirAbaAvaliacoes([avaliacao({ editavelAte: null })]);
+
+      expect(await screen.findByText("Hospital Regional da Asa Norte")).toBeTruthy();
+    });
+
+    test("dentro do prazo, Editar abre o formulário com a avaliação atual", async () => {
+      const item = avaliacao({ editavelAte: new Date(Date.now() + DIA_EM_MS).toISOString() });
+      await abrirAbaAvaliacoes([item]);
+
+      fireEvent.press(
+        await screen.findByRole("button", { name: "Editar avaliação de Hospital Regional da Asa Norte" })
+      );
+
+      expect(NAVEGACAO.navigate).toHaveBeenCalledWith("Feedback", {
+        screen: "FeedbackForm",
+        params: {
+          visitaId: "v1",
+          hospitalNome: "Hospital Regional da Asa Norte",
+          feedbackId: "fb1",
+          avaliacao: item,
+        },
+      });
+    });
+
+    test("prazo vencido ou avaliação sem prazo (anônima) não oferece edição", async () => {
+      await abrirAbaAvaliacoes([
+        avaliacao({ id: "fb1", editavelAte: new Date(Date.now() - DIA_EM_MS).toISOString() }),
+        avaliacao({ id: "fb2", hospitalNome: null, editavelAte: undefined }),
+      ]);
+
+      expect(await screen.findByText("Hospital Regional da Asa Norte")).toBeTruthy();
+      expect(screen.getByText("Hospital")).toBeTruthy();
+      expect(screen.queryByText("Editar")).toBeNull();
+    });
+  });
+
   describe("exportação de dados em PDF (E5-03 / art. 18 LGPD)", () => {
     beforeEach(() => {
       definirUsuarioDaSessao({ id: "u1", nome: "Marina" });

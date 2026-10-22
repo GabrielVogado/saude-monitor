@@ -21,7 +21,8 @@ import { concluirFeedback } from "../service/FeedbackNotificationService";
  *   4. Avaliação geral (nota 1-5 obrigatória + comentário opcional)
  *
  * Todas as perguntas, exceto a `nota`, podem ser puladas. Submit dispara POST
- * (criação) ou PUT (edição — janela de 24h, RN-09).
+ * (criação) ou PUT (edição — até 15 dias após a criação, RN-09). Na edição, aberta
+ * pelo Histórico, `avaliacao` traz as respostas atuais para pré-preencher o formulário.
  */
 
 const OPCOES_SIM_NAO = ["SIM", "NAO", "NAO_SEI"];
@@ -99,6 +100,27 @@ const FORM_INICIAL = {
   comentario: "",
 };
 
+/**
+ * Respostas já gravadas (vindas do Histórico) no formato do formulário, para a edição
+ * começar do que o usuário respondeu e não apagar o que ele não for mudar.
+ *
+ * @returns {FormFeedback}
+ */
+function formDaAvaliacao(avaliacao) {
+  if (!avaliacao) return FORM_INICIAL;
+  return {
+    fezTriagem: avaliacao.fezTriagem ?? null,
+    especialidadeProcurada: avaliacao.especialidadeProcurada ?? "",
+    foiAtendido: avaliacao.foiAtendido ?? null,
+    teveMedico: avaliacao.teveMedico ?? null,
+    motivoNaoAtendido: avaliacao.motivoNaoAtendido ?? null,
+    medicacaoReceita: avaliacao.medicacaoReceita ?? null,
+    tratamentoEquipe: avaliacao.tratamentoEquipe ?? null,
+    nota: avaliacao.nota ?? null,
+    comentario: avaliacao.comentario ?? "",
+  };
+}
+
 const ROTULOS_TRATAMENTO = ["Ruim", "Regular", "Bom", "Muito bom", "Excelente"];
 
 const OpcoesFezTriagem = ({ valor, aoSelecionar, rotulo, opcoes = OPCOES_SIM_NAO }) => (
@@ -174,7 +196,7 @@ const ETAPAS = [
 ];
 
 export default function FeedbackFormScreen({ navigation, route }) {
-  const { visitaId, hospitalNome, feedbackId } = route.params || {};
+  const { visitaId, hospitalNome, feedbackId, avaliacao } = route.params || {};
 
   const [etapa, setEtapa] = useState(0);
   const [enviando, setEnviando] = useState(false);
@@ -184,7 +206,7 @@ export default function FeedbackFormScreen({ navigation, route }) {
   const [jaAvaliado, setJaAvaliado] = useState(false);
   const [naoInteragi, setNaoInteragi] = useState(false);
 
-  const [form, setForm] = useState(FORM_INICIAL);
+  const [form, setForm] = useState(() => formDaAvaliacao(avaliacao));
 
   // RN-11: a Tela 2 (especialidade + atendimento) só aparece quando triagem = Sim.
   // Sem triagem o fluxo vai direto da Tela 1 para a Tela 3.
@@ -235,20 +257,25 @@ export default function FeedbackFormScreen({ navigation, route }) {
     }
     setEnviando(true);
     setErro(null);
+    // Respostas da Tela 2 só valem com triagem = Sim (RN-11). Na edição o formulário
+    // começa com o que foi gravado: quem troca a triagem para Não/Não sei não pode
+    // reenviar, escondidas, as respostas antigas de especialidade e atendimento.
+    const comTela2 = form.fezTriagem === "SIM";
+    const foiAtendido = comTela2 ? form.foiAtendido : null;
     const payload = {
       visitaId,
       fezTriagem: form.fezTriagem || undefined,
-      especialidadeProcurada: form.especialidadeProcurada || undefined,
-      foiAtendido: form.foiAtendido || undefined,
+      especialidadeProcurada: (comTela2 && form.especialidadeProcurada) || undefined,
+      foiAtendido: foiAtendido || undefined,
       // Frontend envia o label amigável quando o paciente escolhe "Casos mais graves" (F-05);
       // o backend o normaliza para CLASSIFICACAO_RISCO.
       motivoNaoAtendido:
-        form.foiAtendido === "NAO"
+        foiAtendido === "NAO"
           ? form.motivoNaoAtendido === "CLASSIFICACAO_RISCO"
             ? "CASOS_MAIS_GRAVES_PRIORIDADE"
             : form.motivoNaoAtendido || undefined
           : undefined,
-      teveMedico: form.teveMedico || undefined,
+      teveMedico: (comTela2 && form.teveMedico) || undefined,
       medicacaoReceita: form.medicacaoReceita || undefined,
       tratamentoEquipe: form.tratamentoEquipe || undefined,
       nota: form.nota,
@@ -257,14 +284,23 @@ export default function FeedbackFormScreen({ navigation, route }) {
 
     try {
       await enviarFeedback({ feedbackId, payload });
-      await concluirFeedback(visitaId);
+      // A pendência local só existe antes da primeira resposta; a edição não tem o que concluir.
+      if (!feedbackId) {
+        await concluirFeedback(visitaId);
+      }
       setEnviado(true);
     } catch (e) {
       // Já avaliado (dedupe RN-12): a pendência desta visita não tem mais o que
       // esperar, então sai da lista da Home. O 404 NÃO remove: ele também vem quando o
       // checkout ainda está na fila offline (visita aberta no servidor), e a pendência
       // vence sozinha em 24h (RN-09) se a visita de fato não puder mais ser avaliada.
-      if (e.status === 409) {
+      if (feedbackId && e.status === 409) {
+        // Na edição, o 409 é o prazo de 15 dias encerrado (RN-09), não visita já avaliada.
+        setErro(e.message || "O prazo para editar esta avaliação já encerrou.");
+      } else if (feedbackId && (e.status === 403 || e.status === 404)) {
+        // Avaliação apagada ou desvinculada da conta depois que o Histórico foi carregado.
+        setErro("Esta avaliação não pode mais ser editada.");
+      } else if (e.status === 409) {
         concluirFeedback(visitaId).catch(() => {});
         setJaAvaliado(true);
       } else if (e.status === 404) {
@@ -282,7 +318,9 @@ export default function FeedbackFormScreen({ navigation, route }) {
     return (
       <SafeAreaView style={styles.containerCentral}>
         <View style={styles.cardAgradecimento}>
-          <Text style={styles.tituloAgradecimento}>Obrigado pela sua avaliação!</Text>
+          <Text style={styles.tituloAgradecimento}>
+            {feedbackId ? "Avaliação atualizada!" : "Obrigado pela sua avaliação!"}
+          </Text>
           <Text style={styles.textoAgradecimento}>
             Sua opinião ajuda a melhorar o atendimento de quem chega a um hospital.
           </Text>

@@ -47,15 +47,22 @@ import java.util.stream.Collectors;
  * <p>Regras aplicadas: dedupe 1 feedback por visita (RN-12, via {@code visitaId} único);
  * feedback anônimo sem {@code usuarioId} (RN-13); a visita deve estar {@code FINALIZADA}
  * ou {@code GPS_INTERROMPIDO} (não é possível avaliar visita em andamento); janela de 24h
- * a partir da saída para responder e a partir da criação para editar (RN-09);
+ * a partir da saída para responder e prazo de 15 dias a partir da criação para o dono
+ * editar (RN-09);
  * {@code motivoNaoAtendido} obrigatório quando {@code foiAtendido = NAO} (RN-10).</p>
  */
 @Service
 @RequiredArgsConstructor
 public class FeedbackServiceImpl implements FeedbackService {
 
-    /** Janela de 24h para responder/editar o feedback após a saída (RN-09). */
+    /** Janela de 24h para responder o feedback após a saída (RN-09). */
     private static final Duration JANELA_RESPOSTA = Duration.ofHours(24);
+
+    /**
+     * Prazo para o dono editar a avaliação, contado da criação (RN-09, decisão do PO em
+     * 22/10/2026): pode editar quantas vezes quiser dentro dele.
+     */
+    public static final Duration PRAZO_EDICAO = Duration.ofDays(15);
 
     /** Label amigável enviado pelo frontend (F-05); o backend normaliza para CLASSIFICACAO_RISCO. */
     private static final String LABEL_CASOS_MAIS_GRAVES = "CASOS_MAIS_GRAVES_PRIORIDADE";
@@ -123,7 +130,8 @@ public class FeedbackServiceImpl implements FeedbackService {
         // AFTER_COMMIT no listener garante que só recalcula depois do commit desta transação.
         eventPublisher.publishEvent(new FeedbackSalvoEvent(salvo.getHospitalId()));
 
-        return toResponse(salvo, true);
+        // Sem o nome do hospital: o envio é o caminho mais quente e o app já o tem na tela.
+        return toResponse(salvo, null);
     }
 
     @Override
@@ -133,7 +141,7 @@ public class FeedbackServiceImpl implements FeedbackService {
             return Optional.empty();
         }
         exigirDono(feedback, usuarioId);
-        return Optional.of(toResponse(feedback, true));
+        return Optional.of(toResponse(feedback, obterNomeHospital(feedback.getHospitalId())));
     }
 
     @Override
@@ -142,8 +150,10 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Feedback não encontrado para o id informado."));
         exigirDono(feedback, usuarioId);
 
-        if (Duration.between(feedback.getCriadoEm(), Instant.now()).compareTo(JANELA_RESPOSTA) > 0) {
-            throw new ConflitoException("A janela de 24 horas para editar este feedback já encerrou.");
+        Instant agora = Instant.now();
+        Instant editavelAte = calcularEditavelAte(feedback);
+        if (editavelAte == null || agora.isAfter(editavelAte)) {
+            throw new ConflitoException("O prazo de 15 dias para editar esta avaliação já encerrou.");
         }
         validarMotivoNaoAtendido(request);
 
@@ -156,21 +166,25 @@ public class FeedbackServiceImpl implements FeedbackService {
         feedback.setNota(request.nota());
         feedback.setTratamentoEquipe(request.tratamentoEquipe());
         feedback.setComentario(request.comentario());
+        feedback.setEditadoEm(agora);
 
         FeedbackDocument salvo = feedbackRepository.save(feedback);
 
-        // Edição dentro da janela de 24h pode alterar a nota — recalcula o indicador (RN-18).
+        // A edição pode alterar a nota — recalcula o indicador (RN-18). A visita não muda,
+        // então a prova de presença (SEG-01) que valia na criação continua valendo.
         eventPublisher.publishEvent(new FeedbackSalvoEvent(salvo.getHospitalId()));
 
-        return toResponse(salvo, true);
+        return toResponse(salvo, obterNomeHospital(salvo.getHospitalId()));
     }
 
     @Override
     public PageResponse<FeedbackResponse> historico(String usuarioId, int page, int size) {
         Page<FeedbackDocument> resultado = feedbackRepository
                 .findByUsuarioIdOrderByCriadoEmDesc(usuarioId, PageRequest.of(page, size));
+        Map<String, String> nomes = obterNomesHospitais(resultado.getContent().stream()
+                .map(FeedbackDocument::getHospitalId).toList());
         List<FeedbackResponse> content = resultado.getContent().stream()
-                .map(f -> toResponse(f, true))
+                .map(f -> toResponse(f, nomes.get(f.getHospitalId())))
                 .toList();
         return PageResponse.of(content, page, size, resultado.getTotalElements());
     }
@@ -197,16 +211,8 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .filter(v -> !comFeedback.contains(v.getId()))
                 .toList();
 
-        // Sem Collectors.toMap: ele lança NPE com valor nulo, e hospital importado pode
-        // vir sem nome — um cadastro incompleto não pode derrubar a lista inteira.
-        Map<String, String> nomes = new HashMap<>();
-        List<String> hospitalIds = semFeedback.stream()
-                .map(VisitaDocument::getHospitalId).filter(Objects::nonNull).distinct().toList();
-        if (!hospitalIds.isEmpty()) {
-            for (HospitalDocument hospital : hospitalRepository.findAllById(hospitalIds)) {
-                nomes.putIfAbsent(hospital.getId(), hospital.getNome());
-            }
-        }
+        Map<String, String> nomes = obterNomesHospitais(semFeedback.stream()
+                .map(VisitaDocument::getHospitalId).toList());
 
         return semFeedback.stream()
                 .map(v -> new FeedbackPendenteResponse(
@@ -326,11 +332,45 @@ public class FeedbackServiceImpl implements FeedbackService {
         }
     }
 
-    private FeedbackResponse toResponse(FeedbackDocument f, boolean recebido) {
+    /**
+     * Nomes dos hospitais em uma só consulta (sem N+1). Sem Collectors.toMap: ele lança
+     * NPE com valor nulo, e hospital importado pode vir sem nome — um cadastro incompleto
+     * não pode derrubar a lista inteira.
+     */
+    private Map<String, String> obterNomesHospitais(List<String> hospitalIds) {
+        Map<String, String> nomes = new HashMap<>();
+        List<String> distintos = hospitalIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (!distintos.isEmpty()) {
+            for (HospitalDocument hospital : hospitalRepository.findAllById(distintos)) {
+                nomes.putIfAbsent(hospital.getId(), hospital.getNome());
+            }
+        }
+        return nomes;
+    }
+
+    private String obterNomeHospital(String hospitalId) {
+        if (hospitalId == null) {
+            return null;
+        }
+        return hospitalRepository.findById(hospitalId).map(HospitalDocument::getNome).orElse(null);
+    }
+
+    /**
+     * Fim do prazo de edição (RN-09). Só a avaliação com dono é editável: a anônima, ou a
+     * desvinculada da conta (DAD-01 B), não tem quem passe em {@link #exigirDono}.
+     */
+    private static Instant calcularEditavelAte(FeedbackDocument f) {
+        if (f.getUsuarioId() == null || f.getCriadoEm() == null) {
+            return null;
+        }
+        return f.getCriadoEm().plus(PRAZO_EDICAO);
+    }
+
+    private FeedbackResponse toResponse(FeedbackDocument f, String hospitalNome) {
         return new FeedbackResponse(
-                f.getId(), f.getVisitaId(), f.getHospitalId(),
+                f.getId(), f.getVisitaId(), f.getHospitalId(), hospitalNome,
                 f.getFoiAtendido(), f.getMotivoNaoAtendido(), f.getTeveMedico(), f.getFezTriagem(),
                 f.getMedicacaoReceita(), f.getEspecialidadeProcurada(), f.getNota(), f.getTratamentoEquipe(),
-                f.getComentario(), f.isAnonimizado(), f.getCriadoEm(), recebido);
+                f.getComentario(), f.isAnonimizado(), f.getCriadoEm(), calcularEditavelAte(f), true);
     }
 }

@@ -15,9 +15,9 @@ import { concluirFeedback } from "../../../screens/feedback/service/FeedbackNoti
 jest.mock("../../../screens/feedback/service/FeedbackService");
 jest.mock("../../../screens/feedback/service/FeedbackNotificationService");
 
-function renderizar() {
+function renderizar(paramsExtras = {}) {
   const navigation = { goBack: jest.fn() };
-  const route = { params: { visitaId: "v1", hospitalNome: "Hospital Central" } };
+  const route = { params: { visitaId: "v1", hospitalNome: "Hospital Central", ...paramsExtras } };
   return renderComProviders(<FeedbackFormScreen navigation={navigation} route={route} />);
 }
 
@@ -190,5 +190,103 @@ describe("FeedbackFormScreen (Épico 03)", () => {
     fireEvent.press(screen.getByTestId("star-3"));
     fireEvent.press(screen.getByText("Enviar avaliação"));
     expect(await screen.findByText("Você já avaliou esta visita")).toBeTruthy();
+  });
+
+  describe("edição pelo Histórico (até 15 dias, RN-09)", () => {
+    const AVALIACAO = {
+      id: "fb9",
+      visitaId: "v1",
+      fezTriagem: "SIM",
+      especialidadeProcurada: "Cardiologia",
+      foiAtendido: "NAO",
+      motivoNaoAtendido: "LOTACAO",
+      medicacaoReceita: "RECEBI",
+      tratamentoEquipe: 3,
+      nota: 2,
+      comentario: "Demorou muito.",
+    };
+
+    function renderizarEdicao() {
+      return renderizar({ feedbackId: "fb9", avaliacao: AVALIACAO });
+    }
+
+    function irAteAvaliacaoGeral() {
+      // Triagem Sim já vem marcada: são 4 telas, e o motivo gravado deixa passar a Tela 2.
+      ["Continuar", "Continuar", "Continuar"].forEach((label) => fireEvent.press(screen.getByText(label)));
+    }
+
+    test("começa com as respostas gravadas e salva pelo PUT sem perder o que não mudou", async () => {
+      FeedbackService.atualizar.mockResolvedValue({ id: "fb9" });
+      renderizarEdicao();
+
+      expect(screen.getByText("Etapa 1 de 4")).toBeTruthy();
+      irAteAvaliacaoGeral();
+      expect(screen.getByDisplayValue("Demorou muito.")).toBeTruthy();
+      fireEvent.press(screen.getByTestId("star-4"));
+      fireEvent.press(screen.getByText("Salvar alterações"));
+
+      expect(await screen.findByText("Avaliação atualizada!")).toBeTruthy();
+      expect(FeedbackService.enviar).not.toHaveBeenCalled();
+      expect(FeedbackService.atualizar).toHaveBeenCalledWith(
+        "fb9",
+        expect.objectContaining({
+          visitaId: "v1",
+          nota: 4,
+          fezTriagem: "SIM",
+          especialidadeProcurada: "Cardiologia",
+          foiAtendido: "NAO",
+          motivoNaoAtendido: "LOTACAO",
+          medicacaoReceita: "RECEBI",
+          tratamentoEquipe: 3,
+          comentario: "Demorou muito.",
+        })
+      );
+    });
+
+    test("trocar a triagem para Não descarta as respostas antigas da Tela 2 (RN-11)", async () => {
+      FeedbackService.atualizar.mockResolvedValue({ id: "fb9" });
+      renderizarEdicao();
+
+      fireEvent.press(screen.getByText("Não"));
+      ["Continuar", "Continuar"].forEach((label) => fireEvent.press(screen.getByText(label)));
+      fireEvent.press(screen.getByText("Salvar alterações"));
+
+      expect(await screen.findByText("Avaliação atualizada!")).toBeTruthy();
+      const [, payload] = FeedbackService.atualizar.mock.calls[0];
+      expect(payload).toEqual(
+        expect.objectContaining({
+          fezTriagem: "NAO",
+          especialidadeProcurada: undefined,
+          foiAtendido: undefined,
+          motivoNaoAtendido: undefined,
+          teveMedico: undefined,
+          nota: 2,
+        })
+      );
+      expect(concluirFeedback).not.toHaveBeenCalled();
+    });
+
+    test("avaliação que sumiu da conta (404 na edição) diz que não pode mais ser editada", async () => {
+      FeedbackService.atualizar.mockRejectedValue(Object.assign(new Error("x"), { status: 404 }));
+      renderizarEdicao();
+
+      irAteAvaliacaoGeral();
+      fireEvent.press(screen.getByText("Salvar alterações"));
+
+      expect(await screen.findByText("Esta avaliação não pode mais ser editada.")).toBeTruthy();
+    });
+
+    test("prazo encerrado (409 na edição) explica o prazo em vez de 'já avaliou'", async () => {
+      FeedbackService.atualizar.mockRejectedValue(
+        Object.assign(new Error("O prazo de 15 dias para editar esta avaliação já encerrou."), { status: 409 })
+      );
+      renderizarEdicao();
+
+      irAteAvaliacaoGeral();
+      fireEvent.press(screen.getByText("Salvar alterações"));
+
+      expect(await screen.findByText("O prazo de 15 dias para editar esta avaliação já encerrou.")).toBeTruthy();
+      expect(screen.queryByText("Você já avaliou esta visita")).toBeNull();
+    });
   });
 });

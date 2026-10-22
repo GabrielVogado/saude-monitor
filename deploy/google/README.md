@@ -1,8 +1,9 @@
 # Deploy do backend no Google Cloud Run
 
 Substitui o Render como destino de publicacao do backend a partir de 04/09/2026.
-O workflow do Render (`cd-backend-render.yml`) continua no repositorio, sem gatilho
-automatico, como caminho de rollback ate o Cloud Run estar validado.
+O Render, que ficou como rollback, foi aposentado em 22/10/2026 (M-060): o
+`cd-backend-render.yml`, o `keep-alive-backend.yml` e os `render.yaml` sairam do
+repositorio. Rollback agora e voltar o trafego para uma revisao anterior do Cloud Run.
 
 ## Ambientes
 

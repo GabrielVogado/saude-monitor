@@ -148,8 +148,5 @@ docker compose down -v
 ```
 
 # Deploy
-O deploy do backend e disparado por push em backend/ (workflow cd-backend.yml).
-
-- Deploy validado em 2026-08-26 22:05.
-
-- Auto-Deploy desabilitado para deploy via GHCR/Render API.
+O deploy do backend e disparado por push em backend/ (workflow cd-backend-google.yml),
+no Google Cloud Run. Ver deploy/google/README.md.

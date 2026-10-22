@@ -3220,7 +3220,7 @@ com 11 avisos (teto 16), `tsc` limpo.
 
 ## M-059 — Teste de campo da rc.6: lista sem esperar o servidor, temporizador da visita automática e checkout na hora certa
 
-**Data:** 21/10/2026 · **PR:** (este PR) · **Origem:** teste de campo do PO na homologação v1.0.0-rc.6
+**Data:** 21/10/2026 · **PR:** #220 · **Origem:** teste de campo do PO na homologação v1.0.0-rc.6
 
 ### Como apareceu
 

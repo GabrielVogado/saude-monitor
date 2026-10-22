@@ -18,6 +18,16 @@ class HospitalService {
   }
 
   /**
+   * Nota e tempo de todos os estabelecimentos do catálogo numa resposta só
+   * (`{ versao, porHospital: { [hospitalId]: indicadores } }`). Ficam fora do catálogo
+   * guardado no aparelho porque mudam a cada avaliação; o servidor e a borda guardam a
+   * resposta por até 5 minutos.
+   */
+  static listarIndicadoresDoCatalogo({ signal } = {}) {
+    return request("/api/v1/catalogo/indicadores", { signal });
+  }
+
+  /**
    * Ranking público de hospitais (E4-05).
    *
    * `ordem` aceita `NOTA` (maior nota primeiro) ou `TEMPO` (menor tempo mediano

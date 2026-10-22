@@ -105,6 +105,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/camadas/**").permitAll()
                         // Catálogo público de estabelecimentos (ARQ-01).
                         .requestMatchers(HttpMethod.GET, "/api/v1/catalogo").permitAll()
+                        // Nota e tempo de todo o catálogo, à parte porque mudam a cada avaliação.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/catalogo/indicadores").permitAll()
                         // Configuração remota lida pelo app ao abrir (ARQ-09); alterá-la é ADMIN.
                         .requestMatchers(HttpMethod.GET, "/api/v1/configuracao").permitAll()
                         .requestMatchers("/api/v1/admin/configuracao").hasRole("ADMIN")

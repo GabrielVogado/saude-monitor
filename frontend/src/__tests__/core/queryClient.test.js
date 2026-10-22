@@ -50,7 +50,8 @@ describe("queryClient", () => {
 
 describe("queryKeys", () => {
   test("todas as chaves começam pelo domínio, para invalidar o domínio inteiro", () => {
-    expect(queryKeys.hospitais.lista({ busca: "x" })).toEqual(["hospitais", "lista", { busca: "x" }]);
+    expect(queryKeys.hospitais.catalogoLocal()).toEqual(["hospitais", "catalogoLocal"]);
+    expect(queryKeys.hospitais.indicadoresDoCatalogo()).toEqual(["hospitais", "indicadoresDoCatalogo"]);
     expect(queryKeys.hospitais.detalhe("h1")).toEqual(["hospitais", "detalhe", "h1"]);
     expect(queryKeys.hospitais.ranking({ ordem: "NOTA" })).toEqual(["hospitais", "ranking", { ordem: "NOTA" }]);
     expect(queryKeys.conta.historico("u1")).toEqual(["conta", "u1", "historico"]);

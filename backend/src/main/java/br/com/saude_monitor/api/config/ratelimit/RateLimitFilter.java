@@ -159,8 +159,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if ("GET".equals(method) && uri.startsWith("/api/v1/hospitais")) {
             return true;
         }
-        // Catálogo público de estabelecimentos (ARQ-01).
-        if ("GET".equals(method) && "/api/v1/catalogo".equals(uri)) {
+        // Catálogo público de estabelecimentos (ARQ-01) e os indicadores dele.
+        if ("GET".equals(method)
+                && ("/api/v1/catalogo".equals(uri) || "/api/v1/catalogo/indicadores".equals(uri))) {
             return true;
         }
         // Configuração remota lida pelo app ao abrir (ARQ-09).

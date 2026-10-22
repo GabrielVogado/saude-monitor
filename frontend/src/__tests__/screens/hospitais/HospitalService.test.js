@@ -34,6 +34,12 @@ describe("HospitalService (Épico 01)", () => {
     });
   });
 
+  test("indicadores do catálogo vêm do endpoint público, numa chamada só", async () => {
+    await HospitalService.listarIndicadoresDoCatalogo();
+    expect(capturada.pathname).toBe("/api/v1/catalogo/indicadores");
+    expect(capturada.search).toBe("");
+  });
+
   test("listar monta a URL pública correta com query", async () => {
     await HospitalService.listar({ latitude: -15.79, longitude: -47.88, raioKm: 5, size: 50 });
     expect(capturada.pathname).toBe("/api/v1/hospitais");

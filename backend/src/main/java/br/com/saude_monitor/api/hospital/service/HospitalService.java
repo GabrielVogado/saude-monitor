@@ -4,6 +4,7 @@ import br.com.saude_monitor.api.hospital.document.TipoEstabelecimento;
 import br.com.saude_monitor.api.hospital.dto.GeoJsonPolygonDto;
 import br.com.saude_monitor.api.hospital.dto.HospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.HospitalResumoResponse;
+import br.com.saude_monitor.api.hospital.dto.IndicadoresResponse;
 import br.com.saude_monitor.api.hospital.dto.HospitalResponse;
 import br.com.saude_monitor.api.hospital.dto.PageResponse;
 import br.com.saude_monitor.api.hospital.dto.OrdemRanking;
@@ -16,6 +17,7 @@ import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalRequest;
 import br.com.saude_monitor.api.hospital.dto.SugestaoHospitalResponse;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Contrato do serviço de hospitais (Épico 01).
@@ -52,10 +54,19 @@ public interface HospitalService {
     PageResponse<HospitalResumoResponse> ranking(OrdemRanking ordem, TipoEstabelecimento tipo, int page, int size);
 
     /**
-     * Catálogo público (ARQ-01): todos os estabelecimentos ativos, com indicadores, em
-     * ordem de nome e id. É a base de {@code GET /api/v1/catalogo}.
+     * Catálogo público (ARQ-01): todos os estabelecimentos ativos, em ordem de nome e id,
+     * <b>sem indicadores</b> ({@code indicadores = null}). É a base de
+     * {@code GET /api/v1/catalogo}: só tem o que o painel muda, então a versão dele só muda
+     * quando um estabelecimento é criado, alterado, ativado ou desativado.
      */
     List<HospitalResumoResponse> listarCatalogo();
+
+    /**
+     * Indicadores de todos os estabelecimentos ativos, por id do hospital, na ordem do
+     * catálogo. É a base de {@code GET /api/v1/catalogo/indicadores}: nota e tempo mudam a
+     * cada avaliação, então ficam fora do catálogo.
+     */
+    Map<String, IndicadoresResponse> listarIndicadoresDoCatalogo();
 
     HospitalResponse alterarStatus(String id, boolean ativo);
 

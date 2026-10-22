@@ -3,7 +3,8 @@ import { apiRequest } from "../core/api/apiClient";
 
 /**
  * Configuração remota da operação (APP-03, ARQ-09): versão mínima do app, modo somente
- * leitura e mensagem de manutenção, lidas de `GET /api/v1/configuracao`.
+ * leitura, mensagem de manutenção e versão do catálogo de estabelecimentos
+ * (`versaoCatalogo`), lidas de `GET /api/v1/configuracao`.
  *
  * Sem ela, uma correção de escala ou de segurança dependia de cada pessoa atualizar o app
  * por conta própria, e as versões antigas seguiam gerando o tráfego antigo por meses.

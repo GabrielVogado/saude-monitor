@@ -3339,3 +3339,77 @@ ser voltar o tráfego para uma revisão anterior do Cloud Run.
 - Apagar os secrets `RENDER_API_KEY_DEV` e `RENDER_SERVICE_ID_DEV` do GitHub e revogar a API key no
   Render.
 - Opcional: apagar as imagens `ghcr.io/gabrielvogado/saude-monitor-backend`, que só o Render usava.
+
+---
+
+## M-061 — Lista de hospitais só baixa o catálogo quando ele muda
+
+**Data:** 22/10/2026 · **PR:** (este PR) · **Origem:** pedido do PO no thread de testes de campo
+
+### Como apareceu
+
+O PO pediu que a lista de hospitais deixasse de ir ao servidor repetidas vezes. A ideia dele era
+o painel admin disparar um evento para o app sempre que um hospital fosse incluído, alterado ou
+excluído, e o app trocar a cópia guardada só nesse caso. Avaliamos e o PO escolheu, pelo cartão
+de decisão, a alternativa com a versão do catálogo na configuração remota.
+
+### Por que não um evento do painel para o app
+
+1. A lista leva nota e tempo de espera, que mudam a cada avaliação, e não pelo painel. Só com o
+   evento, os números do app congelariam.
+2. Avisar todos os aparelhos exige push (FCM), que o app não tem. O Android atrasa ou descarta
+   esses avisos com o app fechado ou sem internet, então o app precisaria conferir a versão
+   sozinho de qualquer forma.
+3. Na meta do DF (~2 mi de instalações), um aviso faria todos os aparelhos baixarem a lista no
+   mesmo segundo, o pico que a análise de escala quer evitar.
+
+### Como era
+
+- A aba Hospitais pedia `GET /api/v1/hospitais` em páginas de 50, considerava a resposta fresca
+  por 2 min e buscava de novo ao voltar ao primeiro plano, ao puxar a tela e ao rolar até o fim.
+  Ao recarregar, refazia todas as páginas já abertas.
+- O catálogo guardado no aparelho (M-057) trazia os indicadores. A versão dele mudava a cada
+  avaliação, e o app o conferia a cada 5 min com o app aberto.
+
+### O que mudou (comportamento)
+
+- **Catálogo só com dados do painel:** `GET /api/v1/catalogo` vem sem indicadores
+  (`indicadores: null`). A versão (SHA-256 do conteúdo, também no `ETag`) só muda quando um
+  estabelecimento é criado, alterado, ativado ou desativado, pelo painel ou pela carga de dados.
+  O painel não precisou mudar: salvar um hospital já descarta o catálogo montado.
+- **Versão na configuração remota:** `GET /api/v1/configuracao`, que o app já lê ao abrir e ao
+  voltar ao primeiro plano, traz `versaoCatalogo`. Se ela difere da cópia do aparelho, o app
+  baixa o catálogo uma vez e a lista relê a cópia nova; se é igual, nada vai à rede. Sem banco
+  no momento, a configuração chega sem a versão e o app mantém a cópia.
+- **Lista e busca no aparelho:** a aba Hospitais não pagina mais no servidor. A lista, o filtro
+  de tipo e a busca sem acento saem da cópia guardada, na mesma ordem por nome e id.
+- **Indicadores numa resposta só:** nota e tempo de todos os estabelecimentos vêm de
+  `GET /api/v1/catalogo/indicadores` (mapa por id, `ETag` e o mesmo cache de 5 min na borda),
+  buscado só com a aba aberta e válido por 5 min no app. Sem servidor, a lista continua na tela,
+  sem nota, com o aviso "Sem conexão com o servidor".
+- **Puxar para atualizar:** confere o catálogo (304 quando nada mudou) e busca os indicadores.
+- **Rede de segurança:** se a configuração não chegar, a cópia vale por até um dia com o app
+  aberto (antes 5 min). Passado esse prazo, a lista confere em segundo plano e, se a cópia
+  mudou, mostra a nova sem precisar fechar a tela.
+- **Nota antiga nunca aparece:** cópias do catálogo gravadas antes desta mudança ainda trazem
+  nota. A lista ignora essa nota e mostra só a que veio de `/catalogo/indicadores`.
+- **Sem gravação à toa:** com a mesma versão, o aparelho regrava a data de conferência da cópia
+  no máximo uma vez por hora, e não a cada volta ao primeiro plano.
+- **Atraso de uma alteração do painel:** a instância que recebeu a alteração descarta na hora o
+  catálogo e os indicadores. As outras instâncias levam até 5 min, e a configuração tem cache de
+  1 min, então o app vê a versão nova em até cerca de 6 min.
+
+### Efeito esperado
+
+Abrir o app custa uma chamada pequena de configuração. A lista só é baixada quando alguém muda
+um hospital, e a mudança chega ao app na próxima vez em que ele é aberto ou volta ao primeiro
+plano. Nota e tempo custam uma chamada por aparelho a cada 5 min de uso da aba, com uma resposta
+que a borda pode servir a todos.
+
+### Fora desta mudança
+
+- O mapa continua lendo `GET /api/v1/hospitais` em páginas de 100: trocar pela cópia do catálogo
+  é o próximo passo natural.
+- O detalhe do hospital continua lendo o próprio hospital e os indicadores dele no servidor.
+- O APK da rc.7 ainda usa a listagem paginada: a lista dele continua funcionando, mas a cópia do
+  catálogo deixa de trazer nota até o próximo APK.

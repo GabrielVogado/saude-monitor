@@ -226,6 +226,11 @@ class HospitalControllerTest {
         }
 
         @Override
+        public java.util.Map<String, IndicadoresResponse> listarIndicadoresDoCatalogo() {
+            return java.util.Map.of();
+        }
+
+        @Override
         public HospitalResponse atualizar(String id, HospitalRequest request) {
             return criar(request);
         }

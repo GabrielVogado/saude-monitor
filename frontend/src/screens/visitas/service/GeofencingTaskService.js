@@ -834,8 +834,8 @@ export async function iniciarGeofencing({ interativo = true } = {}) {
 
   let lista;
   try {
-    // Com o app aberto, o catálogo é conferido se tiver mais de 5 min; no recálculo em
-    // segundo plano, a cópia de até um dia vale sem rede nenhuma.
+    // A cópia de até um dia vale sem rede nenhuma, com o app aberto ou não: quem avisa que o
+    // catálogo mudou é a versão da configuração remota, lida ao abrir o app (M-061).
     lista = await CatalogoLocal.obterEstabelecimentos({
       idadeMaximaMs: interativo ? IDADE_MAXIMA_PRIMEIRO_PLANO_MS : IDADE_MAXIMA_SEGUNDO_PLANO_MS,
     });

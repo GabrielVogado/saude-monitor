@@ -95,7 +95,7 @@ class HospitalServiceImplTest {
     }
 
     @Test
-    void catalogoTrazSoAtivosOrdenadosPorNomeEIdComIndicadores() {
+    void catalogoTrazSoAtivosOrdenadosPorNomeEIdSemIndicadores() {
         var captor = org.mockito.ArgumentCaptor.forClass(org.springframework.data.mongodb.core.query.Query.class);
 
         List<HospitalResumoResponse> catalogo = service.listarCatalogo();
@@ -105,7 +105,17 @@ class HospitalServiceImplTest {
         assertThat(captor.getValue().getQueryObject()).containsEntry("ativo", true);
         assertThat(captor.getValue().getSortObject().keySet()).containsExactly("nome", "id");
         assertThat(catalogo).hasSize(6);
-        assertThat(catalogo.getFirst().indicadores().notaMedia()).isEqualTo(5.0);
+        assertThat(catalogo).allSatisfy(item -> assertThat(item.indicadores()).isNull());
+    }
+
+    @Test
+    void indicadoresDoCatalogoVemPorIdNaOrdemDoCatalogo() {
+        var indicadores = service.listarIndicadoresDoCatalogo();
+        List<HospitalResumoResponse> catalogo = service.listarCatalogo();
+
+        assertThat(indicadores.keySet())
+                .containsExactlyElementsOf(catalogo.stream().map(HospitalResumoResponse::id).toList());
+        assertThat(indicadores.values().iterator().next().notaMedia()).isEqualTo(5.0);
     }
 
     @Test

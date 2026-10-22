@@ -187,13 +187,20 @@ public class HospitalServiceImpl implements HospitalService {
 
     @Override
     public List<HospitalResumoResponse> listarCatalogo() {
+        return buscarAtivosDoCatalogo().stream()
+                .map(d -> toResumo(d, null))
+                .toList();
+    }
+
+    @Override
+    public Map<String, IndicadoresResponse> listarIndicadoresDoCatalogo() {
+        return mapaIndicadores(buscarAtivosDoCatalogo());
+    }
+
+    private List<HospitalDocument> buscarAtivosDoCatalogo() {
         Query query = new Query(Criteria.where(CAMPO_ATIVO).is(true))
                 .with(Sort.by(Sort.Direction.ASC, "nome").and(Sort.by(Sort.Direction.ASC, "id")));
-        List<HospitalDocument> ativos = mongoTemplate.find(query, HospitalDocument.class);
-        Map<String, IndicadoresResponse> porId = mapaIndicadores(ativos);
-        return ativos.stream()
-                .map(d -> toResumo(d, porId.get(d.getId())))
-                .toList();
+        return mongoTemplate.find(query, HospitalDocument.class);
     }
 
     @Override

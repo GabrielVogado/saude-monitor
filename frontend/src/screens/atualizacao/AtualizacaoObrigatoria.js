@@ -4,6 +4,7 @@ import { Download } from "lucide-react-native";
 import { CSEmptyState } from "../../components";
 import { colors } from "../../theme";
 import ConfiguracaoRemota, { obterEnderecosDaLoja, isAtualizacaoObrigatoria } from "../../services/ConfiguracaoRemota";
+import { atualizarCatalogoSeMudou } from "../hospitais/hooks/useHospitais";
 
 /**
  * Tela de atualização obrigatória (APP-03).
@@ -12,6 +13,10 @@ import ConfiguracaoRemota, { obterEnderecosDaLoja, isAtualizacaoObrigatoria } fr
  * da mínima, o app inteiro dá lugar a esta tela, com o botão para a loja; o geofencing e a
  * fila offline continuam no fundo. Sem rede ou sem resposta, o app segue normal: a
  * conferência nunca impede o uso por falha dela mesma.
+ *
+ * A mesma leitura traz a versão do catálogo de estabelecimentos: quando ela difere da cópia
+ * do aparelho, o catálogo é baixado de novo. É assim que uma mudança feita no painel chega à
+ * lista de hospitais, sem o app conferir o catálogo de tempos em tempos.
  */
 export default function AtualizacaoObrigatoria({ children }) {
   const [bloqueado, setBloqueado] = useState(false);
@@ -20,6 +25,7 @@ export default function AtualizacaoObrigatoria({ children }) {
     try {
       const configuracao = await ConfiguracaoRemota.obterConfiguracao();
       setBloqueado(isAtualizacaoObrigatoria(configuracao));
+      atualizarCatalogoSeMudou(configuracao?.versaoCatalogo).catch(() => {});
     } catch {
       // Mantém o que já se sabia: sem rede, nem bloqueia nem libera quem já estava bloqueado.
     }

@@ -877,7 +877,7 @@ autenticada só para fechar uma janela de 15 minutos.
 
 ## M-013 — Confirmação obrigatória de e-mail no cadastro
 
-**Data:** 10/09/2026 · **PR:** (este PR)
+**Data:** 10/09/2026 · **PR:** #224
 
 ### O que aconteceu
 
@@ -1646,7 +1646,7 @@ Relato do PO com quatro comportamentos do fluxo de feedback após check-in/check
 
 ## M-025 — Edição de geofence no painel (E7-06) e o reconciliador que a desfaria
 
-**Data:** 28/09/2026 · **PR:** (este PR)
+**Data:** 28/09/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -1693,7 +1693,7 @@ de salvo, sem erro nem log visível para quem editou.
 
 ## M-026 — Mapa do painel vazio após 15 min e divisões pouco legíveis
 
-**Data:** 28/09/2026 · **PR:** (este PR)
+**Data:** 28/09/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -1739,7 +1739,7 @@ chamada voltava 401 em silêncio e as telas ficavam vazias (o dashboard mostrava
 
 ## M-027 — Massa de dados de avaliações para o ambiente de desenvolvimento
 
-**Data:** 29/09/2026 · **PR:** (este PR)
+**Data:** 29/09/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -1787,7 +1787,7 @@ regressão garante que ela não volte a ser `ApplicationRunner`.
 
 ## M-028 — Check-in e check-out automáticos com o app fechado
 
-**Data:** 04/10/2026 · **PR:** (este PR)
+**Data:** 04/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -1848,7 +1848,7 @@ aconteceu quando o app foi aberto. O check-out tinha a mesma dependência.
 
 ## M-029 — Avaliação da visita pendente até 24h (sem depender da notificação)
 
-**Data:** 04/10/2026 · **PR:** (este PR)
+**Data:** 04/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -1905,7 +1905,7 @@ na hora ou ficou com o celular descarregado.
 
 ## M-030 — Trava de contagem de testes e SonarQube Cloud na esteira
 
-**Data:** 04/10/2026 · **PR:** (este PR)
+**Data:** 04/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -1957,7 +1957,7 @@ e no backend.
 
 ## M-031 — Cobertura mínima de 90% no código novo e cobertura total que não cai
 
-**Data:** 04/10/2026 · **PR:** (este PR)
+**Data:** 04/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -2363,7 +2363,7 @@ grupo de entidades com uma raiz), e o endpoint e os DTOs já falavam em indicado
 
 ## M-041 — Exclusão de conta passa a apagar aparelho, GPS e comentário
 
-**Data:** 14/10/2026 · **PR:** (este PR)
+**Data:** 14/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -2393,7 +2393,7 @@ telefone ou o caso da pessoa. Com isso a afirmação "anonimizado" não se suste
 
 ## M-042 — Site público com política de privacidade, termos e exclusão de conta
 
-**Data:** 14/10/2026 · **PR:** (este PR)
+**Data:** 14/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -2435,7 +2435,7 @@ sem identificar o controlador nem dar um contato; os Termos de Uso não existiam
 
 ## M-043 — Textos legais do app alinhados à política publicada
 
-**Data:** 14/10/2026 · **PR:** (este PR)
+**Data:** 14/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -2482,7 +2482,7 @@ Análise de prontidão para a Play Store (14/10/2026), bloqueador B3. Dentro do 
 
 ## M-044 — Aviso de localização em segundo plano no formato da Play Store
 
-**Data:** 14/10/2026 · **PR:** (este PR)
+**Data:** 14/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -2513,7 +2513,7 @@ enviado ao hospital: o sinal vai só para o backend do Radar Saúde.
 
 ## M-045 — Manifesto de release sem sobreposição de tela e sem HTTP aberto
 
-**Data:** 14/10/2026 · **PR:** (este PR)
+**Data:** 14/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -2548,7 +2548,7 @@ Análise de prontidão para a Play Store (14/10/2026), itens A4 e A5. O
 
 ## M-046 — AAB de produção para a Play Store
 
-**Data:** 14/10/2026 · **PR:** (este PR)
+**Data:** 14/10/2026 · **PR:** #224
 
 ### Como apareceu
 
@@ -2585,7 +2585,7 @@ Até aqui nenhuma `release/` tinha sido criada, então o defeito não tinha apar
 
 ## M-047 — Visita e feedback anônimos só para o aparelho dono (SEG-02)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2640,7 +2640,7 @@ para não ligar o `dispositivoId` à conta.
 
 ## M-048 — Pontos de GPS apagados ao encerrar a visita e vínculo pessoal só por 90 dias (DAD-01, ARQ-04)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2696,7 +2696,7 @@ indicadores públicos não mudam.
 
 ## M-049 — Só avaliação com prova de presença conta no indicador público (SEG-01, parte de código)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2751,7 +2751,7 @@ de teste deixam de contar.
 
 ## M-050 — Seed e tarefas de inicialização com trava distribuída (SOL-02)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2794,7 +2794,7 @@ produção). O comentário do workflow que trava o limite em 1 deixa de ter moti
 
 ## M-051 — Rate limit por identidade e renovação de sessão fora do limite por IP (ARQ-02)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2840,7 +2840,7 @@ maior. Para limite por pessoa isso é aceitável; o teto global por IP fica para
 
 ## M-052 — Catálogo público com cache HTTP e cache curto do usuário no filtro JWT (ARQ-01 servidor, ARQ-03)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2891,7 +2891,7 @@ ainda não foi publicado na loja, então não há versão antiga instalada a man
 
 ## M-053 — Jobs periódicos disparáveis pelo Cloud Scheduler, com trava e log (SOL-05, ARQ-08)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2941,7 +2941,7 @@ depende desse job como rede de segurança.
 
 ## M-054 — E-mail de código dentro da requisição, piso de tempo e limite por destino (SOL-09, SEG-03)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -2991,7 +2991,7 @@ código atrasado ou perdido (verificação aberta da análise).
 
 ## M-055 — Contenção de falhas, pool do banco e configuração remota (ARQ-05, SOL-07, ARQ-09)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -3052,7 +3052,7 @@ como item novo (hoje é pelo `PUT`).
 
 ## M-056 — Swagger fora de produção, admin sem senha padrão e contêiner sem root (SEG-07, SEG-06)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -3092,7 +3092,7 @@ release. Mexem na esteira e geram PRs automáticos, então ficam para a fase de 
 
 ## M-057 — Catálogo local no geofencing e versão mínima do app (APP-01, APP-03)
 
-**Data:** 18/10/2026 · **PR:** (este PR) · **Épico 9**
+**Data:** 18/10/2026 · **PR:** #224 · **Épico 9**
 
 ### Como apareceu
 
@@ -3299,7 +3299,7 @@ Falta o PO repetir o trajeto no aparelho com o APK que sair deste PR.
 
 ## M-060 — Render aposentado: sem rollback para o Render e sem keep-alive
 
-**Data:** 22/10/2026 · **PR:** (este PR) · **Origem:** decisão do PO ("não utilizaremos mais o Render")
+**Data:** 22/10/2026 · **PR:** #224 · **Origem:** decisão do PO ("não utilizaremos mais o Render")
 
 ### Como estava
 
@@ -3344,7 +3344,7 @@ ser voltar o tráfego para uma revisão anterior do Cloud Run.
 
 ## M-061 — Lista de hospitais só baixa o catálogo quando ele muda
 
-**Data:** 22/10/2026 · **PR:** (este PR) · **Origem:** pedido do PO no thread de testes de campo
+**Data:** 22/10/2026 · **PR:** #224 · **Origem:** pedido do PO no thread de testes de campo
 
 ### Como apareceu
 

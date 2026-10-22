@@ -3494,3 +3494,24 @@ O prazo conta da criação da avaliação, a edição pode ser repetida dentro d
 não é editável (não aparece no Histórico nem tem dono logado). Com o prazo de 15 dias, a
 avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 B).
 
+## M-064 — Mapa com um hospital só não vai ao zoom máximo
+
+**Data:** 22/10/2026 · **PR:** #229 · **Origem:** teste da rc.8 pelo PO
+
+### Como era
+
+- O mapa enquadrava a câmera na caixa que cobre os hospitais exibidos. Com o filtro de 1 km
+  sobrou um hospital só: a caixa tinha área zero, o `fitBounds` levou o mapa ao zoom máximo e
+  ele ficou cinza, sem tiles, com a escala marcando 0,4 m. O mesmo acontecia com vários
+  estabelecimentos no mesmo ponto.
+
+### O que mudou (comportamento)
+
+- **Área mínima:** a caixa do enquadramento tem pelo menos ~1,1 km de lado, em volta do centro
+  dos hospitais. Com mais hospitais espalhados, o enquadramento continua igual.
+- **Posição do GPS no enquadramento:** com um raio selecionado, a posição usada no recorte
+  entra na caixa, então a pessoa vê onde está em relação aos hospitais próximos.
+
+### A conferir no aparelho
+
+- Filtro de 1 km com um hospital só: o mapa mostra as ruas em volta, com o marcador e a posição.

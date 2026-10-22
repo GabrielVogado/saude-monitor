@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 22/10/2026 — Mapa com um hospital só
+
+**O que mudou:** o enquadramento do mapa ganha área mínima (com um hospital só no filtro de 1 km, o mapa ia ao zoom máximo e ficava cinza) e, com raio, inclui a posição do GPS. A rc.8 fica reprovada no roteiro 3.1. Registro em `Historico-Melhorias.md` (M-064) e resultado em [`10-git-flow/homologacoes/v1.0.0-rc.8.md`](./10-git-flow/homologacoes/v1.0.0-rc.8.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` (correção de defeito, sem estória nova).
+
+---
+
 ## 📌 Revisão 22/10/2026 — Editar avaliação em até 15 dias
 
 **O que mudou:** a pedido do PO, a aba Avaliações do Histórico mostra o hospital de cada avaliação e um botão Editar até 15 dias depois de criada (antes o backend aceitava edição por 24h e o app não tinha como chegar nela). O prazo e a regra de dono ficam no backend. Atualizados RN-09 no `Documento-Negocial-v2.1.md` e `PUT /feedbacks/{id}` e `GET /contas/feedbacks` na `Especificacao-API-v2.4.md`. Registro em `Historico-Melhorias.md` (M-063).

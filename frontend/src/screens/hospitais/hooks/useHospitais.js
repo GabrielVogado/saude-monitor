@@ -95,7 +95,7 @@ export function useHospitaisCatalogoLocal({ busca, tipo }) {
     CatalogoLocal.conferirSeVencida()
       .then((mudou) => {
         if (mudou && montado) {
-          cliente.invalidateQueries({ queryKey: queryKeys.hospitais.catalogoLocal() });
+          void cliente.invalidateQueries({ queryKey: queryKeys.hospitais.catalogoLocal() });
         }
       })
       .catch(() => {});

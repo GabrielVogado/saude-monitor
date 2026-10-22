@@ -78,7 +78,7 @@ export default function HospitaisScreen({ navigation }) {
   const [atualizando, setAtualizando] = useState(false);
   const atualizar = useCallback(() => {
     setAtualizando(true);
-    recarregarListaDeHospitais(cliente).finally(() => setAtualizando(false));
+    void recarregarListaDeHospitais(cliente).finally(() => setAtualizando(false));
   }, [cliente]);
 
   // Visita ativa compartilhada com o observador global, recarregada ao focar a aba (e

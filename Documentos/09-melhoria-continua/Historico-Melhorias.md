@@ -3520,7 +3520,7 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
 
 ## M-065 — README que apresenta o produto, com o guia técnico em Documentos/
 
-**Data:** 23/10/2026 · **PR:** (este PR) · **Origem:** pedido do PO
+**Data:** 23/10/2026 · **PR:** #232 · **Origem:** pedido do PO
 
 ### Como era
 

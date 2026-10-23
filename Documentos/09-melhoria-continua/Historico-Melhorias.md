@@ -3571,6 +3571,16 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
 - No cold start (`--min-instances=0`) a primeira requisição espera os runners terminarem, agora com
   CPU cheia, em vez de ser atendida antes deles.
 
+### Medição depois do merge (23/10/2026, logs do Cloud Run)
+
+- O app sobe em 11–13 s e a sonda de startup passa em ~20 s do início da instância; as tarefas de
+  inicialização levam ~1 s com CPU cheia. Os ~4 min do passo de deploy são espera do próprio Cloud
+  Run até a revisão ficar Ready, sem atividade no contêiner.
+- No primeiro CD da develop, o Cloud Run desligou a instância do rollout logo após a sonda e, com
+  `--max-instances=1`, respondeu `429` "no available instance" por mais de 1 min sem o pedido chegar
+  ao app; a nova tentativa do mesmo commit passou. O smoke test passa a esperar até ~3 min quando a
+  resposta é 429/503/sem conexão, e falha na hora com qualquer outro código (PR #236).
+
 ---
 
 ## M-067 — Alarme de CD vermelho e conferência do CD após o merge

@@ -227,13 +227,16 @@ describe("VisitaService (Épico 02)", () => {
 
     test("checkout sem internet guarda o momento em que a pessoa saiu, não o do envio", async () => {
       semInternet();
+      // Relativo ao agora: a fila descarta itens com mais de 24h (VALIDADE_MS), então
+      // uma data fixa fazia o teste falhar um dia depois de escrito.
+      const saida = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
-      await expect(
-        VisitaService.checkout("v1", { ocorridoEm: "2026-10-21T20:05:00.000Z" })
-      ).rejects.toMatchObject({ enfileirado: true });
+      await expect(VisitaService.checkout("v1", { ocorridoEm: saida })).rejects.toMatchObject({
+        enfileirado: true,
+      });
 
       const [item] = await itensDaFila();
-      expect(item.ocorridoEm).toBe("2026-10-21T20:05:00.000Z");
+      expect(item.ocorridoEm).toBe(saida);
     });
 
     test("a mensagem promete o que a fila cumpre, em vez de anunciar falha", async () => {

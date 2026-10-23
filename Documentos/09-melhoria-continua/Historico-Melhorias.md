@@ -3592,3 +3592,45 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
 - **Regra de entrega (MANUAL §3.1, passo 5):** o merge só está entregue com os runs de CD do commit
   do merge verdes; CD vermelho é trabalho da mesma entrega.
 
+
+---
+
+## M-068 — Checkout que chega atrasado corrige a visita encerrada sem sinal
+
+**Data:** 23/10/2026 · **PR:** a definir · **Origem:** teste de campo do PO no Hospital Regional de Ceilândia (23/10/2026)
+
+### Como era
+
+- O check-in automático foi feito com internet; a saída aconteceu sem rede, e o Histórico mostrou a
+  visita como **GPS interrompido** com **0 min** de permanência.
+- Sem internet, o aparelho para de mandar o sinal da visita. Depois de 45 min, o
+  `VisitaGpsInterrompidoJob` encerra a visita com a saída no último sinal recebido, que era o próprio
+  check-in (RN-06). Quando a conexão volta, o checkout guardado na fila chega com a hora real, mas a
+  visita já está encerrada: o servidor responde 409 e o app descarta o item.
+- Com sinal fraco (timeout, servidor sem responder ou 5xx), o checkout nem entrava na fila: só o
+  erro "sem internet" era guardado. A fila também só era enviada com o app aberto.
+
+### O que mudou
+
+- **Backend:** o job marca a visita com `encerradaSemSinal`. O checkout que chega depois, com
+  `ocorridoEm` dentro da janela de 24h e sem `gpsIndisponivel`, troca a saída do último sinal pela
+  saída real, recalcula a duração e encerra como `FINALIZADA`, com `processadoEm` novo para o
+  indicador do hospital ser recalculado. A troca é um update condicionado ao estado que o job
+  deixou: uma segunda cópia do checkout recebe 409. Visita encerrada pelo aparelho, pela pessoa ou
+  antes da regra não muda. A regra de dono (SEG-02) continua valendo.
+- **App:** o checkout também vai para a fila quando o servidor não respondeu (timeout, servidor
+  indisponível ou 5xx), com aviso próprio e a hora do pedido como saída quando o aparelho não
+  informou outra. No reenvio, essas falhas deixam o item na fila sem gastar tentativa (antes,
+  cinco timeouts seguidos descartavam o checkout); a validade de 24h da fila continua valendo.
+  As tarefas de segundo plano (evento de região e leitura do acompanhamento) tentam enviar a
+  fila depois de tratar o evento, no máximo uma vez a cada 2 min, sem esperar a pessoa abrir o
+  app.
+- Atualizados RN-06 no `Documento-Negocial-v2.1.md` e o checkout na `Especificacao-API-v2.4.md`.
+
+### O que ficou de fora
+
+- Check-in automático feito sem internet: a visita só existe no servidor quando a fila envia o
+  check-in, e a saída depois disso não gera checkout. Fica para uma entrega própria
+  (`analises/Funcionamento-Offline-App-2026-10-23.md`, pasta do projeto).
+- Precisa de teste de campo: entrar com internet, sair sem rede, esperar mais de 45 min e reconectar.
+  O esperado é a visita aparecer como Finalizada com o tempo real.

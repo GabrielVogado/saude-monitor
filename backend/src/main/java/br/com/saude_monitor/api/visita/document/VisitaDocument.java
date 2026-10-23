@@ -83,6 +83,14 @@ public class VisitaDocument {
     private OrigemVisita origem;
 
     /**
+     * {@code true} quando quem encerrou a visita foi o job de GPS interrompido, por falta de
+     * sinal, e não o aparelho. Só essa visita aceita o checkout atrasado da fila offline, que
+     * troca a saída do último sinal pela saída real (teste de campo de 23/10/2026).
+     * {@code null} nas visitas encerradas de outro jeito ou antes da regra.
+     */
+    private Boolean encerradaSemSinal;
+
+    /**
      * {@code true} quando o check-in trouxe posição dentro do geofence do hospital, recebida
      * perto do momento da entrada (SEG-01). Só a visita comprovada, e o feedback dela, entram
      * no indicador público. {@code null} nas visitas anteriores à regra: ver

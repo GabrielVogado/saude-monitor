@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { ErroSemInternet } from "../../config/http";
+import { ErroDeTimeout, ErroSemInternet, ErroServidorIndisponivel } from "../../config/http";
 import { enfileirar, itensDaFila } from "../../config/filaOffline";
 import VisitaService from "../../screens/visitas/service/VisitaService";
 import { MAX_TENTATIVAS, sincronizar } from "../../services/SincronizacaoOffline";
@@ -54,6 +54,26 @@ describe("OPS-05 — sincronização da fila offline", () => {
     await sincronizar();
 
     expect(VisitaService.enviarEventoOffline).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * Teste de campo de 23/10/2026: com sinal fraco, cinco timeouts seguidos descartavam o
+   * checkout guardado, e a visita ficava como GPS interrompido com 0 min.
+   */
+  it.each([
+    ["timeout", () => new ErroDeTimeout("https://api/visitas", 20000)],
+    ["servidor indisponível", () => new ErroServidorIndisponivel("https://api/visitas")],
+    ["5xx", () => Object.assign(new Error("falha"), { status: 503 })],
+  ])("%s mantém o evento sem gastar tentativa", async (_nome, criarErro) => {
+    VisitaService.enviarEventoOffline.mockRejectedValue(criarErro());
+    await enfileirar({ chave: "checkout:v1", tipo: "checkout", corpo: { visitaId: "v1" } });
+
+    for (let i = 0; i < MAX_TENTATIVAS + 1; i += 1) {
+      await sincronizar();
+    }
+
+    const [item] = await itensDaFila();
+    expect(item).toMatchObject({ chave: "checkout:v1", tentativas: 0 });
   });
 
   it("descarta o evento que o servidor recusou de vez (409 de visita já encerrada)", async () => {

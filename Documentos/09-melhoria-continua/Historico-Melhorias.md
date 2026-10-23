@@ -3543,6 +3543,36 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
 
 ---
 
+## M-066 — Deploy do backend espera o readiness de verdade
+
+**Data:** 23/10/2026 · **PR:** #234 · **Origem:** deploy dev falhando nos merges do #224 e do #228
+
+### Como era
+
+- O Cloud Run usava a sonda TCP padrão: a revisão era dada por pronta quando a porta abria. Os
+  `ApplicationRunner` de inicialização (seed, reconciliações de raio e de região, backfill de
+  e-mail) rodam depois disso e só então o readiness passa a `UP`. Sem requisição, a CPU fica
+  estrangulada fora da fase de startup, e eles se arrastavam.
+- O smoke test do CD dá 60 s ao `/actuator/health`. O #223 passou com ~42 s; o #224 e o #228
+  ficaram em `503 OUT_OF_SERVICE` nas 6 tentativas e o deploy dev ficou vermelho, com a revisão
+  nova já recebendo tráfego.
+
+### O que mudou
+
+- **Sonda de startup HTTP** em `/actuator/health` (inclui o readinessState e é público) com até
+  230 s, e `--cpu-boost`. A fase de startup, com CPU cheia, dura até o readiness ficar `UP`; o
+  `gcloud run deploy` só termina aí e a revisão nova só recebe tráfego pronta.
+- **Falha segura:** se o readiness não ficar `UP` no prazo, o deploy falha e o tráfego continua na
+  revisão anterior, em vez de ir para uma revisão que responde 503.
+- Vale para dev e homologação (o `cd-homologacao.yml` chama este workflow).
+
+### Efeito colateral aceito
+
+- No cold start (`--min-instances=0`) a primeira requisição espera os runners terminarem, agora com
+  CPU cheia, em vez de ser atendida antes deles.
+
+---
+
 ## M-067 — Alarme de CD vermelho e conferência do CD após o merge
 
 **Data:** 23/10/2026 · **PR:** #235 · **Origem:** decisão do PO depois do deploy dev vermelho (M-066)

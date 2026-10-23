@@ -3545,7 +3545,7 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
 
 ## M-067 — Alarme de CD vermelho e conferência do CD após o merge
 
-**Data:** 23/10/2026 · **PR:** (a definir) · **Origem:** decisão do PO depois do deploy dev vermelho (M-066)
+**Data:** 23/10/2026 · **PR:** #235 · **Origem:** decisão do PO depois do deploy dev vermelho (M-066)
 
 ### Como era
 

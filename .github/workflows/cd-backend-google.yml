@@ -191,6 +191,19 @@ jobs:
             --min-instances=0
             --max-instances=1
             --timeout=60s
+            --cpu-boost
+            --startup-probe=httpGet.path=/actuator/health,httpGet.port=8080,initialDelaySeconds=0,timeoutSeconds=3,periodSeconds=5,failureThreshold=46
+          # --startup-probe (23/10/2026): sem ele o Cloud Run usa a sonda TCP padrao e da a
+          # revisao por pronta quando a porta abre. So que os ApplicationRunner (seed,
+          # reconciliacoes de raio e de regiao, backfill de e-mail) rodam DEPOIS disso, e o
+          # readiness so vira ACCEPTING_TRAFFIC quando eles terminam. Fora da fase de startup a
+          # CPU e estrangulada sem requisicao, entao eles se arrastavam: o #223 passou no smoke
+          # test com ~42 s e o #224 e o #228 estouraram os 60 s com 503 OUT_OF_SERVICE.
+          # Sondando /actuator/health (que inclui o readinessState e e permitAll; o
+          # /health/readiness nao e), a fase de startup, com CPU cheia e --cpu-boost, dura ate
+          # o readiness ficar UP, o gcloud so termina o deploy nesse ponto e a revisao nova so
+          # recebe trafego pronta. Se nao ficar UP em 230 s (limite do Cloud Run: 240 s), o
+          # deploy falha e o trafego fica na revisao anterior.
           # --max-instances=1 nao e escolha de capacidade, e trava de seguranca:
           # SeedRunner.java:57 le `hospitalRepository.count()` e so pula o seed se der
           # diferente de zero. No Render, instancia unica, a corrida era inalcancavel.

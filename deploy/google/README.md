@@ -78,6 +78,17 @@ gcloud secrets create ADMIN_SENHA --data-file=- --replication-policy=automatic  
 
 e entao trocar `APP_SEEDADMIN_ENABLED=false` por `APP_SEEDADMIN_ENABLED=true` e essas duas entradas em `secrets:`.
 
+## Sonda de startup (23/10/2026)
+
+O deploy declara `--startup-probe` em `/actuator/health` e `--cpu-boost`. Os `ApplicationRunner`
+(seed, reconciliacoes de raio e de regiao, backfill de e-mail) rodam depois que a porta abre, e o
+readiness so fica `UP` quando eles terminam. Com a sonda TCP padrao o Cloud Run dava a revisao por
+pronta ao abrir a porta e estrangulava a CPU, e o smoke test via `503 OUT_OF_SERVICE` por mais de
+60 s (merges do #224 e do #228). Com a sonda HTTP, a revisao so recebe trafego com o readiness
+`UP`; se nao ficar pronta em 230 s, o deploy falha e o trafego continua na revisao anterior.
+Efeito no cold start: a primeira requisicao espera os runners terminarem (com CPU cheia), em vez de
+ser atendida antes deles.
+
 ## Pontos em aberto
 
 - **Cold start (vale para homologacao tambem).** `--min-instances=0` mantem o custo em zero e traz de volta o

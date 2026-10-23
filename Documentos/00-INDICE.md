@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 23/10/2026 — Deploy do backend espera o readiness
+
+**O que mudou:** o deploy dev falhava com `503 OUT_OF_SERVICE` no smoke test (merges do #224 e do #228). O `cd-backend-google.yml` passa a declarar sonda de startup HTTP em `/actuator/health` e `--cpu-boost`: a revisão nova só recebe tráfego com as tarefas de inicialização terminadas. Detalhe em `deploy/google/README.md` e registro em `Historico-Melhorias.md` (M-066).
+**Sem mudança:** `De-Para-Backlog-Features.md` (correção de infraestrutura, sem estória entregue).
+
+---
+
 ## 📌 Revisão 23/10/2026 — README de apresentação
 
 **O que mudou:** a pedido do PO, o `README.md` da raiz passa a apresentar o Radar Saúde ao público final e a parceiros e investidores, com um GIF por tela e um tutorial curto de uso (gravados com dados fictícios, em `doc/assets/readme/`). O passo a passo para subir o projeto na máquina, que era o README, foi movido sem alteração para [`02-arquitetura-tecnica/Guia-Ambiente-Local-v1.0.md`](./02-arquitetura-tecnica/Guia-Ambiente-Local-v1.0.md). Registro em `Historico-Melhorias.md` (M-065).

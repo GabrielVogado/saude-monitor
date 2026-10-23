@@ -12,6 +12,7 @@ import { agendarFeedback } from "../../feedback/service/FeedbackNotificationServ
 import { centroDoHospital } from "../../../utils/geojson";
 import { haversineMetros } from "../../../utils/distancia";
 import { duracaoMinutosDesde } from "../../../utils/format";
+import { sincronizar } from "../../../services/SincronizacaoOffline";
 
 /**
  * Geofencing nativo (F-03/ADR-002): substitui o GPS contínuo (que não funciona em
@@ -531,11 +532,39 @@ async function registrarEvento(eventType, hospitalId) {
   await processarPendencias(agora);
 }
 
+/**
+ * Intervalo mínimo entre duas tentativas de enviar a fila a partir do segundo plano. As
+ * leituras do acompanhamento chegam a cada 30 s numa pendência: sem o intervalo, uma fila
+ * parada atrás de um servidor fora faria uma requisição por leitura.
+ */
+export const INTERVALO_FILA_SEGUNDO_PLANO_MS = 2 * 60 * 1000;
+
+let ultimaTentativaDaFila = 0;
+
+/**
+ * Envia a fila offline a partir da tarefa de segundo plano (teste de campo de 23/10/2026).
+ * Antes ela só saía com o app aberto: o checkout guardado na saída sem internet esperava a
+ * pessoa abrir o app. Cada evento de região e cada leitura do acompanhamento são uma chance
+ * de a conexão ter voltado. Roda depois do trabalho do evento, para uma rede lenta não gastar
+ * o tempo que o SO dá à tarefa antes do check-in ou do checkout.
+ */
+export async function enviarFilaOffline(agora = Date.now()) {
+  if (agora - ultimaTentativaDaFila < INTERVALO_FILA_SEGUNDO_PLANO_MS) {
+    return;
+  }
+  ultimaTentativaDaFila = agora;
+  await sincronizar().catch(() => {});
+}
+
 TaskManager.defineTask(GEOFENCING_TASK, async ({ data, error }) => {
   if (error) {
     return;
   }
+  await tratarEventoDeRegiao(data);
+  await enviarFilaOffline();
+});
 
+async function tratarEventoDeRegiao(data) {
   const { eventType, region } = data || {};
   const hospitalId = region?.identifier;
 
@@ -556,7 +585,7 @@ TaskManager.defineTask(GEOFENCING_TASK, async ({ data, error }) => {
     // eslint-disable-next-line no-console
     console.warn("GeofencingTaskService: falha ao tratar evento de região", erro?.message);
   }
-});
+}
 
 /**
  * Heartbeat da visita aberta com a posição da leitura recebida pela tarefa, no máximo um
@@ -702,6 +731,7 @@ TaskManager.defineTask(ACOMPANHAMENTO_TASK, async ({ data, error }) => {
   } catch {
     // A próxima leitura tenta de novo.
   }
+  await enviarFilaOffline();
 });
 
 /**

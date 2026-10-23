@@ -1,4 +1,4 @@
-import { ErroEnfileirado, ErroSemInternet } from "../../../config/http";
+import { ErroDeConexao, ErroEnfileirado, ErroSemInternet } from "../../../config/http";
 import { enfileirar } from "../../../config/filaOffline";
 import { apiRequest as request, buildQuery } from "../../../core/api/apiClient";
 import TokenStorage from "../../../services/TokenStorage";
@@ -14,10 +14,24 @@ const BASE_PATH = "/api/v1/visitas";
  * requisição não chegou a sair do aparelho. Nesse caso o reenvio é seguro: não
  * existe a dúvida de "o servidor chegou a receber?" que impediria repetir.
  */
-async function guardarOffline({ chave, tipo, corpo, ocorridoEm }) {
+async function guardarOffline({ chave, tipo, corpo, ocorridoEm }, mensagem) {
   await enfileirar({ chave, tipo, corpo, ocorridoEm });
 
-  return new ErroEnfileirado();
+  return new ErroEnfileirado(undefined, mensagem);
+}
+
+const MENSAGEM_SERVIDOR_FORA =
+  "Não foi possível falar com o servidor agora. A saída foi guardada e será enviada em seguida.";
+
+/**
+ * O checkout também vai para a fila quando o servidor não respondeu (timeout, servidor fora
+ * ou 5xx depois das novas tentativas), e não só sem internet. Teste de campo de 23/10/2026:
+ * com sinal fraco na saída, o checkout se perdia e a visita ficava GPS_INTERROMPIDO com 0 min.
+ * O reenvio é seguro mesmo que o primeiro pedido tenha chegado: a segunda chegada encontra
+ * a visita encerrada (409) e sai da fila.
+ */
+function isFalhaSemResposta(erro) {
+  return erro instanceof ErroDeConexao || (Number.isInteger(erro?.status) && erro.status >= 500);
 }
 
 class VisitaService {
@@ -70,6 +84,9 @@ class VisitaService {
    * permanência (teste de campo da rc.6, 21/10/2026).
    */
   static async checkout(id, { posicao, gpsIndisponivel, encerramentoManual, ocorridoEm } = {}) {
+    // Hora do pedido, para a fila: sem ela, um checkout manual guardado depois dos timeouts
+    // e das novas tentativas registraria como saída o instante em que foi guardado.
+    const pedidoEm = new Date().toISOString();
     const corpo = {
       posicao,
       gpsIndisponivel,
@@ -87,13 +104,14 @@ class VisitaService {
         idempotente: true,
       });
     } catch (erro) {
-      if (erro instanceof ErroSemInternet) {
-        throw await guardarOffline({
+      if (isFalhaSemResposta(erro)) {
+        const evento = {
           chave: `checkout:${id}`,
           tipo: "checkout",
           corpo: { visitaId: id, ...corpo },
-          ocorridoEm,
-        });
+          ocorridoEm: ocorridoEm || pedidoEm,
+        };
+        throw await guardarOffline(evento, erro instanceof ErroSemInternet ? undefined : MENSAGEM_SERVIDOR_FORA);
       }
       throw erro;
     }

@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 23/10/2026 — Checkout atrasado corrige GPS interrompido
+
+**O que mudou:** teste de campo do PO: a saída sem internet deixava a visita como GPS interrompido com 0 min, porque o job encerrava a visita antes de o checkout da fila chegar. O checkout atrasado com a hora real passa a corrigir a visita encerrada pelo job, e o app guarda o checkout também com sinal fraco e envia a fila em segundo plano. Atualizados RN-06 no `Documento-Negocial-v2.1.md` e o checkout na `Especificacao-API-v2.4.md`. Registro em `Historico-Melhorias.md` (M-068).
+**Também:** `De-Para-Backlog-Features.md` atualiza E2-05.
+
+---
+
 ## 📌 Revisão 23/10/2026 — Alarme de CD vermelho
 
 **O que mudou:** por decisão do PO, o novo `alarme-cd.yml` abre uma issue quando um CD falha na `develop`, na `master` ou numa `release/**` e a fecha quando ele volta ao verde, e o `10-git-flow/MANUAL.md` (§3.1 e §4.1) passa a exigir a conferência do CD depois do merge. Registro em `Historico-Melhorias.md` (M-067).

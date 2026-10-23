@@ -3597,7 +3597,7 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
 
 ## M-068 — Checkout que chega atrasado corrige a visita encerrada sem sinal
 
-**Data:** 23/10/2026 · **PR:** a definir · **Origem:** teste de campo do PO no Hospital Regional de Ceilândia (23/10/2026)
+**Data:** 23/10/2026 · **PR:** #237 · **Origem:** teste de campo do PO no Hospital Regional de Ceilândia (23/10/2026)
 
 ### Como era
 

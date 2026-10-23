@@ -1,0 +1,113 @@
+name: Alarme - CD vermelho
+
+# Abre uma issue quando um CD falha na develop, na master ou numa release, e a fecha quando o
+# mesmo CD volta ao verde (decisao do PO, 23/10/2026). Motivo: o deploy dev ficou vermelho nos
+# merges do #224 e do #228 sem ninguem ver -- as threads confirmavam o merge sem olhar o CD.
+# A issue notifica o dono do repositorio mesmo que ninguem esteja acompanhando o run.
+#
+# `workflow_run` so dispara pela versao deste arquivo na branch padrao (develop): ele passa a
+# valer no merge, e vale para runs de qualquer branch, por isso o filtro de branch abaixo.
+# `cancelled` fica de fora de proposito: o APK dev cancela o run anterior a cada push novo.
+on:
+  workflow_run:
+    workflows:
+      - 'CD - Backend (Google Cloud Run)'
+      - 'CD - Mobile (APK via Gradle)'
+      - 'CD - Homologação'
+      - 'CD - Produção (AAB)'
+    types: [completed]
+
+permissions:
+  issues: write
+
+concurrency:
+  group: alarme-cd-${{ github.event.workflow_run.name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  alarme:
+    name: Abrir ou fechar a issue do CD
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event.workflow_run.head_branch == 'develop'
+        || github.event.workflow_run.head_branch == 'master'
+        || startsWith(github.event.workflow_run.head_branch, 'release/'))
+      && contains(fromJSON('["success","failure","timed_out"]'), github.event.workflow_run.conclusion)
+    steps:
+      - name: Abrir, atualizar ou fechar a issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const titulo = `CD vermelho: ${run.name} (${run.head_branch})`;
+            const rotulo = 'cd-vermelho';
+            const commit = run.head_sha.substring(0, 7);
+            const mensagem = (run.head_commit?.message ?? '').split('\n')[0];
+
+            // Busca pela lista de issues abertas com o rotulo (a busca por texto do GitHub tem
+            // atraso de indexacao e poderia duplicar a issue numa falha seguida da outra).
+            const abertas = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: rotulo,
+              per_page: 100,
+            });
+            const issue = abertas.find((i) => i.title === titulo);
+
+            if (run.conclusion === 'success') {
+              if (!issue) return;
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `Voltou ao verde no commit \`${commit}\` (${mensagem}): ${run.html_url}`,
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed',
+              });
+              return;
+            }
+
+            const falha = [
+              `**${run.name}** terminou em \`${run.conclusion}\` na \`${run.head_branch}\`.`,
+              '',
+              `- Commit: \`${commit}\` (${mensagem})`,
+              `- Run: ${run.html_url}`,
+              '',
+              'A issue fecha sozinha quando este CD voltar ao verde nesta branch.',
+            ].join('\n');
+
+            if (issue) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `Falhou de novo.\n\n${falha}`,
+              });
+              return;
+            }
+            try {
+              await github.rest.issues.getLabel({ owner: context.repo.owner, repo: context.repo.repo, name: rotulo });
+            } catch (e) {
+              if (e.status !== 404) throw e;
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: rotulo,
+                color: 'd73a4a',
+                description: 'CD falhou na develop, na master ou numa release (alarme-cd.yml)',
+              });
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: titulo,
+              body: falha,
+              labels: [rotulo],
+              assignees: [context.repo.owner],
+            });

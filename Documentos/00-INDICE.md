@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 23/10/2026 — Alarme de CD vermelho
+
+**O que mudou:** por decisão do PO, o novo `alarme-cd.yml` abre uma issue quando um CD falha na `develop`, na `master` ou numa `release/**` e a fecha quando ele volta ao verde, e o `10-git-flow/MANUAL.md` (§3.1 e §4.1) passa a exigir a conferência do CD depois do merge. Registro em `Historico-Melhorias.md` (M-067).
+**Sem mudança:** `De-Para-Backlog-Features.md` (processo e infraestrutura, sem estória entregue).
+
+---
+
 ## 📌 Revisão 23/10/2026 — Deploy do backend espera o readiness
 
 **O que mudou:** o deploy dev falhava com `503 OUT_OF_SERVICE` no smoke test (merges do #224 e do #228). O `cd-backend-google.yml` passa a declarar sonda de startup HTTP em `/actuator/health` e `--cpu-boost`: a revisão nova só recebe tráfego com as tarefas de inicialização terminadas. Detalhe em `deploy/google/README.md` e registro em `Historico-Melhorias.md` (M-066).

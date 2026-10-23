@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 22/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 23/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 23/10/2026 — README de apresentação
+
+**O que mudou:** a pedido do PO, o `README.md` da raiz passa a apresentar o Radar Saúde ao público final e a parceiros e investidores, com um GIF por tela e um tutorial curto de uso (gravados com dados fictícios, em `doc/assets/readme/`). O passo a passo para subir o projeto na máquina, que era o README, foi movido sem alteração para [`02-arquitetura-tecnica/Guia-Ambiente-Local-v1.0.md`](./02-arquitetura-tecnica/Guia-Ambiente-Local-v1.0.md). Registro em `Historico-Melhorias.md` (M-065).
+**Sem mudança:** `De-Para-Backlog-Features.md` (documentação, sem estória entregue).
 
 ---
 
@@ -419,6 +426,7 @@ Documentos/
 │   ├── Plano-Escala-Infraestrutura-DF-v1.0.md  ← patamares de carga, custo e migração da infraestrutura para o DF
 │   ├── Analise-Escalabilidade-Seguranca-DF-v1.0.md (+ .pdf)  ← 46 gaps por setor, soluções, custos, roteiro e perguntas ao PO
 │   ├── Contexto-Sessao-Analise-Escala-Seguranca-2026-10-18.md  ← resumo da análise para o projeto Radar Saude no Claude
+│   ├── Guia-Ambiente-Local-v1.0.md           ← subir backend (Docker) e app (Expo) na máquina; era o README da raiz até 23/10/2026
 │   └── assets/                               ← diagramas usados pelos documentos desta pasta
 │
 ├── 03-ui-ux/                                 ← padrão de experiência e interface
@@ -483,6 +491,7 @@ Documentos/
 | 3c | [Plano de Escala da Infraestrutura para o DF](./02-arquitetura-tecnica/Plano-Escala-Infraestrutura-DF-v1.0.md) | 1.0 | 🟡 Proposta | Estrutura atual medida, travas para escalar, patamares de carga com custo estimado (US$/mês) e migração em cinco fases. ADR-015. |
 | 3d | [Análise de Escalabilidade, Segurança e Custo para o DF](./02-arquitetura-tecnica/Analise-Escalabilidade-Seguranca-DF-v1.0.md) ([PDF](./02-arquitetura-tecnica/Analise-Escalabilidade-Seguranca-DF-v1.0.pdf)) | 1.0 | 🟡 Proposta | 46 gaps em 8 setores com evidência, soluções e recomendação; modelo de carga revisado (recálculo de geofence em 2º plano); arquitetura-alvo; custos por patamar; roteiro; plano de prova de carga; ADR-016 proposto; por que não Quarkus (§12.4); 15 perguntas ao PO com sugestões. Complementa o 3c. |
 | 3e | [Contexto da análise de escala (resumo)](./02-arquitetura-tecnica/Contexto-Sessao-Analise-Escala-Seguranca-2026-10-18.md) | 18/10/2026 | ✅ Ativo | Resumo do 3d para o projeto "Radar Saude" no Claude: conclusões, gaps, perguntas pendentes com o efeito de cada resposta, roteiro e mapa dos documentos. Em caso de divergência, vale o 3d. |
+| 3f | [Guia do Ambiente Local](./02-arquitetura-tecnica/Guia-Ambiente-Local-v1.0.md) | 1.0 | ✅ Ativo | Como subir backend (Spring Boot + MongoDB via Docker) e app (Expo) na máquina, URL da API por plataforma, como parar o ambiente e problemas comuns (tela branca, `Network request failed`). Era o `README.md` da raiz até 23/10/2026. |
 | 4 | [Padrão UI/UX](./03-ui-ux/Padrao-UI-UX-v2.1.md) | **2.1** | ✅ Ativo | Princípios de UX, personas, jornada ponta a ponta, arquitetura de informação, design system completo (tokens, componentes), acessibilidade WCAG AA, LGPD por design e protótipos ASCII. |
 | 5 | [Backlog do MVP](./04-backlog/Backlog-MVP-v2.2.md) | **2.2** | ✅ Ativo | Backlog priorizado (Fase 0 + 8 épicos), decisões de priorização (§2.1), **Épico 8 — Estabilização e Desempenho**, sequência real S0–S8 + planejada S9–S12, DoD com situação real e regra de atualização documental. |
 | 6 | [Plano de Sprints](./06-sprints/Plano-Sprints-v2.2.md) | **2.2** | ✅ Ativo | S0–S6 e S8 concluídas, S7 adiada, **S9–S12 planejadas (§22)** com diagnóstico de desempenho medido, velocity, riscos, cerimônias e métricas. |
@@ -522,6 +531,7 @@ Documentos/
 | **QA / Testes** | Regras de negócio (Documento Negocial §6) + critérios de aceite (Backlog) + contratos (Especificação da API) |
 | **Scrum Master / Agile Coach** | `06-sprints/Plano-Sprints-v2.2.md` (§22 = próximas sprints) → `04-backlog/Backlog-MVP-v2.2.md` |
 | **Quem vai retomar o desenvolvimento** | `08-analise tecnica/Consolidacao-Tecnica-e-Backlog-Pendente-v1.1.md` §0 — é a fonte da priorização vigente e diz, em uma página, o que fazer primeiro e por quê |
+| **Quem vai rodar o projeto na máquina** | `02-arquitetura-tecnica/Guia-Ambiente-Local-v1.0.md` → `backend/README.md` |
 | **Novo integrante** | `00-INDICE.md` → leia na ordem: 1 (negócio) → 4 (UI/UX) → 2 (arquitetura) → 3 (API) → 5 (backlog) |
 
 ---

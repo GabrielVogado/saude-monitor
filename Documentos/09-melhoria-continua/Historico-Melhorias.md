@@ -3540,3 +3540,25 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
 - **GIFs reproduzíveis e sem dado pessoal:** gravados com o app na Web (react-native-web) e a API
   respondida por dados fictícios ("Hospital Exemplo ..."), em `doc/assets/readme/`, todos abaixo
   de 2,5 MB. A detecção automática e o mapa com ruas não aparecem na Web; o detalhe está no PR.
+
+---
+
+## M-067 — Alarme de CD vermelho e conferência do CD após o merge
+
+**Data:** 23/10/2026 · **PR:** (a definir) · **Origem:** decisão do PO depois do deploy dev vermelho (M-066)
+
+### Como era
+
+- O deploy dev ficou vermelho nos merges do #224 e do #228 e ninguém viu: o merge era dado por
+  entregue sem olhar os runs de CD que ele disparava, e uma falha no Actions só aparecia para quem
+  abrisse a aba.
+
+### O que mudou
+
+- **Alarme (`alarme-cd.yml`):** ao fim de cada CD na `develop`, na `master` ou numa `release/**`,
+  uma falha abre a issue `CD vermelho: <workflow> (<branch>)` (rótulo `cd-vermelho`, atribuída ao
+  dono do repositório, que é notificado); falha repetida comenta na mesma issue; o primeiro verde
+  do mesmo CD comenta e fecha. Cancelamentos são ignorados.
+- **Regra de entrega (MANUAL §3.1, passo 5):** o merge só está entregue com os runs de CD do commit
+  do merge verdes; CD vermelho é trabalho da mesma entrega.
+

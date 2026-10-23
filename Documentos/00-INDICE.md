@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 23/10/2026 — Alarme de CD vermelho
+
+**O que mudou:** por decisão do PO, o novo `alarme-cd.yml` abre uma issue quando um CD falha na `develop`, na `master` ou numa `release/**` e a fecha quando ele volta ao verde, e o `10-git-flow/MANUAL.md` (§3.1 e §4.1) passa a exigir a conferência do CD depois do merge. Registro em `Historico-Melhorias.md` (M-067).
+**Sem mudança:** `De-Para-Backlog-Features.md` (processo e infraestrutura, sem estória entregue).
+
+---
+
 ## 📌 Revisão 23/10/2026 — README de apresentação
 
 **O que mudou:** a pedido do PO, o `README.md` da raiz passa a apresentar o Radar Saúde ao público final e a parceiros e investidores, com um GIF por tela e um tutorial curto de uso (gravados com dados fictícios, em `doc/assets/readme/`). O passo a passo para subir o projeto na máquina, que era o README, foi movido sem alteração para [`02-arquitetura-tecnica/Guia-Ambiente-Local-v1.0.md`](./02-arquitetura-tecnica/Guia-Ambiente-Local-v1.0.md). Registro em `Historico-Melhorias.md` (M-065).

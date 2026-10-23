@@ -58,6 +58,7 @@ feature/* ──► develop ──► master ──► release/<tag>
 2. Desenvolva e commite.
 3. Abra um **Pull Request** para `develop`.
 4. Após merge, o CI roda e o **ambiente dev** é atualizado automaticamente.
+5. **Confira o CD do merge** (desde 23/10/2026, M-067): o merge só está entregue quando os runs disparados pelo commit do merge (`cd-backend-google.yml`, `cd-mobile-apk.yml`, `cd-homologacao.yml` na `master`) terminaram verdes. CD vermelho é trabalho da mesma entrega. Como rede de segurança, o `alarme-cd.yml` abre a issue `CD vermelho: <workflow> (<branch>)` quando um CD falha e a fecha quando ele volta ao verde.
 
 ### 3.2 Correção de bug em funcionalidade já entregue
 1. Crie a branch a partir de `develop`:
@@ -146,6 +147,7 @@ feature/* ──► develop ──► master ──► release/<tag>
 | `cd-mobile-apk.yml` | push em `develop` (caminho `frontend/**`) + manual + `workflow_call` | Build do APK (ou do AAB, com `formato: aab`) com Gradle no próprio Actions. Artefato do run (30 dias). Pacote, nome e versão por ambiente |
 | `cd-producao.yml` | push em `release/**` + manual (disparado pelo `release.yml` desde 14/10/2026) | **Produção:** AAB do pacote de produção, assinado com a chave de release, anexado à GitHub Release `vX.Y.Z` para envio à Play Console (§3.4) |
 | `cd-mobile-eas.yml` | **só manual** (`workflow_dispatch`, a partir de `release/*`) | Build do **AAB de loja** no EAS |
+| `alarme-cd.yml` | `workflow_run` ao fim de cada CD acima (só `develop`, `master` e `release/**`) | Abre a issue `CD vermelho: <workflow> (<branch>)` com o rótulo `cd-vermelho` quando o CD falha (`failure`/`timed_out`), comenta nela se falhar de novo e a fecha quando o mesmo CD volta ao verde. `cancelled` é ignorado (o APK dev cancela o run anterior) |
 | `release.yml` | manual (workflow_dispatch) | Cria branch `release/<versão>` a partir da rc homologada e dispara o backend de produção (`cd-backend-google.yml`) e o AAB (`cd-producao.yml`) |
 
 > **Removidas em 03/09/2026** (PR de limpeza de esteiras mortas):

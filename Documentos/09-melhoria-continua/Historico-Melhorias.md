@@ -3545,7 +3545,7 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
 
 ## M-066 — Deploy do backend espera o readiness de verdade
 
-**Data:** 23/10/2026 · **PR:** (este) · **Origem:** deploy dev falhando nos merges do #224 e do #228
+**Data:** 23/10/2026 · **PR:** #234 · **Origem:** deploy dev falhando nos merges do #224 e do #228
 
 ### Como era
 

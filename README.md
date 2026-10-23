@@ -1,199 +1,180 @@
-# saude-monitor
+<div align="center">
 
-Guia rapido para subir o backend (Spring Boot + MongoDB via Docker) e o frontend (React Native com Expo).
+<img src="doc/assets/readme/icone.png" alt="Ícone do Radar Saúde" width="96" height="96">
 
-## Pre-requisitos
+# Radar Saúde
 
-- Docker Desktop (com Docker Compose v2)
-- Node.js 18+ e npm
-- Conta Expo (recomendada; obrigatoria para Expo Go com recursos online, EAS Build/Submit e compartilhamento facilitado)
-- (Opcional) Java 25, somente se for rodar backend sem Docker
+**Quanto tempo se espera em cada hospital do DF, medido por quem esteve lá.**
 
-## 1) Subir o backend
+App gratuito para Android · Distrito Federal · Em homologação, com lançamento público previsto para março de 2027
 
-No projeto, o backend e o banco sobem pelo `docker compose` da pasta `backend`.
+[Como funciona](#como-funciona) · [Tutorial](#tutorial-tela-a-tela) · [Por que dá para confiar](#por-que-dá-para-confiar) · [Para parceiros e investidores](#para-parceiros-e-investidores) · [Para desenvolvedores](#para-desenvolvedores)
 
-```powershell
-Set-Location "D:\saude-monitor\backend"
-Copy-Item .env.example .env -ErrorAction SilentlyContinue
-docker compose --env-file .env up -d --build
-```
+</div>
 
-Verifique se esta de pe:
+---
 
-```powershell
-Set-Location "D:\saude-monitor\backend"
-docker compose ps
-```
+## O problema
 
-Ver logs do backend:
+Quem precisa de um pronto-socorro decide no escuro. Não dá para saber, antes de sair de casa, quanto tempo se espera em cada hospital, e não existe um indicador público e imparcial da experiência de quem foi atendido. Depois da visita, o paciente também não tem um jeito rápido de contar como foi: pesquisa de satisfação longa ninguém responde.
 
-```powershell
-Set-Location "D:\saude-monitor\backend"
-docker compose logs -f backend
-```
+## Como funciona
 
-Teste rapido da API:
+O Radar Saúde transforma o celular de quem vai ao hospital num termômetro do atendimento, com o mínimo de esforço.
 
-```powershell
-Invoke-RestMethod -Uri "http://localhost:8080/api/v1/auth/login" `
-  -Method Post `
-  -ContentType "application/json" `
-  -Body '{"email":"usuario@teste.com","password":"senha123","rememberDevice":true}'
-# Obs: O retorno será um Erro 401 caso o usuário não tenha sido previamente cadastrado/semeado na base local.
-```
+| 1. Você chega | 2. Você sai | 3. Todo mundo vê |
+|---|---|---|
+| O app percebe pela localização que você entrou numa unidade de saúde e começa a contar o tempo. Você não precisa apertar nada. | Na saída, ele pergunta como foi: poucas perguntas, menos de um minuto, e dá para pular qualquer uma. | A nota e o tempo de cada hospital aparecem para todos, calculados só a partir de visitas reais e só quando há avaliações suficientes. |
 
-## 2) Subir o frontend
+Consultar hospitais, ver notas e usar o mapa não exige conta. A conta é opcional e serve só para guardar o seu histórico.
 
-Abra outro terminal para o frontend:
+> [!IMPORTANT]
+> O Radar Saúde não substitui atendimento de emergência. Em caso de urgência, ligue **192 (SAMU)**.
 
-```powershell
-Set-Location "D:\saude-monitor\frontend"
-npm install
-npx expo login
-npx expo run:android
-```
+---
 
-> Se nao tiver conta, crie em https://expo.dev/signup e depois rode `npx expo login`.
+## Tutorial tela a tela
 
-### Fluxo diario recomendado (sem tela branca)
+> As gravações abaixo foram feitas com **dados de exemplo**: os hospitais "Exemplo", as notas e os tempos são fictícios e não representam unidades reais.
 
-O `npx expo run:android` so e necessario quando houver mudanca em **codigo nativo**
-(ex.: novos modulos ou alteracoes em `android/`). Para o dia a dia, use o script que
-garante a conexao correta do Metro e evita a **tela branca**:
+<table>
+<tr>
+<td width="290" valign="top"><img src="doc/assets/readme/01-inicio.gif" alt="Tela inicial do Radar Saúde explicando detecção automática, feedback rápido e avaliação pública" width="270"></td>
+<td valign="top">
 
-```powershell
-Set-Location "D:\saude-monitor\frontend"
-.\start-dev.ps1               # normal
-.\start-dev.ps1 -ClearCache   # limpa o cache do Metro (apos erro de bundle)
-```
+### 1. Início
 
-> O script configura `adb reverse tcp:8081 tcp:8081` e o app passa a usar
-> `localhost:8081` por padrao (fix nativo em `MainApplication.kt`), evitando a
-> corrupcao de resposta do NAT `10.0.2.2` do emulador (causa de
-> `Compiling JS failed` / tela branca).
+A primeira tela explica o app em três ideias: a visita é detectada sozinha, a avaliação é rápida e opcional, e o resultado é público.
 
-Se quiser apenas abrir o Metro/Expo sem build nativo:
+As quatro abas embaixo levam a tudo: **Início**, **Hospitais**, **Mapa** e **Perfil**.
 
-```powershell
-Set-Location "D:\saude-monitor\frontend"
-npm run start
-```
+</td>
+</tr>
+<tr>
+<td valign="top"><img src="doc/assets/readme/02-hospitais.gif" alt="Lista de hospitais com nota e tempo, busca por nome e detalhe de um hospital" width="270"></td>
+<td valign="top">
 
-Atalhos comuns do Expo (quando rodar `npm run start`):
+### 2. Encontre um hospital
 
-- `a` abre Android (emulador)
-- `w` abre Web
-- app Expo Go no celular tambem pode ser usado
+Na aba **Hospitais** cada unidade mostra a nota de 1 a 5, quantas avaliações ela tem e o tempo de permanência típico.
 
-### Enderecos exibidos no terminal do Expo
+- Busque pelo nome ou filtre por público, privado e filantrópico.
+- Toque num hospital para ver endereço, telefone, horário e a **avaliação pública**, com o número de atendimentos que a sustentam, o período e a data da última atualização.
 
-Quando o frontend sobe com sucesso, o Expo normalmente mostra:
+</td>
+</tr>
+<tr>
+<td valign="top"><img src="doc/assets/readme/03-ranking.gif" alt="Ranking de hospitais por melhor nota e por menor tempo" width="270"></td>
+<td valign="top">
 
-- `Metro: http://localhost:8081`
-- `Web: http://localhost:8081`
+### 3. Compare no ranking
 
-Isso esta correto. A porta `8081` e do bundler/dev server do frontend.
+O troféu no alto da lista abre o **ranking**. Ordene por **melhor nota** ou por **menor tempo** e combine com o tipo de unidade.
 
-Ja a API do backend roda em outra porta:
+Hospitais com avaliações suficientes para a média fazer sentido vêm primeiro. Os demais aparecem no fim, sem nota.
 
-- Backend: `http://localhost:8080`
+</td>
+</tr>
+<tr>
+<td valign="top"><img src="doc/assets/readme/04-mapa.gif" alt="Mapa com os hospitais e filtros de distância de 1, 5, 10 e 25 km" width="270"></td>
+<td valign="top">
 
-Resumo rapido:
+### 4. Veja o que está perto
 
-- `8081` = frontend (Expo/Metro)
-- `8080` = backend (Spring Boot)
+Na aba **Mapa** os hospitais aparecem em volta de você. Os filtros de **1, 5, 10 e 25 km** mostram só o que está ao alcance, e tocar num marcador abre o detalhe do hospital.
 
-## Com Conta Expo: `npx expo run:android`
+</td>
+</tr>
+<tr>
+<td valign="top"><img src="doc/assets/readme/05-checkin.gif" alt="Check-in manual com temporizador de permanência e botão Não estou aqui" width="270"></td>
+<td valign="top">
 
-Use esta secao se voce sobe o frontend com build nativo Android.
+### 5. A sua visita
 
-Pre-requisitos recomendados:
+**Automática:** com a localização permitida "o tempo todo", o app detecta a entrada e a saída do hospital mesmo fechado, e mostra o temporizador no detalhe do hospital.
 
-- Android Studio instalado (SDK + Platform Tools)
-- Variaveis `ANDROID_HOME` e `PATH` configuradas
-- Um emulador Android criado no AVD Manager **ou** celular com depuracao USB ativa
-- Conta autenticada no Expo CLI (`npx expo login`) para fluxos com Expo Go e servicos EAS
+**Manual (plano B):** sem GPS ou sem permissão, toque em **Check-in** no card do hospital. O temporizador começa a contar, e **Não estou aqui** encerra a visita quando você sair.
 
-Comandos uteis:
+</td>
+</tr>
+<tr>
+<td valign="top"><img src="doc/assets/readme/06-avaliacao.gif" alt="Avaliação pendente na tela inicial e formulário curto de avaliação em etapas" width="270"></td>
+<td valign="top">
 
-```powershell
-Set-Location "D:\saude-monitor\frontend"
-npx expo run:android
-```
+### 6. Conte como foi
 
-Se ocorrer erro de cache/build no Android:
+Depois da saída, o app avisa e a avaliação fica esperando na tela inicial por até 24 horas.
 
-```powershell
-Set-Location "D:\saude-monitor\frontend"
-npx expo prebuild --clean
-npx expo run:android
-```
+São etapas curtas: triagem, especialidade e atendimento, receita e tratamento da equipe, e a nota da visita. Todas as perguntas, menos a nota, podem ser puladas. Uma visita vale uma avaliação.
 
-## Sem Expo: sem conta Expo
+</td>
+</tr>
+<tr>
+<td valign="top"><img src="doc/assets/readme/07-perfil.gif" alt="Login opcional, perfil e histórico de visitas e avaliações" width="270"></td>
+<td valign="top">
 
-Voce consegue desenvolver localmente sem conta Expo em parte dos fluxos.
+### 7. Conta opcional e seus dados
 
-Funciona sem conta:
+Quem cria conta acompanha no **Histórico** as visitas e as avaliações feitas, e pode **editar uma avaliação por até 15 dias**.
 
-- `npx expo run:android` para build e execucao local no emulador/dispositivo
-- `npm run start` para abrir o Metro bundler local
+Em **Perfil** você controla a permissão de localização e as notificações, baixa em PDF tudo o que o app guarda sobre você e pode excluir a conta.
 
-Nao funciona (ou fica limitado) sem conta:
+</td>
+</tr>
+</table>
 
-- Login no Expo CLI (`npx expo login`)
-- Recursos online do Expo Go que dependem da conta
-- Servicos EAS (`eas build`, `eas submit`, updates remotos)
+Quer o passo a passo completo, com cadastro, confirmação de e-mail e recuperação de senha? Veja o [tutorial de primeiros passos](doc/tutorial-usuario/tutorial-primeiros-passos.md).
 
-Fluxo minimo sem conta:
+---
 
-```powershell
-Set-Location "D:\saude-monitor\frontend"
-npm install
-npx expo run:android
-```
+## Por que dá para confiar
 
-## Configuracao da URL da API no frontend
+- **Tempo medido, não declarado.** A duração da visita vem da localização do celular, da entrada até a saída, e não de alguém digitando quanto esperou.
+- **Só conta quem esteve lá.** A avaliação fica ligada a uma visita, cada visita aceita uma avaliação, e só entram na nota pública as visitas registradas dentro da área do hospital.
+- **Nada de nota com pouca gente.** Nota e tempo só aparecem com pelo menos 5 avaliações. O tempo usa a mediana, que não se deixa levar por um caso extremo.
+- **Método à vista.** Cada hospital mostra quantos atendimentos sustentam o número, o período considerado e quando foi atualizado.
+- **Privacidade por padrão.** A avaliação publicada nunca mostra quem avaliou. A localização serve para detectar a visita e pode ser revogada a qualquer momento no Perfil. Política de privacidade, termos de uso e exclusão de conta em [saudemonitor.dev](https://saudemonitor.dev/privacidade/).
 
-As URLs ficam em `frontend/app.json` (chave `expo.extra`) e sao consumidas por `frontend/src/config/api.js`.
+---
 
-Padrao atual:
+## Para parceiros e investidores
 
-- Web: `http://localhost:8080`
-- Android emulator: `http://10.0.2.2:8080`
-- iOS: `http://localhost:8080`
+### A oportunidade
 
-Se mudar porta/host do backend, ajuste esses campos e reinicie o Expo.
+Não existe hoje um dado contínuo e público sobre quanto se espera e como o paciente percebe o atendimento em cada unidade de saúde. O Radar Saúde gera esse dado de baixo para cima: cada visita registrada vira um ponto de medição, e quanto mais gente usa, mais útil o app fica para quem vem depois.
 
-## Parar ambiente
+### Modelo
 
-Parar backend e banco:
+- **Para o cidadão, o app é e continuará gratuito.**
+- **Quem paga é o poder público.** Secretarias e conselhos de saúde recebem relatórios agregados por região e por hospital, sempre anônimos e com o mesmo método público do app. A venda começa por conversas e pilotos. Preço e formato de contrato ainda não estão definidos.
 
-```powershell
-Set-Location "D:\saude-monitor\backend"
-docker compose down
-```
+### Onde estamos
 
-(Se quiser apagar volume de dados do Mongo)
+| | |
+|---|---|
+| **Produto** | App Android funcional, em homologação (versão candidata `v1.0.0-rc.9`, outubro de 2026). |
+| **Cobertura** | 341 estabelecimentos de saúde do DF cadastrados a partir de dados públicos do CNES/DATASUS. |
+| **Operação** | API em nuvem (Google Cloud Run), painel administrativo web para a equipe manter o catálogo, site público com política de privacidade, termos e exclusão de conta. |
+| **Próximos passos** | Publicação na Play Store, beta fechado com cerca de 50 pessoas por 30 dias e lançamento público no DF em março de 2027. |
 
-```powershell
-Set-Location "D:\saude-monitor\backend"
-docker compose down -v
-```
+O lançamento público só acontece quando o beta atingir pelo menos **3 hospitais com 5 ou mais avaliações**. Antes de ter dado de verdade, o app não mostra número inflado.
 
-## Troubleshooting rapido
+### Quer conversar?
 
-- `HTTP 404` em endpoint novo: o container pode estar com imagem antiga. Rode:
+Gestores públicos, conselhos de saúde e investidores interessados em um piloto ou em acompanhar o projeto podem falar com [Gabriel Vogado](https://github.com/GabrielVogado), criador do Radar Saúde.
 
-```powershell
-Set-Location "D:\saude-monitor\backend"
-docker compose up -d --build backend
-```
+---
 
-- `Network request failed` no app: normalmente URL/porta incorreta para a plataforma (ex.: Android emulator deve usar `10.0.2.2`).
+## Para desenvolvedores
 
-- **Tela branca / `Compiling JS failed` / `ProtocolException: Expected leading [0-9a-fA-F] character but was 0xd`**:
-  e a corrupcao de resposta chunked/gzip do Metro pelo NAT `10.0.2.2` do emulador.
-  Correcao permanente ja aplicada: o app usa `localhost:8081` via `adb reverse`
-  (ver `frontend/android/.../MainApplication.kt`). Para resolver na hora, rode
-  `.\start-dev.ps1` na pasta `frontend` (ele reconfigura o `adb reverse` e abre o app).
+| Componente | Tecnologia | Pasta |
+|---|---|---|
+| App mobile | Expo 55, React Native, Mapbox, TanStack Query, Zustand | [`frontend/`](frontend/) |
+| API | Java 25, Spring Boot 4, MongoDB | [`backend/`](backend/) |
+| Painel administrativo | Angular 21 | [`admin/`](admin/) |
+| Site público | Cloudflare Workers | [`site/`](site/) |
+| Infraestrutura | Google Cloud Run, GitHub Actions | [`deploy/`](deploy/), [`.github/`](.github/) |
+
+- **Subir o projeto na sua máquina:** [Guia do Ambiente Local](Documentos/02-arquitetura-tecnica/Guia-Ambiente-Local-v1.0.md) (backend com Docker, app com Expo, URLs da API e problemas comuns).
+- **Documentação completa:** [índice central](Documentos/00-INDICE.md), com negócio, arquitetura, contratos da API, backlog e histórico de melhorias.
+- **Fluxo de trabalho:** branches, ambientes, homologação e deploy no [manual do git-flow](Documentos/10-git-flow/MANUAL.md).

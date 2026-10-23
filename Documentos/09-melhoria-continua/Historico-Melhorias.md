@@ -3515,3 +3515,28 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
 ### A conferir no aparelho
 
 - Filtro de 1 km com um hospital só: o mapa mostra as ruas em volta, com o marcador e a posição.
+
+---
+
+## M-065 — README que apresenta o produto, com o guia técnico em Documentos/
+
+**Data:** 23/10/2026 · **PR:** #232 · **Origem:** pedido do PO
+
+### Como era
+
+- O `README.md` da raiz era só o passo a passo para subir backend e app na máquina. Quem chegava
+  ao repositório (público final, parceiro, investidor) não via o que o Radar Saúde faz nem como
+  ele é usado.
+
+### O que mudou
+
+- **README de apresentação:** problema, como funciona em três passos, tutorial tela a tela com um
+  GIF por tela (início, hospitais, ranking, mapa, visita, avaliação, perfil e histórico), por que
+  o número é confiável, modelo (gratuito para o cidadão, receita do poder público), estágio atual
+  e links para desenvolvedores. Nada que ainda não existe no app é prometido.
+- **Guia técnico preservado:** o conteúdo antigo foi para
+  `02-arquitetura-tecnica/Guia-Ambiente-Local-v1.0.md`, sem alteração, linkado no fim do README e
+  no índice.
+- **GIFs reproduzíveis e sem dado pessoal:** gravados com o app na Web (react-native-web) e a API
+  respondida por dados fictícios ("Hospital Exemplo ..."), em `doc/assets/readme/`, todos abaixo
+  de 2,5 MB. A detecção automática e o mapa com ruas não aparecem na Web; o detalhe está no PR.

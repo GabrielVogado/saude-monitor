@@ -1,4 +1,4 @@
-import { ErroSemInternet } from "../config/http";
+import { ErroDeConexao } from "../config/http";
 import { itensDaFila, marcarTentativa, removerDaFila } from "../config/filaOffline";
 import VisitaService from "../screens/visitas/service/VisitaService";
 import { invalidarVisitaAtiva } from "../core/query/queryClient";
@@ -36,6 +36,16 @@ function recusaDefinitiva(erro) {
   return Number.isInteger(erro?.status) && erro.status >= 400 && erro.status < 500;
 }
 
+/**
+ * Sem internet, sem resposta (timeout, servidor fora) ou 5xx: o servidor não decidiu nada, e
+ * o item espera a próxima rodada sem gastar tentativa. Antes só a falta de internet era
+ * poupada, e com sinal fraco cinco timeouts seguidos descartavam o checkout (teste de campo de
+ * 23/10/2026). A validade de 24h da fila continua limitando a espera.
+ */
+function semDecisaoDoServidor(erro) {
+  return erro instanceof ErroDeConexao || (Number.isInteger(erro?.status) && erro.status >= 500);
+}
+
 export async function sincronizar() {
   if (emAndamento) {
     return { enviados: 0, descartados: 0, pendentes: null, ignorado: true };
@@ -54,8 +64,8 @@ export async function sincronizar() {
         await removerDaFila(item.chave);
         enviados += 1;
       } catch (erro) {
-        if (erro instanceof ErroSemInternet) {
-          // Continua offline: parar aqui preserva a ordem dos eventos e evita
+        if (semDecisaoDoServidor(erro)) {
+          // Continua sem resposta: parar aqui preserva a ordem dos eventos e evita
           // gastar tentativa de todos os itens numa rodada que não vai passar.
           break;
         }

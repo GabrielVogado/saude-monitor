@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 23/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 25/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 25/10/2026 — Homologação v1.0.0-rc.10
+
+**O que entrou:** registro da rc que leva a correção do teste de campo de 23/10, em que a saída sem internet deixava a visita como GPS interrompido com 0 min (PR #237, M-068, backend e app), e as mudanças do pipeline de deploy que passam a valer na homologação: sonda de startup e espera do smoke test (PRs #234 e #236, M-066) e alarme de CD vermelho (PR #235, M-067). O roteiro começa pela saída sem internet e remete ao roteiro da rc.9 inteiro. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.10.md`](./10-git-flow/homologacoes/v1.0.0-rc.10.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
 
 ---
 

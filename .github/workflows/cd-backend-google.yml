@@ -215,17 +215,30 @@ jobs:
         env:
           URL: ${{ steps.deploy.outputs.url }}
         run: |
+          # 18 tentativas a cada 10 s (~3 min), nao 6 (23/10/2026). No merge do #234 o Cloud
+          # Run desligou a instancia do rollout logo depois da startup probe e, com
+          # --max-instances=1, respondeu 429 "no available instance" por mais de 1 min sem
+          # o pedido chegar ao container (logs da revisao 00044); a nova tentativa do mesmo
+          # commit passou. 429/503/000 aqui sao espera por instancia, nao defeito do app:
+          # o app sobe em ~20 s com a sonda de startup. Qualquer outro codigo falha na hora.
           echo "Servico publicado em $URL"
-          for tentativa in 1 2 3 4 5 6; do
+          for tentativa in $(seq 1 18); do
             HTTP_CODE=$(curl -sS --max-time 30 -o /tmp/health.json -w '%{http_code}' "$URL/actuator/health" || echo "000")
             echo "tentativa $tentativa -> HTTP $HTTP_CODE"
-            if [ "$HTTP_CODE" = "200" ]; then
-              cat /tmp/health.json
-              exit 0
-            fi
-            sleep 10
+            case "$HTTP_CODE" in
+              200)
+                cat /tmp/health.json
+                exit 0
+                ;;
+              429|503|000) sleep 10 ;;
+              *)
+                echo "ERRO: /actuator/health respondeu HTTP $HTTP_CODE."
+                [ -s /tmp/health.json ] && cat /tmp/health.json
+                exit 1
+                ;;
+            esac
           done
-          echo "ERRO: /actuator/health nao respondeu 200 em 6 tentativas."
+          echo "ERRO: /actuator/health nao respondeu 200 em 18 tentativas (~3 min)."
           [ -s /tmp/health.json ] && cat /tmp/health.json
           exit 1
 

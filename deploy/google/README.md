@@ -89,6 +89,10 @@ pronta ao abrir a porta e estrangulava a CPU, e o smoke test via `503 OUT_OF_SER
 Efeito no cold start: a primeira requisicao espera os runners terminarem (com CPU cheia), em vez de
 ser atendida antes deles.
 
+O smoke test de saude espera ate ~3 min quando recebe 429/503 (sem instancia disponivel: com
+`--max-instances=1` o Cloud Run pode levar mais de 1 min para subir a instancia de trafego depois do
+rollout) e falha na hora com qualquer outro codigo.
+
 ## Pontos em aberto
 
 - **Cold start (vale para homologacao tambem).** `--min-instances=0` mantem o custo em zero e traz de volta o

@@ -191,6 +191,19 @@ jobs:
             --min-instances=0
             --max-instances=1
             --timeout=60s
+            --cpu-boost
+            --startup-probe=httpGet.path=/actuator/health,httpGet.port=8080,initialDelaySeconds=0,timeoutSeconds=3,periodSeconds=5,failureThreshold=46
+          # --startup-probe (23/10/2026): sem ele o Cloud Run usa a sonda TCP padrao e da a
+          # revisao por pronta quando a porta abre. So que os ApplicationRunner (seed,
+          # reconciliacoes de raio e de regiao, backfill de e-mail) rodam DEPOIS disso, e o
+          # readiness so vira ACCEPTING_TRAFFIC quando eles terminam. Fora da fase de startup a
+          # CPU e estrangulada sem requisicao, entao eles se arrastavam: o #223 passou no smoke
+          # test com ~42 s e o #224 e o #228 estouraram os 60 s com 503 OUT_OF_SERVICE.
+          # Sondando /actuator/health (que inclui o readinessState e e permitAll; o
+          # /health/readiness nao e), a fase de startup, com CPU cheia e --cpu-boost, dura ate
+          # o readiness ficar UP, o gcloud so termina o deploy nesse ponto e a revisao nova so
+          # recebe trafego pronta. Se nao ficar UP em 230 s (limite do Cloud Run: 240 s), o
+          # deploy falha e o trafego fica na revisao anterior.
           # --max-instances=1 nao e escolha de capacidade, e trava de seguranca:
           # SeedRunner.java:57 le `hospitalRepository.count()` e so pula o seed se der
           # diferente de zero. No Render, instancia unica, a corrida era inalcancavel.
@@ -202,17 +215,30 @@ jobs:
         env:
           URL: ${{ steps.deploy.outputs.url }}
         run: |
+          # 18 tentativas a cada 10 s (~3 min), nao 6 (23/10/2026). No merge do #234 o Cloud
+          # Run desligou a instancia do rollout logo depois da startup probe e, com
+          # --max-instances=1, respondeu 429 "no available instance" por mais de 1 min sem
+          # o pedido chegar ao container (logs da revisao 00044); a nova tentativa do mesmo
+          # commit passou. 429/503/000 aqui sao espera por instancia, nao defeito do app:
+          # o app sobe em ~20 s com a sonda de startup. Qualquer outro codigo falha na hora.
           echo "Servico publicado em $URL"
-          for tentativa in 1 2 3 4 5 6; do
+          for tentativa in $(seq 1 18); do
             HTTP_CODE=$(curl -sS --max-time 30 -o /tmp/health.json -w '%{http_code}' "$URL/actuator/health" || echo "000")
             echo "tentativa $tentativa -> HTTP $HTTP_CODE"
-            if [ "$HTTP_CODE" = "200" ]; then
-              cat /tmp/health.json
-              exit 0
-            fi
-            sleep 10
+            case "$HTTP_CODE" in
+              200)
+                cat /tmp/health.json
+                exit 0
+                ;;
+              429|503|000) sleep 10 ;;
+              *)
+                echo "ERRO: /actuator/health respondeu HTTP $HTTP_CODE."
+                [ -s /tmp/health.json ] && cat /tmp/health.json
+                exit 1
+                ;;
+            esac
           done
-          echo "ERRO: /actuator/health nao respondeu 200 em 6 tentativas."
+          echo "ERRO: /actuator/health nao respondeu 200 em 18 tentativas (~3 min)."
           [ -s /tmp/health.json ] && cat /tmp/health.json
           exit 1
 

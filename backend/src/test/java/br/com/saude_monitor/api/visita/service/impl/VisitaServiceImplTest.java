@@ -117,6 +117,7 @@ class VisitaServiceImplTest {
                 case "ultimaPosicaoEm" -> v.setUltimaPosicaoEm((Instant) valor);
                 case "usuarioId" -> v.setUsuarioId((String) valor);
                 case "tipoPermanencia" -> v.setTipoPermanencia((TipoPermanencia) valor);
+                case "encerradaSemSinal" -> v.setEncerradaSemSinal((Boolean) valor);
                 default -> throw new IllegalArgumentException("campo não previsto no teste: " + campo);
             }
         });
@@ -126,6 +127,9 @@ class VisitaServiceImplTest {
         }
         if (unset.containsKey("dispositivoId")) {
             v.setDispositivoId(null);
+        }
+        if (unset.containsKey("encerradaSemSinal")) {
+            v.setEncerradaSemSinal(null);
         }
         Document push = (Document) update.getUpdateObject().getOrDefault("$push", new Document());
         if (push.containsKey("pontosAmostrais")) {
@@ -644,6 +648,8 @@ class VisitaServiceImplTest {
         aplicar(semPosicao, update.getValue());
         assertEquals(StatusVisita.GPS_INTERROMPIDO, semPosicao.getStatus());
         assertEquals(semPosicao.getUltimoHeartbeat(), semPosicao.getSaida());
+        // A saída é a do último sinal: o checkout atrasado do aparelho ainda pode corrigi-la.
+        assertEquals(Boolean.TRUE, semPosicao.getEncerradaSemSinal());
         // Só encerra se nenhum heartbeat chegou depois da leitura (ARQ-04).
         assertEquals(semPosicao.getUltimoHeartbeat(), query.getValue().getQueryObject().get("ultimoHeartbeat"));
     }
@@ -686,5 +692,144 @@ class VisitaServiceImplTest {
         Instant esperado = antes.minus(Duration.ofMinutes(45));
         assertFalse(corte.getValue().isBefore(esperado.minusSeconds(5)));
         assertFalse(corte.getValue().isAfter(esperado.plusSeconds(5)));
+    }
+
+    // ------------------------------------------------------------------
+    // Checkout atrasado de visita encerrada pelo job de GPS interrompido
+    // (teste de campo de 23/10/2026)
+    // ------------------------------------------------------------------
+
+    private VisitaDocument visitaEncerradaPeloJob(Instant entrada) {
+        return VisitaDocument.builder()
+                .id("v9")
+                .usuarioId("u1")
+                .hospitalId("h1")
+                .entrada(entrada)
+                .saida(entrada)
+                .duracaoMinutos(0)
+                .status(StatusVisita.GPS_INTERROMPIDO)
+                .encerradaSemSinal(true)
+                .build();
+    }
+
+    private static CheckoutRequest checkoutComHoraReal(Instant ocorridoEm) {
+        return new CheckoutRequest(null, null, null, ocorridoEm, null);
+    }
+
+    @Test
+    void checkoutAtrasadoCorrigeVisitaEncerradaPeloJobComAHoraRealDaSaida() {
+        Instant entrada = Instant.now().minus(Duration.ofHours(2));
+        VisitaDocument visita = visitaEncerradaPeloJob(entrada);
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visita));
+        Instant saidaReal = entrada.plus(Duration.ofMinutes(38));
+
+        CheckoutResponse resposta = visitaService.checkout("v9", checkoutComHoraReal(saidaReal), "u1");
+
+        assertEquals(StatusVisita.FINALIZADA, resposta.status());
+        assertEquals(saidaReal, resposta.saida());
+        assertEquals(38, resposta.duracaoMinutos());
+        assertNull(visita.getEncerradaSemSinal());
+        assertNotNull(visita.getProcessadoEm());
+    }
+
+    @Test
+    void checkoutAtrasadoSoCorrigeSeAVisitaContinuaComoOJobDeixou() {
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaEncerradaPeloJob(Instant.now().minus(Duration.ofHours(1)))));
+
+        visitaService.checkout("v9", checkoutComHoraReal(Instant.now().minus(Duration.ofMinutes(20))), "u1");
+
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).findAndModify(query.capture(), any(Update.class),
+                any(FindAndModifyOptions.class), eq(VisitaDocument.class));
+        Document filtro = query.getValue().getQueryObject();
+        assertEquals(StatusVisita.GPS_INTERROMPIDO, filtro.get("status"));
+        assertEquals(true, filtro.get("encerradaSemSinal"));
+    }
+
+    @Test
+    void checkoutManualAtrasadoContinuaMarcadoComoEncerramentoManual() {
+        Instant entrada = Instant.now().minus(Duration.ofHours(1));
+        VisitaDocument visita = visitaEncerradaPeloJob(entrada);
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visita));
+
+        CheckoutRequest naoEstouAqui = new CheckoutRequest(null, null, true, entrada.plus(Duration.ofMinutes(12)), null);
+        CheckoutResponse resposta = visitaService.checkout("v9", naoEstouAqui, "u1");
+
+        assertTrue(resposta.encerramentoManual());
+        assertEquals(12, resposta.duracaoMinutos());
+    }
+
+    @Test
+    void segundaCopiaDoCheckoutAtrasadoRecebeConflito() {
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaEncerradaPeloJob(Instant.now().minus(Duration.ofHours(1)))));
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class),
+                any(FindAndModifyOptions.class), eq(VisitaDocument.class))).thenReturn(null);
+
+        CheckoutRequest pedido = checkoutComHoraReal(Instant.now().minus(Duration.ofMinutes(20)));
+        assertThrows(ConflitoException.class, () -> visitaService.checkout("v9", pedido, "u1"));
+    }
+
+    @Test
+    void checkoutAtrasadoSemHoraRealNaoMudaAVisitaEncerradaPeloJob() {
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaEncerradaPeloJob(Instant.now().minus(Duration.ofHours(1)))));
+
+        CheckoutRequest semHora = checkoutComHoraReal(null);
+        assertThrows(ConflitoException.class, () -> visitaService.checkout("v9", semHora, "u1"));
+        verify(mongoTemplate, never()).findAndModify(any(Query.class), any(Update.class),
+                any(FindAndModifyOptions.class), eq(VisitaDocument.class));
+    }
+
+    @Test
+    void checkoutAtrasadoComHoraForaDaJanelaDe24hNaoCorrige() {
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaEncerradaPeloJob(Instant.now().minus(Duration.ofHours(30)))));
+
+        CheckoutRequest antigo = checkoutComHoraReal(Instant.now().minus(Duration.ofHours(25)));
+        assertThrows(ConflitoException.class, () -> visitaService.checkout("v9", antigo, "u1"));
+        CheckoutRequest futuro = checkoutComHoraReal(Instant.now().plus(Duration.ofMinutes(10)));
+        assertThrows(ConflitoException.class, () -> visitaService.checkout("v9", futuro, "u1"));
+    }
+
+    @Test
+    void checkoutAtrasadoNaoCorrigeGpsInterrompidoInformadoPeloAparelho() {
+        VisitaDocument peloAparelho = visitaEncerradaPeloJob(Instant.now().minus(Duration.ofHours(1)));
+        peloAparelho.setEncerradaSemSinal(null);
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(peloAparelho));
+
+        CheckoutRequest pedido = checkoutComHoraReal(Instant.now().minus(Duration.ofMinutes(20)));
+        assertThrows(ConflitoException.class, () -> visitaService.checkout("v9", pedido, "u1"));
+    }
+
+    @Test
+    void checkoutAtrasadoComGpsIndisponivelConfirmaOGpsInterrompido() {
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaEncerradaPeloJob(Instant.now().minus(Duration.ofHours(1)))));
+
+        CheckoutRequest semGps = new CheckoutRequest(null, true, null, Instant.now().minus(Duration.ofMinutes(20)), null);
+        assertThrows(ConflitoException.class, () -> visitaService.checkout("v9", semGps, "u1"));
+    }
+
+    @Test
+    void checkoutAtrasadoDeOutroDonoLancaAcessoNegado() {
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(visitaEncerradaPeloJob(Instant.now().minus(Duration.ofHours(1)))));
+
+        CheckoutRequest pedido = checkoutComHoraReal(Instant.now().minus(Duration.ofMinutes(20)));
+        assertThrows(AcessoNegadoException.class, () -> visitaService.checkout("v9", pedido, "invasor"));
+    }
+
+    @Test
+    void checkoutAtrasadoNaoDeixaASaidaAntesDaEntradaNemNoFuturo() {
+        Instant entrada = Instant.now().minus(Duration.ofMinutes(30));
+        VisitaDocument antesDaEntrada = visitaEncerradaPeloJob(entrada);
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(antesDaEntrada));
+
+        CheckoutResponse resposta = visitaService.checkout("v9", checkoutComHoraReal(entrada.minus(Duration.ofMinutes(5))), "u1");
+        assertEquals(entrada, resposta.saida());
+        assertEquals(0, resposta.duracaoMinutos());
+
+        VisitaDocument relogioAdiantado = visitaEncerradaPeloJob(entrada);
+        when(visitaRepository.findById("v9")).thenReturn(Optional.of(relogioAdiantado));
+        Instant antes = Instant.now();
+        CheckoutResponse adiantada = visitaService.checkout("v9", checkoutComHoraReal(antes.plus(Duration.ofMinutes(2))), "u1");
+        assertFalse(adiantada.saida().isAfter(Instant.now()));
+        assertFalse(adiantada.saida().isBefore(antes));
     }
 }

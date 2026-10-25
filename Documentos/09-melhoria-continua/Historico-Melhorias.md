@@ -3515,3 +3515,132 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
 ### A conferir no aparelho
 
 - Filtro de 1 km com um hospital só: o mapa mostra as ruas em volta, com o marcador e a posição.
+
+---
+
+## M-065 — README que apresenta o produto, com o guia técnico em Documentos/
+
+**Data:** 23/10/2026 · **PR:** #232 · **Origem:** pedido do PO
+
+### Como era
+
+- O `README.md` da raiz era só o passo a passo para subir backend e app na máquina. Quem chegava
+  ao repositório (público final, parceiro, investidor) não via o que o Radar Saúde faz nem como
+  ele é usado.
+
+### O que mudou
+
+- **README de apresentação:** problema, como funciona em três passos, tutorial tela a tela com um
+  GIF por tela (início, hospitais, ranking, mapa, visita, avaliação, perfil e histórico), por que
+  o número é confiável, modelo (gratuito para o cidadão, receita do poder público), estágio atual
+  e links para desenvolvedores. Nada que ainda não existe no app é prometido.
+- **Guia técnico preservado:** o conteúdo antigo foi para
+  `02-arquitetura-tecnica/Guia-Ambiente-Local-v1.0.md`, sem alteração, linkado no fim do README e
+  no índice.
+- **GIFs reproduzíveis e sem dado pessoal:** gravados com o app na Web (react-native-web) e a API
+  respondida por dados fictícios ("Hospital Exemplo ..."), em `doc/assets/readme/`, todos abaixo
+  de 2,5 MB. A detecção automática e o mapa com ruas não aparecem na Web; o detalhe está no PR.
+
+---
+
+## M-066 — Deploy do backend espera o readiness de verdade
+
+**Data:** 23/10/2026 · **PR:** #234 · **Origem:** deploy dev falhando nos merges do #224 e do #228
+
+### Como era
+
+- O Cloud Run usava a sonda TCP padrão: a revisão era dada por pronta quando a porta abria. Os
+  `ApplicationRunner` de inicialização (seed, reconciliações de raio e de região, backfill de
+  e-mail) rodam depois disso e só então o readiness passa a `UP`. Sem requisição, a CPU fica
+  estrangulada fora da fase de startup, e eles se arrastavam.
+- O smoke test do CD dá 60 s ao `/actuator/health`. O #223 passou com ~42 s; o #224 e o #228
+  ficaram em `503 OUT_OF_SERVICE` nas 6 tentativas e o deploy dev ficou vermelho, com a revisão
+  nova já recebendo tráfego.
+
+### O que mudou
+
+- **Sonda de startup HTTP** em `/actuator/health` (inclui o readinessState e é público) com até
+  230 s, e `--cpu-boost`. A fase de startup, com CPU cheia, dura até o readiness ficar `UP`; o
+  `gcloud run deploy` só termina aí e a revisão nova só recebe tráfego pronta.
+- **Falha segura:** se o readiness não ficar `UP` no prazo, o deploy falha e o tráfego continua na
+  revisão anterior, em vez de ir para uma revisão que responde 503.
+- Vale para dev e homologação (o `cd-homologacao.yml` chama este workflow).
+
+### Efeito colateral aceito
+
+- No cold start (`--min-instances=0`) a primeira requisição espera os runners terminarem, agora com
+  CPU cheia, em vez de ser atendida antes deles.
+
+### Medição depois do merge (23/10/2026, logs do Cloud Run)
+
+- O app sobe em 11–13 s e a sonda de startup passa em ~20 s do início da instância; as tarefas de
+  inicialização levam ~1 s com CPU cheia. Os ~4 min do passo de deploy são espera do próprio Cloud
+  Run até a revisão ficar Ready, sem atividade no contêiner.
+- No primeiro CD da develop, o Cloud Run desligou a instância do rollout logo após a sonda e, com
+  `--max-instances=1`, respondeu `429` "no available instance" por mais de 1 min sem o pedido chegar
+  ao app; a nova tentativa do mesmo commit passou. O smoke test passa a esperar até ~3 min quando a
+  resposta é 429/503/sem conexão, e falha na hora com qualquer outro código (PR #236).
+
+---
+
+## M-067 — Alarme de CD vermelho e conferência do CD após o merge
+
+**Data:** 23/10/2026 · **PR:** #235 · **Origem:** decisão do PO depois do deploy dev vermelho (M-066)
+
+### Como era
+
+- O deploy dev ficou vermelho nos merges do #224 e do #228 e ninguém viu: o merge era dado por
+  entregue sem olhar os runs de CD que ele disparava, e uma falha no Actions só aparecia para quem
+  abrisse a aba.
+
+### O que mudou
+
+- **Alarme (`alarme-cd.yml`):** ao fim de cada CD na `develop`, na `master` ou numa `release/**`,
+  uma falha abre a issue `CD vermelho: <workflow> (<branch>)` (rótulo `cd-vermelho`, atribuída ao
+  dono do repositório, que é notificado); falha repetida comenta na mesma issue; o primeiro verde
+  do mesmo CD comenta e fecha. Cancelamentos são ignorados.
+- **Regra de entrega (MANUAL §3.1, passo 5):** o merge só está entregue com os runs de CD do commit
+  do merge verdes; CD vermelho é trabalho da mesma entrega.
+
+
+---
+
+## M-068 — Checkout que chega atrasado corrige a visita encerrada sem sinal
+
+**Data:** 23/10/2026 · **PR:** #237 · **Origem:** teste de campo do PO no Hospital Regional de Ceilândia (23/10/2026)
+
+### Como era
+
+- O check-in automático foi feito com internet; a saída aconteceu sem rede, e o Histórico mostrou a
+  visita como **GPS interrompido** com **0 min** de permanência.
+- Sem internet, o aparelho para de mandar o sinal da visita. Depois de 45 min, o
+  `VisitaGpsInterrompidoJob` encerra a visita com a saída no último sinal recebido, que era o próprio
+  check-in (RN-06). Quando a conexão volta, o checkout guardado na fila chega com a hora real, mas a
+  visita já está encerrada: o servidor responde 409 e o app descarta o item.
+- Com sinal fraco (timeout, servidor sem responder ou 5xx), o checkout nem entrava na fila: só o
+  erro "sem internet" era guardado. A fila também só era enviada com o app aberto.
+
+### O que mudou
+
+- **Backend:** o job marca a visita com `encerradaSemSinal`. O checkout que chega depois, com
+  `ocorridoEm` dentro da janela de 24h e sem `gpsIndisponivel`, troca a saída do último sinal pela
+  saída real, recalcula a duração e encerra como `FINALIZADA`, com `processadoEm` novo para o
+  indicador do hospital ser recalculado. A troca é um update condicionado ao estado que o job
+  deixou: uma segunda cópia do checkout recebe 409. Visita encerrada pelo aparelho, pela pessoa ou
+  antes da regra não muda. A regra de dono (SEG-02) continua valendo.
+- **App:** o checkout também vai para a fila quando o servidor não respondeu (timeout, servidor
+  indisponível ou 5xx), com aviso próprio e a hora do pedido como saída quando o aparelho não
+  informou outra. No reenvio, essas falhas deixam o item na fila sem gastar tentativa (antes,
+  cinco timeouts seguidos descartavam o checkout); a validade de 24h da fila continua valendo.
+  As tarefas de segundo plano (evento de região e leitura do acompanhamento) tentam enviar a
+  fila depois de tratar o evento, no máximo uma vez a cada 2 min, sem esperar a pessoa abrir o
+  app.
+- Atualizados RN-06 no `Documento-Negocial-v2.1.md` e o checkout na `Especificacao-API-v2.4.md`.
+
+### O que ficou de fora
+
+- Check-in automático feito sem internet: a visita só existe no servidor quando a fila envia o
+  check-in, e a saída depois disso não gera checkout. Fica para uma entrega própria
+  (`analises/Funcionamento-Offline-App-2026-10-23.md`, pasta do projeto).
+- Precisa de teste de campo: entrar com internet, sair sem rede, esperar mais de 45 min e reconectar.
+  O esperado é a visita aparecer como Finalizada com o tempo real.

@@ -227,13 +227,16 @@ describe("VisitaService (Épico 02)", () => {
 
     test("checkout sem internet guarda o momento em que a pessoa saiu, não o do envio", async () => {
       semInternet();
+      // Relativo ao agora: a fila descarta itens com mais de 24h (VALIDADE_MS), então
+      // uma data fixa fazia o teste falhar um dia depois de escrito.
+      const saida = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
-      await expect(
-        VisitaService.checkout("v1", { ocorridoEm: "2026-10-21T20:05:00.000Z" })
-      ).rejects.toMatchObject({ enfileirado: true });
+      await expect(VisitaService.checkout("v1", { ocorridoEm: saida })).rejects.toMatchObject({
+        enfileirado: true,
+      });
 
       const [item] = await itensDaFila();
-      expect(item.ocorridoEm).toBe("2026-10-21T20:05:00.000Z");
+      expect(item.ocorridoEm).toBe(saida);
     });
 
     test("a mensagem promete o que a fila cumpre, em vez de anunciar falha", async () => {
@@ -250,6 +253,39 @@ describe("VisitaService (Épico 02)", () => {
       await expect(
         VisitaService.checkin({ hospitalId: "h1", origem: "GEOFENCE" })
       ).rejects.not.toMatchObject({ enfileirado: true });
+
+      expect(await itensDaFila()).toHaveLength(0);
+    });
+
+    /**
+     * Teste de campo de 23/10/2026: com sinal fraco na saída, o checkout não respondia e
+     * ninguém o guardava. Ele é endereçado à visita, então repetir depois é seguro.
+     */
+    test("checkout com o servidor sem responder também vai para a fila, com aviso próprio", async () => {
+      global.fetch = jest.fn().mockRejectedValue(new TypeError("Network request failed"));
+      const saida = new Date(Date.now() - 6 * 60 * 1000).toISOString();
+
+      await expect(VisitaService.checkout("v1", { ocorridoEm: saida })).rejects.toMatchObject({
+        enfileirado: true,
+        message: expect.stringMatching(/servidor/),
+      });
+
+      const [item] = await itensDaFila();
+      expect(item).toMatchObject({ chave: "checkout:v1", tipo: "checkout", ocorridoEm: saida });
+    });
+
+    test("checkout com 5xx depois das novas tentativas vai para a fila", async () => {
+      global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "falha" }, 500));
+
+      await expect(VisitaService.checkout("v1", {})).rejects.toMatchObject({ enfileirado: true });
+
+      expect(await itensDaFila()).toHaveLength(1);
+    });
+
+    test("checkout recusado pelo servidor (4xx) não vai para a fila", async () => {
+      global.fetch = jest.fn().mockResolvedValue(jsonResponse({ message: "Visita já encerrada." }, 409));
+
+      await expect(VisitaService.checkout("v1", {})).rejects.toMatchObject({ status: 409 });
 
       expect(await itensDaFila()).toHaveLength(0);
     });

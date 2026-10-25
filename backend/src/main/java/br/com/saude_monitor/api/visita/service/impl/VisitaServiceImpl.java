@@ -96,6 +96,9 @@ public class VisitaServiceImpl implements VisitaService {
     private static final String CAMPO_PONTOS_AMOSTRAIS = "pontosAmostrais";
     private static final String CAMPO_USUARIO = "usuarioId";
     private static final String CAMPO_DISPOSITIVO = "dispositivoId";
+    private static final String CAMPO_PROCESSADO_EM = "processadoEm";
+    private static final String CAMPO_ENCERRADA_SEM_SINAL = "encerradaSemSinal";
+    private static final String CAMPO_ENCERRAMENTO_MANUAL = "encerramentoManual";
 
     private static final List<StatusVisita> STATUS_ATIVOS = List.of(StatusVisita.EM_ATENDIMENTO, StatusVisita.SUSPEITA);
 
@@ -162,17 +165,16 @@ public class VisitaServiceImpl implements VisitaService {
 
     @Override
     public CheckoutResponse checkout(String id, CheckoutRequest request, String usuarioId) {
-        VisitaDocument visita = obterVisitaAtivaDoDono(id, usuarioId, request.dispositivoId());
-
+        VisitaDocument visita = obterVisitaDoDono(id, usuarioId, request.dispositivoId());
         Instant agora = Instant.now();
+        if (isCheckoutAtrasadoDeVisitaSemSinal(visita, request, agora)) {
+            return corrigirSaidaDeVisitaSemSinal(visita, request, agora);
+        }
+        exigirVisitaAtiva(visita);
+
         boolean gpsIndisponivel = Boolean.TRUE.equals(request.gpsIndisponivel());
 
-        // Saída nunca antes da entrada: um `ocorridoEm` da fila offline com relógio errado
-        // produziria duração negativa, que envenenaria a mediana de permanência (RN-15).
-        Instant saida = resolverMomento(request.ocorridoEm(), agora);
-        if (saida.isBefore(visita.getEntrada())) {
-            saida = visita.getEntrada();
-        }
+        Instant saida = resolverSaida(visita, request.ocorridoEm(), agora);
 
         Update update = new Update()
                 .set(CAMPO_SAIDA, saida)
@@ -181,9 +183,9 @@ public class VisitaServiceImpl implements VisitaService {
                 // `agora` (write time), não `saida` (business time — pode ser retroativo via
                 // `ocorridoEm` da fila offline, OPS-05): é o que `recalcularPendentes` usa para
                 // saber "isso mudou desde a última varredura", achado do code-review de 09/09/2026.
-                .set("processadoEm", agora);
+                .set(CAMPO_PROCESSADO_EM, agora);
         if (Boolean.TRUE.equals(request.encerramentoManual())) {
-            update.set("encerramentoManual", true);
+            update.set(CAMPO_ENCERRAMENTO_MANUAL, true);
         }
         if (request.posicao() != null) {
             update.set("ultimaPosicaoEm", saida);
@@ -326,7 +328,10 @@ public class VisitaServiceImpl implements VisitaService {
                     .set(CAMPO_DURACAO, (int) Duration.between(v.getEntrada(), ultimoSinal).toMinutes())
                     // `agora` (write time), não `ultimoSinal` (pode ser de até ~15min atrás, o
                     // ciclo deste job) — mesmo motivo do checkout, achado do code-review.
-                    .set("processadoEm", agora);
+                    .set(CAMPO_PROCESSADO_EM, agora)
+                    // Marca que a saída é a do último sinal, não a real: o checkout que ficou
+                    // na fila do aparelho ainda pode corrigi-la (`corrigirSaidaDeVisitaSemSinal`).
+                    .set(CAMPO_ENCERRADA_SEM_SINAL, true);
             encerrarSeSemSinalNovo(v, apagarPontos(update));
         });
     }
@@ -514,6 +519,12 @@ public class VisitaServiceImpl implements VisitaService {
      * quando a visita tem dono logado, ou o aparelho que fez o check-in, quando é anônima.
      */
     private VisitaDocument obterVisitaAtivaDoDono(String id, String usuarioId, String dispositivoId) {
+        VisitaDocument visita = obterVisitaDoDono(id, usuarioId, dispositivoId);
+        exigirVisitaAtiva(visita);
+        return visita;
+    }
+
+    private VisitaDocument obterVisitaDoDono(String id, String usuarioId, String dispositivoId) {
         VisitaDocument visita = visitaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Visita não encontrada para o id informado."));
 
@@ -522,10 +533,76 @@ public class VisitaServiceImpl implements VisitaService {
             // autenticado; só não é dono desta visita (BOLA).
             throw new AcessoNegadoException("Visita não pertence ao usuário ou aparelho informado.");
         }
-        if (visita.getStatus() != StatusVisita.EM_ATENDIMENTO && visita.getStatus() != StatusVisita.SUSPEITA) {
+        return visita;
+    }
+
+    private static void exigirVisitaAtiva(VisitaDocument visita) {
+        if (!STATUS_ATIVOS.contains(visita.getStatus())) {
             throw new ConflitoException("Visita já encerrada (status " + visita.getStatus() + ").");
         }
-        return visita;
+    }
+
+    /**
+     * Checkout que ficou na fila offline do aparelho e chegou depois de o job de GPS
+     * interrompido encerrar a visita (teste de campo de 23/10/2026: sem internet na saída, a
+     * visita ficou GPS_INTERROMPIDO com 0 min e o checkout com a hora real levou 409).
+     *
+     * <p>Só vale para a visita que o job encerrou ({@code encerradaSemSinal}), nunca para a
+     * encerrada pelo aparelho ou pela pessoa, e só com a hora real da saída dentro da mesma
+     * janela de 24h do {@code ocorridoEm} (RN-04). O aparelho que pediu
+     * {@code gpsIndisponivel} confirma o GPS interrompido, e não há o que corrigir.</p>
+     */
+    private static boolean isCheckoutAtrasadoDeVisitaSemSinal(VisitaDocument visita, CheckoutRequest request, Instant agora) {
+        return visita.getStatus() == StatusVisita.GPS_INTERROMPIDO
+                && Boolean.TRUE.equals(visita.getEncerradaSemSinal())
+                && !Boolean.TRUE.equals(request.gpsIndisponivel())
+                && isMomentoOfflineAceito(request.ocorridoEm(), agora);
+    }
+
+    /**
+     * Troca a saída do último sinal pela saída real e encerra como {@code FINALIZADA}. O update
+     * é condicionado ao mesmo estado lido: duas cópias do checkout corrigem uma vez só, e a
+     * segunda recebe 409, que o aparelho já trata como entregue.
+     */
+    private CheckoutResponse corrigirSaidaDeVisitaSemSinal(VisitaDocument visita, CheckoutRequest request, Instant agora) {
+        Instant saida = resolverSaida(visita, request.ocorridoEm(), agora);
+        Update update = new Update()
+                .set(CAMPO_SAIDA, saida)
+                .set(CAMPO_DURACAO, (int) Duration.between(visita.getEntrada(), saida).toMinutes())
+                .set(CAMPO_STATUS, StatusVisita.FINALIZADA)
+                // Write time: o indicador do hospital é recalculado com a duração nova.
+                .set(CAMPO_PROCESSADO_EM, agora)
+                .unset(CAMPO_ENCERRADA_SEM_SINAL);
+        if (Boolean.TRUE.equals(request.encerramentoManual())) {
+            update.set(CAMPO_ENCERRAMENTO_MANUAL, true);
+        }
+        Query query = new Query(Criteria.where(CAMPO_ID).is(visita.getId())
+                .and(CAMPO_STATUS).is(StatusVisita.GPS_INTERROMPIDO)
+                .and(CAMPO_ENCERRADA_SEM_SINAL).is(true));
+        VisitaDocument salva = mongoTemplate.findAndModify(
+                query, update, FindAndModifyOptions.options().returnNew(true), VisitaDocument.class);
+        if (salva == null) {
+            throw new ConflitoException("Visita já encerrada.");
+        }
+        return new CheckoutResponse(salva.getId(), salva.getSaida(), salva.getDuracaoMinutos(),
+                salva.getStatus(), salva.isEncerramentoManual());
+    }
+
+    /**
+     * Saída do checkout: a hora do aparelho quando aceita ({@link #resolverMomento}), nunca antes
+     * da entrada. Um {@code ocorridoEm} da fila offline com relógio errado produziria duração
+     * negativa, que envenenaria a mediana de permanência (RN-15).
+     */
+    private static Instant resolverSaida(VisitaDocument visita, Instant ocorridoEm, Instant agora) {
+        Instant saida = resolverMomento(ocorridoEm, agora);
+        return saida.isBefore(visita.getEntrada()) ? visita.getEntrada() : saida;
+    }
+
+    /** O {@code ocorridoEm} que {@link #resolverMomento} aceita em vez do relógio do servidor. */
+    private static boolean isMomentoOfflineAceito(Instant ocorridoEm, Instant agora) {
+        return ocorridoEm != null
+                && !ocorridoEm.isAfter(agora.plus(TOLERANCIA_RELOGIO))
+                && !ocorridoEm.isBefore(agora.minus(LIMITE_EVENTO_OFFLINE));
     }
 
     private String exigirUsuario(String usuarioId) {
@@ -548,14 +625,8 @@ public class VisitaServiceImpl implements VisitaService {
      * falsa esperando o tempo passar. Ele impede que um relógio errado no aparelho, que é o
      * caso comum, produza permanência de dias ou negativa nos indicadores (RN-15).</p>
      */
-    private Instant resolverMomento(Instant ocorridoEm, Instant agora) {
-        if (ocorridoEm == null) {
-            return agora;
-        }
-        if (ocorridoEm.isAfter(agora.plus(TOLERANCIA_RELOGIO))) {
-            return agora;
-        }
-        if (ocorridoEm.isBefore(agora.minus(LIMITE_EVENTO_OFFLINE))) {
+    private static Instant resolverMomento(Instant ocorridoEm, Instant agora) {
+        if (!isMomentoOfflineAceito(ocorridoEm, agora)) {
             return agora;
         }
         // Relógio levemente adiantado, dentro da tolerância: não deixa o evento no futuro.

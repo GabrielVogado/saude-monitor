@@ -43,6 +43,12 @@ jest.mock("../../../screens/feedback/service/FeedbackNotificationService", () =>
 
 // Fora do `jest.isolateModules`: cada carga do serviço recebe um módulo novo, e o
 // prefixo `mock` deixa a fábrica apontar para a mesma função espiã.
+const mockSincronizar = jest.fn(() => Promise.resolve({ enviados: 0 }));
+jest.mock("../../../services/SincronizacaoOffline", () => ({
+  __esModule: true,
+  sincronizar: (...args) => mockSincronizar(...args),
+}));
+
 const mockInvalidarVisitaAtiva = jest.fn(() => Promise.resolve());
 jest.mock("../../../core/query/queryClient", () => ({
   __esModule: true,
@@ -1187,5 +1193,84 @@ describe("saída pela posição da leitura (teste de campo da rc.6, 21/10/2026)"
     await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
 
     expect(VisitaService.checkout).toHaveBeenCalledWith("v7", expect.any(Object));
+  });
+});
+
+/**
+ * Teste de campo de 23/10/2026: o checkout guardado sem internet só saía com o app aberto.
+ * As duas tarefas de segundo plano passam a tentar a fila.
+ */
+describe("fila offline em segundo plano", () => {
+  const REGIAO = { identifier: "hospital-1", latitude: HOSPITAL_LAT, longitude: HOSPITAL_LON };
+
+  beforeEach(() => {
+    permitirTudo();
+    mockSincronizar.mockReset();
+    mockSincronizar.mockResolvedValue({ enviados: 0 });
+  });
+
+  it("evento de região tenta enviar a fila", async () => {
+    const { executarTask } = carregarServico();
+
+    await executarTask({ data: { eventType: Location.GeofencingEventType.Exit, region: REGIAO } });
+
+    expect(mockSincronizar).toHaveBeenCalledTimes(1);
+  });
+
+  it("leitura do acompanhamento tenta enviar a fila", async () => {
+    const { executarAcompanhamento } = carregarServico();
+
+    await executarAcompanhamento({ data: { locations: [] } });
+
+    expect(mockSincronizar).toHaveBeenCalledTimes(1);
+  });
+
+  it("falha ao enviar a fila não interrompe a tarefa", async () => {
+    mockSincronizar.mockRejectedValue(new Error("disco"));
+
+    await expect(
+      carregarServico().executarTask({ data: { eventType: Location.GeofencingEventType.Enter, region: REGIAO } })
+    ).resolves.toBeUndefined();
+    await expect(carregarServico().executarAcompanhamento({ data: { locations: [] } })).resolves.toBeUndefined();
+    expect(mockSincronizar).toHaveBeenCalledTimes(2);
+  });
+
+  it("o evento da região é tratado antes de a fila ir para a rede", async () => {
+    const ordem = [];
+    mockSincronizar.mockImplementation(async () => {
+      ordem.push("fila");
+    });
+    CatalogoLocal.obterEstabelecimentos.mockImplementation(async () => {
+      ordem.push("recalculo");
+      return [];
+    });
+    const { executarTask, REGIAO_RECALCULO } = carregarServico();
+
+    await executarTask({
+      data: { eventType: Location.GeofencingEventType.Exit, region: { identifier: REGIAO_RECALCULO } },
+    });
+
+    expect(ordem).toEqual(["recalculo", "fila"]);
+  });
+
+  it("tenta a fila no máximo uma vez a cada 2 minutos", async () => {
+    const { enviarFilaOffline, INTERVALO_FILA_SEGUNDO_PLANO_MS } = carregarServico();
+    const inicio = Date.now();
+
+    await enviarFilaOffline(inicio);
+    await enviarFilaOffline(inicio + 30 * 1000);
+    expect(mockSincronizar).toHaveBeenCalledTimes(1);
+
+    await enviarFilaOffline(inicio + INTERVALO_FILA_SEGUNDO_PLANO_MS);
+    expect(mockSincronizar).toHaveBeenCalledTimes(2);
+  });
+
+  it("evento com erro do SO não mexe na fila", async () => {
+    const { executarTask, executarAcompanhamento } = carregarServico();
+
+    await executarTask({ error: new Error("SO"), data: {} });
+    await executarAcompanhamento({ error: new Error("SO"), data: {} });
+
+    expect(mockSincronizar).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { solicitarPermissaoNotificacao } from "../../../services/NotificacaoPermissao";
 import TokenStorage from "../../../services/TokenStorage";
 import FeedbackService from "./FeedbackService";
+import { registrarErro } from "../../../config/monitoramento";
 
 /**
  * Notificações locais e pendências de feedback pós-saída (Épico 03 — F-05/E3-01/E3-03).
@@ -184,6 +185,7 @@ export async function agendarFeedback({ visitaId, hospitalId, hospitalNome, said
   } catch (erro) {
     // eslint-disable-next-line no-console
     console.warn("FeedbackNotificationService: falha ao agendar notificações", erro?.message);
+    registrarErro(erro, "feedback.agendarNotificacoes");
   }
   return pendencia;
 }

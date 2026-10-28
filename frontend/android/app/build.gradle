@@ -1,6 +1,12 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+// E8-07: envia ao Sentry o bundle e o mapa de código do build de release, para o erro
+// aparecer com a linha do código-fonte. Instalação manual (o projeto não usa `expo
+// prebuild`, então o plugin do app.json não chegaria aqui). O sentry-cli lê
+// SENTRY_AUTH_TOKEN, SENTRY_ORG e SENTRY_PROJECT do ambiente (secrets do CI); sem token, o
+// CI liga SENTRY_DISABLE_AUTO_UPLOAD e o build segue sem envio. Builds debug não enviam.
+apply from: new File(new File(["node", "--print", "require.resolve('@sentry/react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile(), "sentry.gradle")
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 

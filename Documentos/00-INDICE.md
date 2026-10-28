@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 25/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 28/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 28/10/2026 — Crash reporting no app (E8-07)
+
+**O que mudou:** o app passa a enviar ao Sentry os erros não tratados e os que as tarefas de segundo plano só escreviam no console, com coordenadas, e-mail, nome, telefone, tokens e identificador do aparelho apagados antes do envio. Liga só com o DSN do build do CI; o `cd-mobile-apk.yml` ganha os secrets opcionais do Sentry e o envio do mapa de código. Política de privacidade (`site/`, versão 1.2) cita o Sentry como operador. Registro em `Historico-Melhorias.md` (M-069).
+**Também:** `De-Para-Backlog-Features.md` atualiza E8-07 para parcial (falta validar no APK de homologação; painel e backend ficam para depois).
 
 ---
 

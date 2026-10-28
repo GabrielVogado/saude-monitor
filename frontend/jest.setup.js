@@ -192,3 +192,12 @@ jest.mock("@react-native-async-storage/async-storage", () => {
     },
   };
 });
+
+// @sentry/react-native (E8-07): o SDK real tenta falar com o módulo nativo RNSentry, que
+// não existe no Jest. O mock expõe só o que `src/config/monitoramento.js` usa; nenhum teste
+// envia evento de verdade, e quem quer conferir a chamada lê os `jest.fn` daqui.
+jest.mock("@sentry/react-native", () => ({
+  init: jest.fn(),
+  wrap: jest.fn((Componente) => Componente),
+  captureException: jest.fn(),
+}));

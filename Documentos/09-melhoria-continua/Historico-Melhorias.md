@@ -3644,3 +3644,51 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
   (`analises/Funcionamento-Offline-App-2026-10-23.md`, pasta do projeto).
 - Precisa de teste de campo: entrar com internet, sair sem rede, esperar mais de 45 min e reconectar.
   O esperado é a visita aparecer como Finalizada com o tempo real.
+
+---
+
+## M-069 — Crash reporting no app: os erros que ninguém via passam a chegar ao Sentry
+
+**Data:** 28/10/2026 · **PR:** (este PR) · **Origem:** E8-07 / OPS-03, item 2 do guia de pendências de 25/10/2026
+
+### Como era
+
+- Nenhuma ferramenta de crash reporting no app. O crash do PR #46 e o ANR do BUG-04 só foram
+  descobertos porque alguém contou, e sem a pilha de chamadas nem o modelo do aparelho.
+- As tarefas de segundo plano (geofencing, sinal da visita, agendamento do feedback) tratavam a
+  falha com um `console.warn`, que ninguém lê num aparelho de usuário.
+
+### O que mudou
+
+- **App:** `@sentry/react-native` 7.11 (versão indicada pelo Expo 55). O novo
+  `src/config/monitoramento.js` liga o Sentry só quando há `EXPO_PUBLIC_SENTRY_DSN`, então dev
+  local e testes seguem sem enviar nada. O `index.js` liga o monitoramento antes de registrar o
+  componente raiz, o que cobre também o processo que o SO acorda só para a tarefa de geofencing.
+- **Sem dado pessoal (LGPD art. 11):** antes de qualquer envio, o app tira o usuário, reduz a
+  requisição a método e rota sem query string, apaga campos de posição, e-mail, nome, telefone,
+  token e identificador do aparelho em qualquer nível e troca no texto JWT, `Bearer`, e-mail e
+  coordenada com 4 ou mais casas decimais. Sem `sendDefaultPii`, captura de tela, replay nem
+  tracing.
+- **Erros nativos** (crash em Java/Kotlin, ANR) são montados pelo SDK nativo e não passam por
+  esse filtro em JavaScript. Não têm localização, mas levam um código aleatório de instalação criado
+  pelo Sentry para contar aparelhos afetados, o que a política de privacidade passa a dizer.
+- **Erros silenciosos:** os sete `catch` que só escreviam no console nas tarefas de segundo plano
+  passam a registrar o erro, com o local como tag. Falha de rede, item da fila offline, 401
+  (sessão vencida) e 5xx não são enviados: são rotina ou o backend já registra, e gastariam a cota de 5 mil erros por mês do
+  plano gratuito.
+- **Build:** `android/app/build.gradle` aplica o `sentry.gradle` à mão (o projeto não usa
+  `expo prebuild`), que envia o mapa de código no build de release. O `cd-mobile-apk.yml` recebe
+  quatro secrets opcionais (`EXPO_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`,
+  `SENTRY_PROJECT`) e o ambiente (`EXPO_PUBLIC_AMBIENTE`); sem token, o envio do mapa é desligado
+  em vez de quebrar o build.
+- **Política de privacidade** (`site/`, versão 1.2): Sentry como operador, a transferência
+  internacional (EUA), a base legal (legítimo interesse) e o prazo de até 90 dias.
+
+### O que ficou de fora
+
+- Painel `admin/`: sem deploy hoje, o Sentry dele só pegaria erros de quem roda o painel na
+  própria máquina. Entra quando o painel for publicado.
+- Backend: o Error Reporting do Google Cloud lê as exceções do log, e depende do log estruturado
+  (OPS-02, item 11 do guia).
+- Validação: o E8-07 fica parcial até um erro forçado no APK de homologação aparecer no Sentry com
+  a linha do código e sem dado pessoal.

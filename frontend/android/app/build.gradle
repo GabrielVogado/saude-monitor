@@ -9,7 +9,13 @@ apply plugin: "com.facebook.react"
 // Builds debug não enviam.
 def envioSentryConfigurado = ["SENTRY_AUTH_TOKEN", "SENTRY_ORG", "SENTRY_PROJECT"].every { System.getenv(it) }
 if (envioSentryConfigurado) {
-    apply from: new File(new File(["node", "--print", "require.resolve('@sentry/react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile(), "sentry.gradle")
+    def pacoteSentry = ["node", "--print", "require.resolve('@sentry/react-native/package.json')"].execute(null, rootDir).text.trim()
+    def sentryGradle = pacoteSentry ? new File(new File(pacoteSentry).getParentFile(), "sentry.gradle") : null
+    if (sentryGradle?.exists()) {
+        apply from: sentryGradle
+    } else {
+        logger.warn("E8-07: sentry.gradle não encontrado (node ou npm install?); build segue sem enviar o mapa ao Sentry.")
+    }
 }
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()

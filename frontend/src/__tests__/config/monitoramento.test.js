@@ -319,6 +319,25 @@ describe("limparEvento (beforeSend)", () => {
     expect(JSON.stringify(extra.profundo)).not.toContain("fundo");
   });
 
+  test("apaga nome e telefone com os nomes de campo que o app usa (cadastro, perfil)", () => {
+    const { extra } = limparEvento({
+      extra: { usuario: { fullName: "Maria Souza", phone: "61999990000", celular: "61988880000", id: 7 } },
+    });
+    expect(extra.usuario).toEqual({ fullName: "[removido]", phone: "[removido]", celular: "[removido]", id: 7 });
+  });
+
+  test("query de URL guardada à parte (breadcrumb de rede) é apagada", () => {
+    const { extra } = limparEvento({
+      extra: { "http.query": "latitude=-15.92&longitude=-48.05", "http.fragment": "x", "http.method": "GET" },
+    });
+    expect(extra).toEqual({ "http.query": "[removido]", "http.fragment": "[removido]", "http.method": "GET" });
+  });
+
+  test("campo url que não é texto é limpo por dentro", () => {
+    const { extra } = limparEvento({ extra: { url: { href: "https://api/x", token: "abc", lat: -23.5505 } } });
+    expect(extra.url).toEqual({ href: "https://api/x", token: "[removido]", lat: "[removido]" });
+  });
+
   test("campo url fora da requisição também perde a query string", () => {
     const limpo = limparEvento({ extra: { url: "https://api/hospitais?lat=-15.7942287" } });
     expect(limpo.extra.url).toBe("https://api/hospitais");

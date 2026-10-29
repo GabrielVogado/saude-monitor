@@ -37,6 +37,10 @@ const CHAVES_SENSIVEIS = new Set(
     "email",
     "nome",
     "telefone",
+    // Nomes dos campos de conta como o app e a API os usam (cadastro, perfil).
+    "fullname",
+    "phone",
+    "celular",
     "senha",
     "password",
     "token",
@@ -47,6 +51,9 @@ const CHAVES_SENSIVEIS = new Set(
     "cookies",
     "x-cliente-id",
     "dispositivoid",
+    // Query e fragmento de URL guardados à parte (breadcrumb de rede do SDK).
+    "http.query",
+    "http.fragment",
   ].map((chave) => chave.toLowerCase())
 );
 
@@ -117,7 +124,7 @@ function limparValor(valor, profundidade) {
       limpo[chave] = REMOVIDO;
     } else if (CHAVES_DE_CODIGO.has(chave)) {
       limpo[chave] = item;
-    } else if (chave === "url") {
+    } else if (chave === "url" && typeof item === "string") {
       limpo[chave] = limparTexto(semQueryString(item));
     } else {
       limpo[chave] = limparValor(item, profundidade + 1);

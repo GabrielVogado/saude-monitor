@@ -37,8 +37,11 @@ object LimpezaSentry {
 
   private val CHAVES_SENSIVEIS = setOf(
     "lat", "lng", "lon", "latitude", "longitude", "coords", "coordinates", "posicao",
-    "localizacao", "email", "nome", "telefone", "senha", "password", "token", "accesstoken",
-    "refreshtoken", "authorization", "cookie", "cookies", "x-cliente-id", "dispositivoid",
+    "localizacao", "email", "nome", "telefone", "fullname", "phone", "celular", "senha",
+    "password", "token", "accesstoken", "refreshtoken", "authorization", "cookie", "cookies",
+    "x-cliente-id", "dispositivoid",
+    // Query e fragmento da URL, que o breadcrumb de rede nativo guarda à parte.
+    "http.query", "http.fragment",
   )
 
   private val PADROES_DE_TEXTO = listOf(
@@ -88,6 +91,11 @@ object LimpezaSentry {
     }
     event.exceptions?.forEach { it.value = limparTexto(it.value) }
     event.breadcrumbs?.forEach(::limparBreadcrumb)
+    event.tags?.let { tags ->
+      for (chave in tags.keys.toList()) {
+        event.setTag(chave, limparValor(chave, tags[chave]).toString())
+      }
+    }
     event.extras?.let { extras ->
       for (chave in extras.keys.toList()) {
         event.setExtra(chave, limparValor(chave, extras[chave]))

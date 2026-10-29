@@ -63,8 +63,7 @@
       ],
       "expo-notifications",
       "expo-sharing",
-      "expo-secure-store",
-      "@sentry/react-native"
+      "expo-secure-store"
     ],
     "owner": "gabrielvogado"
   }

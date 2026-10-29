@@ -332,14 +332,14 @@ jobs:
           # E8-07: crash reporting. O DSN e o ambiente entram no bundle (lidos pelo
           # `src/config/monitoramento.js`); o ambiente separa dev/hom/prod no mesmo projeto
           # do Sentry. Org, projeto e token sao lidos pelo sentry-cli que o `sentry.gradle`
-          # chama no build de release para enviar o mapa de codigo. Sem token, o envio e
-          # desligado em vez de quebrar o build.
+          # chama no build de release para enviar o mapa de codigo. O `app/build.gradle` so
+          # aplica o `sentry.gradle` com os tres preenchidos: faltando qualquer um, o build
+          # segue sem envio em vez de quebrar.
           EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
           EXPO_PUBLIC_AMBIENTE: ${{ env.AMBIENTE }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-          SENTRY_DISABLE_AUTO_UPLOAD: ${{ secrets.SENTRY_AUTH_TOKEN == '' && 'true' || 'false' }}
           VERSION_NAME: ${{ steps.versao.outputs.nome }}
           VERSION_CODE: ${{ steps.versao.outputs.codigo }}
         working-directory: frontend/android

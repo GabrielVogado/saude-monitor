@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/react-native";
+import { NativeModules } from "react-native";
 
 /**
  * Crash reporting do app (E8-07, OPS-03): cada erro não tratado chega ao Sentry com a
@@ -10,7 +11,9 @@ import * as Sentry from "@sentry/react-native";
  *
  * LGPD: localização em hospital é dado sensível (art. 11). Nada sai do aparelho sem passar
  * por `limparEvento`/`limparBreadcrumb`, que apagam coordenadas, e-mail, tokens e corpo de
- * requisição. Sem `sendDefaultPii`, sem captura de tela, sem replay e sem tracing.
+ * requisição. Sem `sendDefaultPii`, sem captura de tela, sem replay e sem tracing. Os
+ * crashes e ANRs nativos do Android não passam pelo `beforeSend` do JS: recebem a mesma
+ * limpeza no `LimpezaSentry` (Kotlin), instalado assim que o SDK nativo liga.
  *
  * O `release` não é definido aqui de propósito: o SDK usa `<applicationId>@<versionName>+
  * <versionCode>`, o mesmo nome com que o `sentry.gradle` envia o mapa de código no build.
@@ -63,6 +66,19 @@ const PADROES_DE_TEXTO = [
 
 const PROFUNDIDADE_MAXIMA = 8;
 
+/**
+ * Coordenada guardada como número (`centro: [-46.6333, -23.5505]`, `console.warn(msg, lat)`):
+ * mesmo critério do texto, 4+ casas decimais dentro da faixa de grau. Data e hora do evento
+ * são segundos desde 1970 (bem acima de 180) e não casam.
+ */
+function pareceCoordenada(numero) {
+  if (!Number.isFinite(numero) || Number.isInteger(numero) || Math.abs(numero) > 180) {
+    return false;
+  }
+  const decimais = String(numero).split(".")[1] || "";
+  return !decimais.includes("e") && decimais.length >= 4;
+}
+
 export function limparTexto(texto) {
   if (typeof texto !== "string") {
     return texto;
@@ -82,6 +98,9 @@ export function semQueryString(url) {
 function limparValor(valor, profundidade) {
   if (typeof valor === "string") {
     return limparTexto(valor);
+  }
+  if (typeof valor === "number") {
+    return pareceCoordenada(valor) ? "[coord]" : valor;
   }
   if (!valor || typeof valor !== "object") {
     return valor;
@@ -108,18 +127,23 @@ function limparValor(valor, profundidade) {
 }
 
 /**
- * `beforeSend`: devolve uma cópia do evento sem dado pessoal. Sem usuário (nem id, nem IP),
- * sem corpo/cabeçalho/cookie de requisição, e todo texto passa pelos padrões acima.
+ * `beforeSend`: devolve uma cópia do evento sem dado pessoal. Do usuário fica só o `id`, o
+ * código aleatório que o Sentry cria na instalação do app (é o que conta em quantos aparelhos
+ * o erro aconteceu, como diz a política de privacidade); IP, e-mail e o resto saem. Sem
+ * corpo/cabeçalho/cookie de requisição, e todo texto passa pelos padrões acima.
  */
 export function limparEvento(evento) {
   if (!evento) {
     return evento;
   }
-  const { request } = evento;
+  const { request, user } = evento;
   const semUsuario = { ...evento };
   delete semUsuario.user;
   delete semUsuario.request;
   const limpo = limparValor(semUsuario, 0);
+  if (user?.id) {
+    limpo.user = { id: user.id };
+  }
   if (request) {
     limpo.request = {
       method: request.method,
@@ -154,9 +178,26 @@ export function limparBreadcrumb(breadcrumb) {
 let ativo = false;
 
 /**
- * Liga o Sentry quando há DSN. Chamado uma vez, no `index.js`, antes de registrar o
- * componente raiz — também quando o SO acorda o app fechado só para a tarefa de
- * geofencing, que é justamente onde estão os erros que ninguém vê.
+ * Liga a limpeza do lado nativo (`LimpezaSentry.kt`). Só depois do `initNativeSdk`: o SDK
+ * nativo é recriado ali e perderia o que fosse instalado antes. Sem o módulo (Jest, iOS), não
+ * faz nada.
+ */
+function instalarLimpezaNativa({ didCallNativeInit }) {
+  if (!didCallNativeInit) {
+    return;
+  }
+  try {
+    NativeModules.LimpezaSentry?.instalar();
+  } catch {
+    // Monitorar não pode derrubar o app.
+  }
+}
+
+/**
+ * Liga o Sentry quando há DSN. Chamado uma vez por `iniciarMonitoramento.js`, o primeiro
+ * import do `index.js`, antes de qualquer outro módulo do app ser avaliado — também quando o
+ * SO acorda o app fechado só para a tarefa de geofencing, que é justamente onde estão os
+ * erros que ninguém vê.
  *
  * @returns {boolean} se o monitoramento ficou ligado.
  */
@@ -182,6 +223,7 @@ export function iniciarMonitoramento({
     maxBreadcrumbs: 50,
     beforeSend: limparEvento,
     beforeBreadcrumb: limparBreadcrumb,
+    onReady: instalarLimpezaNativa,
   });
   ativo = true;
   return true;
@@ -193,21 +235,39 @@ export function envolverRaiz(Componente) {
 }
 
 /**
+ * Recusas do Android que o app já contorna (o timer e a próxima abertura confirmam a
+ * pendência): o serviço em primeiro plano não pode nascer com o app em segundo plano
+ * (Android 12+), e a permissão de localização pode ter sido revogada nas configurações.
+ * `ERR_FOREGROUND_SERVICE_PERMISSIONS` (falta no manifesto) fica de fora: é defeito do app.
+ */
+const RECUSAS_DO_SISTEMA = new Set([
+  "ERR_FOREGROUND_SERVICE_START_NOT_ALLOWED",
+  "ERR_LOCATION_BACKGROUND_UNAUTHORIZED",
+  "ERR_LOCATION_UNAUTHORIZED",
+]);
+
+/**
  * Falha de transporte (sem internet, timeout, servidor fora) é rotina num app de celular e
- * já tem tratamento (fila offline, nova tentativa). Erro 5xx o próprio backend registra, e
- * 401 é sessão vencida, que o cliente HTTP já trata.
- * Mandá-los esgotaria a cota sem dizer nada que o app possa corrigir.
+ * já tem tratamento (fila offline, nova tentativa). Resposta HTTP de erro também não vai: o
+ * 5xx o próprio backend registra, o 401 é sessão vencida que o cliente HTTP trata, e os 4xx
+ * são recusas de negócio esperadas — a posição fora do geofence (a região nativa é maior que
+ * o polígono de propósito, BUG-08), hospital inativo, 403, 409, o 429 do limite.
+ * A exceção é o 400 com `details`: campo reprovado pelo Bean Validation quer dizer que o app
+ * montou o payload errado.
+ * Mandar o resto esgotaria a cota sem dizer nada que o app possa corrigir.
  */
 function ehErroEsperado(erro) {
   if (!erro) {
     return true;
   }
-  if (erro.classificado || erro.enfileirado) {
+  if (erro.classificado || erro.enfileirado || RECUSAS_DO_SISTEMA.has(erro.code)) {
     return true;
   }
-  // 401 é sessão vencida: o refresh/logout do cliente HTTP já trata, e em segundo plano
-  // acontece toda vez que o token expira com o app fechado.
-  return typeof erro.status === "number" && (erro.status === 401 || erro.status >= 500);
+  if (typeof erro.status !== "number") {
+    return false;
+  }
+  const payloadInvalido = erro.status === 400 && erro.data?.details?.length > 0;
+  return !payloadInvalido;
 }
 
 /**

@@ -3662,25 +3662,35 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
 
 - **App:** `@sentry/react-native` 7.11 (versão indicada pelo Expo 55). O novo
   `src/config/monitoramento.js` liga o Sentry só quando há `EXPO_PUBLIC_SENTRY_DSN`, então dev
-  local e testes seguem sem enviar nada. O `index.js` liga o monitoramento antes de registrar o
-  componente raiz, o que cobre também o processo que o SO acorda só para a tarefa de geofencing.
-- **Sem dado pessoal (LGPD art. 11):** antes de qualquer envio, o app tira o usuário, reduz a
-  requisição a método e rota sem query string, apaga campos de posição, e-mail, nome, telefone,
-  token e identificador do aparelho em qualquer nível e troca no texto JWT, `Bearer`, e-mail e
-  coordenada com 4 ou mais casas decimais. Sem `sendDefaultPii`, captura de tela, replay nem
-  tracing.
-- **Erros nativos** (crash em Java/Kotlin, ANR) são montados pelo SDK nativo e não passam por
-  esse filtro em JavaScript. Não têm localização, mas levam um código aleatório de instalação criado
-  pelo Sentry para contar aparelhos afetados, o que a política de privacidade passa a dizer.
+  local e testes seguem sem enviar nada. O `index.js` importa `src/config/iniciarMonitoramento.js`
+  antes dos outros módulos do app (os `import` sobem para o topo do arquivo, e uma chamada no corpo
+  só rodaria depois de `App` e do geofencing já carregados), o que cobre também o erro no
+  carregamento dos módulos e o processo que o SO acorda só para a tarefa de geofencing.
+- **Sem dado pessoal (LGPD art. 11):** antes de qualquer envio, o app deixa do usuário só o código
+  aleatório que o Sentry cria na instalação (conta em quantos aparelhos o erro aconteceu, como diz
+  a política), reduz a requisição a método e rota sem query string, apaga campos de posição,
+  e-mail, nome, telefone, token e identificador do aparelho em qualquer nível e troca JWT,
+  `Bearer`, e-mail e coordenada com 4 ou mais casas decimais, no texto e em número. Sem
+  `sendDefaultPii`, captura de tela, replay nem tracing.
+- **Erros nativos** (crash em Java/Kotlin, ANR) são montados pelo SDK nativo e não passam pelo
+  `beforeSend` em JavaScript. O `LimpezaSentry.kt` aplica a mesma limpeza do lado nativo, nas duas
+  filas de processamento do SDK (a comum e a do ANR da sessão anterior, lido na abertura
+  seguinte); o JS o instala no `onReady` do `Sentry.init`, depois que o SDK nativo liga.
 - **Erros silenciosos:** os sete `catch` que só escreviam no console nas tarefas de segundo plano
-  passam a registrar o erro, com o local como tag. Falha de rede, item da fila offline, 401
-  (sessão vencida) e 5xx não são enviados: são rotina ou o backend já registra, e gastariam a cota de 5 mil erros por mês do
-  plano gratuito.
+  passam a registrar o erro, com o local como tag. Não são enviados: falha de rede, item da fila
+  offline, resposta HTTP de erro (5xx o backend registra, 401 é sessão vencida, e os 4xx são
+  recusas de negócio esperadas, como a posição fora do geofence que a região nativa maior do
+  BUG-08 provoca de propósito) e as recusas do Android que o app contorna (serviço em primeiro
+  plano com o app em segundo plano no Android 12+, permissão de localização revogada). O 400 com
+  campo reprovado, que é payload montado errado pelo app, continua indo. O resto gastaria a cota
+  de 5 mil erros por mês do plano gratuito.
 - **Build:** `android/app/build.gradle` aplica o `sentry.gradle` à mão (o projeto não usa
-  `expo prebuild`), que envia o mapa de código no build de release. O `cd-mobile-apk.yml` recebe
-  quatro secrets opcionais (`EXPO_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`,
-  `SENTRY_PROJECT`) e o ambiente (`EXPO_PUBLIC_AMBIENTE`); sem token, o envio do mapa é desligado
-  em vez de quebrar o build.
+  `expo prebuild`), que envia o mapa de código no build de release, e só quando token, org e
+  projeto estão no ambiente: faltando qualquer um, no CI ou na máquina de quem roda um release
+  local, o build sai igual ao de antes. O `metro.config.js` usa o `getSentryExpoConfig`, que grava
+  um Debug ID no bundle e no mapa, e o Sentry casa um com o outro sem depender de release e dist
+  baterem. O `cd-mobile-apk.yml` recebe quatro secrets opcionais (`EXPO_PUBLIC_SENTRY_DSN`,
+  `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`) e o ambiente (`EXPO_PUBLIC_AMBIENTE`).
 - **Política de privacidade** (`site/`, versão 1.2): Sentry como operador, a transferência
   internacional (EUA), a base legal (legítimo interesse) e o prazo de até 90 dias.
 

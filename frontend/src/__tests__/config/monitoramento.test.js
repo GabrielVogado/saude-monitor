@@ -3,6 +3,7 @@
  * coordenada, e-mail, token ou corpo de requisição (LGPD art. 11).
  */
 import * as Sentry from "@sentry/react-native";
+import { NativeModules } from "react-native";
 import {
   _reiniciarParaTeste,
   envolverRaiz,
@@ -49,6 +50,7 @@ describe("iniciarMonitoramento", () => {
       tracesSampleRate: 0,
       beforeSend: limparEvento,
       beforeBreadcrumb: limparBreadcrumb,
+      onReady: expect.any(Function),
     });
     // O release fica com o SDK, para casar com o nome usado pelo sentry.gradle no upload.
     expect(opcoes).not.toHaveProperty("release");
@@ -57,6 +59,45 @@ describe("iniciarMonitoramento", () => {
   test("sem ambiente informado marca como dev", () => {
     iniciarMonitoramento({ dsn: DSN, ambiente: undefined });
     expect(Sentry.init.mock.calls[0][0].environment).toBe("dev");
+  });
+});
+
+describe("limpeza dos eventos nativos (onReady)", () => {
+  const instalar = jest.fn();
+
+  beforeEach(() => {
+    NativeModules.LimpezaSentry = { instalar };
+  });
+
+  afterEach(() => {
+    delete NativeModules.LimpezaSentry;
+  });
+
+  const onReady = () => {
+    iniciarMonitoramento({ dsn: DSN });
+    return Sentry.init.mock.calls[0][0].onReady;
+  };
+
+  test("instala a limpeza nativa depois que o SDK nativo liga", () => {
+    onReady()({ didCallNativeInit: true });
+    expect(instalar).toHaveBeenCalledTimes(1);
+  });
+
+  test("sem SDK nativo ligado não chama o módulo", () => {
+    onReady()({ didCallNativeInit: false });
+    expect(instalar).not.toHaveBeenCalled();
+  });
+
+  test("sem o módulo nativo (iOS, Jest) não quebra", () => {
+    delete NativeModules.LimpezaSentry;
+    expect(() => onReady()({ didCallNativeInit: true })).not.toThrow();
+  });
+
+  test("falha do módulo nativo não derruba o app", () => {
+    instalar.mockImplementationOnce(() => {
+      throw new Error("módulo indisponível");
+    });
+    expect(() => onReady()({ didCallNativeInit: true })).not.toThrow();
   });
 });
 
@@ -99,17 +140,47 @@ describe("registrarErro", () => {
     expect(Sentry.captureException).toHaveBeenCalledWith(erro, undefined);
   });
 
-  test("4xx é defeito do app (payload, rota) e é enviado", () => {
+  test("400 com campo reprovado é payload montado errado pelo app e é enviado", () => {
     iniciarMonitoramento({ dsn: DSN });
-    registrarErro(new ApiError("Requisição inválida", 400), "geofencing.saida");
+    const erro = new ApiError("Requisição inválida", 400, {
+      code: "CAMPOS_INVALIDOS",
+      details: [{ campo: "hospitalId", mensagem: "não pode ser nulo" }],
+    });
+    registrarErro(erro, "geofencing.saida");
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
+
+  test("permissão de serviço em primeiro plano faltando no manifesto é defeito e é enviada", () => {
+    iniciarMonitoramento({ dsn: DSN });
+    const erro = Object.assign(new Error("Couldn't start the foreground service"), {
+      code: "ERR_FOREGROUND_SERVICE_PERMISSIONS",
+    });
+    registrarErro(erro, "geofencing.acompanhamento");
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  const recusaDoSistema = (code) => Object.assign(new Error(code), { code });
 
   test.each([
     ["sem internet", new ErroSemInternet("/api/v1/visitas/checkin")],
     ["guardado na fila offline", new ErroEnfileirado("/api/v1/visitas/checkin")],
     ["5xx, que o backend já registra", new ApiError("Erro interno", 503)],
     ["401, sessão vencida que o refresh trata", new ApiError("Não autorizado", 401)],
+    [
+      "400 de posição fora do geofence (região nativa maior que o polígono, BUG-08)",
+      new ApiError("A posição informada não está dentro do geofence de nenhum hospital.", 400, {
+        code: "CAMPOS_INVALIDOS",
+        details: [],
+      }),
+    ],
+    ["403 de acesso negado", new ApiError("Acesso negado", 403, { code: "ACESSO_NEGADO" })],
+    ["404 de hospital que saiu do catálogo", new ApiError("Não encontrado", 404)],
+    ["409 de visita já aberta", new ApiError("Conflito", 409, { code: "CONFLITO" })],
+    ["429 do limite de requisições", new ApiError("Limite", 429, { code: "LIMITE_EXCEDIDO" })],
+    ["serviço em primeiro plano com o app em segundo plano (Android 12+)",
+      recusaDoSistema("ERR_FOREGROUND_SERVICE_START_NOT_ALLOWED")],
+    ["localização em segundo plano revogada", recusaDoSistema("ERR_LOCATION_BACKGROUND_UNAUTHORIZED")],
+    ["localização revogada", recusaDoSistema("ERR_LOCATION_UNAUTHORIZED")],
     ["vazio", null],
   ])("não envia erro esperado: %s", (_nome, erro) => {
     iniciarMonitoramento({ dsn: DSN });
@@ -186,8 +257,30 @@ describe("limparEvento (beforeSend)", () => {
     contexts: { device: { model: "moto g54", family: "Android" } },
   });
 
-  test("tira o usuário inteiro, inclusive IP", () => {
-    expect(limparEvento(evento())).not.toHaveProperty("user");
+  test("do usuário fica só o código aleatório da instalação, sem IP nem e-mail", () => {
+    expect(limparEvento(evento()).user).toEqual({ id: "u-1" });
+  });
+
+  test("usuário sem id não vira um objeto vazio", () => {
+    expect(limparEvento({ message: "x", user: { ip_address: "200.1.2.3" } })).not.toHaveProperty("user");
+  });
+
+  test("coordenada guardada como número em campo de outro nome também sai", () => {
+    const { extra } = limparEvento({
+      extra: { centro: [-46.6333094, -23.5505199], args: ["aviso", -15.7942287], nota: 4.5 },
+    });
+    expect(extra.centro).toEqual(["[coord]", "[coord]"]);
+    expect(extra.args).toEqual(["aviso", "[coord]"]);
+    expect(extra.nota).toBe(4.5);
+  });
+
+  test("número que não é coordenada passa igual (hora do evento, memória, inteiros)", () => {
+    const limpo = limparEvento({
+      timestamp: 1730000000.1234,
+      contexts: { device: { memory_size: 4096, screen_density: 2.625, battery_level: 87.5 } },
+    });
+    expect(limpo.timestamp).toBe(1730000000.1234);
+    expect(limpo.contexts.device).toEqual({ memory_size: 4096, screen_density: 2.625, battery_level: 87.5 });
   });
 
   test("da requisição sobram só método e rota", () => {

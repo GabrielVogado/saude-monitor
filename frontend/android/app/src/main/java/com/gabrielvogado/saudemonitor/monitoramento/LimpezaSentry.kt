@@ -47,7 +47,7 @@ object LimpezaSentry {
   private val PADROES_DE_TEXTO = listOf(
     Regex("""eyJ[\w-]+\.[\w-]+\.[\w-]+""") to "[token]",
     Regex("""Bearer\s+[\w.~+/=-]+""", RegexOption.IGNORE_CASE) to "Bearer [token]",
-    Regex("""[\w.%+-]+@[\w.-]+\.[a-z]{2,}""", RegexOption.IGNORE_CASE) to "[email]",
+    Regex("""(?<![\w.%+-])[\w.%+-]+@[\w-]+(?:\.[\w-]+)+""", RegexOption.IGNORE_CASE) to "[email]",
     // Coordenada em grau decimal com 4+ casas (~11 m), como no JS.
     Regex("""-?\b\d{1,3}\.\d{4,}\b""") to "[coord]",
   )

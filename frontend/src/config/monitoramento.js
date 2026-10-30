@@ -65,7 +65,9 @@ const PADROES_DE_TEXTO = [
   // JWT (access/refresh do backend, F0-01).
   [/eyJ[\w-]+\.[\w-]+\.[\w-]+/g, "[token]"],
   [/Bearer\s+[\w.~+/=-]+/gi, "Bearer [token]"],
-  [/[\w.%+-]+@[\w.-]+\.[a-z]{2,}/gi, "[email]"],
+  // Linear: o lookbehind só deixa começar no início de uma palavra, e os rótulos do domínio
+  // são separados por ponto sem sobreposição entre as classes (sem backtracking).
+  [/(?<![\w.%+-])[\w.%+-]+@[\w-]+(?:\.[\w-]+)+/gi, "[email]"],
   // Coordenada em grau decimal com 4+ casas (~11 m): é a precisão que identifica o
   // hospital. Inteiros, versões ("1.0.0") e durações não casam.
   [/-?\b\d{1,3}\.\d{4,}\b/g, "[coord]"],

@@ -205,6 +205,13 @@ describe("limparTexto e semQueryString", () => {
     expect(texto).toBe("token [token] | Bearer [token] | [email] | [coord],[coord]");
   });
 
+  test("texto longo sem e-mail é limpo em tempo linear", () => {
+    const textos = ["a".repeat(50000), `x@${"a.".repeat(25000)}`];
+    const inicio = Date.now();
+    textos.forEach(limparTexto);
+    expect(Date.now() - inicio).toBeLessThan(500);
+  });
+
   test("não mexe em versão, inteiro nem número curto", () => {
     expect(limparTexto("versão 1.0.0-rc.10, 45 min, nota 4.5")).toBe(
       "versão 1.0.0-rc.10, 45 min, nota 4.5"

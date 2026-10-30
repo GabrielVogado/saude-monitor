@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 28/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 29/10/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 29/10/2026 — Homologação v1.0.0-rc.11
+
+**O que entrou:** registro da rc que leva o crash reporting do app com Sentry (PR #240, M-069, só app; o backend sai igual ao da rc.10). Exige os secrets do Sentry cadastrados antes do merge na `master`, senão o APK sai com o Sentry desligado. O roteiro começa pela conferência dos erros no painel do Sentry, sem dado pessoal, e remete ao roteiro da rc.10 inteiro, que não foi feito. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.11.md`](./10-git-flow/homologacoes/v1.0.0-rc.11.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
 
 ---
 

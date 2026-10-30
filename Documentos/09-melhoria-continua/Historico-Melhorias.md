@@ -3644,3 +3644,61 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
   (`analises/Funcionamento-Offline-App-2026-10-23.md`, pasta do projeto).
 - Precisa de teste de campo: entrar com internet, sair sem rede, esperar mais de 45 min e reconectar.
   O esperado é a visita aparecer como Finalizada com o tempo real.
+
+---
+
+## M-069 — Crash reporting no app: os erros que ninguém via passam a chegar ao Sentry
+
+**Data:** 28/10/2026 · **PR:** (este PR) · **Origem:** E8-07 / OPS-03, item 2 do guia de pendências de 25/10/2026
+
+### Como era
+
+- Nenhuma ferramenta de crash reporting no app. O crash do PR #46 e o ANR do BUG-04 só foram
+  descobertos porque alguém contou, e sem a pilha de chamadas nem o modelo do aparelho.
+- As tarefas de segundo plano (geofencing, sinal da visita, agendamento do feedback) tratavam a
+  falha com um `console.warn`, que ninguém lê num aparelho de usuário.
+
+### O que mudou
+
+- **App:** `@sentry/react-native` 7.11 (versão indicada pelo Expo 55). O novo
+  `src/config/monitoramento.js` liga o Sentry só quando há `EXPO_PUBLIC_SENTRY_DSN`, então dev
+  local e testes seguem sem enviar nada. O `index.js` importa `src/config/iniciarMonitoramento.js`
+  antes dos outros módulos do app (os `import` sobem para o topo do arquivo, e uma chamada no corpo
+  só rodaria depois de `App` e do geofencing já carregados), o que cobre também o erro no
+  carregamento dos módulos e o processo que o SO acorda só para a tarefa de geofencing.
+- **Sem dado pessoal (LGPD art. 11):** antes de qualquer envio, o app deixa do usuário só o código
+  aleatório que o Sentry cria na instalação (conta em quantos aparelhos o erro aconteceu, como diz
+  a política), reduz a requisição a método e rota sem query string, apaga campos de posição,
+  e-mail, nome, telefone, token e identificador do aparelho em qualquer nível e troca JWT,
+  `Bearer`, e-mail e coordenada com 4 ou mais casas decimais, no texto e em número. Sem
+  `sendDefaultPii`, captura de tela, replay nem tracing.
+- **Erros nativos** (crash em Java/Kotlin, ANR) são montados pelo SDK nativo e não passam pelo
+  `beforeSend` em JavaScript. O `LimpezaSentry.kt` aplica a mesma limpeza do lado nativo, nas duas
+  filas de processamento do SDK (a comum e a do ANR da sessão anterior, lido na abertura
+  seguinte); o JS o instala no `onReady` do `Sentry.init`, depois que o SDK nativo liga.
+- **Erros silenciosos:** os sete `catch` que só escreviam no console nas tarefas de segundo plano
+  passam a registrar o erro, com o local como tag. Não são enviados: falha de rede, item da fila
+  offline, resposta HTTP de erro (5xx o backend registra, 401 é sessão vencida, e os 4xx são
+  recusas de negócio esperadas, como a posição fora do geofence que a região nativa maior do
+  BUG-08 provoca de propósito) e as recusas do Android que o app contorna (serviço em primeiro
+  plano com o app em segundo plano no Android 12+, permissão de localização revogada). O 400 com
+  campo reprovado, que é payload montado errado pelo app, continua indo. O resto gastaria a cota
+  de 5 mil erros por mês do plano gratuito.
+- **Build:** `android/app/build.gradle` aplica o `sentry.gradle` à mão (o projeto não usa
+  `expo prebuild`), que envia o mapa de código no build de release, e só quando token, org e
+  projeto estão no ambiente: faltando qualquer um, no CI ou na máquina de quem roda um release
+  local, o build sai igual ao de antes. O `metro.config.js` usa o `getSentryExpoConfig`, que grava
+  um Debug ID no bundle e no mapa, e o Sentry casa um com o outro sem depender de release e dist
+  baterem. O `cd-mobile-apk.yml` recebe quatro secrets opcionais (`EXPO_PUBLIC_SENTRY_DSN`,
+  `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`) e o ambiente (`EXPO_PUBLIC_AMBIENTE`).
+- **Política de privacidade** (`site/`, versão 1.2): Sentry como operador, a transferência
+  internacional (EUA), a base legal (legítimo interesse) e o prazo de até 90 dias.
+
+### O que ficou de fora
+
+- Painel `admin/`: sem deploy hoje, o Sentry dele só pegaria erros de quem roda o painel na
+  própria máquina. Entra quando o painel for publicado.
+- Backend: o Error Reporting do Google Cloud lê as exceções do log, e depende do log estruturado
+  (OPS-02, item 11 do guia).
+- Validação: o E8-07 fica parcial até um erro forçado no APK de homologação aparecer no Sentry com
+  a linha do código e sem dado pessoal.

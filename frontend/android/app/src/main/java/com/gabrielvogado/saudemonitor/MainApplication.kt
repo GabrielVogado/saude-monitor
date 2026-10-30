@@ -15,6 +15,8 @@ import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ExpoReactHostFactory
 
+import com.gabrielvogado.saudemonitor.monitoramento.LimpezaSentryPackage
+
 class MainApplication : Application(), ReactApplication {
 
   override val reactHost: ReactHost by lazy {
@@ -24,6 +26,8 @@ class MainApplication : Application(), ReactApplication {
         PackageList(this).packages.apply {
           // Packages that cannot be autolinked yet can be added manually here, for example:
           // add(MyReactNativePackage())
+          // E8-07: limpeza dos eventos nativos do Sentry (crash, ANR) antes do envio.
+          add(LimpezaSentryPackage())
         },
       // [FIX] Usa o flag de debug do APP (não o ReactBuildConfig.DEBUG da lib RN,
       // que vem false no AAR pré-compilado). Sem isso o app tenta carregar o bundle

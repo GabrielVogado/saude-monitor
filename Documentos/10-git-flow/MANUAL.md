@@ -227,6 +227,7 @@ Actions se autentica por Workload Identity Federation, sem chave. No GitHub:
 | `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_STORE_PASSWORD`, `ANDROID_RELEASE_KEY_ALIAS`, `ANDROID_RELEASE_KEY_PASSWORD` | Chave de release do APK. Obrigatórios para homologação — ver [`deploy/android/README.md`](../../deploy/android/README.md) |
 | `EXPO_PUBLIC_MAPBOX_TOKEN` | Token público do Mapbox embutido no APK |
 | `SONAR_TOKEN` | Token do SonarQube Cloud (§4.4). Sem ele, a análise é pulada e o CI segue |
+| `EXPO_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | Crash reporting do app (E8-07, M-069). O DSN entra no APK e liga o Sentry; org, projeto e token servem ao envio do mapa de código no build de release. Opcionais: sem DSN o APK sai sem Sentry; faltando token, org ou projeto o mapa não é enviado e o build segue |
 
 ### 4.4 Qualidade: trava de testes, cobertura e SonarQube Cloud
 

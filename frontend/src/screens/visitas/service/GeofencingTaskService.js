@@ -13,6 +13,7 @@ import { centroDoHospital } from "../../../utils/geojson";
 import { haversineMetros } from "../../../utils/distancia";
 import { duracaoMinutosDesde } from "../../../utils/format";
 import { sincronizar } from "../../../services/SincronizacaoOffline";
+import { registrarErro } from "../../../config/monitoramento";
 
 /**
  * Geofencing nativo (F-03/ADR-002): substitui o GPS contínuo (que não funciona em
@@ -325,6 +326,7 @@ async function confirmarEntrada(hospitalId) {
     if (erro?.status !== 409) {
       // eslint-disable-next-line no-console
       console.warn("GeofencingTaskService: falha ao confirmar entrada", erro?.message);
+      registrarErro(erro, "geofencing.entrada");
     }
   }
   return false;
@@ -359,6 +361,7 @@ async function confirmarSaida(hospitalId, desde) {
       // Não bloqueia o encerramento local da visita: só registra a falha.
       // eslint-disable-next-line no-console
       console.warn("GeofencingTaskService: falha ao agendar o feedback", erro?.message);
+      registrarErro(erro, "geofencing.agendarFeedback");
     });
     await alterarEstado((estado) => {
       if (estado.visita?.id === visita.id) {
@@ -394,6 +397,7 @@ async function confirmarSaida(hospitalId, desde) {
 
     // eslint-disable-next-line no-console
     console.warn("GeofencingTaskService: falha ao confirmar saída", erro?.message);
+    registrarErro(erro, "geofencing.saida");
   }
 }
 
@@ -497,6 +501,7 @@ async function ajustarAcompanhamentoEmSerie() {
     // pendência — com atraso, mas sem perder o evento, que está salvo no estado.
     // eslint-disable-next-line no-console
     console.warn("GeofencingTaskService: acompanhamento indisponível", erro?.message);
+    registrarErro(erro, "geofencing.acompanhamento");
   }
 }
 
@@ -584,6 +589,7 @@ async function tratarEventoDeRegiao(data) {
   } catch (erro) {
     // eslint-disable-next-line no-console
     console.warn("GeofencingTaskService: falha ao tratar evento de região", erro?.message);
+    registrarErro(erro, "geofencing.evento");
   }
 }
 
@@ -636,6 +642,7 @@ export async function enviarSinalDaVisita(locations, agora = Date.now()) {
     });
     // eslint-disable-next-line no-console
     console.warn("GeofencingTaskService: falha ao enviar o sinal da visita", error?.message);
+    registrarErro(error, "geofencing.sinalVisita");
   }
 }
 

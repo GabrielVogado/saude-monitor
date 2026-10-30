@@ -110,6 +110,17 @@ on:
         required: true
       ANDROID_RELEASE_KEY_PASSWORD:
         required: true
+      # E8-07 (crash reporting): opcionais de proposito. Sem DSN o app sai sem Sentry e sem
+      # token o build nao envia o mapa de codigo -- nos dois casos o APK continua igual ao
+      # de antes, entao a falta deles nao pode reprovar a homologacao.
+      EXPO_PUBLIC_SENTRY_DSN:
+        required: false
+      SENTRY_AUTH_TOKEN:
+        required: false
+      SENTRY_ORG:
+        required: false
+      SENTRY_PROJECT:
+        required: false
 
 permissions:
   contents: read
@@ -318,6 +329,17 @@ jobs:
           ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
           ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
           ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          # E8-07: crash reporting. O DSN e o ambiente entram no bundle (lidos pelo
+          # `src/config/monitoramento.js`); o ambiente separa dev/hom/prod no mesmo projeto
+          # do Sentry. Org, projeto e token sao lidos pelo sentry-cli que o `sentry.gradle`
+          # chama no build de release para enviar o mapa de codigo. O `app/build.gradle` so
+          # aplica o `sentry.gradle` com os tres preenchidos: faltando qualquer um, o build
+          # segue sem envio em vez de quebrar.
+          EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
+          EXPO_PUBLIC_AMBIENTE: ${{ env.AMBIENTE }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           VERSION_NAME: ${{ steps.versao.outputs.nome }}
           VERSION_CODE: ${{ steps.versao.outputs.codigo }}
         working-directory: frontend/android

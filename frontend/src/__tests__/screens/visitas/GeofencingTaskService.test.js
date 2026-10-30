@@ -49,6 +49,14 @@ jest.mock("../../../services/SincronizacaoOffline", () => ({
   sincronizar: (...args) => mockSincronizar(...args),
 }));
 
+// E8-07: o serviço manda ao crash reporting os erros que antes só iam para o console.
+// Espião no lugar do módulo real, que sem DSN não faz nada e não daria o que conferir.
+const mockRegistrarErro = jest.fn();
+jest.mock("../../../config/monitoramento", () => ({
+  __esModule: true,
+  registrarErro: (...args) => mockRegistrarErro(...args),
+}));
+
 const mockInvalidarVisitaAtiva = jest.fn(() => Promise.resolve());
 jest.mock("../../../core/query/queryClient", () => ({
   __esModule: true,
@@ -609,6 +617,28 @@ describe("falhas e casos de borda", () => {
       "GeofencingTaskService: falha ao confirmar entrada",
       "500"
     );
+    // Só o erro que não é o 409 chega ao crash reporting (quem filtra 5xx é o monitoramento).
+    expect(mockRegistrarErro).toHaveBeenCalledTimes(1);
+    expect(mockRegistrarErro).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 500 }),
+      "geofencing.entrada"
+    );
+  });
+
+  it("falha inesperada ao tratar o evento de região vai para o crash reporting", async () => {
+    // Gravar o estado falha (armazenamento cheio ou corrompido): antes, só um aviso no
+    // console de um aparelho que ninguém vê.
+    const falha = new Error("disco cheio");
+    AsyncStorage.setItem.mockRejectedValueOnce(falha);
+    const { executarTask } = carregarServico();
+
+    await entrar(executarTask);
+
+    expect(console.warn).toHaveBeenCalledWith(
+      "GeofencingTaskService: falha ao tratar evento de região",
+      "disco cheio"
+    );
+    expect(mockRegistrarErro).toHaveBeenCalledWith(falha, "geofencing.evento");
   });
 
   it("checkout sem internet encerra a visita localmente com a duração até a saída", async () => {

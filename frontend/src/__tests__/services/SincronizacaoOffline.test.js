@@ -287,6 +287,14 @@ describe("saída que espera a entrada guardada sem internet", () => {
     expect(eventos).toEqual([{ tipo: "saida", hospitalId: "h1", visitaId: "v7", duracaoMinutos: 12 }]);
   });
 
+  it("visita aberta sem horário de entrada na resposta ainda vale para a saída", async () => {
+    VisitaService.buscarAtiva.mockResolvedValue({ visita: { id: "v7", hospitalId: "h1" } });
+    VisitaService.enviarEventoOffline.mockResolvedValue({ id: "v7" });
+    await saidaNaFila();
+
+    await expect(sincronizar()).resolves.toMatchObject({ enviados: 1 });
+  });
+
   it.each([
     ["sem visita aberta", { visita: null }],
     ["com visita aberta em outra unidade", { visita: { id: "v8", hospitalId: "h2", entrada: minutosAtras(40) } }],

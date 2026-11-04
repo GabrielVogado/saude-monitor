@@ -160,7 +160,9 @@ class VisitaService {
     }
 
     if (item?.tipo === "checkout") {
-      const { visitaId, entradaPendente: _entradaPendente, ...dados } = item.corpo || {};
+      // `entradaPendente` é só do aparelho (liga a saída à entrada na fila): não vai ao servidor.
+      const { visitaId, ...dados } = item.corpo || {};
+      delete dados.entradaPendente;
       const dispositivoId = dados.dispositivoId || (await DispositivoId.obterSeDisponivel());
       return request(`${BASE_PATH}/${visitaId}/checkout`, {
         method: "POST",

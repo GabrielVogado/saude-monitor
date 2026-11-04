@@ -458,10 +458,10 @@ async function guardarSaidaProvisoria(visita, saidaEm) {
         estado.visita = null;
       }
     });
-  } catch (erro) {
+  } catch (error) {
     // eslint-disable-next-line no-console
-    console.warn("GeofencingTaskService: falha ao guardar a saída", erro?.message);
-    registrarErro(erro, "geofencing.saidaProvisoria");
+    console.warn("GeofencingTaskService: falha ao guardar a saída", error?.message);
+    registrarErro(error, "geofencing.saidaProvisoria");
   }
 }
 
@@ -522,7 +522,8 @@ export async function processarPendencias(agora = Date.now()) {
   const vencidas = await alterarEstado((estado) => {
     // A entrada provisória que a fila não entregou em 24h já saiu dela: não há mais visita.
     const entradaProvisoria = estado.visita?.provisoria ? new Date(estado.visita.entrada).getTime() : null;
-    if (entradaProvisoria !== null && !(agora - entradaProvisoria < VALIDADE_FILA_MS)) {
+    const idadeProvisoria = agora - entradaProvisoria;
+    if (entradaProvisoria !== null && (Number.isNaN(idadeProvisoria) || idadeProvisoria >= VALIDADE_FILA_MS)) {
       estado.visita = null;
     }
     const saidas = Object.keys(estado.saidas).filter(

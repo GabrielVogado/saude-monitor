@@ -105,7 +105,9 @@ async function resolverVisitaDaSaida(item, entrada, rodada) {
   } catch (erro) {
     throw semDecisaoDoServidor(erro) ? erro : new ErroAoConferirVisita(erro);
   }
-  const comecouAntes = !(new Date(visita?.entrada).getTime() > new Date(item.ocorridoEm).getTime());
+  // Sem horário de entrada na resposta, não há como dizer que a visita é posterior à saída.
+  const inicio = new Date(visita?.entrada).getTime();
+  const comecouAntes = Number.isNaN(inicio) || inicio <= new Date(item.ocorridoEm).getTime();
   return visita?.hospitalId === entrada.hospitalId && comecouAntes ? visita.id : null;
 }
 
@@ -131,8 +133,8 @@ async function processarItem(item, seguintes, rodada) {
     await removerDaFila(item.chave);
     await aposEntregar(envio, resposta, seguintes, rodada);
     return "enviado";
-  } catch (erro) {
-    return tratarFalha(item, erro, rodada);
+  } catch (error) {
+    return tratarFalha(item, error, rodada);
   }
 }
 

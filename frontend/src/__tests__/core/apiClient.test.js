@@ -6,6 +6,7 @@ import {
   apiRequest,
   buildQuery,
   configurarSessao,
+  expiracaoDoToken,
   renovarSessaoAposNaoAutorizado,
 } from "../../core/api/apiClient";
 import { ApiError } from "../../core/api/apiError";
@@ -83,7 +84,11 @@ describe("apiClient", () => {
   test("sem login e sem armazenamento, segue sem o cabeçalho da instalação", async () => {
     global.fetch = jest.fn().mockResolvedValue(resposta({}));
     const AsyncStorage = require("@react-native-async-storage/async-storage").default;
-    AsyncStorage.getItem.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error("disco cheio"));
+    // Sem token na conferência de vencimento e no cabeçalho; o id da instalação falha.
+    AsyncStorage.getItem
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error("disco cheio"));
 
     await apiRequest("/a");
 
@@ -169,6 +174,76 @@ describe("apiClient", () => {
     await expect(apiRequest("/a")).resolves.toEqual({ ok: true });
     expect(renovar).toHaveBeenCalledTimes(1);
     expect(global.fetch.mock.calls[1][1].headers.Authorization).toBe("Bearer NEW");
+  });
+
+  /**
+   * Teste de campo de 29/10/2026: com o token de 15 min vencido, as rotas de visita (públicas)
+   * tratavam o pedido como anônimo e respondiam 403, sem o 401 que dispara a renovação. O sinal
+   * e o checkout da visita automática eram recusados e ela terminava como GPS interrompido.
+   */
+  describe("token vencido antes de enviar", () => {
+    const jwt = (exp) => {
+      // base64url sem "=", como o servidor emite.
+      const payload = btoa(JSON.stringify({ sub: "u", exp }))
+        .replaceAll("+", "-")
+        .replaceAll("/", "_")
+        .replaceAll("=", "");
+      return `cab.${payload}.ass`;
+    };
+    const emSegundos = (ms) => Math.floor(ms / 1000);
+
+    test("lê o vencimento do JWT e devolve null quando não dá para ler", () => {
+      expect(expiracaoDoToken(jwt(1_800_000_000))).toBe(1_800_000_000_000);
+      expect(expiracaoDoToken("TOK")).toBeNull();
+      expect(expiracaoDoToken(jwt("nunca"))).toBeNull();
+    });
+
+    test("token vencido é renovado antes do pedido, que já sai com o token novo", async () => {
+      await TokenStorage.salvarTokens({ accessToken: jwt(emSegundos(Date.now() - 1000)), refreshToken: "R" });
+      renovar.mockImplementation(async () => {
+        await TokenStorage.salvarTokens({ accessToken: "NEW", refreshToken: "R2" });
+      });
+      global.fetch = jest.fn().mockResolvedValue(resposta({ ok: true }));
+
+      await expect(apiRequest("/api/v1/visitas/v1/heartbeat", { method: "POST" })).resolves.toEqual({ ok: true });
+
+      expect(renovar).toHaveBeenCalledTimes(1);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(global.fetch.mock.calls[0][1].headers.Authorization).toBe("Bearer NEW");
+    });
+
+    test("renova também quando falta menos de um minuto para vencer", async () => {
+      await TokenStorage.salvarTokens({ accessToken: jwt(emSegundos(Date.now() + 30 * 1000)), refreshToken: "R" });
+      global.fetch = jest.fn().mockResolvedValue(resposta({}));
+
+      await apiRequest("/a");
+
+      expect(renovar).toHaveBeenCalledTimes(1);
+    });
+
+    test.each([
+      ["token ainda válido", () => jwt(emSegundos(Date.now() + 10 * 60 * 1000)), "R"],
+      ["token que não é JWT", () => "TOK", "R"],
+      ["sem refresh token", () => jwt(emSegundos(Date.now() - 1000)), undefined],
+    ])("%s: não renova antes", async (_nome, token, refreshToken) => {
+      await TokenStorage.salvarTokens({ accessToken: token(), refreshToken });
+      global.fetch = jest.fn().mockResolvedValue(resposta({}));
+
+      await apiRequest("/a");
+
+      expect(renovar).not.toHaveBeenCalled();
+    });
+
+    test("sem internet para renovar, o pedido falha com o erro de conexão (vai para a fila)", async () => {
+      await TokenStorage.salvarTokens({ accessToken: jwt(emSegundos(Date.now() - 1000)), refreshToken: "R" });
+      const indisponivel = new ErroServidorIndisponivel("https://api.test/api/v1/auth/refresh");
+      renovar.mockRejectedValue(indisponivel);
+      global.fetch = jest.fn();
+
+      await expect(apiRequest("/a", { method: "POST" })).rejects.toBe(indisponivel);
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(encerrar).not.toHaveBeenCalled();
+    });
   });
 
   test("401 sem refresh token não renova e devolve o erro do servidor", async () => {

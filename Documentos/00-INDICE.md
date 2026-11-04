@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 29/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 04/11/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 04/11/2026 — Sinal e saída da visita com a sessão vencida
+
+**O que mudou:** teste de campo de 29/10 (rc.10): a visita automática ficou de novo como GPS interrompido com 0 min. O banco e os logs de homologação mostraram o sinal da visita recusado com 403 depois dos 15 min do token, porque as rotas públicas de visita tratam o token vencido como anônimo e o app só renovava em 401. O app passa a renovar a sessão antes do pedido quando o token venceu; a entrada confirmada sem internet vira visita provisória, com a saída guardada na fila logo atrás do check-in. Só app. Registro em `Historico-Melhorias.md` (M-070).
+**Também:** `De-Para-Backlog-Features.md` atualiza E2-05 e o `Documento-Negocial-v2.1.md` complementa a RN-06.
 
 ---
 

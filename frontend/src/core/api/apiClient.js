@@ -67,6 +67,49 @@ export async function renovarSessaoAposNaoAutorizado(geracao) {
 }
 
 /**
+ * Folga antes da expiração do access token. Cobre o relógio do aparelho um pouco atrasado e
+ * o tempo da própria requisição.
+ */
+export const FOLGA_EXPIRACAO_MS = 60 * 1000;
+
+/**
+ * Instante (ms) em que o access token vence, lido do `exp` do JWT, ou `null` quando não dá
+ * para ler. Só para decidir quando renovar: quem valida o token é o servidor.
+ */
+export function expiracaoDoToken(token) {
+  try {
+    const base64 = token.split(".")[1].replaceAll("-", "+").replaceAll("_", "/");
+    // JWT vem sem o preenchimento "=", que nem todo `atob` aceita omitir.
+    const payload = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const exp = Number(JSON.parse(atob(payload)).exp);
+    return Number.isFinite(exp) ? exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Renova antes de enviar quando o access token já venceu (teste de campo de 29/10/2026).
+ *
+ * As rotas de visita aceitam quem não fez login (OPS-03). Com o token vencido, o servidor
+ * ignora o cabeçalho e trata o pedido como anônimo: a visita do usuário logado responde 403
+ * ("não é sua"), nunca o 401 que dispararia a renovação. O token dura 15 min, então o sinal e
+ * o checkout de toda visita automática mais longa que isso eram recusados, e a visita
+ * terminava como GPS interrompido com 0 min.
+ */
+async function renovarSeVencido(geracao) {
+  const token = await TokenStorage.getAccessToken();
+  const expiraEm = token ? expiracaoDoToken(token) : null;
+  if (expiraEm === null || Date.now() < expiraEm - FOLGA_EXPIRACAO_MS) {
+    return;
+  }
+  if (!(await TokenStorage.getRefreshToken())) {
+    return;
+  }
+  await renovarSessaoAposNaoAutorizado(geracao);
+}
+
+/**
  * Com login, o access token. Sem login, o id da instalação (`X-Cliente-Id`), que o backend
  * usa como chave do rate limit no lugar do IP compartilhado pelo CGNAT (ARQ-02).
  */
@@ -137,6 +180,7 @@ export async function apiRequest(path, { method = "GET", body, headers = {}, sig
   // Geração lida antes do 401: se ela mudar, outra requisição já renovou a
   // sessão e esta só precisa repetir a chamada com o token novo.
   const geracao = geracaoDaSessao();
+  await renovarSeVencido(geracao);
   let response = await doFetch();
 
   // Só tenta renovar quando há refresh token persistido (sessão ativa): sem ele,

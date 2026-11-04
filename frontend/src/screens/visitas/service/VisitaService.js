@@ -15,9 +15,10 @@ const BASE_PATH = "/api/v1/visitas";
  * existe a dúvida de "o servidor chegou a receber?" que impediria repetir.
  */
 async function guardarOffline({ chave, tipo, corpo, ocorridoEm }, mensagem) {
-  await enfileirar({ chave, tipo, corpo, ocorridoEm });
+  const item = await enfileirar({ chave, tipo, corpo, ocorridoEm });
 
-  return new ErroEnfileirado(undefined, mensagem);
+  // O item guardado vai junto: o geofencing liga a saída a esta entrada pela chave.
+  return Object.assign(new ErroEnfileirado(undefined, mensagem), { item });
 }
 
 const MENSAGEM_SERVIDOR_FORA =
@@ -62,8 +63,10 @@ class VisitaService {
       if (erro instanceof ErroSemInternet) {
         // OPS-01: este é o caminho do geofencing em segundo plano, sem tela e
         // sem usuário. Sem a fila, a visita se perderia em silêncio.
+        // Uma chave por entrada: voltar à mesma unidade ainda sem internet é outra visita,
+        // e reaproveitar a chave mandaria a entrada nova para trás da saída da anterior.
         throw await guardarOffline({
-          chave: `checkin:${hospitalId}`,
+          chave: `checkin:${hospitalId}:${Date.now()}`,
           tipo: "checkin",
           corpo,
         });
@@ -118,6 +121,25 @@ class VisitaService {
   }
 
   /**
+   * Guarda a saída de uma visita cuja entrada ainda está na fila offline (teste de campo de
+   * 29/10/2026). Sem o número da visita não há o que chamar agora: o item espera o check-in
+   * de chave `chaveEntrada` e sai logo depois dele, com o horário real da saída, que o
+   * `SincronizacaoOffline` completa com o número devolvido pelo servidor.
+   */
+  static async guardarSaidaDeEntradaPendente({ chaveEntrada, hospitalId }, ocorridoEm) {
+    return enfileirar({
+      chave: `checkout:${chaveEntrada}`,
+      tipo: "checkout",
+      corpo: {
+        visitaId: null,
+        entradaPendente: { chave: chaveEntrada, hospitalId },
+        dispositivoId: await DispositivoId.obterSeDisponivel(),
+      },
+      ocorridoEm,
+    });
+  }
+
+  /**
    * Reenvia um item da fila offline (OPS-05). Usado apenas pelo
    * `SincronizacaoOffline`; não enfileira de novo em caso de falha, porque o
    * item já está na fila — quem decide mantê-lo ou descartá-lo é o sincronizador.
@@ -138,7 +160,7 @@ class VisitaService {
     }
 
     if (item?.tipo === "checkout") {
-      const { visitaId, ...dados } = item.corpo || {};
+      const { visitaId, entradaPendente: _entradaPendente, ...dados } = item.corpo || {};
       const dispositivoId = dados.dispositivoId || (await DispositivoId.obterSeDisponivel());
       return request(`${BASE_PATH}/${visitaId}/checkout`, {
         method: "POST",

@@ -3702,3 +3702,57 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
   (OPS-02, item 11 do guia).
 - Validação: o E8-07 fica parcial até um erro forçado no APK de homologação aparecer no Sentry com
   a linha do código e sem dado pessoal.
+
+---
+
+## M-070 — Entrada guardada sem internet passa a ter saída, sinal e feedback
+
+**Data:** 04/11/2026 · **PR:** (este PR) · **Origem:** teste de campo do PO no Hospital Regional de Ceilândia (29/10/2026, APK da rc.10)
+
+### Como era
+
+- O Histórico mostrou de novo a visita automática como **GPS interrompido** com **0 min**, agora
+  com o M-068 no aparelho. O PO conectou no Wi-Fi do hospital (que exige login), a entrada foi
+  registrada, e na saída o Wi-Fi caiu sem dados móveis; a internet só voltou mais de 10 min depois.
+- 0 min quer dizer que nenhum sinal chegou ao servidor depois da entrada. O caminho no código que
+  produz isso é a entrada confirmada **sem internet** (antes de o Wi-Fi liberar a rede): o check-in
+  ia para a fila, mas o aparelho não guardava visita nenhuma (`confirmarEntrada` só retornava). Quando
+  a fila entregava o check-in, o número da visita não chegava ao geofencing: sem sinal, sem
+  checkout na saída e sem convite de feedback. O job encerrava a visita no último sinal, que era o
+  próprio check-in. Era a lacuna que o M-068 deixou de fora. Sem acesso ao banco de homologação, a
+  causa foi deduzida do código e do relato, não do registro da visita.
+
+### O que mudou (só app)
+
+- **Visita provisória:** com o check-in na fila, o geofencing guarda uma visita provisória com a
+  chave do item na fila e o mesmo horário dele. Ela mantém o acompanhamento ligado no modo de visita,
+  então a saída é vista pelo Exit do SO ou pela posição da leitura, como numa visita normal. Não
+  manda sinal (o servidor ainda não a conhece) e não é apagada quando o servidor responde que não há
+  visita ativa. Some sozinha depois de 24h, a validade da fila.
+- **Saída na fila atrás da entrada:** a saída da provisória vai para a fila com o horário real
+  (`ocorridoEm`), ligada à chave da entrada. O `SincronizacaoOffline` envia o check-in, grava o
+  número devolvido na saída que o espera (também no disco, para o caso de o processo morrer no meio)
+  e envia a saída logo em seguida. Entrada recusada (empate de geofences, fora do polígono) leva a
+  saída junto. Sem a entrada na fila, a saída só usa a visita aberta da mesma unidade que começou
+  antes dela; uma visita aberta depois (check-in manual) não é encerrada com a saída velha.
+- **Geofencing avisado:** a fila avisa o desfecho a um observador registrado pelo geofencing. Com a
+  pessoa ainda no hospital, a provisória ganha o número da visita e passa a mandar sinal; com a saída
+  já na fila, é esquecida; a saída entregue agenda o convite de feedback com a duração do servidor.
+- **Uma chave por entrada:** o check-in da fila era `checkin:<hospital>`. Voltar à mesma unidade
+  ainda sem internet substituía a entrada anterior e a mandava para trás da própria saída. Agora a
+  chave leva o instante da entrada.
+- **Fila em série:** as operações de leitura e escrita da fila em disco rodam uma de cada vez, para
+  a sincronização e a tarefa de segundo plano não apagarem o item uma da outra.
+- Backend sem mudança: o checkout com `ocorridoEm` (OPS-05) e a correção da visita encerrada pelo
+  job (M-068) já cobrem a chegada atrasada.
+
+### O que ficou de fora
+
+- Sinal da visita (heartbeat) sem internet continua sem fila: a saída com o horário real já corrige
+  a visita que o job encerrou (M-068), e guardar sinais só multiplicaria requisições. Caso que ainda
+  sobra: ficar mais de 45 min no hospital sem internet e reconectar **ainda lá dentro**. O primeiro
+  sinal recebe 409, o app esquece a visita e a saída não gera checkout. Vira entrega própria se o
+  PO quiser.
+- Precisa de teste de campo com o APK novo: chegar sem internet (ou antes do login do Wi-Fi),
+  esperar a entrada, conectar, sair sem rede e reconectar depois de mais de 10 min. O esperado é a
+  visita como Finalizada com o tempo real e o convite de feedback.

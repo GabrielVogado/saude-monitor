@@ -12,7 +12,8 @@ import { agendarFeedback } from "../../feedback/service/FeedbackNotificationServ
 import { centroDoHospital } from "../../../utils/geojson";
 import { haversineMetros } from "../../../utils/distancia";
 import { duracaoMinutosDesde } from "../../../utils/format";
-import { sincronizar } from "../../../services/SincronizacaoOffline";
+import { definirObservador, sincronizar } from "../../../services/SincronizacaoOffline";
+import { VALIDADE_MS as VALIDADE_FILA_MS } from "../../../config/filaOffline";
 import { registrarErro } from "../../../config/monitoramento";
 
 /**
@@ -152,6 +153,27 @@ const RAIO_RECALCULO_MAX_METROS = 2500;
  */
 const LIMITE_NOVA_TENTATIVA_ENTRADA_MS = 30 * 60 * 1000;
 const INTERVALO_NOVA_TENTATIVA_MS = 60 * 1000;
+
+/**
+ * Visita provisória: a entrada automática foi confirmada sem internet e espera na fila
+ * offline (teste de campo de 29/10/2026, Hospital Regional de Ceilândia). O aparelho a
+ * acompanha como uma visita aberta, para a saída também ser vista e guardada com o horário
+ * real; o número verdadeiro chega quando a fila entrega o check-in.
+ */
+const PREFIXO_VISITA_PROVISORIA = "provisoria:";
+
+function visitaProvisoria(hospitalId, itemDaFila) {
+  return {
+    id: `${PREFIXO_VISITA_PROVISORIA}${hospitalId}`,
+    provisoria: true,
+    // Liga a saída a esta entrada na fila, e não a outra entrada na mesma unidade.
+    chaveEntrada: itemDaFila?.chave || null,
+    hospitalId,
+    // O mesmo instante que a fila usa para a validade de 24h do check-in.
+    entrada: itemDaFila?.ocorridoEm || new Date().toISOString(),
+    origem: "GEOFENCE",
+  };
+}
 
 /** Chave do estado do geofencing que precisa sobreviver ao processo ser encerrado. */
 const CHAVE_ESTADO = "@saude_monitor:geofencing";
@@ -313,8 +335,16 @@ async function confirmarEntrada(hospitalId) {
     void invalidarVisitaAtiva();
   } catch (erro) {
     // Aparelho sem internet: o check-in foi para a fila offline (OPS-05) e sai
-    // quando a conexão voltar, com o horário real da entrada. Não é falha.
+    // quando a conexão voltar, com o horário real da entrada. Não é falha. A visita
+    // provisória mantém o acompanhamento ligado, para a saída não se perder.
     if (erro?.enfileirado) {
+      if (minhaGeracao === geracao) {
+        await alterarEstado((estado) => {
+          if (!estado.visita) {
+            estado.visita = visitaProvisoria(hospitalId, erro.item);
+          }
+        });
+      }
       return false;
     }
 
@@ -345,24 +375,15 @@ async function confirmarSaida(hospitalId, desde) {
   }
   const saidaEm = new Date(Number.isFinite(desde) ? desde : Date.now()).toISOString();
 
+  if (visita.provisoria) {
+    await guardarSaidaProvisoria(visita, saidaEm);
+    return;
+  }
+
   const encerrarLocalmente = async (duracaoMinutos) => {
-    // Épico 03 — E3-01: pede o feedback após a saída automática por geofence, só se a
-    // visita passou do piso de 2 min (RN-01/RN-07). Online a duração vem da resposta do
-    // checkout; offline é calculada a partir da entrada guardada.
-    agendarFeedback({
-      visitaId: visita.id,
-      hospitalId: visita.hospitalId,
-      hospitalNome: null,
-      // Base do convite de feedback, que sai ~1 min depois dela: é o agora, não o
-      // instante da saída, que já tem ao menos os 5 min da RN-03 e cairia no passado.
-      saidaEm: new Date().toISOString(),
-      duracaoMinutos,
-    }).catch((erro) => {
-      // Não bloqueia o encerramento local da visita: só registra a falha.
-      // eslint-disable-next-line no-console
-      console.warn("GeofencingTaskService: falha ao agendar o feedback", erro?.message);
-      registrarErro(erro, "geofencing.agendarFeedback");
-    });
+    // Online a duração vem da resposta do checkout; offline é calculada a partir da
+    // entrada guardada.
+    convidarParaFeedback(visita.id, visita.hospitalId, duracaoMinutos);
     await alterarEstado((estado) => {
       if (estado.visita?.id === visita.id) {
         estado.visita = null;
@@ -402,6 +423,96 @@ async function confirmarSaida(hospitalId, desde) {
 }
 
 /**
+ * Épico 03 — E3-01: pede o feedback após a saída automática por geofence, só se a visita
+ * passou do piso de 2 min (RN-01/RN-07). Não bloqueia quem chama: a falha só é registrada.
+ */
+function convidarParaFeedback(visitaId, hospitalId, duracaoMinutos) {
+  agendarFeedback({
+    visitaId,
+    hospitalId,
+    hospitalNome: null,
+    // Base do convite de feedback, que sai ~1 min depois dela: é o agora, não o
+    // instante da saída, que já tem ao menos os 5 min da RN-03 e cairia no passado.
+    saidaEm: new Date().toISOString(),
+    duracaoMinutos,
+  }).catch((erro) => {
+    // eslint-disable-next-line no-console
+    console.warn("GeofencingTaskService: falha ao agendar o feedback", erro?.message);
+    registrarErro(erro, "geofencing.agendarFeedback");
+  });
+}
+
+/**
+ * Saída de uma visita provisória: vai para a fila logo atrás do check-in, com o horário
+ * real. O convite de feedback espera o servidor devolver a duração (`tratarEventoDaFila`),
+ * porque ainda não existe número de visita para ele.
+ */
+async function guardarSaidaProvisoria(visita, saidaEm) {
+  try {
+    await VisitaService.guardarSaidaDeEntradaPendente(
+      { chaveEntrada: visita.chaveEntrada, hospitalId: visita.hospitalId },
+      saidaEm
+    );
+    await alterarEstado((estado) => {
+      if (estado.visita?.id === visita.id) {
+        estado.visita = null;
+      }
+    });
+  } catch (erro) {
+    // eslint-disable-next-line no-console
+    console.warn("GeofencingTaskService: falha ao guardar a saída", erro?.message);
+    registrarErro(erro, "geofencing.saidaProvisoria");
+  }
+}
+
+/**
+ * O que a fila offline resolveu sobre uma entrada guardada sem internet:
+ *
+ * - entrada aceita com a pessoa ainda lá: a visita provisória ganha o número do servidor e
+ *   passa a mandar sinal como qualquer outra;
+ * - entrada recusada (empate de geofences, fora do polígono): a provisória é esquecida;
+ * - saída que esperava a entrada aceita: agenda o convite de feedback com a duração real.
+ */
+export async function tratarEventoDaFila(evento) {
+  const { tipo, hospitalId } = evento || {};
+
+  if (tipo === "saida") {
+    if (evento.visitaId) {
+      convidarParaFeedback(evento.visitaId, hospitalId, evento.duracaoMinutos);
+    }
+    return;
+  }
+
+  if (tipo !== "entrada" && tipo !== "entradaRecusada") {
+    return;
+  }
+
+  await alterarEstado((estado) => {
+    const atual = estado.visita;
+    const daMesmaEntrada = atual?.chaveEntrada
+      ? atual.chaveEntrada === evento.chaveEntrada
+      : atual?.hospitalId === hospitalId;
+    if (!atual?.provisoria || !daMesmaEntrada) {
+      return;
+    }
+    if (tipo === "entradaRecusada" || evento.saidaPendente) {
+      estado.visita = null;
+      return;
+    }
+    estado.visita = {
+      id: evento.visitaId,
+      hospitalId,
+      entrada: evento.entrada || atual.entrada,
+      origem: "GEOFENCE",
+      ...(atual.regiao ? { regiao: atual.regiao } : {}),
+    };
+  });
+  await ajustarAcompanhamento();
+}
+
+definirObservador(tratarEventoDaFila);
+
+/**
  * Confirma as entradas e saídas cuja tolerância já venceu. Chamado pelo timer, por cada
  * leitura da tarefa de acompanhamento, por cada evento de região e na abertura do app —
  * qualquer um que chegue primeiro. Cada pendência é retirada do estado antes de ser
@@ -409,6 +520,11 @@ async function confirmarSaida(hospitalId, desde) {
  */
 export async function processarPendencias(agora = Date.now()) {
   const vencidas = await alterarEstado((estado) => {
+    // A entrada provisória que a fila não entregou em 24h já saiu dela: não há mais visita.
+    const entradaProvisoria = estado.visita?.provisoria ? new Date(estado.visita.entrada).getTime() : null;
+    if (entradaProvisoria !== null && !(agora - entradaProvisoria < VALIDADE_FILA_MS)) {
+      estado.visita = null;
+    }
     const saidas = Object.keys(estado.saidas).filter(
       (id) => agora - estado.saidas[id] >= TOLERANCIA_SAIDA_MS
     );
@@ -602,7 +718,8 @@ async function tratarEventoDeRegiao(data) {
 export async function enviarSinalDaVisita(locations, agora = Date.now()) {
   const reserva = await alterarEstado((estado) => {
     const { visita, sinal } = estado;
-    if (!visita) {
+    // A visita provisória ainda não existe no servidor: o sinal não tem para onde ir.
+    if (!visita || visita.provisoria) {
       return null;
     }
     if (sinal?.visitaId === visita.id && agora - sinal.em < INTERVALO_SINAL_VISITA_MS) {
@@ -951,11 +1068,19 @@ export async function sincronizarVisitaAtiva(
 ) {
   await alterarEstado((estado) => {
     if (!visitaId) {
+      // O servidor não conhece a visita provisória: ela só sai pela fila offline.
+      if (estado.visita?.provisoria) {
+        return;
+      }
       estado.visita = null;
       estado.saidas = {};
       return;
     }
-    const anterior = estado.visita?.id === visitaId ? estado.visita : null;
+    const atual = estado.visita;
+    // A visita que o servidor devolve pode ser a provisória já entregue pela fila.
+    const mesmaVisita =
+      atual?.id === visitaId || (atual?.provisoria && hospitalId && atual.hospitalId === hospitalId);
+    const anterior = mesmaVisita ? atual : null;
     if (!anterior) {
       // Visita nova (ex.: check-in manual): saídas pendentes eram da visita anterior.
       estado.saidas = {};

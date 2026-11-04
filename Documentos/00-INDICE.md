@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 29/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 04/11/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 04/11/2026 — Entrada sem internet com saída e sinal
+
+**O que mudou:** teste de campo de 29/10 (rc.10): a visita automática ficou de novo como GPS interrompido com 0 min, porque a entrada confirmada sem internet ia para a fila sem o aparelho guardar a visita, e a saída não gerava checkout. O app passa a guardar uma visita provisória, põe a saída na fila logo atrás do check-in com a hora real e passa a mandar sinal quando a fila entrega a entrada. Só app. Registro em `Historico-Melhorias.md` (M-070).
+**Também:** `De-Para-Backlog-Features.md` atualiza E2-05.
 
 ---
 

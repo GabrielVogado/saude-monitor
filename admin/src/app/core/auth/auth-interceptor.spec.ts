@@ -148,13 +148,20 @@ describe('authInterceptor — sessão vencida', () => {
     expect((r.erro() as HttpErrorResponse).status).toBe(403);
   });
 
-  it('401 do próprio login ou refresh não dispara renovação (sem laço)', () => {
+  it('401 das rotas de sessão do painel não dispara renovação (sem laço)', () => {
     const { auth } = configurar(() => of('novo'));
-    const next: HttpHandlerFn = () => throwError(() => erro401());
+    const vistos: HttpRequest<unknown>[] = [];
+    const next: HttpHandlerFn = (r) => {
+      vistos.push(r);
+      return throwError(() => erro401());
+    };
 
-    executar(new HttpRequest('POST', `${BASE}/api/v1/auth/refresh`, {}), next);
-    executar(new HttpRequest('POST', `${BASE}/api/v1/auth/login`, {}), next);
+    executar(new HttpRequest('POST', `${BASE}/api/v1/auth/painel/refresh`, null), next);
+    executar(new HttpRequest('POST', `${BASE}/api/v1/auth/painel/login`, {}), next);
+    executar(new HttpRequest('POST', `${BASE}/api/v1/auth/painel/logout`, null), next);
 
     expect(auth.renovar).not.toHaveBeenCalled();
+    // Nas rotas de sessão vai só o cookie; o access token não segue junto.
+    expect(vistos.map((r) => r.headers.has('Authorization'))).toEqual([false, false, false]);
   });
 });

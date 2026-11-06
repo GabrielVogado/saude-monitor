@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, TestRequest, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router } from '@angular/router';
 
 import { appConfig } from '../../app.config';
@@ -24,7 +24,7 @@ describe('Sessão vencida (appConfig real)', () => {
   let navegar: ReturnType<typeof vi.spyOn>;
 
   const usuario = { id: '1', nome: 'Admin', email: 'admin@x.com', papel: 'ADMIN' };
-  const parNovo = { accessToken: 'access.novo', refreshToken: 'refresh.novo', expiraEm: 900, usuario };
+  const parNovo = { accessToken: 'access.novo', expiraEm: 900, usuario };
   const nao401 = { status: 401, statusText: 'Unauthorized' };
 
   beforeEach(() => {
@@ -35,8 +35,9 @@ describe('Sessão vencida (appConfig real)', () => {
     }
     TestBed.configureTestingModule({ providers: [...appConfig.providers, provideHttpClientTesting()] });
     storage = TestBed.inject(TokenStorage);
-    // Sessão de um login feito há mais de 15 min: o access token já não vale.
-    storage.salvar('access.vencido', 'refresh.valido', usuario);
+    // Sessão de um login feito há mais de 15 min: o access token já não vale. O refresh
+    // está no cookie HttpOnly, que o navegador manda sozinho e o teste não enxerga.
+    storage.salvar('access.vencido', usuario);
 
     http = TestBed.inject(HttpClient);
     backend = TestBed.inject(HttpTestingController);
@@ -47,6 +48,7 @@ describe('Sessão vencida (appConfig real)', () => {
   afterEach(() => backend.verify());
 
   const url = () => `${base}/api/v1/admin/hospitais`;
+  const refreshUrl = () => `${base}/api/v1/auth/painel/refresh`;
 
   it('401 por token vencido: renova, repete a chamada e entrega os dados', () => {
     let resposta: unknown;
@@ -56,8 +58,10 @@ describe('Sessão vencida (appConfig real)', () => {
     expect(primeira.request.headers.get('Authorization')).toBe('Bearer access.vencido');
     primeira.flush({ message: 'expirado' }, nao401);
 
-    const refresh = backend.expectOne(`${base}/api/v1/auth/refresh`);
-    expect(refresh.request.body).toEqual({ refreshToken: 'refresh.valido' });
+    const refresh = backend.expectOne(refreshUrl());
+    expect(refresh.request.body).toBeNull();
+    expect(refresh.request.withCredentials).toBe(true);
+    expect(refresh.request.headers.get('X-Requested-With')).toBe('painel');
     refresh.flush(parNovo);
 
     const repetida = backend.expectOne(url());
@@ -66,7 +70,7 @@ describe('Sessão vencida (appConfig real)', () => {
 
     expect(resposta).toEqual({ content: [{ id: 'h1' }], totalElements: 340 });
     expect(storage.getAccessToken()).toBe('access.novo');
-    expect(storage.getRefreshToken()).toBe('refresh.novo');
+    expect(sessionStorage.getItem('admin.usuario')).not.toContain('access');
     expect(navegar).not.toHaveBeenCalled();
   });
 
@@ -78,7 +82,7 @@ describe('Sessão vencida (appConfig real)', () => {
 
     backend.match((r) => r.url === url()).forEach((r) => r.flush(null, nao401));
     // Um segundo refresh com o token já rotacionado seria recusado e derrubaria a sessão.
-    backend.expectOne(`${base}/api/v1/auth/refresh`).flush(parNovo);
+    backend.expectOne(refreshUrl()).flush(parNovo);
 
     const repetidas = backend.match((r) => r.url === url());
     expect(repetidas).toHaveLength(4);
@@ -94,11 +98,13 @@ describe('Sessão vencida (appConfig real)', () => {
     http.get(url()).subscribe({ error: (e) => (erro = e) });
 
     backend.expectOne(url()).flush(null, nao401);
-    backend.expectOne(`${base}/api/v1/auth/refresh`).flush(null, nao401);
+    backend.expectOne(refreshUrl()).flush(null, nao401);
+    // Encerrar a sessão também pede ao backend que apague o cookie.
+    backend.expectOne(`${base}/api/v1/auth/painel/logout`).flush({ success: true });
 
     expect(erro?.status).toBe(401);
     expect(TestBed.inject(Auth).isAuthenticated()).toBe(false);
-    expect(storage.getRefreshToken()).toBeNull();
+    expect(storage.getAccessToken()).toBeNull();
     expect(navegar).toHaveBeenCalledWith(['/login'], { queryParams: { sessao: 'expirada' } });
   });
 
@@ -106,10 +112,10 @@ describe('Sessão vencida (appConfig real)', () => {
     http.get(url()).subscribe({ error: () => undefined });
 
     backend.expectOne(url()).flush(null, nao401);
-    backend.expectOne(`${base}/api/v1/auth/refresh`).flush(null, { status: 503, statusText: 'Unavailable' });
+    backend.expectOne(refreshUrl()).flush(null, { status: 503, statusText: 'Unavailable' });
 
     expect(TestBed.inject(Auth).isAuthenticated()).toBe(true);
-    expect(storage.getRefreshToken()).toBe('refresh.valido');
+    expect(storage.getAccessToken()).toBe('access.vencido');
     expect(navegar).not.toHaveBeenCalled();
   });
 
@@ -118,10 +124,60 @@ describe('Sessão vencida (appConfig real)', () => {
     http.get(url()).subscribe({ error: (e) => (erro = e) });
 
     backend.expectOne(url()).flush(null, nao401);
-    backend.expectOne(`${base}/api/v1/auth/refresh`).flush(parNovo);
+    backend.expectOne(refreshUrl()).flush(parNovo);
     backend.expectOne(url()).flush(null, nao401);
 
-    backend.expectNone(`${base}/api/v1/auth/refresh`);
+    backend.expectNone(refreshUrl());
     expect(erro?.status).toBe(401);
+  });
+
+  describe('aba recarregada', () => {
+    beforeEach(() => {
+      // Recarregar a aba apaga a memória: sobra o usuário no sessionStorage e o cookie.
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ providers: [...appConfig.providers, provideHttpClientTesting()] });
+      sessionStorage.setItem('admin.usuario', JSON.stringify(usuario));
+      backend = TestBed.inject(HttpTestingController);
+      base = TestBed.inject(API_BASE_URL);
+    });
+
+    /** A navegação carrega a rota e roda o guard em ticks seguintes: espera o refresh sair. */
+    async function aguardarRefresh(): Promise<TestRequest> {
+      for (let tentativa = 0; tentativa < 50; tentativa++) {
+        const pedidos = backend.match(refreshUrl());
+        if (pedidos.length > 0) {
+          expect(pedidos).toHaveLength(1);
+          return pedidos[0];
+        }
+        await new Promise((resolver) => setTimeout(resolver, 0));
+      }
+      throw new Error('O guard não pediu o refresh da sessão.');
+    }
+
+    it('recupera a sessão pelo cookie e abre a rota protegida', async () => {
+      const router = TestBed.inject(Router);
+      expect(TestBed.inject(Auth).isAuthenticated()).toBe(false);
+
+      const navegacao = router.navigateByUrl('/hospitais');
+      const refresh = await aguardarRefresh();
+      expect(refresh.request.withCredentials).toBe(true);
+      refresh.flush(parNovo);
+
+      expect(await navegacao).toBe(true);
+      expect(router.url).toBe('/hospitais');
+      expect(TestBed.inject(Auth).accessToken).toBe('access.novo');
+      expect(Object.keys(sessionStorage)).toEqual(['admin.usuario']);
+    });
+
+    it('sem cookie válido, leva ao login', async () => {
+      const router = TestBed.inject(Router);
+
+      const navegacao = router.navigateByUrl('/hospitais');
+      (await aguardarRefresh()).flush(null, nao401);
+      await navegacao;
+
+      expect(router.url).toBe('/login');
+      expect(sessionStorage.getItem('admin.usuario')).toBeNull();
+    });
   });
 });

@@ -3,10 +3,10 @@ import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { API_BASE_URL } from '../config/api.config';
-import { Auth } from './auth';
+import { Auth, ROTAS_SESSAO_PAINEL } from './auth';
 
-/** Rotas de autenticação: um 401 nelas é resposta do fluxo, não sessão vencida. */
-const ROTAS_AUTH = ['/api/v1/auth/login', '/api/v1/auth/refresh'];
+/** Rotas de sessão: um 401 nelas é resposta do fluxo, não sessão vencida. */
+const ROTAS_AUTH = Object.values(ROTAS_SESSAO_PAINEL);
 
 function comToken(req: HttpRequest<unknown>, token: string): HttpRequest<unknown> {
   return req.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
@@ -16,9 +16,11 @@ function comToken(req: HttpRequest<unknown>, token: string): HttpRequest<unknown
  * Anexa `Authorization: Bearer <token>` apenas nas chamadas à nossa API e apenas
  * quando há token — nunca vaza o token para terceiros (ex. tiles de mapa, CDNs).
  *
- * Quando a API responde 401 (access token de 15 min vencido), renova a sessão com o
- * refresh token e repete a chamada uma vez. Se a renovação falhar, encerra a sessão e
- * leva ao login — antes, o painel seguia "logado" com todas as telas vazias.
+ * Quando a API responde 401 (access token de 15 min vencido), renova a sessão pelo
+ * cookie de refresh (`Auth.renovar`, que junta as renovações simultâneas numa só) e repete
+ * a chamada uma vez; se a repetida voltar 401 de novo, o erro sobe sem nova renovação. Se
+ * a renovação falhar, encerra a sessão e leva ao login — antes, o painel seguia "logado"
+ * com todas as telas vazias. O interceptor não lê nem guarda refresh token nenhum.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(Auth);

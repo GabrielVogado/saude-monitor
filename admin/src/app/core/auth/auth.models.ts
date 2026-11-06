@@ -9,23 +9,20 @@ export interface Usuario {
   papel: Papel;
 }
 
-/** Corpo do `POST /api/v1/auth/login`. */
+/** Corpo do `POST /api/v1/auth/painel/login`. */
 export interface LoginRequest {
   email: string;
   password: string;
   rememberDevice: boolean;
 }
 
-/** Resposta do login/refresh (espelha `AuthResponse` do backend). */
+/**
+ * Resposta do login e do refresh do painel (espelha `PainelAuthResponse` do backend).
+ * Sem refresh token: ele vai só no cookie `HttpOnly`, fora do alcance do JavaScript.
+ */
 export interface AuthResponse {
   accessToken: string;
-  refreshToken: string;
   /** Validade do access token em segundos. */
   expiraEm: number;
   usuario: Usuario;
-}
-
-/** Corpo do `POST /api/v1/auth/refresh` (e do logout). */
-export interface RefreshRequest {
-  refreshToken: string;
 }

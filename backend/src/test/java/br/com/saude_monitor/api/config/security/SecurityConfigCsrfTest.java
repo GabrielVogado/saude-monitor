@@ -155,6 +155,34 @@ class SecurityConfigCsrfTest {
     }
 
     @Test
+    void rotaDeSessaoDoPainelExigeOrigemECabecalhoDoPainel() throws Exception {
+        // ADR-013: a única rota que lê cookie. Sem Origin, ou sem X-Requested-With, é 403,
+        // mesmo com o cookie de refresh presente.
+        mockMvc.perform(post("/api/v1/auth/painel/refresh")
+                        .cookie(new Cookie("__Host-painel_refresh", TOKEN_VALIDO)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/auth/painel/refresh").header("Origin", ORIGEM_PAINEL)
+                        .cookie(new Cookie("__Host-painel_refresh", TOKEN_VALIDO)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/auth/painel/refresh").header("X-Requested-With", "painel")
+                        .cookie(new Cookie("__Host-painel_refresh", TOKEN_VALIDO)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void credenciaisNoCorsSoNasRotasDeSessaoDoPainel() {
+        var rotaDoPainel = new org.springframework.mock.web.MockHttpServletRequest("POST", "/api/v1/auth/painel/refresh");
+        CorsConfiguration cors = securityConfig.corsConfigurationSource().getCorsConfiguration(rotaDoPainel);
+        assertThat(cors).isNotNull();
+        assertThat(cors.getAllowCredentials()).isTrue();
+        assertThat(cors.getAllowedOrigins()).containsExactly(ORIGEM_PAINEL);
+
+        var loginDoApp = new org.springframework.mock.web.MockHttpServletRequest("POST", "/api/v1/auth/login");
+        assertThat(securityConfig.corsConfigurationSource().getCorsConfiguration(loginDoApp).getAllowCredentials())
+                .isFalse();
+    }
+
+    @Test
     void corsNaoLiberaCredenciaisDoNavegador() {
         var requisicao = new org.springframework.mock.web.MockHttpServletRequest("POST", ROTA);
         CorsConfiguration cors = securityConfig.corsConfigurationSource().getCorsConfiguration(requisicao);
@@ -238,7 +266,12 @@ class SecurityConfigCsrfTest {
 
         @Bean
         CorsProperties corsProperties() {
-            return new CorsProperties(List.of(ORIGEM_PAINEL));
+            return new CorsProperties(List.of(ORIGEM_PAINEL), ORIGEM_PAINEL);
+        }
+
+        @Bean
+        PainelCsrfFilter painelCsrfFilter(CorsProperties cors) {
+            return new PainelCsrfFilter(cors, objectMapper);
         }
     }
 }

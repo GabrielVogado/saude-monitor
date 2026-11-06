@@ -85,6 +85,9 @@ class ModoSomenteLeituraFilterTest {
             "POST, /api/v1/auth/login",
             "POST, /api/v1/auth/refresh",
             "POST, /api/v1/auth/logout",
+            "POST, /api/v1/auth/painel/login",
+            "POST, /api/v1/auth/painel/refresh",
+            "POST, /api/v1/auth/painel/logout",
             "PUT, /api/v1/admin/configuracao",
             "POST, /internal/jobs/indicadores"
     })

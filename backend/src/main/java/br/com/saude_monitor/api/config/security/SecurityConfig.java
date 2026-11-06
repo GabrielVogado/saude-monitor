@@ -18,6 +18,7 @@ import org.springframework.security.web.util.matcher.AnyRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -33,6 +34,7 @@ public class SecurityConfig {
     private final LimiteConcorrenciaFilter limiteConcorrenciaFilter;
     private final ModoSomenteLeituraFilter modoSomenteLeituraFilter;
     private final CorsProperties corsProperties;
+    private final PainelCsrfFilter painelCsrfFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -45,15 +47,16 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // CSRF desligado de propósito (Sonar java:S4502 revisado como "Safe"): nenhuma
-                // credencial vai sozinha do navegador. A autenticação é só o Bearer no cabeçalho
-                // Authorization (JwtAuthenticationFilter) — o app guarda o token no SecureStore e
-                // o Painel Admin no sessionStorage, anexado pelo interceptor; o refresh vai no
-                // corpo JSON. Sessão STATELESS (sem JSESSIONID), sem formLogin/httpBasic/cookie e
-                // CORS sem credenciais. Um site terceiro não consegue pôr o cabeçalho num POST de
-                // formulário, logo não há o que forjar. Se o ADR-013 (refresh em cookie HttpOnly)
-                // for implementado, as rotas que lerem o cookie passam a exigir defesa CSRF.
-                // Guarda: SecurityConfigCsrfTest.
+                // CSRF do Spring desligado de propósito (Sonar java:S4502 revisado como "Safe"):
+                // a autenticação é só o Bearer no cabeçalho Authorization (JwtAuthenticationFilter)
+                // — o app guarda o token no SecureStore e o Painel Admin só em memória, anexado
+                // pelo interceptor. Sessão STATELESS (sem JSESSIONID), sem formLogin/httpBasic e
+                // nenhum cookie vale como credencial de API. Um site terceiro não consegue pôr o
+                // cabeçalho num POST de formulário, logo não há o que forjar.
+                // Exceção (ADR-013): as rotas /api/v1/auth/painel/** leem o refresh do cookie
+                // __Host-painel_refresh (HttpOnly, SameSite=Strict). Lá a defesa CSRF é o
+                // PainelCsrfFilter: Origin exatamente igual à do painel e X-Requested-With: painel,
+                // senão 403. Guarda: SecurityConfigCsrfTest e PainelAuthIntegracaoTest.
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 // HSTS (achado F-03 do pentest de 23/09/2026): o writer padrão do Spring
@@ -122,6 +125,7 @@ public class SecurityConfig {
                         // Contrato OpenAPI (E8-09): público, para quem consome a API sem estar autenticado.
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated())
+                .addFilterAfter(painelCsrfFilter, CorsFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class)
                 // ARQ-05: o teto de requisições simultâneas vem antes de qualquer trabalho da
@@ -135,6 +139,29 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        // A primeira regra que casa vale: as rotas de sessão do painel vêm antes do "/**".
+        source.registerCorsConfiguration(PainelCsrfFilter.PREFIXO_ROTAS + "**", corsDoPainel());
+        source.registerCorsConfiguration("/**", corsDaApi());
+        return source;
+    }
+
+    /**
+     * Sessão do Painel Admin (ADR-013): o refresh vai em cookie, então o navegador precisa de
+     * credenciais nesta chamada. Só a origem do painel, exata, e só aqui; o resto da API
+     * continua sem credenciais.
+     */
+    private CorsConfiguration corsDoPainel() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of(corsProperties.painelOrigin()));
+        config.setAllowedMethods(List.of("POST", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Content-Type", PainelCsrfFilter.CABECALHO));
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
+        return config;
+    }
+
+    private CorsConfiguration corsDaApi() {
         CorsConfiguration config = new CorsConfiguration();
         // Origens configuráveis por ambiente (CORS-01, Épico 7): dev cobre localhost
         // (inclui o Painel Admin em :4200); produção sobrescreve por APP_CORS_ALLOWED_ORIGINS.
@@ -149,12 +176,10 @@ public class SecurityConfig {
         // If-None-Match: o app confere o catálogo guardado pela versão (APP-01, versão web).
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Cliente-Id", "If-None-Match"));
         // Autenticação é por Bearer/JWT no header Authorization, não por cookie/sessão: não há
-        // credencial de navegador a compartilhar entre origens, então credenciais ficam desligadas.
+        // credencial de navegador a compartilhar entre origens, então credenciais ficam desligadas
+        // (a única exceção é a sessão do painel, em corsDoPainel).
         config.setAllowCredentials(false);
         config.setMaxAge(3600L);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
+        return config;
     }
 }

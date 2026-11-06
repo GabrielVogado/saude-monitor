@@ -23,6 +23,18 @@ public interface AuthService {
     AuthResponse refresh(@Valid RefreshRequest request);
 
     /**
+     * Login do Painel Admin (ADR-013): o mesmo login, mas só para o papel ADMIN. Conta de
+     * outro papel recebe o mesmo erro de credenciais inválidas, sem revelar que existe.
+     */
+    AuthResponse loginPainel(@Valid LoginRequest request);
+
+    /**
+     * Renovação do Painel Admin (ADR-013) com o refresh lido do cookie: mesma rotação e
+     * blacklist do {@link #refresh}, e a conta precisa continuar ADMIN.
+     */
+    AuthResponse refreshPainel(String refreshToken);
+
+    /**
      * Encerra a sessão (logout) revogando o refresh token na blacklist.
      * Tokens já expirados/malformados são aceitos (idempotente) — nada a revogar.
      */

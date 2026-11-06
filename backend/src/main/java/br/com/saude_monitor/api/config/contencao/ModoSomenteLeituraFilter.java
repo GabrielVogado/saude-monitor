@@ -37,6 +37,10 @@ public class ModoSomenteLeituraFilter extends OncePerRequestFilter {
             "/api/v1/auth/login",
             "/api/v1/auth/refresh",
             "/api/v1/auth/logout",
+            // Sessão do Painel Admin (ADR-013): sem ela o administrador não entra no painel.
+            "/api/v1/auth/painel/login",
+            "/api/v1/auth/painel/refresh",
+            "/api/v1/auth/painel/logout",
             "/api/v1/admin/configuracao");
 
     private final ConfiguracaoRemotaService configuracaoRemotaService;

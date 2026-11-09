@@ -32,7 +32,13 @@ jest.mock("../../../services/CatalogoLocal", () => ({
 
 jest.mock("../../../screens/visitas/service/VisitaService", () => ({
   __esModule: true,
-  default: { checkin: jest.fn(), checkout: jest.fn(), buscarAtiva: jest.fn(), heartbeat: jest.fn() },
+  default: {
+    checkin: jest.fn(),
+    checkout: jest.fn(),
+    buscarAtiva: jest.fn(),
+    heartbeat: jest.fn(),
+    guardarSaidaDeEntradaPendente: jest.fn(),
+  },
 }));
 
 jest.mock("../../../screens/feedback/service/FeedbackNotificationService", () => ({
@@ -47,7 +53,9 @@ const mockSincronizar = jest.fn(() => Promise.resolve({ enviados: 0 }));
 jest.mock("../../../services/SincronizacaoOffline", () => ({
   __esModule: true,
   sincronizar: (...args) => mockSincronizar(...args),
+  definirObservador: (...args) => mockDefinirObservador(...args),
 }));
+const mockDefinirObservador = jest.fn();
 
 // E8-07: o serviço manda ao crash reporting os erros que antes só iam para o console.
 // Espião no lugar do módulo real, que sem DSN não faz nada e não daria o que conferir.
@@ -591,7 +599,7 @@ describe("falhas e casos de borda", () => {
   const sair = (executarTask) =>
     executarTask({ data: { eventType: Location.GeofencingEventType.Exit, region: REGIAO } });
 
-  it("check-in sem internet fica na fila offline e não marca visita local", async () => {
+  it("check-in sem internet fica na fila offline e guarda uma visita provisória", async () => {
     VisitaService.checkin.mockRejectedValue(Object.assign(new Error("offline"), { enfileirado: true }));
     const { executarTask } = carregarServico();
 
@@ -599,7 +607,12 @@ describe("falhas e casos de borda", () => {
     await jest.advanceTimersByTimeAsync(2 * 60 * 1000);
 
     expect(VisitaService.checkin).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(await AsyncStorage.getItem("@saude_monitor:geofencing")).visita).toBeNull();
+    expect(JSON.parse(await AsyncStorage.getItem("@saude_monitor:geofencing")).visita).toMatchObject({
+      id: "provisoria:hospital-1",
+      provisoria: true,
+      hospitalId: "hospital-1",
+      origem: "GEOFENCE",
+    });
     expect(console.warn).not.toHaveBeenCalled();
   });
 
@@ -1302,5 +1315,282 @@ describe("fila offline em segundo plano", () => {
     await executarAcompanhamento({ error: new Error("SO"), data: {} });
 
     expect(mockSincronizar).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Teste de campo de 29/10/2026 (Hospital Regional de Ceilândia): a entrada foi confirmada
+ * antes de o Wi-Fi do hospital liberar a internet e ficou na fila. Quando a fila a entregou,
+ * o aparelho não conhecia a visita: não mandou sinal nem checkout, e o job a encerrou como
+ * GPS interrompido com 0 min.
+ */
+describe("entrada guardada sem internet (teste de campo de 29/10/2026)", () => {
+  const REGIAO = { identifier: "hospital-1", latitude: HOSPITAL_LAT, longitude: HOSPITAL_LON };
+  const LEITURA = [{ coords: { latitude: HOSPITAL_LAT, longitude: HOSPITAL_LON } }];
+  const CHAVE = "@saude_monitor:geofencing";
+  const lerVisita = async () => JSON.parse(await AsyncStorage.getItem(CHAVE)).visita;
+  const CHAVE_ENTRADA = "checkin:hospital-1:1";
+  let ENTRADA_EM;
+
+  beforeEach(() => {
+    permitirTudo();
+    jest.useFakeTimers();
+    ENTRADA_EM = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    VisitaService.checkin.mockReset();
+    VisitaService.checkin.mockRejectedValue(
+      Object.assign(new Error("offline"), { enfileirado: true, item: { chave: CHAVE_ENTRADA, ocorridoEm: ENTRADA_EM } })
+    );
+    VisitaService.checkout.mockReset();
+    VisitaService.heartbeat.mockReset();
+    VisitaService.heartbeat.mockResolvedValue({ status: "EM_ATENDIMENTO" });
+    VisitaService.guardarSaidaDeEntradaPendente.mockReset();
+    VisitaService.guardarSaidaDeEntradaPendente.mockResolvedValue({});
+    mockRegistrarErro.mockReset();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  async function entrarSemInternet() {
+    const servico = carregarServico();
+    await servico.executarTask({ data: { eventType: Location.GeofencingEventType.Enter, region: REGIAO } });
+    await jest.advanceTimersByTimeAsync(2 * 60 * 1000);
+    return servico;
+  }
+
+  it("registra o tratamento dos eventos da fila ao carregar o módulo", () => {
+    mockDefinirObservador.mockClear();
+    const { tratarEventoDaFila } = carregarServico();
+
+    expect(mockDefinirObservador).toHaveBeenCalledWith(tratarEventoDaFila);
+  });
+
+  it("a visita provisória guarda a chave e o horário da entrada na fila", async () => {
+    await entrarSemInternet();
+
+    expect(await lerVisita()).toMatchObject({ chaveEntrada: CHAVE_ENTRADA, entrada: ENTRADA_EM });
+  });
+
+  it("sem o item da fila, a provisória usa o agora como entrada", async () => {
+    VisitaService.checkin.mockRejectedValue(Object.assign(new Error("offline"), { enfileirado: true }));
+    await entrarSemInternet();
+
+    expect(await lerVisita()).toMatchObject({ chaveEntrada: null, entrada: expect.any(String) });
+  });
+
+  it("a visita provisória mantém o acompanhamento ligado no modo de visita", async () => {
+    await entrarSemInternet();
+
+    expect(acompanhamentoLigado).toBe(true);
+    expect(Location.startLocationUpdatesAsync.mock.calls.at(-1)[1].foregroundService.notificationBody).toContain(
+      "Visita em andamento"
+    );
+  });
+
+  it("não manda sinal enquanto a visita só existe no aparelho", async () => {
+    const { executarAcompanhamento } = await entrarSemInternet();
+
+    await executarAcompanhamento({ data: { locations: LEITURA } });
+
+    expect(VisitaService.heartbeat).not.toHaveBeenCalled();
+  });
+
+  it("a saída sem internet vai para a fila com o horário real, atrás da entrada", async () => {
+    const { executarTask } = await entrarSemInternet();
+    const saidaEm = Date.now();
+
+    await executarTask({ data: { eventType: Location.GeofencingEventType.Exit, region: REGIAO } });
+    await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    expect(VisitaService.guardarSaidaDeEntradaPendente).toHaveBeenCalledWith(
+      { chaveEntrada: CHAVE_ENTRADA, hospitalId: "hospital-1" },
+      new Date(saidaEm).toISOString()
+    );
+    expect(VisitaService.checkout).not.toHaveBeenCalled();
+    expect(await lerVisita()).toBeNull();
+    // Sem visita nem pendência, o GPS em segundo plano desliga.
+    expect(acompanhamentoLigado).toBe(false);
+  });
+
+  it("a saída pela posição da leitura também vale para a visita provisória", async () => {
+    CatalogoLocal.lerCopiaGuardada.mockResolvedValue([hospital("hospital-1", 100)]);
+    const { executarAcompanhamento } = await entrarSemInternet();
+    const longe = [{ coords: { latitude: HOSPITAL_LAT + 0.05, longitude: HOSPITAL_LON, accuracy: 20 } }];
+
+    await executarAcompanhamento({ data: { locations: longe } });
+    await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    expect(VisitaService.guardarSaidaDeEntradaPendente).toHaveBeenCalledWith(
+      expect.objectContaining({ hospitalId: "hospital-1" }),
+      expect.any(String)
+    );
+  });
+
+  it("falha ao guardar a saída mantém a visita e vai para o crash reporting", async () => {
+    const falha = new Error("disco cheio");
+    VisitaService.guardarSaidaDeEntradaPendente.mockRejectedValue(falha);
+    const { executarTask } = await entrarSemInternet();
+
+    await executarTask({ data: { eventType: Location.GeofencingEventType.Exit, region: REGIAO } });
+    await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    expect(mockRegistrarErro).toHaveBeenCalledWith(falha, "geofencing.saidaProvisoria");
+    expect((await lerVisita())?.provisoria).toBe(true);
+  });
+
+  it("entrada entregue com a pessoa ainda lá: a visita ganha o número e passa a mandar sinal", async () => {
+    const { tratarEventoDaFila, executarAcompanhamento } = await entrarSemInternet();
+
+    await tratarEventoDaFila({
+      tipo: "entrada",
+      chaveEntrada: CHAVE_ENTRADA,
+      hospitalId: "hospital-1",
+      visitaId: "v42",
+      entrada: "2026-10-29T12:00:00Z",
+      saidaPendente: false,
+    });
+    await executarAcompanhamento({ data: { locations: LEITURA } });
+
+    expect(await lerVisita()).toMatchObject({
+      id: "v42",
+      hospitalId: "hospital-1",
+      entrada: "2026-10-29T12:00:00Z",
+      origem: "GEOFENCE",
+    });
+    expect((await lerVisita()).provisoria).toBeUndefined();
+    expect(VisitaService.heartbeat).toHaveBeenCalledWith("v42", expect.any(Object));
+  });
+
+  it("entrada entregue guarda a região já conferida e usa a entrada provisória sem horário do servidor", async () => {
+    CatalogoLocal.lerCopiaGuardada.mockResolvedValue([hospital("hospital-1", 100)]);
+    const { tratarEventoDaFila, executarAcompanhamento } = await entrarSemInternet();
+    await executarAcompanhamento({ data: { locations: LEITURA } });
+    const provisoria = await lerVisita();
+
+    await tratarEventoDaFila({ tipo: "entrada", chaveEntrada: CHAVE_ENTRADA, hospitalId: "hospital-1", visitaId: "v42" });
+
+    expect(await lerVisita()).toMatchObject({ id: "v42", entrada: provisoria.entrada, regiao: provisoria.regiao });
+  });
+
+  it.each([
+    ["recusada", { tipo: "entradaRecusada", chaveEntrada: "checkin:hospital-1:1", hospitalId: "hospital-1" }],
+    [
+      "entregue com a saída logo atrás",
+      { tipo: "entrada", chaveEntrada: "checkin:hospital-1:1", hospitalId: "hospital-1", visitaId: "v42", saidaPendente: true },
+    ],
+  ])("entrada %s esquece a visita provisória", async (_nome, evento) => {
+    const { tratarEventoDaFila } = await entrarSemInternet();
+
+    await tratarEventoDaFila(evento);
+
+    expect(await lerVisita()).toBeNull();
+    expect(acompanhamentoLigado).toBe(false);
+  });
+
+  it("evento de outra unidade ou desconhecido não mexe na visita", async () => {
+    const { tratarEventoDaFila } = await entrarSemInternet();
+
+    await tratarEventoDaFila({ tipo: "entrada", chaveEntrada: "checkin:hospital-2:1", hospitalId: "hospital-2", visitaId: "v7" });
+    // Outra entrada na mesma unidade (visita anterior já encerrada): não é a desta provisória.
+    await tratarEventoDaFila({ tipo: "entrada", chaveEntrada: "checkin:hospital-1:0", hospitalId: "hospital-1", visitaId: "v6" });
+    await tratarEventoDaFila({ tipo: "outro", hospitalId: "hospital-1" });
+    await tratarEventoDaFila(undefined);
+
+    expect((await lerVisita()).id).toBe("provisoria:hospital-1");
+  });
+
+  it("provisória sem chave da fila é reconhecida pela unidade", async () => {
+    VisitaService.checkin.mockRejectedValue(Object.assign(new Error("offline"), { enfileirado: true }));
+    const { tratarEventoDaFila } = await entrarSemInternet();
+
+    await tratarEventoDaFila({ tipo: "entrada", chaveEntrada: "checkin:hospital-1:9", hospitalId: "hospital-1", visitaId: "v42" });
+
+    expect((await lerVisita()).id).toBe("v42");
+  });
+
+  it("entrada entregue não troca uma visita real já conhecida", async () => {
+    const { tratarEventoDaFila, sincronizarVisitaAtiva } = carregarServico();
+    await sincronizarVisitaAtiva("v1", null, "hospital-1");
+
+    await tratarEventoDaFila({ tipo: "entrada", hospitalId: "hospital-1", visitaId: "v42" });
+
+    expect((await lerVisita()).id).toBe("v1");
+  });
+
+  it("saída entregue pela fila agenda o convite de feedback com a duração do servidor", async () => {
+    const { agendarFeedback } = require("../../../screens/feedback/service/FeedbackNotificationService");
+    agendarFeedback.mockClear();
+    const { tratarEventoDaFila } = carregarServico();
+
+    await tratarEventoDaFila({ tipo: "saida", hospitalId: "hospital-1", visitaId: "v42", duracaoMinutos: 25 });
+    await tratarEventoDaFila({ tipo: "saida", hospitalId: "hospital-1", visitaId: null });
+
+    expect(agendarFeedback).toHaveBeenCalledTimes(1);
+    expect(agendarFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({ visitaId: "v42", hospitalId: "hospital-1", duracaoMinutos: 25 })
+    );
+  });
+
+  it("falha ao agendar o feedback da saída entregue vai para o crash reporting", async () => {
+    const { agendarFeedback } = require("../../../screens/feedback/service/FeedbackNotificationService");
+    const falha = new Error("notificação");
+    agendarFeedback.mockRejectedValueOnce(falha);
+
+    await carregarServico().tratarEventoDaFila({ tipo: "saida", hospitalId: "hospital-1", visitaId: "v42" });
+
+    expect(mockRegistrarErro).toHaveBeenCalledWith(falha, "geofencing.agendarFeedback");
+  });
+
+  it("o servidor sem visita ativa não apaga a provisória, que ele ainda não conhece", async () => {
+    const { sincronizarVisitaAtiva } = await entrarSemInternet();
+
+    await sincronizarVisitaAtiva(null);
+
+    expect((await lerVisita())?.provisoria).toBe(true);
+  });
+
+  it("a visita do servidor na mesma unidade substitui a provisória sem perder a saída pendente", async () => {
+    const { executarTask, sincronizarVisitaAtiva } = await entrarSemInternet();
+    await executarTask({ data: { eventType: Location.GeofencingEventType.Exit, region: REGIAO } });
+
+    await sincronizarVisitaAtiva("v42", "2026-10-29T12:00:00Z", "hospital-1", "GEOFENCE");
+
+    const estado = JSON.parse(await AsyncStorage.getItem(CHAVE));
+    expect(estado.visita).toMatchObject({ id: "v42", hospitalId: "hospital-1" });
+    expect(estado.visita.provisoria).toBeUndefined();
+    expect(estado.saidas["hospital-1"]).toEqual(expect.any(Number));
+  });
+
+  it("a provisória que a fila não entregou em 24h é esquecida", async () => {
+    const { processarPendencias } = await entrarSemInternet();
+
+    await processarPendencias(Date.now() + 23 * 60 * 60 * 1000);
+    expect((await lerVisita())?.provisoria).toBe(true);
+
+    await processarPendencias(Date.now() + 24 * 60 * 60 * 1000);
+    expect(await lerVisita()).toBeNull();
+    expect(acompanhamentoLigado).toBe(false);
+  });
+
+  it("logout no meio do check-in sem internet não deixa visita provisória", async () => {
+    let liberar;
+    VisitaService.checkin.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          liberar = () => reject(Object.assign(new Error("offline"), { enfileirado: true }));
+        })
+    );
+    const { executarTask, pararGeofencing } = carregarServico();
+    await executarTask({ data: { eventType: Location.GeofencingEventType.Enter, region: REGIAO } });
+    await jest.advanceTimersByTimeAsync(2 * 60 * 1000);
+
+    await pararGeofencing();
+    liberar();
+    await jest.advanceTimersByTimeAsync(0);
+
+    expect(await lerVisita()).toBeNull();
   });
 });

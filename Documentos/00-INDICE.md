@@ -1,7 +1,28 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 29/10/2026 · Responsável: Gabriel Vogado
+> Última atualização: 09/11/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 09/11/2026 — Homologação v1.0.0-rc.12
+
+**O que entrou:** registro da rc que leva duas mudanças do app: a renovação da sessão antes do pedido e a visita provisória da entrada sem internet (PR #243, M-070, correção do teste de campo de 29/10) e o mapa com MapLibre e OpenFreeMap no lugar do Mapbox (PR #244, M-071). O backend sai igual ao da rc.11. O roteiro começa pelo mapa e pela visita automática de mais de 15 min, com e sem internet, e remete ao roteiro da rc.11 inteiro, que não foi feito. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.12.md`](./10-git-flow/homologacoes/v1.0.0-rc.12.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
+
+---
+
+## 📌 Revisão 09/11/2026 — Mapa volta para MapLibre
+
+**O que mudou:** a pedido do PO, o mapa do app sai do Mapbox (cobrado por usuário ativo) e volta para MapLibre: `@maplibre/maplibre-react-native` v11 no aparelho e `maplibre-gl` v5 na Web, com o estilo Liberty do OpenFreeMap, sem chave. Saem o Maven privado da Mapbox e o segredo `EXPO_PUBLIC_MAPBOX_TOKEN` (removido do `cd-mobile-apk.yml` e da tabela de secrets do `10-git-flow/MANUAL.md`). As telas continuam usando só o adaptador `utils/mapkit`. Só app. Registro em `Historico-Melhorias.md` (M-071); `Arvore-Tecnologica` v2.1 → v2.2 (anterior em `_historico/`).
+**Sem mudança:** `De-Para-Backlog-Features.md` (troca de biblioteca, sem estória entregue). `Features-MVP-v2.3.md` e o relatório de aderência ainda citam o Mapbox na F-07 como retrato de 12/09.
+
+---
+
+## 📌 Revisão 04/11/2026 — Sinal e saída da visita com a sessão vencida
+
+**O que mudou:** teste de campo de 29/10 (rc.10): a visita automática ficou de novo como GPS interrompido com 0 min. O banco e os logs de homologação mostraram o sinal da visita recusado com 403 depois dos 15 min do token, porque as rotas públicas de visita tratam o token vencido como anônimo e o app só renovava em 401. O app passa a renovar a sessão antes do pedido quando o token venceu; a entrada confirmada sem internet vira visita provisória, com a saída guardada na fila logo atrás do check-in. Só app. Registro em `Historico-Melhorias.md` (M-070).
+**Também:** `De-Para-Backlog-Features.md` atualiza E2-05 e o `Documento-Negocial-v2.1.md` complementa a RN-06.
 
 ---
 
@@ -462,7 +483,7 @@ Documentos/
 │   └── Documento-Negocial-v2.1.md            ← problema, público, jornada, regras de negócio, LGPD, KPIs
 │
 ├── 02-arquitetura-tecnica/                   ← visão técnica e de engenharia
-│   ├── Arvore-Tecnologica-v2.1.md            ← stack atual vs. proposta, manter/refatorar, ADRs, roadmap
+│   ├── Arvore-Tecnologica-v2.2.md            ← stack atual vs. proposta, manter/refatorar, ADRs, roadmap
 │   ├── Especificacao-API-v2.4.md             ← contratos REST (OpenAPI), modelo de dados MongoDB, fluxos (+ §3.6 camadas)
 │   ├── Plano-Tecnico-Painel-Administrativo-Web-v1.0.md  ← stack, estrutura de pastas e consumo de API do painel web (F-11)
 │   ├── Plano-Escala-Infraestrutura-DF-v1.0.md  ← patamares de carga, custo e migração da infraestrutura para o DF
@@ -515,7 +536,7 @@ Documentos/
     ├── Backlog-MVP-v2.0.md                   ← substituído pela v2.1 em 02/09/2026
     ├── Plano-Sprints-v2.0.md                 ← substituído pela v2.1 em 02/09/2026
     ├── Especificacao-API-v2.0.md / -v2.1.md  ← v2.1 substituída pela v2.2 em 12/09/2026
-    ├── Arvore-Tecnologica-v2.0.md            ← substituída pela v2.1 em 12/09/2026
+    ├── Arvore-Tecnologica-v2.0.md / -v2.1.md ← v2.1 substituída pela v2.2 em 09/11/2026
     ├── Relatorio-Aderencia-Codigo-vs-Features-v1.md / -v3.5.md / -v3.6.md / -v3.7.md
     └── De-Para-Backlog-Features-v1.md / -v2.md ← retratos anteriores do status das estórias
 ```
@@ -527,7 +548,7 @@ Documentos/
 | # | Documento | Versão | Status | Resumo |
 |---|---|---|---|---|
 | 1 | [Documento Negocial](./01-negocio/Documento-Negocial-v2.1.md) | **2.1** | ✅ Ativo | Problema, proposta de valor, público, jornada do usuário, regras de negócio do geofence/feedback, modelo de dados conceitual, KPIs, roadmap e conformidade LGPD. |
-| 2 | [Árvore Tecnológica](./02-arquitetura-tecnica/Arvore-Tecnologica-v2.1.md) | **2.1** | ✅ Ativo | Mapa da stack atual (Spring Boot 4 + MongoDB + Expo 55 + **Mapbox v10**), decisões manter/refatorar/adicionar, matriz comparativa, ADRs e plano de evolução. **v2.1 (12/09/2026):** linhagem do mapa (`react-native-maps` → MapLibre → Mapbox) + contexto `regiao`. |
+| 2 | [Árvore Tecnológica](./02-arquitetura-tecnica/Arvore-Tecnologica-v2.2.md) | **2.2** | ✅ Ativo | Mapa da stack atual (Spring Boot 4 + MongoDB + Expo 55 + **MapLibre v11 + OpenFreeMap**), decisões manter/refatorar/adicionar, matriz comparativa, ADRs e plano de evolução. **v2.2 (09/11/2026):** mapa sai do Mapbox e volta para MapLibre (M-071). |
 | 3 | [Especificação da API](./02-arquitetura-tecnica/Especificacao-API-v2.4.md) | **2.4** | ✅ Ativo | Contratos REST de todos os endpoints (auth, hospitais, visitas, feedbacks, agregados, **camadas**), coleções MongoDB com índices/GeoJSON e fluxo geofence → API. **v2.4 (04/10/2026):** `GET /api/v1/contas/feedbacks/pendentes` e feedback aceito em visita `GPS_INTERROMPIDO` (M-029). **v2.2 (12/09/2026):** novo §3.6 `GET /api/v1/camadas/{tipo}` (F-11). v2.1 (06/09/2026) fechava CONT-01/CONT-02 (E8-14). |
 | 3b | [Plano Técnico — Painel Administrativo Web](./02-arquitetura-tecnica/Plano-Tecnico-Painel-Administrativo-Web-v1.0.md) | 1.0 | 🟡 Proposta | Stack (React + Vite + Leaflet), estrutura de pastas de `web-admin/` e estratégia de consumo da API existente para o painel administrativo (F-11). |
 | 3c | [Plano de Escala da Infraestrutura para o DF](./02-arquitetura-tecnica/Plano-Escala-Infraestrutura-DF-v1.0.md) | 1.0 | 🟡 Proposta | Estrutura atual medida, travas para escalar, patamares de carga com custo estimado (US$/mês) e migração em cinco fases. ADR-015. |
@@ -567,7 +588,7 @@ Documentos/
 | Quem é você | Comece por |
 |---|---|
 | **Product Owner / Negócio** | `01-negocio/Documento-Negocial-v2.1.md` → `04-backlog/Backlog-MVP-v2.2.md` → `De-Para-Backlog-Features.md` (status real) |
-| **Arquiteto / Backend** | `02-arquitetura-tecnica/Arvore-Tecnologica-v2.1.md` (decisões, ADRs) → `02-arquitetura-tecnica/Especificacao-API-v2.4.md` (contratos) |
+| **Arquiteto / Backend** | `02-arquitetura-tecnica/Arvore-Tecnologica-v2.2.md` (decisões, ADRs) → `02-arquitetura-tecnica/Especificacao-API-v2.4.md` (contratos) |
 | **Frontend / Mobile** | `03-ui-ux/Padrao-UI-UX-v2.1.md` → `02-arquitetura-tecnica/Especificacao-API-v2.4.md` (consumo) |
 | **Designer** | `03-ui-ux/Padrao-UI-UX-v2.1.md` → `_historico/v1.2-design-clinical-sanctuary/` (base da identidade) |
 | **QA / Testes** | Regras de negócio (Documento Negocial §6) + critérios de aceite (Backlog) + contratos (Especificação da API) |

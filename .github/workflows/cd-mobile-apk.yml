@@ -97,11 +97,9 @@ on:
         description: Nome do arquivo (.apk ou .aab) dentro do artefato
         value: ${{ jobs.apk.outputs.arquivo }}
     # Declarados para o chamador nao poder esquecer um sem erro: sem `secrets: inherit`
-    # nem repasse explicito, todos chegariam vazios -- a chave falharia alto, mas o token
-    # do Mapbox nao, e o APK sairia para a Release com o mapa em branco.
+    # nem repasse explicito, todos chegariam vazios. O mapa (MapLibre + OpenFreeMap)
+    # nao usa token desde 11/2026.
     secrets:
-      EXPO_PUBLIC_MAPBOX_TOKEN:
-        required: true
       ANDROID_RELEASE_KEYSTORE_BASE64:
         required: true
       ANDROID_RELEASE_STORE_PASSWORD:
@@ -321,8 +319,6 @@ jobs:
           # URL do backend que o orquestrador acabou de publicar; dev usa a variavel de
           # repositorio ou o Cloud Run de dev.
           EXPO_PUBLIC_API_BASE_URL: ${{ inputs.api_url || vars.EXPO_PUBLIC_API_BASE_URL || 'https://saude-monitor-backend-dev-uly57kmmia-rj.a.run.app' }}
-          # Token publico do Mapbox (tiles `Street`); sem ele o mapa monta vazio.
-          EXPO_PUBLIC_MAPBOX_TOKEN: ${{ secrets.EXPO_PUBLIC_MAPBOX_TOKEN }}
           # Lidas pelo `signingConfigs.release` do build.gradle. Vazias no caminho de dev
           # sem chave -- ai o build.gradle usa a debug.
           ANDROID_RELEASE_KEYSTORE_PATH: ${{ steps.keystore.outputs.caminho }}

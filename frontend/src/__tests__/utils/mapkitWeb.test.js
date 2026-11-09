@@ -1,33 +1,45 @@
 /**
  * Contrato do shim Web do mapa (`mapkit/index.web.js`) — só o que quebrou em uso real:
  *
- * 1. `Camera.setCamera` sem `zoomLevel`: o `mapbox-gl` trata `flyTo({ zoom: undefined })`
+ * 1. `Camera.setCamera` sem `zoomLevel`: o GL JS (achado no `mapbox-gl`) trata `flyTo({ zoom: undefined })`
  *    como "zoom informado", vira NaN e descarta o voo sem erro. Ao tocar num marcador
  *    para centralizá-lo (mantendo o zoom), o mapa simplesmente não se mexia.
  * 2. `MapView` precisa reagir à mudança de tamanho do CONTAINER: o `mapbox-gl` só
- *    escuta a janela, e o container encolhe quando a mensagem de GPS negado entra.
+ *    escutava a janela, e o container encolhe quando a mensagem de GPS negado entra.
+ * 3. Estilo e atribuição: o mapa usa o estilo recebido da tela e mostra a atribuição
+ *    (OpenStreetMap/OpenMapTiles), exigida pelo provedor dos tiles.
  *
- * O `mapbox-gl` é substituído por um dublê: ele precisa de WebGL, que o Jest não tem.
+ * O `maplibre-gl` é substituído por um dublê: ele precisa de WebGL, que o Jest não tem.
  * O que se afirma aqui é o que o shim ENTREGA ao mapa, que foi onde os dois bugs moravam.
  */
 import React from "react";
 import { render } from "@testing-library/react-native";
-import { Camera, MapView } from "../../utils/mapkit/index.web";
+import maplibregl from "maplibre-gl";
+import { Camera, FillLayer, LineLayer, MapView, ShapeSource } from "../../utils/mapkit/index.web";
 
 const mockMapa = {
-  once: jest.fn((evento, callback) => callback()),
   flyTo: jest.fn(),
   jumpTo: jest.fn(),
   fitBounds: jest.fn(),
   resize: jest.fn(),
   remove: jest.fn(),
+  getSource: jest.fn(() => undefined),
+  addSource: jest.fn(),
+  getLayer: jest.fn(() => undefined),
+  addLayer: jest.fn(),
+  setPaintProperty: jest.fn(),
+  // `load` responde na hora; os outros eventos (clique nas camadas) só são registrados.
+  on: jest.fn((evento, ...resto) => {
+    if (evento === "load") resto[0]();
+  }),
+  off: jest.fn(),
 };
 
-jest.mock("mapbox-gl", () => ({
+jest.mock("maplibre-gl", () => ({
   __esModule: true,
-  default: { Map: jest.fn(() => mockMapa), accessToken: "" },
+  default: { Map: jest.fn(() => mockMapa) },
 }));
-jest.mock("mapbox-gl/dist/mapbox-gl.css", () => ({}));
+jest.mock("maplibre-gl/dist/maplibre-gl.css", () => ({}));
 
 function renderizarMapaComCamera() {
   const cameraRef = React.createRef();
@@ -40,7 +52,7 @@ function renderizarMapaComCamera() {
 }
 
 describe("mapkit web — Camera.setCamera", () => {
-  test("sem zoomLevel, não repassa a chave `zoom` ao flyTo (senão o mapbox-gl vira NaN e não move)", () => {
+  test("sem zoomLevel, não repassa a chave `zoom` ao flyTo (senão o GL JS vira NaN e não move)", () => {
     const { cameraRef } = renderizarMapaComCamera();
 
     cameraRef.current.setCamera({ centerCoordinate: [-47.8, -15.7], animationDuration: 300 });
@@ -137,5 +149,77 @@ describe("mapkit web — MapView e o tamanho do container", () => {
     delete global.ResizeObserver;
 
     expect(() => render(<MapView style={{ flex: 1 }} />)).not.toThrow();
+  });
+});
+
+describe("mapkit web — estilo e atribuição", () => {
+  test("cria o mapa com o estilo da tela e a atribuição ligada, compacta", () => {
+    render(<MapView style={{ flex: 1 }} styleURL="https://tiles.exemplo/estilo.json" />);
+
+    expect(maplibregl.Map).toHaveBeenCalledWith(
+      expect.objectContaining({
+        style: "https://tiles.exemplo/estilo.json",
+        attributionControl: { compact: true },
+      })
+    );
+  });
+});
+
+describe("mapkit web — Camera pelas props", () => {
+  test("posiciona quando o mapa fica pronto e de novo só quando a posição muda", () => {
+    const { rerender } = render(
+      <MapView styleURL="x">
+        <Camera centerCoordinate={[-47.9, -15.8]} zoomLevel={10} />
+      </MapView>
+    );
+    expect(mockMapa.jumpTo).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <MapView styleURL="x">
+        <Camera centerCoordinate={[-47.9, -15.8]} zoomLevel={10} />
+      </MapView>
+    );
+    expect(mockMapa.jumpTo).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <MapView styleURL="x">
+        <Camera centerCoordinate={[-48.1, -15.9]} zoomLevel={14} />
+      </MapView>
+    );
+    expect(mockMapa.jumpTo).toHaveBeenLastCalledWith({ center: [-48.1, -15.9], zoom: 14 });
+  });
+
+  test("sem styleURL, cria o mapa com o estilo padrão do app", () => {
+    render(<MapView />);
+
+    expect(maplibregl.Map).toHaveBeenLastCalledWith(
+      expect.objectContaining({ style: "https://tiles.openfreemap.org/styles/liberty" })
+    );
+  });
+});
+
+describe("mapkit web — camadas dos geofences", () => {
+  test("FillLayer e LineLayer viram camadas com o mesmo paint do adaptador nativo", () => {
+    render(
+      <MapView styleURL="x">
+        <ShapeSource id="geofences" shape={{ type: "FeatureCollection", features: [] }}>
+          <FillLayer id="preenchimento" style={{ fillColor: "#006193", fillOpacity: 0.18 }} />
+          <LineLayer id="contorno" style={{ lineColor: "#006193", lineWidth: 2 }} />
+        </ShapeSource>
+      </MapView>
+    );
+
+    expect(mockMapa.addLayer).toHaveBeenCalledWith({
+      id: "preenchimento",
+      type: "fill",
+      source: "geofences",
+      paint: { "fill-color": "#006193", "fill-opacity": 0.18 },
+    });
+    expect(mockMapa.addLayer).toHaveBeenCalledWith({
+      id: "contorno",
+      type: "line",
+      source: "geofences",
+      paint: { "line-color": "#006193", "line-width": 2 },
+    });
   });
 });

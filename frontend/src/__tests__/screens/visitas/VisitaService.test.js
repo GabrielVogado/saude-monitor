@@ -202,12 +202,13 @@ describe("VisitaService (Épico 02)", () => {
     test("check-in sem internet vai para a fila em vez de se perder", async () => {
       semInternet();
 
-      await expect(
-        VisitaService.checkin({ hospitalId: "h1", origem: "GEOFENCE" })
-      ).rejects.toMatchObject({ enfileirado: true });
+      const erro = await VisitaService.checkin({ hospitalId: "h1", origem: "GEOFENCE" }).catch((e) => e);
+      expect(erro).toMatchObject({ enfileirado: true });
 
       const [item] = await itensDaFila();
-      expect(item).toMatchObject({ chave: "checkin:h1", tipo: "checkin" });
+      expect(item).toMatchObject({ chave: expect.stringMatching(/^checkin:h1:\d+$/), tipo: "checkin" });
+      // O item vai no erro, para o geofencing ligar a saída a esta entrada.
+      expect(erro.item).toEqual(item);
       expect(item.corpo.hospitalId).toBe("h1");
       expect(item.ocorridoEm).toEqual(expect.any(String));
     });
@@ -325,6 +326,48 @@ describe("VisitaService (Épico 02)", () => {
       });
 
       expect(JSON.parse(chamadas[0].body).dispositivoId).toBe("anon-guardado");
+    });
+
+    test("guarda a saída da entrada pendente sem chamar o servidor, com o horário real", async () => {
+      // Recente: a fila descarta o que passou da validade de 24h.
+      const ocorridoEm = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
+      await VisitaService.guardarSaidaDeEntradaPendente({ chaveEntrada: "checkin:h1:1", hospitalId: "h1" }, ocorridoEm);
+
+      expect(chamadas).toHaveLength(0);
+      const [item] = await itensDaFila();
+      expect(item).toMatchObject({
+        chave: "checkout:checkin:h1:1",
+        tipo: "checkout",
+        ocorridoEm,
+        corpo: { visitaId: null, entradaPendente: { chave: "checkin:h1:1", hospitalId: "h1" } },
+      });
+    });
+
+    test("voltar à mesma unidade ainda sem internet guarda outra entrada, depois da anterior", async () => {
+      semInternet();
+      const base = Date.now();
+      const agora = jest.spyOn(Date, "now");
+      agora.mockReturnValue(base - 1000);
+      await VisitaService.checkin({ hospitalId: "h1", origem: "GEOFENCE" }).catch(() => {});
+      agora.mockReturnValue(base);
+      await VisitaService.checkin({ hospitalId: "h1", origem: "GEOFENCE" }).catch(() => {});
+      agora.mockRestore();
+
+      expect((await itensDaFila()).map((i) => i.chave)).toEqual([`checkin:h1:${base - 1000}`, `checkin:h1:${base}`]);
+    });
+
+    test("o reenvio da saída que esperava a entrada não manda o marcador ao servidor", async () => {
+      await VisitaService.enviarEventoOffline({
+        tipo: "checkout",
+        corpo: { visitaId: "v42", entradaPendente: { chave: "checkin:h1:1", hospitalId: "h1" }, dispositivoId: "anon-guardado" },
+        ocorridoEm: "2026-10-29T12:30:00.000Z",
+      });
+
+      expect(chamadas[0].url).toContain("/api/v1/visitas/v42/checkout");
+      const corpo = JSON.parse(chamadas[0].body);
+      expect(corpo.entradaPendente).toBeUndefined();
+      expect(corpo.ocorridoEm).toBe("2026-10-29T12:30:00.000Z");
     });
 
     test("evento desconhecido na fila é recusado", async () => {

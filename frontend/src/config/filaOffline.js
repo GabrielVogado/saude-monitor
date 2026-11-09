@@ -63,6 +63,17 @@ async function gravar(itens) {
   await AsyncStorage.setItem(CHAVE, JSON.stringify(itens));
 }
 
+// Cada leitura-modificação-escrita da fila roda em série: a sincronização e a tarefa de
+// segundo plano podem mexer nela ao mesmo tempo, e uma escrita com a lista velha apagaria
+// o item que a outra acabou de guardar.
+let filaDeEscrita = Promise.resolve();
+
+function emSerie(trabalho) {
+  const execucao = filaDeEscrita.then(trabalho);
+  filaDeEscrita = execucao.catch(() => {});
+  return execucao;
+}
+
 function vigente(item, agora) {
   return agora - Number(new Date(item.ocorridoEm).getTime()) < VALIDADE_MS;
 }
@@ -75,61 +86,96 @@ function vigente(item, agora) {
  * empilhar. Sem isso, um aparelho que tenta o mesmo checkout a cada volta ao
  * primeiro plano acumularia dezenas de cópias do mesmo fato.
  */
-export async function enfileirar({ chave, tipo, corpo, ocorridoEm }) {
-  const agora = Date.now();
-  const item = {
-    chave,
-    tipo,
-    corpo,
-    ocorridoEm: ocorridoEm || new Date(agora).toISOString(),
-    tentativas: 0,
-  };
+export function enfileirar({ chave, tipo, corpo, ocorridoEm }) {
+  return emSerie(async () => {
+    const agora = Date.now();
+    const item = {
+      chave,
+      tipo,
+      corpo,
+      ocorridoEm: ocorridoEm || new Date(agora).toISOString(),
+      tentativas: 0,
+    };
 
-  const itens = (await ler())
-    .filter((existente) => existente.chave !== chave)
-    .filter((existente) => vigente(existente, agora));
+    const itens = (await ler())
+      .filter((existente) => existente.chave !== chave)
+      .filter((existente) => vigente(existente, agora));
 
-  itens.push(item);
-  await gravar(itens.slice(-LIMITE_ITENS));
+    itens.push(item);
+    await gravar(itens.slice(-LIMITE_ITENS));
 
-  return item;
+    return item;
+  });
 }
 
 /** Itens ainda dentro da validade, do mais antigo para o mais novo. */
-export async function itensDaFila() {
-  const agora = Date.now();
-  const itens = await ler();
-  const vigentes = itens.filter((item) => vigente(item, agora));
+export function itensDaFila() {
+  return emSerie(async () => {
+    const agora = Date.now();
+    const itens = await ler();
+    const vigentes = itens.filter((item) => vigente(item, agora));
 
-  if (vigentes.length !== itens.length) {
-    await gravar(vigentes);
-  }
+    if (vigentes.length !== itens.length) {
+      await gravar(vigentes);
+    }
 
-  return vigentes;
+    return vigentes;
+  });
 }
 
 export async function tamanhoDaFila() {
   return (await itensDaFila()).length;
 }
 
-export async function removerDaFila(chave) {
-  const itens = await ler();
-  await gravar(itens.filter((item) => item.chave !== chave));
+export function removerDaFila(chave) {
+  return emSerie(async () => {
+    const itens = await ler();
+    await gravar(itens.filter((item) => item.chave !== chave));
+  });
 }
 
 /** Registra uma tentativa fracassada, mantendo o item na fila. */
-export async function marcarTentativa(chave) {
-  const itens = await ler();
-  const item = itens.find((atual) => atual.chave === chave);
+export function marcarTentativa(chave) {
+  return emSerie(async () => {
+    const itens = await ler();
+    const item = itens.find((atual) => atual.chave === chave);
 
-  if (!item) {
-    return;
-  }
+    if (!item) {
+      return;
+    }
 
-  item.tentativas = (item.tentativas || 0) + 1;
-  await gravar(itens);
+    item.tentativas = (item.tentativas || 0) + 1;
+    await gravar(itens);
+  });
 }
 
-export async function limparFila() {
-  await AsyncStorage.removeItem(CHAVE);
+export function limparFila() {
+  return emSerie(() => AsyncStorage.removeItem(CHAVE));
+}
+
+/**
+ * Completa com o número da visita a saída que esperava o check-in de chave `chaveEntrada`
+ * (`entradaPendente`). Gravado no disco logo que o check-in é aceito: se o processo morrer
+ * antes de a saída sair, a próxima rodada já a envia para a visita certa.
+ */
+export function vincularSaidaPendente(chaveEntrada, visitaId) {
+  return emSerie(async () => {
+    const itens = await ler();
+    let alterou = false;
+
+    for (const item of itens) {
+      if (
+        item.tipo === "checkout" &&
+        item.corpo?.entradaPendente?.chave === chaveEntrada &&
+        !item.corpo.visitaId
+      ) {
+        item.corpo = { ...item.corpo, visitaId };
+        alterou = true;
+      }
+    }
+
+    if (alterou) {
+      await gravar(itens);
+    }
+  });
 }

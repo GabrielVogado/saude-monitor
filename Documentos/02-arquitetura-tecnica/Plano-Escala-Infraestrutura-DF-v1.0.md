@@ -39,7 +39,7 @@ de plano quando a medição mandar, não antes.
 | Jobs | 4 `@Scheduled` de 15 min dentro da aplicação (agregados, feedback sem resposta, expiração, GPS interrompido) | `*Job.java` |
 | Cache | Nenhum cache de aplicação nem de borda; só `/api/v1/camadas/{tipo}` manda `Cache-Control` (1 dia) | `RegiaoController.java` |
 | E-mail | Resend no plano gratuito (100/dia) — usado na **confirmação do cadastro** e no "esqueci a senha" | `UserServiceImpl.java`, relatório de desempenho |
-| Mapa (app) | `@rnmapbox/maps` v10, cobrado por usuário ativo mensal (MAU) do SDK | `Arvore-Tecnologica-v2.1.md` |
+| Mapa (app) | `@rnmapbox/maps` v10, cobrado por usuário ativo mensal (MAU) do SDK. **Atualização 09/11/2026:** trocado por MapLibre + OpenFreeMap, sem cobrança por MAU (M-071, D3 respondida) | `_historico/Arvore-Tecnologica-v2.1.md` (atual: `Arvore-Tecnologica-v2.2.md`) |
 | CI/CD | GitHub Actions, imagem no Artifact Registry, WIF sem chave, smoke tests de Mongo e índice 2dsphere | `cd-backend-google.yml` |
 
 **O que já foi medido de carga** (`11-desempenho/Relatorio-Desempenho-HML-2026-09-23.md`): 100 usuários fazendo a

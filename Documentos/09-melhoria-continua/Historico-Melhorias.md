@@ -3702,3 +3702,120 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
   (OPS-02, item 11 do guia).
 - Validação: o E8-07 fica parcial até um erro forçado no APK de homologação aparecer no Sentry com
   a linha do código e sem dado pessoal.
+
+---
+
+## M-070 — Sinal e saída da visita deixam de ser recusados com a sessão vencida; entrada sem internet ganha saída
+
+**Data:** 04/11/2026 · **PR:** (este PR) · **Origem:** teste de campo do PO no Hospital Regional de Ceilândia (29/10/2026, APK da rc.10)
+
+### Como era
+
+- O Histórico mostrou de novo a visita automática como **GPS interrompido** com **0 min**, já com o
+  M-068 no aparelho. O PO entrou, fez login no Wi-Fi do hospital, a entrada foi registrada, e na
+  saída o Wi-Fi caiu sem dados móveis; a internet voltou mais de 10 min depois.
+- **Dados de homologação (consulta só leitura ao banco e aos logs do Cloud Run, 04/11/2026):** as
+  visitas de 23/10 e 29/10 nesse hospital têm saída = entrada, nenhum ponto amostral e o último sinal
+  igual à entrada. O check-in chegou **com internet** (201). Nenhum checkout chegou. A única chamada
+  depois do check-in foi um heartbeat ~41 min depois, recusado com **403**, e logo em seguida o app
+  renovou a sessão (`/auth/refresh` 200). Nos dois dias o 403 veio antes da renovação.
+- **Causa do 403:** o access token dura 15 min, e o app só renovava ao receber 401. As rotas de visita
+  aceitam quem não fez login (OPS-03): com o token vencido, o filtro JWT segue sem usuário e a visita
+  do usuário logado responde 403 ("não é sua"), nunca 401. Sinal e checkout de toda visita
+  automática com mais de 15 min, feitos sem o app aberto renovando antes, eram recusados; na fila
+  offline, o checkout recusado (4xx) era descartado.
+- **Também no código:** a entrada confirmada sem internet ia para a fila sem o aparelho guardar a
+  visita, então a saída não gerava checkout nem o sinal saía depois que a fila entregava a entrada.
+  Era a lacuna que o M-068 deixou de fora.
+- Não explicado pelos dados do servidor: por que nenhum sinal chegou nos primeiros 15 min (com o
+  token ainda válido). Pode ter sido a saída logo depois da entrada, já sem internet, ou o
+  acompanhamento em segundo plano não ter ligado. O Sentry da rc.11 (M-069) registra
+  `geofencing.acompanhamento` e `geofencing.sinalVisita` e deve responder no próximo teste.
+
+### O que mudou (só app)
+
+- **Renovação antes do pedido** (`core/api/apiClient.js`): o app lê o `exp` do access token e, se
+  ele já venceu (ou vence em menos de 1 min) e há refresh token, renova a sessão antes de enviar.
+  Vale para todos os pedidos, inclusive os das tarefas de segundo plano. Sem internet para renovar,
+  o pedido falha com o erro de conexão, e o checkout vai para a fila como antes.
+- **Visita provisória:** com o check-in na fila, o geofencing guarda uma visita provisória com a
+  chave do item na fila e o mesmo horário dele. Ela mantém o acompanhamento ligado no modo de visita,
+  então a saída é vista pelo Exit do SO ou pela posição da leitura. Não manda sinal (o servidor ainda
+  não a conhece), não é apagada quando o servidor responde que não há visita ativa e some depois de
+  24h, a validade da fila.
+- **Saída na fila atrás da entrada:** a saída da provisória vai para a fila com o horário real
+  (`ocorridoEm`), ligada à chave da entrada. O `SincronizacaoOffline` envia o check-in, grava o
+  número devolvido na saída que o espera (também no disco) e envia a saída logo em seguida. Entrada
+  recusada leva a saída junto. Sem a entrada na fila, a saída só usa a visita aberta da mesma
+  unidade que começou antes dela.
+- **Geofencing avisado:** com a pessoa ainda no hospital, a provisória ganha o número da visita e
+  passa a mandar sinal; com a saída já na fila, é esquecida; a saída entregue agenda o convite de
+  feedback com a duração do servidor.
+- **Uma chave por entrada** na fila (`checkin:<hospital>:<instante>`) e **fila em série** (leituras e
+  escritas em disco uma de cada vez).
+- Backend sem mudança.
+
+### O que ficou de fora
+
+- O backend continua respondendo 403, e não 401, a um token vencido numa rota pública de visita. Com
+  a renovação antes do pedido o app não depende mais disso; responder 401 quando há cabeçalho
+  `Authorization` inválido é uma melhoria possível do lado do servidor.
+- Sinal da visita sem internet continua sem fila: a saída com o horário real já corrige a visita que
+  o job encerrou (M-068). Caso que sobra: mais de 45 min no hospital sem internet e reconectar ainda
+  lá dentro (o primeiro sinal recebe 409 e o app esquece a visita).
+- Precisa de teste de campo com o APK novo: visita automática de mais de 15 min com o app fechado,
+  saída sem internet e reconexão depois. O esperado é a visita como Finalizada com o tempo real.
+
+---
+
+## M-071 — Mapa volta para MapLibre, sem cobrança por usuário ativo
+
+**Data:** 09/11/2026 · **PR:** (este PR) · **Origem:** pedido do PO; decisão D3 do `Plano-Escala-Infraestrutura-DF-v1.0` e P6 da `Analise-Escalabilidade-Seguranca-DF-v1.0`
+
+### Como era
+
+- O mapa do app usava `@rnmapbox/maps` v10 com o estilo `Street` da conta Mapbox, e a Web usava
+  `mapbox-gl` v2 atrás do adaptador `utils/mapkit`. O Mapbox cobra por usuário ativo do SDK: na
+  conta do plano de escala, +~US$ 500/mês na fase P2 e +~US$ 4.700/mês na P4, mais que todo o resto
+  da infraestrutura somado.
+- O build dependia do Maven privado da Mapbox em `android/build.gradle` e do segredo
+  `EXPO_PUBLIC_MAPBOX_TOKEN`. Sem o token o APK saía com o mapa em branco.
+- A Web criava o mapa com `attributionControl: false`.
+
+### O que mudou (só app e pipeline do APK)
+
+- **Bibliotecas:** `@maplibre/maplibre-react-native` v11 (Fabric, SDK nativo no Maven Central, sem
+  token) e `maplibre-gl` v5 na Web. A v5 e não a 6: a 6 é só ESM e carrega o worker por
+  `import.meta.url`, que o bundler Web do Metro não resolve.
+- **Tiles:** estilo vetorial Liberty do OpenFreeMap (`src/utils/mapStyle.js`, `MAP_STYLE`), gratuito,
+  sem chave e sem limite de acessos, mas sem SLA. Se o provedor cair, o mapa fica sem fundo e
+  marcadores, geofences e lista seguem funcionando. `mapStyle.web.js` deixou de existir: sem token,
+  o arquivo é o mesmo nas duas plataformas.
+- **Adaptador nativo** (`src/utils/mapkit/index.js`): a v11 renomeou a API (`Map`, `GeoJSONSource`,
+  `Layer`, `Marker`, câmera por `setStop`). O adaptador mantém o que as telas usam (`MapView`,
+  `Camera.setCamera`/`fitBounds`, `ShapeSource`, `FillLayer`, `LineLayer`, `MarkerView`), então
+  GeoLocalizacaoScreen e HospitalDetalheScreen só trocam o nome da constante do estilo. A câmera
+  entra pela posição inicial e só se move com um centro ou zoom NOVO nas props, para uma leitura de
+  GPS não desfazer o zoom do usuário. Falha do módulo nativo vira aviso no console, não exceção.
+- **Atribuição:** ligada nos dois lados (OpenStreetMap/OpenMapTiles, exigida pelo provedor). Na Web
+  fica compacta, aberta no começo e recolhida ao mexer no mapa.
+- **Build e CI:** sai o Maven privado da Mapbox do `android/build.gradle`. Sai
+  `EXPO_PUBLIC_MAPBOX_TOKEN` do `cd-mobile-apk.yml` e da tabela de secrets do MANUAL (§4.3). O
+  AndroidManifest versionado não muda: a biblioteca só declara `INTERNET` e localização, que o app
+  já tem.
+- **Testes:** novo `mapkit.test.js` com o contrato do adaptador nativo (conversão da câmera,
+  `fitBounds` em `[oeste, sul, leste, norte]`, toque com `features`, `paint` das camadas). As telas
+  passam a mockar o próprio `utils/mapkit`, não a biblioteca.
+- **Validado na Web** (export do Expo + Playwright, API e estilo simulados porque o proxy da nuvem
+  não alcança o OpenFreeMap): marcadores, toque abrindo o card, filtro de 1 km sem zoom máximo
+  (M-064), geofence no Detalhe do Hospital e atribuição.
+
+### O que ficou de fora
+
+- **Teste no aparelho:** o APK DEV precisa ser conferido em campo (mapa com tiles reais, toque no
+  geofence, marcadores, voltar do detalhe). A API nativa da v11 só roda no aparelho.
+- **PMTiles próprio:** antes da fase P2, servir um recorte do DF pelo saudemonitor.dev (Cloudflare
+  R2) e trocar só a URL de `MAP_STYLE`. O MapLibre nativo lê `pmtiles://` desde a 11.7 (a
+  biblioteca traz a 13.6.1); na Web é preciso registrar o protocolo com o pacote `pmtiles`.
+- O segredo `EXPO_PUBLIC_MAPBOX_TOKEN` pode ser apagado do repositório depois do merge, e a conta
+  Mapbox encerrada.

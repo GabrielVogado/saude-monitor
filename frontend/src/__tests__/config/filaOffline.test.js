@@ -9,6 +9,7 @@ import {
   marcarTentativa,
   removerDaFila,
   tamanhoDaFila,
+  vincularSaidaPendente,
 } from "../../config/filaOffline";
 
 /**
@@ -146,5 +147,77 @@ describe("OPS-05 — fila offline", () => {
     await limparFila();
 
     expect(await tamanhoDaFila()).toBe(0);
+  });
+});
+
+describe("saída que espera a entrada guardada sem internet (29/10/2026)", () => {
+  beforeEach(() => {
+    AsyncStorage.__reset();
+  });
+
+  it("grava no disco o número da visita só na saída da mesma unidade", async () => {
+    const saida = (chave) => ({
+      chave: `checkout:${chave}`,
+      tipo: "checkout",
+      corpo: { visitaId: null, entradaPendente: { chave, hospitalId: "h1" } },
+    });
+    await enfileirar(saida("checkin:h1:1"));
+    await enfileirar(saida("checkin:h1:2"));
+    await enfileirar({ chave: "checkin:h1:2", tipo: "checkin", corpo: { hospitalId: "h1" } });
+
+    await vincularSaidaPendente("checkin:h1:1", "v42");
+
+    const itens = await itensDaFila();
+    expect(itens.find((i) => i.chave === "checkout:checkin:h1:1").corpo.visitaId).toBe("v42");
+    // Outra entrada na mesma unidade continua esperando o próprio check-in.
+    expect(itens.find((i) => i.chave === "checkout:checkin:h1:2").corpo.visitaId).toBeNull();
+    expect(itens.find((i) => i.chave === "checkin:h1:2").corpo.visitaId).toBeUndefined();
+  });
+
+  it("não regrava a fila quando não há saída esperando", async () => {
+    await enfileirar({ chave: "checkout:v1", tipo: "checkout", corpo: { visitaId: "v1" } });
+    AsyncStorage.setItem.mockClear();
+
+    await vincularSaidaPendente("checkin:h1:1", "v42");
+
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+  });
+});
+
+describe("escritas simultâneas na fila", () => {
+  beforeEach(() => {
+    AsyncStorage.__reset();
+  });
+
+  it("guardar e remover ao mesmo tempo não apagam o item um do outro", async () => {
+    await enfileirar({ chave: "checkin:h1:1", tipo: "checkin", corpo: {} });
+
+    await Promise.all([
+      removerDaFila("checkin:h1:1"),
+      enfileirar({ chave: "checkout:checkin:h1:1", tipo: "checkout", corpo: {} }),
+      marcarTentativa("checkout:checkin:h1:1"),
+    ]);
+
+    expect(await itensDaFila()).toEqual([
+      expect.objectContaining({ chave: "checkout:checkin:h1:1", tentativas: 1 }),
+    ]);
+  });
+
+  it("tentativa de item que já saiu da fila não grava nada", async () => {
+    await enfileirar({ chave: "a", tipo: "checkin", corpo: {} });
+    AsyncStorage.setItem.mockClear();
+
+    await marcarTentativa("inexistente");
+
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it("uma escrita que falha não trava as seguintes", async () => {
+    AsyncStorage.setItem.mockRejectedValueOnce(new Error("disco cheio"));
+
+    await expect(enfileirar({ chave: "a", tipo: "checkin", corpo: {} })).rejects.toThrow("disco cheio");
+    await enfileirar({ chave: "b", tipo: "checkin", corpo: {} });
+
+    expect((await itensDaFila()).map((i) => i.chave)).toEqual(["b"]);
   });
 });

@@ -1506,7 +1506,7 @@ I = impacto, R = risco, E = esforço (1 a 5). Prioridade = (I + R) × (6 − E).
 **Documentos lidos** (pasta `Documentos/`, commit-base `develop@1d2e431`):
 
 - `00-INDICE.md` e `01-negocio/Documento-Negocial-v2.1.md`;
-- em `02-arquitetura-tecnica/`: `Arvore-Tecnologica-v2.1.md`, `Plano-Escala-Infraestrutura-DF-v1.0.md` e `Especificacao-API-v2.4.md` (consulta);
+- em `02-arquitetura-tecnica/`: `Arvore-Tecnologica-v2.1.md` (em `_historico/` desde 09/11/2026, substituída pela v2.2), `Plano-Escala-Infraestrutura-DF-v1.0.md` e `Especificacao-API-v2.4.md` (consulta);
 - em `09-melhoria-continua/`: `Plano-Implantacao-Cache-Fila-Resiliencia-v1.0.md` e `Arquitetura de Resiliência, Segurança e Evolução Contínua.md`;
 - `08-analise tecnica/adrs.md` (ADR-011 a ADR-015);
 - `11-desempenho/Relatorio-Desempenho-HML-2026-09-23.md` e `12-seguranca/Pentest-HML-2026-09-23.md`;

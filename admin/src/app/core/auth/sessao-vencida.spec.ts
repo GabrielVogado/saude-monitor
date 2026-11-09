@@ -99,8 +99,9 @@ describe('Sessão vencida (appConfig real)', () => {
 
     backend.expectOne(url()).flush(null, nao401);
     backend.expectOne(refreshUrl()).flush(null, nao401);
-    // Encerrar a sessão também pede ao backend que apague o cookie.
-    backend.expectOne(`${base}/api/v1/auth/painel/logout`).flush({ success: true });
+    // Só a sessão desta aba acaba: um logout no servidor revogaria o cookie que outra aba
+    // pode ter acabado de renovar (duas abas renovando juntas derrubavam as duas).
+    backend.expectNone(`${base}/api/v1/auth/painel/logout`);
 
     expect(erro?.status).toBe(401);
     expect(TestBed.inject(Auth).isAuthenticated()).toBe(false);

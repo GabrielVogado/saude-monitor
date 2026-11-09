@@ -58,7 +58,7 @@ describe('authInterceptor — sessão vencida', () => {
   const erro401 = () => new HttpErrorResponse({ status: 401, url: `${BASE}/api/v1/hospitais` });
 
   function configurar(renovar: () => Observable<string>) {
-    const auth = { accessToken: 'velho', renovar: vi.fn(renovar), logout: vi.fn() };
+    const auth = { accessToken: 'velho', renovar: vi.fn(renovar), logout: vi.fn(), encerrarSessaoLocal: vi.fn() };
     const router = { navigate: vi.fn().mockResolvedValue(true) };
     TestBed.configureTestingModule({
       providers: [
@@ -92,7 +92,7 @@ describe('authInterceptor — sessão vencida', () => {
     expect(vistos).toEqual(['Bearer velho', 'Bearer novo']);
     expect(auth.renovar).toHaveBeenCalledTimes(1);
     expect((r.resposta() as HttpResponse<unknown>).status).toBe(200);
-    expect(auth.logout).not.toHaveBeenCalled();
+    expect(auth.encerrarSessaoLocal).not.toHaveBeenCalled();
     expect(router.navigate).not.toHaveBeenCalled();
   });
 
@@ -102,7 +102,8 @@ describe('authInterceptor — sessão vencida', () => {
 
     const r = executar(new HttpRequest('GET', `${BASE}/api/v1/hospitais`), next);
 
-    expect(auth.logout).toHaveBeenCalledTimes(1);
+    expect(auth.encerrarSessaoLocal).toHaveBeenCalledTimes(1);
+    expect(auth.logout).not.toHaveBeenCalled();
     expect(router.navigate).toHaveBeenCalledWith(['/login'], { queryParams: { sessao: 'expirada' } });
     expect((r.erro() as HttpErrorResponse).status).toBe(401);
   });
@@ -116,7 +117,8 @@ describe('authInterceptor — sessão vencida', () => {
     const r = executar(new HttpRequest('GET', `${BASE}/api/v1/hospitais`), () => throwError(() => erro401()));
     await Promise.resolve();
 
-    expect(auth.logout).toHaveBeenCalledTimes(1);
+    expect(auth.encerrarSessaoLocal).toHaveBeenCalledTimes(1);
+    expect(auth.logout).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith('Sessão encerrada, mas a navegação ao login falhou.', falha);
     expect((r.erro() as HttpErrorResponse).status).toBe(401);
     log.mockRestore();
@@ -125,7 +127,8 @@ describe('authInterceptor — sessão vencida', () => {
   it('se o refresh for recusado (401), encerra a sessão', () => {
     const { auth } = configurar(() => throwError(() => new HttpErrorResponse({ status: 401 })));
     executar(new HttpRequest('GET', `${BASE}/api/v1/hospitais`), () => throwError(() => erro401()));
-    expect(auth.logout).toHaveBeenCalledTimes(1);
+    expect(auth.encerrarSessaoLocal).toHaveBeenCalledTimes(1);
+    expect(auth.logout).not.toHaveBeenCalled();
   });
 
   it('falha de rede ou 5xx na renovação não derruba a sessão (ex.: cold start)', () => {
@@ -133,7 +136,7 @@ describe('authInterceptor — sessão vencida', () => {
 
     const r = executar(new HttpRequest('GET', `${BASE}/api/v1/hospitais`), () => throwError(() => erro401()));
 
-    expect(auth.logout).not.toHaveBeenCalled();
+    expect(auth.encerrarSessaoLocal).not.toHaveBeenCalled();
     expect(router.navigate).not.toHaveBeenCalled();
     expect((r.erro() as HttpErrorResponse).status).toBe(503);
   });

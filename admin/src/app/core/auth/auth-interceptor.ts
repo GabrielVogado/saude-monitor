@@ -51,7 +51,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           ) {
             return throwError(() => falhaRenovacao);
           }
-          auth.logout();
+          // Só a sessão desta aba: o refresh que falhou não tem o que revogar, e um logout no
+          // servidor mandaria o cookie atual, que outra aba pode ter acabado de renovar.
+          auth.encerrarSessaoLocal();
           // A sessão já foi encerrada; se a ida ao login falhar (ex.: chunk da rota não
           // carrega após um deploy), registra para não sumir em silêncio.
           router

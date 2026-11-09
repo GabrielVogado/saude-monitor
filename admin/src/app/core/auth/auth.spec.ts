@@ -104,6 +104,17 @@ describe('Auth', () => {
     req.flush({ success: true });
   });
 
+  it('encerrarSessaoLocal limpa só esta aba, sem revogar o cookie que outra aba pode ter renovado', () => {
+    logar();
+
+    service.encerrarSessaoLocal();
+
+    expect(service.isAuthenticated()).toBe(false);
+    expect(service.usuario()).toBeNull();
+    expect(sessionStorage.getItem('admin.usuario')).toBeNull();
+    http.expectNone(LOGOUT);
+  });
+
   it('logout sem rede não lança: a sessão local já acabou', () => {
     logar();
 

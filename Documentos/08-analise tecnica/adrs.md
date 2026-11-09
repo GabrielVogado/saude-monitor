@@ -1277,7 +1277,9 @@ abrir. Login, refresh e logout vão pelas rotas novas com `withCredentials` e
 `X-Requested-With: painel`. Ao abrir ou recarregar a aba, o guard de rota chama
 `/painel/refresh` antes de mandar ao login. Em 401 o interceptor renova uma vez (renovações
 simultâneas viram uma chamada só) e repete a requisição; 401 de novo sobe sem nova renovação.
-O logout pede ao backend que revogue e apague o cookie.
+Se a renovação falha, a aba encerra só a própria sessão, sem chamar o logout do servidor: as
+abas dividem o cookie, e um logout ali revogaria o refresh que outra aba acabou de renovar. Só
+o botão Sair pede ao backend que revogue e apague o cookie.
 
 **Dependência para valer em produção.** `SameSite=Strict` não deixa o navegador guardar nem
 mandar o cookie entre sites diferentes. `run.app` está na Public Suffix List, então cada serviço

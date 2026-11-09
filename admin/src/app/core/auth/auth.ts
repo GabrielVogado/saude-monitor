@@ -99,7 +99,7 @@ export class Auth {
     return this.renovar().pipe(
       map(() => true),
       catchError(() => {
-        this.limparLocal();
+        this.encerrarSessaoLocal();
         return of(false);
       }),
     );
@@ -111,7 +111,7 @@ export class Auth {
    * refresh vence sozinho.
    */
   logout(): void {
-    this.limparLocal();
+    this.encerrarSessaoLocal();
     this.http
       .post(`${this.apiBaseUrl}${ROTAS_SESSAO_PAINEL.logout}`, null, OPCOES_SESSAO)
       .subscribe({ error: () => undefined });
@@ -126,7 +126,12 @@ export class Auth {
     return resposta;
   }
 
-  private limparLocal(): void {
+  /**
+   * Encerra a sessão só nesta aba, sem chamar o backend. É o que se usa quando a renovação
+   * falha: as abas dividem o cookie, e um logout no servidor revogaria o refresh que outra aba
+   * acabou de renovar, derrubando as duas.
+   */
+  encerrarSessaoLocal(): void {
     this.storage.limpar();
     this.usuarioSig.set(null);
   }

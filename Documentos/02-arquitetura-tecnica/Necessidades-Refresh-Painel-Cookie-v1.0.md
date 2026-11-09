@@ -77,22 +77,20 @@ Se P11 for Cloudflare (Origin Rule ou Worker de proxy), conferir na borda:
 
 ---
 
-## 4. Risco encontrado na leitura do código, ainda sem correção
+## 4. Risco das duas abas renovando juntas (corrigido em 09/11/2026)
 
-**Duas abas renovando ao mesmo tempo podem derrubar as duas.** As abas do mesmo navegador dividem o cookie. As chamadas simultâneas **dentro de uma aba** já viram uma renovação só, mas não há coordenação entre abas. Se duas abas recebem 401 no mesmo instante e as duas pedem `/painel/refresh` com o mesmo cookie:
+**Como era.** As abas do mesmo navegador dividem o cookie. As chamadas simultâneas **dentro de uma aba** já viravam uma renovação só, mas não havia coordenação entre abas. Se duas abas recebiam 401 no mesmo instante e as duas pediam `/painel/refresh` com o mesmo cookie:
 
-1. a primeira renova e o backend revoga o refresh usado (rotação);
-2. a segunda leva 401;
-3. o interceptor dessa segunda aba chama o logout, que manda ao backend o cookie que está no navegador naquele momento. Esse cookie já é o novo, gravado pela primeira aba, e é revogado;
-4. a primeira aba perde a sessão na próxima renovação.
+1. a primeira renovava e o backend revogava o refresh usado (rotação);
+2. a segunda levava 401;
+3. o interceptor dessa segunda aba chamava o logout, que mandava ao backend o cookie que estava no navegador naquele momento. Esse cookie já era o novo, gravado pela primeira aba, e era revogado;
+4. a primeira aba perdia a sessão na próxima renovação.
 
-O caso exige duas abas renovando no mesmo instante, por isso é raro. Ainda não foi reproduzido em navegador.
+Achado na leitura do código, sem reprodução em navegador.
 
-**Correção proposta, pequena e no próprio item 7:**
+**Correção, no próprio item 7.** Quando a renovação falha, o interceptor encerra só a sessão da aba (`Auth.encerrarSessaoLocal`), sem chamar o logout do servidor: o refresh que falhou não tem o que revogar. Só o botão Sair revoga no servidor. Testes: `auth-interceptor.spec.ts`, `auth.spec.ts` e `sessao-vencida.spec.ts` (refresh recusado não gera `POST /painel/logout`).
 
-- quando a renovação falha, o interceptor encerra só a sessão local, sem chamar o logout do servidor (não há o que revogar);
-- só o botão Sair revoga no servidor;
-- opcional: coordenar a renovação entre abas com `BroadcastChannel`.
+**O que sobra.** A aba que perde a disputa ainda vai para o login, mas a outra aba continua com a sessão, e recarregar uma rota protegida na aba perdedora recupera a sessão pelo cookie novo. Coordenar a renovação entre abas (por exemplo com `BroadcastChannel`) eliminaria esse retorno ao login; não foi feito.
 
 ---
 
@@ -115,7 +113,7 @@ Os itens 1, 2, 3, 5 e 7 já foram conferidos localmente em 05/11/2026, com backe
 
 ## 6. Ordem sugerida
 
-1. Merge do item 7 (código) na `develop`. Opcionalmente com D1, D2 e a correção do §4.
+1. Merge do item 7 (código) na `develop`, já com a correção do §4. D1 e D2 ficam para depois (decisão do PO em 09/11/2026).
 2. Item 3 (domínio da API) com a borda (I4), atendendo N1 e N5.
 3. Hospedagem e CD do painel com N2 e N3, já com a CSP (D3).
 4. N4 e N6 em cada ambiente, e o critério de aceite do §5.

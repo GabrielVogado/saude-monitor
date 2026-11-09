@@ -9,6 +9,7 @@
 
 **O que mudou:** o painel deixa de guardar token no `sessionStorage`. O backend ganha `POST /api/v1/auth/painel/login`, `/refresh` e `/logout`, só para ADMIN, com o refresh no cookie `__Host-painel_refresh` (`HttpOnly`, `Secure`, `SameSite=Strict`), `Origin` e `X-Requested-With` exigidos e CORS com credenciais só para a origem do painel (nova `APP_CORS_PAINEL_ORIGIN`). O painel guarda o access só em memória e recupera a sessão pelo cookie ao recarregar. O app não muda. ADR-013 passa a "Implementado", com a dependência do domínio próprio da API para valer em produção. Atualizados a §3.1 e a §5 da `Especificacao-API-v2.4.md` e o `deploy/google/README.md`. Registro em `Historico-Melhorias.md` (M-073).
 **Também:** `De-Para-Backlog-Features.md` ganha o SEG-05 (parcial: falta o domínio).
+**Novo:** [`02-arquitetura-tecnica/Necessidades-Refresh-Painel-Cookie-v1.0.md`](./02-arquitetura-tecnica/Necessidades-Refresh-Painel-Cookie-v1.0.md) lista o que falta fora do código para o cookie valer em cada ambiente (domínio da API, painel publicado no mesmo site, variáveis, borda, conta ADMIN), as decisões pendentes e o critério de aceite.
 
 ---
 

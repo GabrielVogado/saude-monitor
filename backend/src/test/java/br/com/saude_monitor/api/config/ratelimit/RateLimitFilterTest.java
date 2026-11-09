@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.function.LongSupplier;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -33,12 +35,18 @@ class RateLimitFilterTest {
     /** Padroes de producao: os mesmos valores de application.properties. */
     static final RateLimitProperties PADRAO = new RateLimitProperties(10, 60, 1, 600);
 
+    /**
+     * Relógio parado: dezenas de chamadas pelo MockMvc levam segundos no CI e não podem cruzar a
+     * virada da janela de 1 minuto, que zera o contador (falha do CI no PR #246).
+     */
+    static final LongSupplier RELOGIO_PARADO = () -> 0L;
+
     private RateLimitService service;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setup() {
-        service = new RateLimitService(PADRAO);
+        service = new RateLimitService(PADRAO, RELOGIO_PARADO);
         RateLimitFilter filter = new RateLimitFilter(service, jsonMapper(), PADRAO, JWT);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new StubController())
@@ -178,7 +186,7 @@ class RateLimitFilterTest {
     @Test
     void comDoisProxiesConfiaveisUsaOPenultimoEndereco() {
         RateLimitProperties doisProxies = new RateLimitProperties(10, 60, 2, 600);
-        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(doisProxies), jsonMapper(), doisProxies, JWT);
+        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(doisProxies, RELOGIO_PARADO), jsonMapper(), doisProxies, JWT);
         org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
         req.addHeader("X-Forwarded-For", "1.1.1.1, 198.51.100.7, 35.191.0.1");
         assertThat(filter.resolverIp(req)).isEqualTo("198.51.100.7");
@@ -187,7 +195,7 @@ class RateLimitFilterTest {
     @Test
     void semProxyConfiavelIgnoraOCabecalho() {
         RateLimitProperties semProxy = new RateLimitProperties(10, 60, 0, 600);
-        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(semProxy), jsonMapper(), semProxy, JWT);
+        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(semProxy, RELOGIO_PARADO), jsonMapper(), semProxy, JWT);
         org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
         req.setRemoteAddr("10.0.0.9");
         req.addHeader("X-Forwarded-For", "1.1.1.1");
@@ -197,7 +205,7 @@ class RateLimitFilterTest {
     @Test
     void cabecalhoMaisCurtoQueOsProxiesCaiNoEnderecoDaConexao() {
         RateLimitProperties doisProxies = new RateLimitProperties(10, 60, 2, 600);
-        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(doisProxies), jsonMapper(), doisProxies, JWT);
+        RateLimitFilter filter = new RateLimitFilter(new RateLimitService(doisProxies, RELOGIO_PARADO), jsonMapper(), doisProxies, JWT);
         org.springframework.mock.web.MockHttpServletRequest req = new org.springframework.mock.web.MockHttpServletRequest();
         req.setRemoteAddr("10.0.0.9");
         req.addHeader("X-Forwarded-For", "1.1.1.1");
@@ -209,7 +217,7 @@ class RateLimitFilterTest {
     @Test
     void limitesVemDaConfiguracaoDoAmbiente() throws Exception {
         RateLimitProperties homologacao = new RateLimitProperties(10, 100, 1, 600);
-        RateLimitService hom = new RateLimitService(homologacao);
+        RateLimitService hom = new RateLimitService(homologacao, RELOGIO_PARADO);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(new StubController())
                 .addFilters(new RateLimitFilter(hom, jsonMapper(), homologacao, JWT)).build();
         for (int i = 0; i < 100; i++) {
@@ -288,7 +296,7 @@ class RateLimitFilterTest {
     void tetoPorIpBarraQuemTrocaDeInstalacaoACadaChamada() throws Exception {
         RateLimitProperties tetoBaixo = new RateLimitProperties(10, 60, 1, 100);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(new StubController())
-                .addFilters(new RateLimitFilter(new RateLimitService(tetoBaixo), jsonMapper(), tetoBaixo, JWT)).build();
+                .addFilters(new RateLimitFilter(new RateLimitService(tetoBaixo, RELOGIO_PARADO), jsonMapper(), tetoBaixo, JWT)).build();
         for (int i = 0; i < 100; i++) {
             mvc.perform(get("/api/v1/hospitais").with(deIp("10.1.0.6")).header("X-Cliente-Id", String.format("cliente-%010d", i)))
                     .andExpect(status().isOk());

@@ -1,10 +1,12 @@
 package br.com.saude_monitor.api.config.ratelimit;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.LongSupplier;
 
 /**
  * Rate limiting com janela fixa de 1 minuto (F0-04), por identidade e por IP (ARQ-02).
@@ -48,11 +50,20 @@ public class RateLimitService {
 
     private final RateLimitProperties properties;
 
+    /** Relógio em milissegundos; os testes passam um parado para não cruzar a virada da janela. */
+    private final LongSupplier relogioEmMs;
+
     /** Chave -> [janelaInicio, contador]. */
     private final ConcurrentMap<String, long[]> contadores = new ConcurrentHashMap<>();
 
+    @Autowired
     public RateLimitService(RateLimitProperties properties) {
+        this(properties, System::currentTimeMillis);
+    }
+
+    RateLimitService(RateLimitProperties properties, LongSupplier relogioEmMs) {
         this.properties = properties;
+        this.relogioEmMs = relogioEmMs;
     }
 
     /** Limite do grupo por minuto, conforme a configuração do ambiente. */
@@ -80,7 +91,7 @@ public class RateLimitService {
      * chave por janela — logar toda rejeição transformaria um ataque num volume de log.
      */
     public long registrar(String chave, Grupo grupo) {
-        long agora = System.currentTimeMillis();
+        long agora = relogioEmMs.getAsLong();
         long janelaInicio = agora - (agora % JANELA_MS);
 
         long[] estado = contadores.compute(chave + ":" + grupo.name(), (k, atual) -> {
@@ -102,6 +113,6 @@ public class RateLimitService {
     /** Executa a limpeza a cada minuto via agendamento do Spring. */
     @Scheduled(fixedDelay = JANELA_MS)
     public void limparPeriodicamente() {
-        limparObsoletos(System.currentTimeMillis());
+        limparObsoletos(relogioEmMs.getAsLong());
     }
 }

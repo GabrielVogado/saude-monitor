@@ -3819,3 +3819,26 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
   biblioteca traz a 13.6.1); na Web é preciso registrar o protocolo com o pacote `pmtiles`.
 - O segredo `EXPO_PUBLIC_MAPBOX_TOKEN` pode ser apagado do repositório depois do merge, e a conta
   Mapbox encerrada.
+
+---
+
+## M-072 — Teste do teto por IP deixa de falhar na virada do minuto
+
+**Data:** 09/11/2026 · **PR:** (este PR) · **Origem:** CI do PR #246 (promoção da v1.0.0-rc.12)
+
+### Como era
+
+- O job Backend do PR #246 falhou em `RateLimitFilterTest.tetoPorIpBarraQuemTrocaDeInstalacaoACadaChamada`
+  e passou ao ser executado de novo, sem mudança de código.
+- O `RateLimitService` conta numa janela fixa de 1 minuto alinhada ao relógio do sistema
+  (`System.currentTimeMillis()`). O teste faz 100 chamadas aceitas e espera 429 na 101ª. No CI as
+  chamadas levaram segundos e atravessaram a virada do minuto (a falha é das 19:35:00): o contador
+  zerou e a 101ª passou.
+
+### O que mudou (só backend, sem mudança de comportamento em produção)
+
+- `RateLimitService` recebe o relógio em milissegundos (`LongSupplier`) por um construtor de pacote.
+  O construtor público, o que o Spring usa, passa `System::currentTimeMillis`, como antes.
+- O `RateLimitFilterTest` inteiro usa um relógio parado (`RELOGIO_PARADO`): os outros testes com 60 a 100 chamadas pelo MockMvc tinham o mesmo risco.
+- Novo teste `contadorRecomecaQuandoAJanelaDeUmMinutoVira`: com o relógio no último milissegundo da
+  janela, a 11ª chamada de autenticação é barrada; um milissegundo depois, volta a passar.

@@ -32,9 +32,9 @@ import { pinturaDaLinha, pinturaDoPreenchimento } from "./paint";
  */
 function moverCamera(camera, parada) {
   try {
-    camera?.setStop(parada)?.catch?.((erro) => avisarFalhaDaCamera(erro));
-  } catch (erro) {
-    avisarFalhaDaCamera(erro);
+    camera?.setStop(parada)?.catch?.((error_) => avisarFalhaDaCamera(error_));
+  } catch (error_) {
+    avisarFalhaDaCamera(error_);
   }
 }
 
@@ -43,8 +43,7 @@ function avisarFalhaDaCamera(erro) {
   console.warn("mapkit: a câmera não pôde se mover", erro?.message);
 }
 
-function paddingEmTodosOsLados(padding) {
-  const valor = padding ?? 0;
+function paddingEmTodosOsLados(valor = 0) {
   return { top: valor, right: valor, bottom: valor, left: valor };
 }
 

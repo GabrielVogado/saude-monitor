@@ -18,7 +18,6 @@ import maplibregl from "maplibre-gl";
 import { Camera, FillLayer, LineLayer, MapView, ShapeSource } from "../../utils/mapkit/index.web";
 
 const mockMapa = {
-  once: jest.fn((evento, callback) => callback()),
   flyTo: jest.fn(),
   jumpTo: jest.fn(),
   fitBounds: jest.fn(),
@@ -29,7 +28,10 @@ const mockMapa = {
   getLayer: jest.fn(() => undefined),
   addLayer: jest.fn(),
   setPaintProperty: jest.fn(),
-  on: jest.fn(),
+  // `load` responde na hora; os outros eventos (clique nas camadas) só são registrados.
+  on: jest.fn((evento, ...resto) => {
+    if (evento === "load") resto[0]();
+  }),
   off: jest.fn(),
 };
 

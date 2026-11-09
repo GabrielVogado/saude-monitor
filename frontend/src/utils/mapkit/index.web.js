@@ -73,7 +73,9 @@ export function MapView({ style, styleURL, onDidFinishLoadingMap, children }) {
       attributionControl: { compact: true },
     });
     mapRef.current = mapa;
-    mapa.once("load", () => setMapa(mapa));
+    // `on` e não `once`: o `once` do maplibre-gl v5 também é tipado como Promise, e o
+    // `load` só dispara uma vez por mapa.
+    mapa.on("load", () => setMapa(mapa));
 
     // O container muda de altura sem a janela mudar (a mensagem de GPS negado e o
     // botão "Tentar novamente" entram depois do mapa montar e encolhem o

@@ -13,24 +13,19 @@ import { __setMockInsets } from "react-native-safe-area-context";
 import App from "../../../App";
 import * as FeedbackNotificationService from "../../screens/feedback/service/FeedbackNotificationService";
 
-// @rnmapbox/maps: expõe componentes nativos (Mapbox) não
+// utils/mapkit (adaptador do MapLibre): expõe componentes nativos não
 // suportados pelo Jest; substituímos por Views textuais para o smoke test.
-jest.mock("@rnmapbox/maps", () => {
+jest.mock("../../utils/mapkit", () => {
   const { View } = require("react-native");
   const stub = (props) => <View {...props} />;
   return {
     __esModule: true,
-    default: { setAccessToken: jest.fn(() => Promise.resolve(null)), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
-    StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
     MapView: stub,
     Camera: stub,
     MarkerView: stub,
     ShapeSource: stub,
     LineLayer: stub,
     FillLayer: stub,
-    CircleLayer: stub,
-    SymbolLayer: stub,
-    UserLocation: stub,
   };
 });
 

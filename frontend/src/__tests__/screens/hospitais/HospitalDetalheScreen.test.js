@@ -27,15 +27,13 @@ jest.mock("../../../screens/hospitais/service/HospitalService");
 jest.mock("../../../screens/visitas/service/VisitaService");
 jest.mock("../../../screens/feedback/service/FeedbackNotificationService");
 
-// @rnmapbox/maps: componentes nativos não suportados pelo Jest;
+// utils/mapkit (adaptador do MapLibre): componentes nativos não suportados pelo Jest;
 // substituídos por Views textuais (mesmo padrão de src/__tests__/screens/App.test.js).
-jest.mock("@rnmapbox/maps", () => {
+jest.mock("../../../utils/mapkit", () => {
   const { View } = require("react-native");
   const stub = (props) => <View {...props} />;
   return {
     __esModule: true,
-    default: { setAccessToken: jest.fn(() => Promise.resolve(null)), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
-    StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
     MapView: stub,
     Camera: stub,
     MarkerView: stub,

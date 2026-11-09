@@ -169,7 +169,7 @@ Gestores públicos, conselhos de saúde e investidores interessados em um piloto
 
 | Componente | Tecnologia | Pasta |
 |---|---|---|
-| App mobile | Expo 55, React Native, Mapbox, TanStack Query, Zustand | [`frontend/`](frontend/) |
+| App mobile | Expo 55, React Native, MapLibre, TanStack Query, Zustand | [`frontend/`](frontend/) |
 | API | Java 25, Spring Boot 4, MongoDB | [`backend/`](backend/) |
 | Painel administrativo | Angular 21 | [`admin/`](admin/) |
 | Site público | Cloudflare Workers | [`site/`](site/) |

@@ -1,50 +1,12 @@
 /**
- * Estilo do mapa (Mapbox) e conversão de região legada em posição de câmera.
- *
- * Migração MapLibre → Mapbox (`feature/mapbox-migration`): o estilo raster próprio
- * (OSM_RASTER_STYLE) foi removido junto dos testes do BUG-06 (teto de zoom na fonte,
- * camada de background, atribuição OSM) — todos específicos do tile.openstreetmap.org
- * e sem equivalente no estilo vetorial `Street` servido pela conta Mapbox.
+ * Estilo do mapa (MapLibre + OpenFreeMap) e conversão de região legada em posição de
+ * câmera.
  */
-import Mapbox from "@rnmapbox/maps";
-import { getInitialViewState, MAPBOX_STYLE } from "../../utils/mapStyle";
+import { getInitialViewState, MAP_STYLE } from "../../utils/mapStyle";
 
-jest.mock("@rnmapbox/maps", () => ({
-  __esModule: true,
-  default: { setAccessToken: jest.fn(() => Promise.resolve(null)), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
-  StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
-}));
-
-describe("MAPBOX_STYLE", () => {
-  test("usa o estilo Street servido pela conta Mapbox", () => {
-    expect(MAPBOX_STYLE).toBe(Mapbox.StyleURL.Street);
-  });
-
-  test("expõe o registro do token público (chamado no import do módulo)", () => {
-    // Afirma-se a fiação, não a chamada: o `clearMocks` do jest.config.js apaga o
-    // histórico antes de cada teste, inclusive a chamada feita no import acima —
-    // afirmar `toHaveBeenCalled` aqui reprovaria sempre, com o código correto.
-    expect(typeof Mapbox.setAccessToken).toBe("function");
-  });
-});
-
-describe("registro do token", () => {
-  test("falha do módulo nativo ao registrar o token é registrada, não vira rejeição solta", async () => {
-    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-    jest.resetModules();
-    jest.doMock("@rnmapbox/maps", () => ({
-      __esModule: true,
-      default: {
-        setAccessToken: jest.fn(() => Promise.reject(new Error("módulo nativo ausente"))),
-        StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
-      },
-    }));
-    require("../../utils/mapStyle");
-
-    await new Promise((resolve) => setImmediate(resolve));
-
-    expect(warn).toHaveBeenCalledWith("mapStyle: falha ao configurar o token do Mapbox", "módulo nativo ausente");
-    warn.mockRestore();
+describe("MAP_STYLE", () => {
+  test("usa o estilo vetorial Liberty do OpenFreeMap, que não exige chave de acesso", () => {
+    expect(MAP_STYLE).toBe("https://tiles.openfreemap.org/styles/liberty");
   });
 });
 

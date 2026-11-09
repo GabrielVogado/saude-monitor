@@ -155,7 +155,7 @@ export function coordenadasParaExibicao(hospital) {
 /**
  * Monta a FeatureCollection dos halos das unidades para o mapa (F-07).
  *
- * O GeoJSON é agnóstico ao SDK de mapa (MapLibre antes, Mapbox `ShapeSource` agora).
+ * O GeoJSON é agnóstico ao SDK de mapa (entra sem conversão no `ShapeSource` de `utils/mapkit`).
  *
  * Cada feature carrega `id` e `nome` nas propriedades, para que o toque no
  * polígono consiga identificar o hospital de origem. Hospitais sem centro

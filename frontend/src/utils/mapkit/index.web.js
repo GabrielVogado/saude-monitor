@@ -1,11 +1,15 @@
 /**
- * Implementação Web do subconjunto de `@rnmapbox/maps` usado por GeoLocalizacaoScreen
+ * Implementação Web do adaptador de mapa (`utils/mapkit`) usado por GeoLocalizacaoScreen
  * e HospitalDetalheScreen (MapView, Camera, ShapeSource, FillLayer, LineLayer,
- * MarkerView) — ver o comentário de `index.js` para o porquê deste módulo existir.
+ * MarkerView). Ver o comentário de `index.js` para o porquê deste módulo existir.
  *
- * Usa `mapbox-gl` (já dependência do projeto, sem build nativo) atrás da mesma API
- * usada pelas telas, para não duplicar a lógica de negócio por plataforma. Não é uma
- * reimplementação genérica do SDK: cobre só as props que as duas telas realmente usam.
+ * Usa `maplibre-gl` (sem build nativo) atrás da mesma API usada pelas telas, para não
+ * duplicar a lógica de negócio por plataforma. Não é uma reimplementação genérica do
+ * SDK: cobre só as props que as duas telas realmente usam. Até 11/2026 era `mapbox-gl`;
+ * as duas bibliotecas têm a mesma origem e a mesma API para o que usamos aqui.
+ *
+ * Fica na linha 5 do `maplibre-gl`: a 6 é só ESM e carrega o worker por
+ * `import.meta.url`, que o bundler Web do Metro não resolve.
  */
 import React, {
   createContext,
@@ -20,10 +24,10 @@ import React, {
 } from "react";
 import { createRoot } from "react-dom/client";
 import { View } from "react-native";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
-
-mapboxgl.accessToken = process.env.EXPO_PUBLIC_MAPBOX_TOKEN || "";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { MAP_STYLE } from "../mapStyle";
+import { pinturaDaLinha, pinturaDoPreenchimento } from "./paint";
 
 const MapContext = createContext(null);
 const SourceContext = createContext(null);
@@ -31,7 +35,7 @@ const SourceContext = createContext(null);
 // React desmonta uma árvore de cima para baixo: quando `mapaMontado` vira false em
 // GeoLocalizacaoScreen, o cleanup do PRÓPRIO `MapView` (`mapa.remove()`) roda antes
 // dos cleanups de ShapeSource/FillLayer/LineLayer, que tentam `getLayer`/`removeLayer`/
-// `removeSource` num mapa que o mapbox-gl já destruiu por dentro — lança
+// `removeSource` num mapa que a biblioteca já destruiu por dentro — lança
 // "Cannot read properties of undefined" (achado ao clicar num marcador de hospital
 // no mapa: a tela ficava em branco). Cleanup de mapa é best-effort por natureza — se
 // o mapa já não existe mais, não há nada a desfazer.
@@ -59,21 +63,26 @@ export function MapView({ style, styleURL, onDidFinishLoadingMap, children }) {
   }, [mapa]);
 
   useEffect(() => {
-    const mapa = new mapboxgl.Map({
+    // A atribuição ao OpenStreetMap/OpenMapTiles é exigida pelo provedor dos tiles;
+    // compacta para não cobrir o card do hospital sobre o mapa.
+    const mapa = new maplibregl.Map({
       container: containerRef.current,
-      style: styleURL || "mapbox://styles/mapbox/streets-v12",
+      style: styleURL || MAP_STYLE,
       center: [0, 0],
       zoom: 0,
-      attributionControl: false,
+      attributionControl: { compact: true },
     });
     mapRef.current = mapa;
-    mapa.once("load", () => setMapa(mapa));
+    // `on` e não `once`: o `once` do maplibre-gl v5 também é tipado como Promise, e o
+    // `load` só dispara uma vez por mapa.
+    mapa.on("load", () => setMapa(mapa));
 
-    // O `mapbox-gl` só reage a resize da JANELA. Aqui o container muda de altura sem a
-    // janela mudar (a mensagem de GPS negado e o botão "Tentar novamente" entram depois
-    // do mapa montar e encolhem o `mapContainer`): o canvas ficava com a altura antiga
-    // (615 px num container de 526) — mapa descentralizado e ~90 px cortados embaixo.
-    // Na versão nativa isso é automático; aqui é o observador que faz o papel.
+    // O container muda de altura sem a janela mudar (a mensagem de GPS negado e o
+    // botão "Tentar novamente" entram depois do mapa montar e encolhem o
+    // `mapContainer`). Com o `mapbox-gl`, que só reagia a resize da janela, o canvas
+    // ficava com a altura antiga (615 px num container de 526): mapa descentralizado e
+    // ~90 px cortados embaixo. O observador garante o `resize()` em qualquer versão do
+    // GL JS. Na versão nativa isso é automático.
     const observador =
       typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => mapa.resize()) : null;
     observador?.observe(containerRef.current);
@@ -96,20 +105,22 @@ export function MapView({ style, styleURL, onDidFinishLoadingMap, children }) {
 
 export const Camera = forwardRef(function Camera({ centerCoordinate, zoomLevel }, ref) {
   const mapa = useContext(MapContext);
-  const posicionadoRef = useRef(false);
+  const [longitude, latitude] = centerCoordinate ?? [];
 
+  // Posiciona quando o mapa fica pronto e de novo só quando os NÚMEROS mudam (mesma
+  // regra do adaptador nativo): o Detalhe do Hospital recentra quando o hospital
+  // carrega, e um re-render com a mesma posição não desfaz o zoom do usuário.
   useEffect(() => {
-    if (mapa && !posicionadoRef.current) {
-      mapa.jumpTo({ center: centerCoordinate, zoom: zoomLevel });
-      posicionadoRef.current = true;
+    if (mapa) {
+      mapa.jumpTo({ center: [longitude, latitude], zoom: zoomLevel });
     }
-  }, [mapa, centerCoordinate, zoomLevel]);
+  }, [mapa, longitude, latitude, zoomLevel]);
 
   useImperativeHandle(
     ref,
     () => ({
       setCamera: ({ centerCoordinate: centro, zoomLevel: zoom, animationDuration }) => {
-        // Só repassa o que veio: no `mapbox-gl`, `flyTo({ zoom: undefined })` conta como
+        // Só repassa o que veio: no GL JS, `flyTo({ zoom: undefined })` conta como
         // "zoom informado" (`'zoom' in options`), vira NaN e o voo é descartado sem erro —
         // a câmera simplesmente não se mexia ao centralizar sem alterar o zoom.
         const opcoes = { duration: animationDuration ?? 0 };
@@ -232,24 +243,18 @@ function useCamadaGeoJson(tipo, id, converterEstilo) {
   });
 }
 
-export function FillLayer({ id, style = {} }) {
-  useCamadaGeoJson("fill", id, () => ({
-    "fill-color": style.fillColor,
-    ...(style.fillOpacity !== undefined ? { "fill-opacity": style.fillOpacity } : {}),
-  }));
+export function FillLayer({ id, style }) {
+  useCamadaGeoJson("fill", id, () => pinturaDoPreenchimento(style));
   return null;
 }
 
-export function LineLayer({ id, style = {} }) {
-  useCamadaGeoJson("line", id, () => ({
-    "line-color": style.lineColor,
-    ...(style.lineWidth !== undefined ? { "line-width": style.lineWidth } : {}),
-  }));
+export function LineLayer({ id, style }) {
+  useCamadaGeoJson("line", id, () => pinturaDaLinha(style));
   return null;
 }
 
 // Sem `anchor`: os marcadores do app são simétricos e a âncora padrão (centro) põe a
-// coordenada no meio do ícone — ver BUG-10 em GeoLocalizacaoScreen. O `mapbox-gl` só
+// coordenada no meio do ícone — ver BUG-10 em GeoLocalizacaoScreen. O GL JS só
 // aceita palavras-chave de âncora, não frações como `{x: 0, y: 0.5}` do SDK nativo.
 export function MarkerView({ coordinate, children }) {
   const mapa = useContext(MapContext);
@@ -260,7 +265,7 @@ export function MarkerView({ coordinate, children }) {
 
   useEffect(() => {
     if (!mapa) return undefined;
-    const marcador = new mapboxgl.Marker({ element: elemento })
+    const marcador = new maplibregl.Marker({ element: elemento })
       .setLngLat([longitude, latitude])
       .addTo(mapa);
     marcadorRef.current = marcador;

@@ -36,7 +36,7 @@ function comCatalogo(hospitais) {
   CatalogoLocal.lerCopiaGuardada.mockResolvedValue(hospitais);
 }
 
-// @rnmapbox/maps: componentes nativos não suportados pelo Jest;
+// utils/mapkit (adaptador do MapLibre): componentes nativos não suportados pelo Jest;
 // substituídos por Views que preservam os props (mesmo padrão do App.test.js).
 /**
  * Espiões COMPARTILHADOS da câmera.
@@ -49,7 +49,7 @@ function comCatalogo(hospitais) {
 const mockCamera = { setCamera: jest.fn(), fitBounds: jest.fn() };
 const mockMapView = { props: null };
 
-jest.mock("@rnmapbox/maps", () => {
+jest.mock("../../../utils/mapkit", () => {
   const ReactMock = require("react");
   const { View } = require("react-native");
   const stub = ({ children, ...props }) => <View {...props}>{children}</View>;
@@ -66,8 +66,6 @@ jest.mock("@rnmapbox/maps", () => {
 
   return {
     __esModule: true,
-    default: { setAccessToken: jest.fn(() => Promise.resolve(null)), StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" } },
-    StyleURL: { Street: "mapbox://styles/mapbox/streets-v11" },
     MapView: ({ children, ...props }) => {
       mockMapView.props = props;
       return <View {...props}>{children}</View>;

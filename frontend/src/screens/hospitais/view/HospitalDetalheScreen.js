@@ -24,7 +24,7 @@ import {
   geojsonParaCoordenadas,
   RAIO_EXIBICAO_METROS,
 } from "../../../utils/geojson";
-import { getInitialViewState, MAPBOX_STYLE } from "../../../utils/mapStyle";
+import { getInitialViewState, MAP_STYLE } from "../../../utils/mapStyle";
 import {
   duracaoMinutosDesde,
   formatarData,
@@ -190,7 +190,7 @@ export default function HospitalDetalheScreen({ navigation, route }) {
     return BRASIL_REGION;
   }, [centroide]);
 
-  // Posição da câmera no formato do Mapbox; recalculada quando o hospital carrega
+  // Posição da câmera no formato de `utils/mapkit`; recalculada quando o hospital carrega
   // (antes do `carregar`, `region` é BRASIL_REGION). Fica antes dos `return`
   // condicionais, junto dos demais hooks.
   const cameraDaRegiao = useMemo(() => getInitialViewState(region), [region]);
@@ -290,7 +290,7 @@ export default function HospitalDetalheScreen({ navigation, route }) {
 
         {haloGeoJson ? (
           <View style={styles.mapContainer}>
-            <MapView style={styles.map} styleURL={MAPBOX_STYLE}>
+            <MapView style={styles.map} styleURL={MAP_STYLE}>
               <Camera
                 centerCoordinate={cameraDaRegiao.centerCoordinate}
                 zoomLevel={cameraDaRegiao.zoomLevel}

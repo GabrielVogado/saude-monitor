@@ -1,37 +1,22 @@
 /**
- * Configuração de mapa do Mapbox (`@rnmapbox/maps` v10).
+ * Estilo do mapa e conversão de região legada em posição de câmera.
  *
- * Migração MapLibre → Mapbox (branch `feature/mapbox-migration`): o estilo raster
- * próprio do OpenStreetMap (`OSM_RASTER_STYLE`, removido) foi trocado pelo estilo
- * vetorial `Street` servido pela conta Mapbox. Exige token público (`pk.*`) em
- * `EXPO_PUBLIC_MAPBOX_TOKEN` — arquivo `.env` local (nunca commitado) e secret do
- * EAS/CI para builds. Sem token o mapa monta vazio; as telas continuam funcionando
- * (lista, câmera e geofences apenas não renderizam tiles).
+ * O mapa usa MapLibre (`@maplibre/maplibre-react-native` no aparelho, `maplibre-gl` na
+ * Web) com o estilo vetorial Liberty do OpenFreeMap: gratuito, sem chave de acesso e
+ * sem limite de acessos, mas sem SLA. A atribuição ao OpenStreetMap e ao OpenMapTiles
+ * é obrigatória e fica ligada nos dois adaptadores de `utils/mapkit`.
  *
- * Os geofences dos hospitais continuam GeoJSON produzido em `utils/geojson.js`
- * (círculos reconstruídos de centro + raio desde E8-03) — o formato é agnóstico
- * ao SDK e é entregue ao `ShapeSource` do Mapbox sem conversão. Os shapefiles de
- * pontos em `backend/data/` alimentam o seed do backend e não são tocados por
- * esta migração; as 4 camadas poligonais administrativas
- * (`multiplas_camadas_saude_14`) pertencem à F-11, adiada (D-01).
+ * O estilo é só esta URL: trocar de provedor (por exemplo, um PMTiles próprio servido
+ * pelo saudemonitor.dev, previsto no plano de escala) é mudar esta constante. Se o
+ * provedor cair, o mapa fica sem fundo; marcadores, geofences e lista continuam.
+ *
+ * Os geofences continuam GeoJSON de `utils/geojson.js`, agnóstico ao SDK.
  */
-
-import Mapbox from "@rnmapbox/maps";
-
-// Token público gerado no painel da Mapbox (https://account.mapbox.com).
-// Em `@rnmapbox/maps` v10 a chamada devolve uma Promise: sem o `.catch`, uma falha
-// do módulo nativo virava rejeição não tratada. O mapa só fica sem tiles, então basta
-// registrar.
-Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN || "").catch((erro) => {
-  // eslint-disable-next-line no-console
-  console.warn("mapStyle: falha ao configurar o token do Mapbox", erro?.message);
-});
-
-export const MAPBOX_STYLE = Mapbox.StyleURL.Street;
+export const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
 /**
  * Converte uma região legada (formato { latitude, longitude, latitudeDelta, longitudeDelta })
- * em posição inicial para a `Camera` do Mapbox.
+ * em posição inicial para a `Camera` de `utils/mapkit`.
  *
  * O zoom é aproximado a partir do `longitudeDelta`:
  *   zoom ≈ log2(360 / longitudeDelta)
@@ -42,10 +27,7 @@ export const MAPBOX_STYLE = Mapbox.StyleURL.Street;
  */
 export function getInitialViewState(region) {
   const { latitude, longitude, longitudeDelta = 0.02 } = region || {};
-  const zoom = Math.max(
-    0,
-    Math.min(19, Math.round(Math.log2(360 / longitudeDelta)))
-  );
+  const zoom = Math.max(0, Math.min(19, Math.round(Math.log2(360 / longitudeDelta))));
   return {
     centerCoordinate: [longitude, latitude],
     zoomLevel: zoom,

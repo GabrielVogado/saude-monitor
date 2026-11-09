@@ -12,7 +12,7 @@ import {
   GeolocalizacaoProvider,
   useGeolocalizacao,
 } from "../service/GeoLocalizacaoService";
-import { getInitialViewState, MAPBOX_STYLE } from "../../../utils/mapStyle";
+import { getInitialViewState, MAP_STYLE } from "../../../utils/mapStyle";
 import {
   centroDoHospital,
   geofencesParaFeatureCollection,
@@ -154,10 +154,10 @@ function GeolocalizacaoContent({ navigation }) {
    * atraso: desmonta o `<MapView>` primeiro, e só no efeito seguinte — depois de o
    * desmonte estar comprometido na árvore — é que navega.
    *
-   * Mantido na migração Mapbox (`feature/mapbox-migration`): o mecanismo da trava foi
-   * verificado no bytecode do MapLibre, não no Mapbox — mas desmontar-antes-de-navegar
-   * continua sendo a ordem segura também aqui (view destruída não recebe toque
-   * atrasado), e os testes de regressão abaixo seguem protegendo a ORDEM.
+   * O mecanismo da trava foi verificado no bytecode do MapLibre, que voltou a ser o SDK
+   * em 11/2026 depois de um período no Mapbox. Desmontar-antes-de-navegar continua
+   * sendo a ordem segura (view destruída não recebe toque atrasado), e os testes de
+   * regressão abaixo seguem protegendo a ORDEM.
    */
   const [mapaMontado, setMapaMontado] = useState(true);
   const hospitalPendente = useRef(null);
@@ -334,9 +334,9 @@ function GeolocalizacaoContent({ navigation }) {
     });
   }, [regionAtual]);
 
-  // Posição inicial da câmera, calculada uma vez por montagem: a `Camera` do Mapbox
-  // acompanha mudanças de props, então recalcular a cada render moveria o mapa
-  // sozinho sempre que o GPS atualizasse. O enquadramento nos hospitais continua
+  // Posição inicial da câmera, calculada uma vez por montagem: a `Camera` de
+  // `utils/mapkit` se move quando o centro ou o zoom das props mudam, então recalcular a
+  // cada render moveria o mapa sozinho sempre que o GPS atualizasse. O enquadramento nos hospitais continua
   // por conta do efeito `enquadrarHospitais` (fitBounds) abaixo.
   const cameraInicial = useMemo(() => getInitialViewState(BRASIL_REGION), []);
 
@@ -461,8 +461,8 @@ function GeolocalizacaoContent({ navigation }) {
        * fica negativa (ou maior que a altura) e o desenho escapa para o resto da tela.
        *
        * Basta um ancestral recortando para conter tudo: `overflow: "hidden"` neste
-       * container faz o RN limitar o canvas à área do mapa. Mantido na migração
-       * Mapbox — o `MarkerView` tem o mesmo modelo de posicionamento.
+       * container faz o RN limitar o canvas à área do mapa. Vale para o Mapbox e
+       * para o MapLibre: o `MarkerView` tem o mesmo modelo de posicionamento nos dois.
        *
        * O container também substitui o placeholder que existia aqui: ele tem `flex: 1`
        * e permanece montado quando o `<MapView>` sai (ver `abrirHospital`), então a
@@ -473,7 +473,7 @@ function GeolocalizacaoContent({ navigation }) {
         {mapaMontado ? (
           <MapView
             style={styles.map}
-            styleURL={MAPBOX_STYLE}
+            styleURL={MAP_STYLE}
             onDidFinishLoadingMap={enquadrarHospitais}
           >
             <Camera

@@ -3765,3 +3765,57 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
   lá dentro (o primeiro sinal recebe 409 e o app esquece a visita).
 - Precisa de teste de campo com o APK novo: visita automática de mais de 15 min com o app fechado,
   saída sem internet e reconexão depois. O esperado é a visita como Finalizada com o tempo real.
+
+---
+
+## M-071 — Mapa volta para MapLibre, sem cobrança por usuário ativo
+
+**Data:** 09/11/2026 · **PR:** (este PR) · **Origem:** pedido do PO; decisão D3 do `Plano-Escala-Infraestrutura-DF-v1.0` e P6 da `Analise-Escalabilidade-Seguranca-DF-v1.0`
+
+### Como era
+
+- O mapa do app usava `@rnmapbox/maps` v10 com o estilo `Street` da conta Mapbox, e a Web usava
+  `mapbox-gl` v2 atrás do adaptador `utils/mapkit`. O Mapbox cobra por usuário ativo do SDK: na
+  conta do plano de escala, +~US$ 500/mês na fase P2 e +~US$ 4.700/mês na P4, mais que todo o resto
+  da infraestrutura somado.
+- O build dependia do Maven privado da Mapbox em `android/build.gradle` e do segredo
+  `EXPO_PUBLIC_MAPBOX_TOKEN`. Sem o token o APK saía com o mapa em branco.
+- A Web criava o mapa com `attributionControl: false`.
+
+### O que mudou (só app e pipeline do APK)
+
+- **Bibliotecas:** `@maplibre/maplibre-react-native` v11 (Fabric, SDK nativo no Maven Central, sem
+  token) e `maplibre-gl` v5 na Web. A v5 e não a 6: a 6 é só ESM e carrega o worker por
+  `import.meta.url`, que o bundler Web do Metro não resolve.
+- **Tiles:** estilo vetorial Liberty do OpenFreeMap (`src/utils/mapStyle.js`, `MAP_STYLE`), gratuito,
+  sem chave e sem limite de acessos, mas sem SLA. Se o provedor cair, o mapa fica sem fundo e
+  marcadores, geofences e lista seguem funcionando. `mapStyle.web.js` deixou de existir: sem token,
+  o arquivo é o mesmo nas duas plataformas.
+- **Adaptador nativo** (`src/utils/mapkit/index.js`): a v11 renomeou a API (`Map`, `GeoJSONSource`,
+  `Layer`, `Marker`, câmera por `setStop`). O adaptador mantém o que as telas usam (`MapView`,
+  `Camera.setCamera`/`fitBounds`, `ShapeSource`, `FillLayer`, `LineLayer`, `MarkerView`), então
+  GeoLocalizacaoScreen e HospitalDetalheScreen só trocam o nome da constante do estilo. A câmera
+  entra pela posição inicial e só se move com um centro ou zoom NOVO nas props, para uma leitura de
+  GPS não desfazer o zoom do usuário. Falha do módulo nativo vira aviso no console, não exceção.
+- **Atribuição:** ligada nos dois lados (OpenStreetMap/OpenMapTiles, exigida pelo provedor). Na Web
+  fica compacta, aberta no começo e recolhida ao mexer no mapa.
+- **Build e CI:** sai o Maven privado da Mapbox do `android/build.gradle`. Sai
+  `EXPO_PUBLIC_MAPBOX_TOKEN` do `cd-mobile-apk.yml` e da tabela de secrets do MANUAL (§4.3). O
+  AndroidManifest versionado não muda: a biblioteca só declara `INTERNET` e localização, que o app
+  já tem.
+- **Testes:** novo `mapkit.test.js` com o contrato do adaptador nativo (conversão da câmera,
+  `fitBounds` em `[oeste, sul, leste, norte]`, toque com `features`, `paint` das camadas). As telas
+  passam a mockar o próprio `utils/mapkit`, não a biblioteca.
+- **Validado na Web** (export do Expo + Playwright, API e estilo simulados porque o proxy da nuvem
+  não alcança o OpenFreeMap): marcadores, toque abrindo o card, filtro de 1 km sem zoom máximo
+  (M-064), geofence no Detalhe do Hospital e atribuição.
+
+### O que ficou de fora
+
+- **Teste no aparelho:** o APK DEV precisa ser conferido em campo (mapa com tiles reais, toque no
+  geofence, marcadores, voltar do detalhe). A API nativa da v11 só roda no aparelho.
+- **PMTiles próprio:** antes da fase P2, servir um recorte do DF pelo saudemonitor.dev (Cloudflare
+  R2) e trocar só a URL de `MAP_STYLE`. O MapLibre nativo lê `pmtiles://` desde a 11.7 (a
+  biblioteca traz a 13.6.1); na Web é preciso registrar o protocolo com o pacote `pmtiles`.
+- O segredo `EXPO_PUBLIC_MAPBOX_TOKEN` pode ser apagado do repositório depois do merge, e a conta
+  Mapbox encerrada.

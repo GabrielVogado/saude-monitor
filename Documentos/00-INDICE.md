@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 09/11/2026 — Homologação v1.0.0-rc.13
+
+**O que entrou:** registro da rc que leva a correção do teste do rate limit (PR #247, M-072, só backend e sem mudança de comportamento em produção). O app sai igual ao da rc.12. O roteiro confere o uso normal sem 429 e remete ao roteiro da rc.12 inteiro, que não foi feito. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.13.md`](./10-git-flow/homologacoes/v1.0.0-rc.13.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
+
+---
+
 ## 📌 Revisão 09/11/2026 — Teste do rate limit na virada do minuto
 
 **O que mudou:** o teste do teto por IP falhava quando as 101 chamadas atravessavam a virada da janela fixa de 1 minuto (CI do PR #246). O `RateLimitService` passa a receber o relógio pelo construtor; o teste usa um relógio parado. Sem mudança de comportamento em produção. Registro em `Historico-Melhorias.md` (M-072).

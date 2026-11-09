@@ -3918,3 +3918,43 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
   passos do PO. Pesquisa de disponibilidade em 11/11/2026: nenhum processo no INPI, .com.br e
   .dev livres, nenhum app com o nome na Play.
 - O site precisa ser republicado (wrangler) para o novo nome aparecer em `saudemonitor.dev`.
+
+---
+
+## M-076 — Chave do JWT com rotação por `kid` (SEG-04)
+
+**Data:** 11/11/2026 · **PR:** (este PR) · **Origem:** SEG-04 da Análise de Escalabilidade, Segurança e Custo (item 8 das pendências do guia técnico de 25/10/2026)
+
+### Como era
+
+- Todos os tokens (access de 15 min e refresh de 30 dias) eram assinados com uma chave só
+  (`JWT_SECRET`), sem identificador no cabeçalho (`JwtService`: `Keys.hmacShaKeyFor(secret)`).
+- Se a chave vazasse, dava para fabricar token de qualquer conta, inclusive admin. Trocar a chave
+  invalidava todas as sessões de uma vez, então na prática ela nunca seria trocada.
+
+### O que mudou (só backend)
+
+- **Chaves com `kid`:** `JwtProperties` ganha `chaves` (`JWT_CHAVES`, JSON `{"kid": "segredo"}`) e
+  `chaveAtiva` (`JWT_CHAVE_ATIVA`). O token novo leva no cabeçalho o `kid` da chave ativa; a
+  validação escolhe a chave pelo `kid` (`ChavesJwt`, um `keyLocator` do jjwt) e aceita as chaves
+  antigas ainda publicadas. `kid` desconhecido é token inválido, mesmo com assinatura de outra chave
+  conhecida.
+- **Transição:** `JWT_SECRET` vira a chave legada, sem `kid`. Ela assina enquanto não houver chave
+  ativa (o comportamento de antes, que continua valendo nos ambientes até a primeira rotação) e
+  valida os tokens sem `kid`. Sem ela configurada, token sem `kid` é recusado.
+- **Boot:** chave com menos de 32 bytes, JSON inválido, `kid` fora de `[A-Za-z0-9._-]{1,64}`, chave
+  ativa fora do mapa ou nenhuma chave para assinar derrubam a aplicação, como no SEG-07. As
+  mensagens citam o `kid`, nunca o segredo. As chaves chegam como texto JSON, e não como mapa no
+  bind do Spring, porque a falha de conversão do bind imprime o valor (com os segredos) no log.
+- **Procedimento** em `deploy/google/README.md`: publicar a chave nova sem ativar, ativar no deploy
+  seguinte, retirar a antiga depois de 30 dias (a validade do refresh).
+- HMAC continua: assimétrico (RS256/ES256) só faz falta quando alguém além do próprio backend
+  validar os tokens (opção B da análise).
+
+### O que ficou de fora
+
+- A primeira rotação nos ambientes: criar `JWT_CHAVES` e `JWT_CHAVE_ATIVA` (com os sufixos `_HOM` e
+  `_PROD`) no Secret Manager e incluir as linhas no `cd-backend-google.yml`. Incluir antes de os
+  secrets existirem derrubaria o deploy.
+- Retirar a chave legada: depois de 30 dias com chave ativa em todos os ambientes, um PR que tira
+  `JWT_SECRET` do workflow e o valor padrão de desenvolvimento de `app.jwt.secret`.

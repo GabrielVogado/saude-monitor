@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 11/11/2026 — Chave do JWT com rotação (SEG-04)
+
+**O que mudou:** o backend passa a aceitar mais de uma chave do JWT ao mesmo tempo. O token novo leva no cabeçalho o `kid` da chave ativa (`JWT_CHAVE_ATIVA`) e a validação escolhe a chave pelo `kid` entre as publicadas (`JWT_CHAVES`); a chave atual (`JWT_SECRET`) vira legada, sem `kid`, e segue assinando até a primeira rotação. Configuração inválida derruba o boot. Procedimento de rotação em `deploy/google/README.md` e registro em `Historico-Melhorias.md` (M-076).
+**Também:** `De-Para-Backlog-Features.md` ganha SEG-04 como parcial (falta a primeira rotação nos ambientes).
+
+---
+
 ## 📌 Revisão 11/11/2026 — Projeto passa a se chamar Pulseira Verde
 
 **O que mudou:** "Radar Saúde" é marca registrada de terceiro no INPI (nº 928495230, classe 42). A pedido do PO, o nome de exibição passa a ser **Pulseira Verde** no app, no painel admin, na mensagem de manutenção do backend, no site `saudemonitor.dev`, nos títulos das GitHub Releases, no Sonar, no `perf/` e na documentação ativa. Identificadores técnicos (pacote Android, pacote Java, banco, serviços do Cloud Run, domínio, Worker do site) não mudam. Registros históricos ficam com o nome da época. Registro em `Historico-Melhorias.md` (M-074).

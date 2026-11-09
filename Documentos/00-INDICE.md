@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 09/11/2026 — Teste do rate limit na virada do minuto
+
+**O que mudou:** o teste do teto por IP falhava quando as 101 chamadas atravessavam a virada da janela fixa de 1 minuto (CI do PR #246). O `RateLimitService` passa a receber o relógio pelo construtor; o teste usa um relógio parado. Sem mudança de comportamento em produção. Registro em `Historico-Melhorias.md` (M-072).
+**Sem mudança:** `De-Para-Backlog-Features.md` (correção de teste, sem estória).
+
+---
+
 ## 📌 Revisão 09/11/2026 — Homologação v1.0.0-rc.12
 
 **O que entrou:** registro da rc que leva duas mudanças do app: a renovação da sessão antes do pedido e a visita provisória da entrada sem internet (PR #243, M-070, correção do teste de campo de 29/10) e o mapa com MapLibre e OpenFreeMap no lugar do Mapbox (PR #244, M-071). O backend sai igual ao da rc.11. O roteiro começa pelo mapa e pela visita automática de mais de 15 min, com e sem internet, e remete ao roteiro da rc.11 inteiro, que não foi feito. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.12.md`](./10-git-flow/homologacoes/v1.0.0-rc.12.md).

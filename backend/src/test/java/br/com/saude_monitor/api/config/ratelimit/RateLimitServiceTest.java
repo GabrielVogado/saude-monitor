@@ -2,6 +2,8 @@ package br.com.saude_monitor.api.config.ratelimit;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -56,6 +58,20 @@ class RateLimitServiceTest {
         service.limparObsoletos(agora + (5 * RateLimitService.JANELA_MS));
         // Após limpar, a mesma chave pode consumir novamente.
         assertThat(service.tentarConsumir("ip-antigo", RateLimitService.Grupo.PUBLICO)).isTrue();
+    }
+
+    @Test
+    void contadorRecomecaQuandoAJanelaDeUmMinutoVira() {
+        AtomicLong agoraEmMs = new AtomicLong(RateLimitService.JANELA_MS - 1);
+        RateLimitService service = new RateLimitService(RateLimitFilterTest.PADRAO, agoraEmMs::get);
+        for (int i = 0; i < 10; i++) {
+            service.tentarConsumir("ip", RateLimitService.Grupo.AUTH);
+        }
+        assertThat(service.tentarConsumir("ip", RateLimitService.Grupo.AUTH)).isFalse();
+
+        agoraEmMs.incrementAndGet();
+
+        assertThat(service.tentarConsumir("ip", RateLimitService.Grupo.AUTH)).isTrue();
     }
 
     @Test

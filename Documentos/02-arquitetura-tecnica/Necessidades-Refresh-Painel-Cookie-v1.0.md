@@ -5,7 +5,7 @@
 > | **Versão** | 1.0 |
 > | **Data** | 09/11/2026 |
 > | **Base** | branch `feature/refresh-painel-admin` (código do item 7 pronto, ainda sem PR) |
-> | **Natureza** | Lista do que falta fora do código, ou depois dele, para o item 7 valer ponta a ponta. O que foi implementado está no [ADR-013](../08-analise%20tecnica/adrs.md), na [Especificação §3.1](./Especificacao-API-v2.4.md) e na M-071 do [Histórico de Melhorias](../09-melhoria-continua/Historico-Melhorias.md). |
+> | **Natureza** | Lista do que falta fora do código, ou depois dele, para o item 7 valer ponta a ponta. O que foi implementado está no [ADR-013](../08-analise%20tecnica/adrs.md), na [Especificação §3.1](./Especificacao-API-v2.4.md) e na M-073 do [Histórico de Melhorias](../09-melhoria-continua/Historico-Melhorias.md). |
 > | **Fonte das dependências** | Guia técnico de pendências de 25/10/2026, itens 3, 7 e I4 |
 
 ---

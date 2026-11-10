@@ -670,10 +670,13 @@ class AuthServiceImplTest {
     void loginPainelDeContaNaoAdminRecebeOMesmoErroDeSenhaErrada() {
         when(userRepository.findByEmail("admin@email.com")).thenReturn(Optional.of(contaComSenha(Papel.USER)));
 
+        LoginRequest senhaCerta = new LoginRequest("admin@email.com", "S3nh@Forte!", false);
+        LoginRequest senhaErrada = new LoginRequest("admin@email.com", "outra-senha", false);
+
         NaoAutorizadoException comSenhaCerta = assertThrows(NaoAutorizadoException.class,
-                () -> authService.loginPainel(new LoginRequest("admin@email.com", "S3nh@Forte!", false)));
+                () -> authService.loginPainel(senhaCerta));
         NaoAutorizadoException comSenhaErrada = assertThrows(NaoAutorizadoException.class,
-                () -> authService.loginPainel(new LoginRequest("admin@email.com", "outra-senha", false)));
+                () -> authService.loginPainel(senhaErrada));
 
         assertEquals(comSenhaErrada.getMessage(), comSenhaCerta.getMessage());
     }
@@ -681,9 +684,9 @@ class AuthServiceImplTest {
     @Test
     void loginPainelDeContaSemPapelEhRecusado() {
         when(userRepository.findByEmail("admin@email.com")).thenReturn(Optional.of(contaComSenha(null)));
+        LoginRequest request = new LoginRequest("admin@email.com", "S3nh@Forte!", false);
 
-        assertThrows(NaoAutorizadoException.class,
-                () -> authService.loginPainel(new LoginRequest("admin@email.com", "S3nh@Forte!", false)));
+        assertThrows(NaoAutorizadoException.class, () -> authService.loginPainel(request));
     }
 
     @Test

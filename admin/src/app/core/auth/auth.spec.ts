@@ -75,8 +75,8 @@ describe('Auth', () => {
     service.renovar().subscribe();
     http.expectOne(REFRESH).flush(respostaAdmin);
 
-    http.expectNone(`${BASE}/api/v1/auth/login`);
-    http.expectNone(`${BASE}/api/v1/auth/refresh`);
+    expect(http.match(`${BASE}/api/v1/auth/login`)).toHaveLength(0);
+    expect(http.match(`${BASE}/api/v1/auth/refresh`)).toHaveLength(0);
   });
 
   it('recusa conta não-ADMIN sem autenticar', () => {

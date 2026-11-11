@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 11/11/2026 — Homologação v1.0.0-rc.15
+
+**O que entrou:** registro da rc que leva o nome Pulseira Verde no app, no painel e no backend (PR #253, M-074), a chave do JWT com rotação por `kid` (PR #256, M-076, ainda desligada: homologação segue assinando com a chave legada) e o teto de 10 min da análise do Sonar no CI (PR #254). O roteiro confere o nome novo no aparelho e a sessão sem regressão, e remete aos roteiros da rc.14 e da rc.13, que não foram feitos. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.15.md`](./10-git-flow/homologacoes/v1.0.0-rc.15.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
+
+---
+
 ## 📌 Revisão 11/11/2026 — Chave do JWT com rotação (SEG-04)
 
 **O que mudou:** o backend passa a aceitar mais de uma chave do JWT ao mesmo tempo. O token novo leva no cabeçalho o `kid` da chave ativa (`JWT_CHAVE_ATIVA`) e a validação escolhe a chave pelo `kid` entre as publicadas (`JWT_CHAVES`); a chave atual (`JWT_SECRET`) vira legada, sem `kid`, e segue assinando até a primeira rotação. Configuração inválida derruba o boot. Procedimento de rotação em `deploy/google/README.md` e registro em `Historico-Melhorias.md` (M-076).

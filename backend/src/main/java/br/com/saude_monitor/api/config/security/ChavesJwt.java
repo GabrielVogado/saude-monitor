@@ -35,7 +35,7 @@ final class ChavesJwt extends LocatorAdapter<Key> {
     /** HS256 exige chave de pelo menos 256 bits. */
     static final int TAMANHO_MINIMO_BYTES = 32;
 
-    /** Vai no cabeçalho de todo token: só caracteres seguros e tamanho limitado. */
+    /** Vai no cabeçalho de cada token: só caracteres seguros e tamanho limitado. */
     private static final Pattern FORMATO_KID = Pattern.compile("[A-Za-z0-9._-]{1,64}");
 
     private final Map<String, SecretKey> porKid;

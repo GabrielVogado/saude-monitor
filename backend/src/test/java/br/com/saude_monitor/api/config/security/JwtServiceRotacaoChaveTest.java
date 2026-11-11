@@ -1,6 +1,8 @@
 package br.com.saude_monitor.api.config.security;
 
 import br.com.saude_monitor.api.user.document.UserDocument;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
@@ -43,7 +45,11 @@ class JwtServiceRotacaoChaveTest {
     private static String kidDoCabecalho(String token) {
         String cabecalho = new String(Base64.getUrlDecoder().decode(token.split("\\.")[0]),
                 StandardCharsets.UTF_8);
-        return cabecalho.contains("\"kid\"") ? cabecalho.replaceAll(".*\"kid\":\"([^\"]+)\".*", "$1") : null;
+        try {
+            return new ObjectMapper().readTree(cabecalho).path("kid").textValue();
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     /** Access token montado à mão, para simular quem tem (ou inventa) uma chave. */

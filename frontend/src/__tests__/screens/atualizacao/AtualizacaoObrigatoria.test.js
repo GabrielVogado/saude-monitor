@@ -54,7 +54,7 @@ describe("AtualizacaoObrigatoria", () => {
     renderizar();
 
     expect(await screen.findByText("Conteúdo do app")).toBeTruthy();
-    expect(screen.queryByText("Atualize o Radar Saúde")).toBeNull();
+    expect(screen.queryByText("Atualize a Pulseira Verde")).toBeNull();
   });
 
   test("abaixo da mínima mostra a tela de atualização no lugar do app", async () => {
@@ -62,7 +62,7 @@ describe("AtualizacaoObrigatoria", () => {
 
     renderizar();
 
-    expect(await screen.findByText("Atualize o Radar Saúde")).toBeTruthy();
+    expect(await screen.findByText("Atualize a Pulseira Verde")).toBeTruthy();
     expect(screen.queryByText("Conteúdo do app")).toBeNull();
   });
 
@@ -111,7 +111,7 @@ describe("AtualizacaoObrigatoria", () => {
       ouvinteAppState("active");
     });
 
-    expect(await screen.findByText("Atualize o Radar Saúde")).toBeTruthy();
+    expect(await screen.findByText("Atualize a Pulseira Verde")).toBeTruthy();
     expect(ConfiguracaoRemota.obterConfiguracao).toHaveBeenCalledTimes(2);
   });
 
@@ -131,6 +131,6 @@ describe("AtualizacaoObrigatoria", () => {
     renderizar();
 
     expect(await screen.findByText("Conteúdo do app")).toBeTruthy();
-    expect(screen.queryByText("Atualize o Radar Saúde")).toBeNull();
+    expect(screen.queryByText("Atualize a Pulseira Verde")).toBeNull();
   });
 });

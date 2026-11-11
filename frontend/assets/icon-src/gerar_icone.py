@@ -1,4 +1,4 @@
-# Fonte do icone "Radar Saude" — pin de localizacao com cruz de saude vazada
+# Fonte do icone "Pulseira Verde" — pin de localizacao com cruz de saude vazada
 # (pontas arredondadas, de proposito distinta do simbolo do SUS) + duas ondas de
 # radar acima, na cor de marca do app (#006193).
 #

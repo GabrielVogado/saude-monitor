@@ -4,7 +4,7 @@
 #   bash perf/scripts/executar.sh baseline    # sempre primeiro (2 usuários)
 #   bash perf/scripts/executar.sh carga100    # 100 usuários simultâneos
 #
-# Durante a execução, acompanhe ao vivo em http://localhost:3000 (painel "Radar Saúde —
+# Durante a execução, acompanhe ao vivo em http://localhost:3000 (painel "Pulseira Verde —
 # Desempenho"). Resultados em perf/resultados/<data>-<cenário>/:
 #   summary.json        resumo exportado pelo k6
 #   k6.log              saída do k6 (inclui o vigia de op/s do Mongo)

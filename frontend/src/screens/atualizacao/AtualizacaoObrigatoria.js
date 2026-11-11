@@ -58,7 +58,7 @@ export default function AtualizacaoObrigatoria({ children }) {
     <View style={styles.tela} accessibilityViewIsModal>
       <CSEmptyState
         icon={Download}
-        title="Atualize o Radar Saúde"
+        title="Atualize a Pulseira Verde"
         message="Esta versão do app não é mais aceita. Instale a versão nova na loja para continuar."
         actionLabel="Atualizar agora"
         onAction={abrirLoja}

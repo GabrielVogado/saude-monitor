@@ -1,20 +1,17 @@
 import React, {useState} from "react";
 import {
     Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from "react-native";
-import {SafeAreaView} from "react-native-safe-area-context";
 import {HeartHandshake, Lock, Mail} from "lucide-react-native";
 import LoginService from "../service/LoginService";
 import {colors} from "../../../theme";
 import CSRodapeLegal, {CSAvisoLgpd} from "../../../components/CSRodapeLegal";
 import styles from "./css/LoginStyle";
+import TelaAuth from "./TelaAuth";
 
 export default function LoginScreen({navigation}) {
     const [email, setEmail] = useState("");
@@ -58,119 +55,107 @@ export default function LoginScreen({navigation}) {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                style={styles.keyboardAvoidingView}
-            >
-                <ScrollView contentContainerStyle={styles.scrollContent}>
+        <TelaAuth>
 
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <Text style={styles.headerTitle}>Radar Saúde</Text>
+            {/* Main Card */}
+            <View style={styles.card}>
+
+                <View style={styles.imageContainer}>
+                    <HeartHandshake size={44} color={colors.primary} />
+                </View>
+
+                <Text style={styles.title}>Sua conta</Text>
+                <Text style={styles.subtitle}>
+                    Entre para acompanhar seu histórico de visitas e suas avaliações.
+                </Text>
+
+                {/* Form */}
+                <View style={styles.form}>
+
+                    {/* Email */}
+                    <Text style={styles.label}>E-MAIL OU USUÁRIO</Text>
+                    <View style={styles.inputContainer}>
+                        <Mail size={20} color={colors.outline} style={styles.inputIcon} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="E-mail ou Nome de Usuario"
+                            placeholderTextColor={colors.outline}
+                            value={email}
+                            onChangeText={setEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                        />
                     </View>
 
-                    {/* Main Card */}
-                    <View style={styles.card}>
+                    {/* Senha */}
+                    <Text style={styles.label}>SENHA</Text>
+                    <View style={styles.inputContainer}>
+                        <Lock size={20} color={colors.outline} style={styles.inputIcon} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="••••••••"
+                            placeholderTextColor={colors.outline}
+                            value={password}
+                            onChangeText={setPassword}
+                            secureTextEntry
+                        />
+                    </View>
 
-                        <View style={styles.imageContainer}>
-                            <HeartHandshake size={44} color={colors.primary} />
-                        </View>
+                    {/* Options */}
+                    <View style={styles.optionsContainer}>
+                        <TouchableOpacity
+                            style={styles.checkboxContainer}
+                            onPress={() => setRememberDevice(!rememberDevice)}
+                            accessibilityRole="checkbox"
+                            accessibilityState={{checked: rememberDevice}}
+                            accessibilityLabel="Lembrar este dispositivo"
+                        >
+                            <View style={[styles.checkbox, rememberDevice && styles.checkboxActive]} />
+                            <Text style={styles.optionText}>Lembrar este dispositivo</Text>
+                        </TouchableOpacity>
 
-                        <Text style={styles.title}>Sua conta</Text>
-                        <Text style={styles.subtitle}>
-                            Entre para acompanhar seu histórico de visitas e suas avaliações.
+                        <TouchableOpacity
+                            onPress={() => navigation?.navigate?.("EsqueciSenha")}
+                            accessibilityRole="button"
+                            accessibilityLabel="Esqueci minha senha"
+                        >
+                            <Text style={styles.link}>Esqueci minha senha</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Login Button */}
+                    <TouchableOpacity
+                        style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+                        onPress={handleLogin}
+                        disabled={loading}
+                        accessibilityRole="button"
+                        accessibilityLabel={loading ? "Entrando" : "Entrar"}
+                        accessibilityState={{disabled: loading, busy: loading}}
+                    >
+                        <Text style={styles.loginButtonText}>
+                            {loading ? "Entrando…" : "Entrar"}
                         </Text>
+                    </TouchableOpacity>
 
-                        {/* Form */}
-                        <View style={styles.form}>
+                    <TouchableOpacity
+                        style={styles.semContaButton}
+                        onPress={() => navigation.goBack?.()}
+                        accessibilityRole="button"
+                        accessibilityLabel="Continuar sem conta"
+                    >
+                        <Text style={styles.semContaText}>Continuar sem conta</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.semContaHelper}>
+                        Você pode usar o app sem se cadastrar. A conta serve só para guardar
+                        seu histórico e suas avaliações.
+                    </Text>
+                </View>
 
-                            {/* Email */}
-                            <Text style={styles.label}>E-MAIL OU USUÁRIO</Text>
-                            <View style={styles.inputContainer}>
-                                <Mail size={20} color={colors.outline} style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="E-mail ou Nome de Usuario"
-                                    placeholderTextColor={colors.outline}
-                                    value={email}
-                                    onChangeText={setEmail}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                />
-                            </View>
+                <CSAvisoLgpd />
+            </View>
 
-                            {/* Senha */}
-                            <Text style={styles.label}>SENHA</Text>
-                            <View style={styles.inputContainer}>
-                                <Lock size={20} color={colors.outline} style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="••••••••"
-                                    placeholderTextColor={colors.outline}
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    secureTextEntry
-                                />
-                            </View>
+            <CSRodapeLegal onPrivacidade={() => navigation.navigate?.("Privacidade")} linkStyle={styles.link} />
 
-                            {/* Options */}
-                            <View style={styles.optionsContainer}>
-                                <TouchableOpacity
-                                    style={styles.checkboxContainer}
-                                    onPress={() => setRememberDevice(!rememberDevice)}
-                                    accessibilityRole="checkbox"
-                                    accessibilityState={{checked: rememberDevice}}
-                                    accessibilityLabel="Lembrar este dispositivo"
-                                >
-                                    <View style={[styles.checkbox, rememberDevice && styles.checkboxActive]} />
-                                    <Text style={styles.optionText}>Lembrar este dispositivo</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    onPress={() => navigation?.navigate?.("EsqueciSenha")}
-                                    accessibilityRole="button"
-                                    accessibilityLabel="Esqueci minha senha"
-                                >
-                                    <Text style={styles.link}>Esqueci minha senha</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Login Button */}
-                            <TouchableOpacity
-                                style={[styles.loginButton, loading && styles.loginButtonDisabled]}
-                                onPress={handleLogin}
-                                disabled={loading}
-                                accessibilityRole="button"
-                                accessibilityLabel={loading ? "Entrando" : "Entrar"}
-                                accessibilityState={{disabled: loading, busy: loading}}
-                            >
-                                <Text style={styles.loginButtonText}>
-                                    {loading ? "Entrando…" : "Entrar"}
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.semContaButton}
-                                onPress={() => navigation.goBack?.()}
-                                accessibilityRole="button"
-                                accessibilityLabel="Continuar sem conta"
-                            >
-                                <Text style={styles.semContaText}>Continuar sem conta</Text>
-                            </TouchableOpacity>
-                            <Text style={styles.semContaHelper}>
-                                Você pode usar o app sem se cadastrar. A conta serve só para guardar
-                                seu histórico e suas avaliações.
-                            </Text>
-                        </View>
-
-                        <CSAvisoLgpd />
-                    </View>
-
-                    <CSRodapeLegal onPrivacidade={() => navigation.navigate?.("Privacidade")} linkStyle={styles.link} />
-
-                </ScrollView>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
+        </TelaAuth>
     );
 }

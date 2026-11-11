@@ -3880,3 +3880,41 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
   mas volta ao login ao recarregar a aba e quando o access token de 15 min vence.
 - CSP estrita no painel (citada no SEG-05) não entrou: o painel ainda não tem hospedagem onde
   definir os cabeçalhos.
+
+---
+
+## M-074 — Projeto passa a se chamar Pulseira Verde
+
+**Data:** 11/11/2026 · **PR:** (este PR) · **Origem:** pedido do PO em 11/11/2026
+
+### Como era
+
+- O app, o painel, o site e a documentação usavam o nome "Radar Saúde". A marca RADAR SAÚDE é
+  registro em vigor de terceiro no INPI (nº 928495230, classe 42, software), e o domínio
+  radarsaude.com.br é da mesma empresa. Lançar com esse nome expunha o app a notificação e a pedido
+  de remoção na loja.
+
+### O que mudou
+
+- **Nome de exibição** trocado para "Pulseira Verde" (a cor da triagem de UPA e pronto-socorro
+  para casos leves, o público do app) no app (nome do aparelho por flavor DEV/HML/prod, telas de
+  login, recuperação de senha, confirmação de e-mail, atualização obrigatória, privacidade, perfil,
+  título da notificação e aviso de localização em segundo plano), no painel admin, na mensagem de
+  manutenção do backend, nas páginas do site `saudemonitor.dev`, nos títulos das GitHub Releases,
+  nos nomes de projeto do Sonar, no `perf/` e na documentação ativa. O nome é tratado no feminino
+  ("a Pulseira Verde").
+- **Sem mudança técnica:** pacote Android `com.gabrielvogado.saudemonitor`, pacote Java
+  `br.com.saude_monitor`, coleções do Mongo, serviços do Cloud Run, domínio `saudemonitor.dev`,
+  Worker `radar-saude-site`, nome do arquivo `logo-radar-saude.png` e o domínio fictício
+  `radarsaude.invalid` da massa de dados. Trocá-los não muda nada para o usuário e quebraria
+  deploys e vínculos.
+- Registros históricos (homologações já publicadas, entradas antigas deste histórico, relatório de
+  desempenho de 23/09 e revisões antigas do índice) ficam com o nome da época.
+
+### O que ficou de fora
+
+- Ícone e logo continuam os atuais (pin com cruz); trocar para uma pulseira é decisão de design.
+- Registro do domínio pulseiraverde.com.br e depósito da marca no INPI (classes 9, 42 e 44) são
+  passos do PO. Pesquisa de disponibilidade em 11/11/2026: nenhum processo no INPI, .com.br e
+  .dev livres, nenhum app com o nome na Play.
+- O site precisa ser republicado (wrangler) para o novo nome aparecer em `saudemonitor.dev`.

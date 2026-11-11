@@ -25,7 +25,7 @@ Este guia configura o pipeline de CI/CD usando **GitHub Actions** + serviços gr
 | **hom** (homologação) | `master` | `saude-monitor-backend-hom` — criado no 1º deploy do `cd-homologacao.yml`; exige os secrets `_HOM` (`bash deploy/google/setup-homologacao.sh`) | — (sem provedor) | `saude_monitor_hom` |
 | **prod** (produção) | `release/<tag>` | `saude-monitor-backend` ⚠️ *não criado* — os secrets `_PROD` também não existem, e o deploy falha de propósito | — (sem provedor) | `saude_monitor_prod` ⚠️ *não criado* |
 
-> O APK de homologação ("Radar Saúde HML") é publicado como **GitHub Release** a cada
+> O APK de homologação ("Pulseira Verde HML") é publicado como **GitHub Release** a cada
 > tag `vX.Y.Z-rc.N` e instala por cima da rc anterior. Ver
 > `Documentos/10-git-flow/MANUAL.md` §3.3 e `deploy/android/README.md`.
 

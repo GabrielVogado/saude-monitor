@@ -1,4 +1,4 @@
-// Jornada do usuário final do Radar Saúde contra a HOMOLOGAÇÃO.
+// Jornada do usuário final da Pulseira Verde contra a HOMOLOGAÇÃO.
 //
 // Cada usuário virtual é um usuário de teste próprio (perf-NNN, criado por
 // mongo/criar-usuarios.js) e percorre UMA vez o que a pessoa faz no app:

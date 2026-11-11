@@ -121,7 +121,7 @@ jobs:
           fi
 
           {
-            echo "## Radar Saúde $VERSION_NAME"
+            echo "## Pulseira Verde $VERSION_NAME"
             echo ""
             echo "- **Play Console:** Produção (ou o teste fechado) → Criar nova versão → enviar \`$(basename "$ARQUIVO")\`."
             echo "- **Backend de produção:** $API_URL_PROD"
@@ -131,6 +131,6 @@ jobs:
           gh release create "$TAG" "$ARQUIVO" \
             -R "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "Radar Saúde $VERSION_NAME" \
+            --title "Pulseira Verde $VERSION_NAME" \
             --notes-file notas.md
           echo "📦 Release \`$TAG\` publicada com o AAB." >> "$GITHUB_STEP_SUMMARY"

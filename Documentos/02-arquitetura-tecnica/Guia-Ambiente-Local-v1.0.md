@@ -1,4 +1,4 @@
-# 🛠️ Guia do Ambiente Local — Radar Saúde v1.0
+# 🛠️ Guia do Ambiente Local — Pulseira Verde v1.0
 
 > | Campo | Valor |
 > |---|---|

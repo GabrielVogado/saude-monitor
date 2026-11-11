@@ -106,7 +106,7 @@ def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
  * `expo run:android`) vale `prod`: pacote e nome iguais aos de sempre, e a CLI do Expo
  * continua achando o app pelo `applicationId` que conhece.
  * Custo aceito (code-review de 22/09/2026): um build local de `release` sai com o pacote
- * de produção assinado pela chave `debug`, e não instalaria por cima de um "Radar Saúde"
+ * de produção assinado pela chave `debug`, e não instalaria por cima de uma "Pulseira Verde"
  * de produção. Produção ainda não existe; quando existir, rever este padrão (a CLI aceita
  * `expo run:android --app-id <pacote>` para abrir um pacote com sufixo).
  *
@@ -114,9 +114,9 @@ def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
  * `app_name`, e um `resValue` com o mesmo nome colidiria na fusão de recursos.
  */
 def AMBIENTES_APK = [
-    dev : [sufixo: '.dev', nome: 'Radar Saúde DEV'],
-    hom : [sufixo: '.hom', nome: 'Radar Saúde HML'],
-    prod: [sufixo: '',     nome: 'Radar Saúde'],
+    dev : [sufixo: '.dev', nome: 'Pulseira Verde DEV'],
+    hom : [sufixo: '.hom', nome: 'Pulseira Verde HML'],
+    prod: [sufixo: '',     nome: 'Pulseira Verde'],
 ]
 def ambienteApk = (findProperty('ambiente') ?: 'prod').toString()
 if (!AMBIENTES_APK.containsKey(ambienteApk)) {

@@ -50,6 +50,19 @@ class ModoSomenteLeituraFilterTest {
     }
 
     @Test
+    void mensagemPadraoChamaOAppPeloNomeAtual() throws Exception {
+        // "Radar Saúde" é marca de terceiro (INPI 928495230): o texto ao usuário não pode voltar a usá-la.
+        configurarModo(true, null);
+        MockHttpServletResponse resposta = new MockHttpServletResponse();
+
+        isRequisicaoAceita("POST", "/api/v1/visitas/checkin", resposta);
+
+        assertThat(objectMapper.readTree(resposta.getContentAsString()).get("message").asText())
+                .startsWith("A Pulseira Verde está em manutenção")
+                .doesNotContain("Radar");
+    }
+
+    @Test
     void usaAMensagemDaConfiguracaoQuandoHa() throws Exception {
         configurarModo(true, "Troca do banco até 23h.");
         MockHttpServletResponse resposta = new MockHttpServletResponse();

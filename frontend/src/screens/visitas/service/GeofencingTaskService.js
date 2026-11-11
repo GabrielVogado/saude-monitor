@@ -603,7 +603,7 @@ async function ajustarAcompanhamentoEmSerie() {
         activityType: Location.ActivityType?.Other,
         showsBackgroundLocationIndicator: true,
         foregroundService: {
-          notificationTitle: "Radar Saúde",
+          notificationTitle: "Pulseira Verde",
           notificationBody,
           notificationColor: "#006193",
         },
@@ -906,7 +906,7 @@ export function textoDivulgacaoLocalizacao(plataforma) {
   const opcao =
     plataforma === "ios" ? '"Sempre" no próximo aviso' : '"Permitir o tempo todo" na próxima tela';
   return (
-    "O Radar Saúde coleta a localização do aparelho para registrar sua chegada e saída de " +
+    "A Pulseira Verde coleta a localização do aparelho para registrar sua chegada e saída de " +
     "hospitais e confirmar que você continua lá durante a visita, mesmo quando o app está " +
     "fechado ou não está em uso. A localização só é enviada perto de hospitais e não é " +
     `usada para publicidade. Para ativar, escolha ${opcao}.`

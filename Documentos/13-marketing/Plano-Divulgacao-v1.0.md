@@ -1,4 +1,4 @@
-# 📣 Plano de Divulgação — Radar Saúde v1.0
+# 📣 Plano de Divulgação — Pulseira Verde v1.0
 
 > | Campo | Valor |
 > |---|---|
@@ -64,7 +64,7 @@ Baseado nas personas do Documento Negocial:
 
 **Mensagem principal (use em tudo):**
 
-> **Radar Saúde — veja quanto tempo se espera e como é o atendimento em cada hospital do DF, medido por quem esteve lá.**
+> **Pulseira Verde — veja quanto tempo se espera e como é o atendimento em cada hospital do DF, medido por quem esteve lá.**
 
 **Três frases de apoio** (escolha uma por post):
 
@@ -83,7 +83,7 @@ A estrutura segue a skill `launch-strategy` (fases interna → beta → lançame
 **Objetivo:** ter o mínimo para não desperdiçar ninguém.
 
 - [ ] Resolver os bloqueios B-2 a B-5 do §3.
-- [ ] Criar um **perfil no Instagram** `@radarsaude.df` (ou parecido) e **uma comunidade no WhatsApp** "Radar Saúde — Beta" (skill `whatsapp-community`).
+- [ ] Criar um **perfil no Instagram** `@pulseiraverde.df` (ou parecido) e **uma comunidade no WhatsApp** "Pulseira Verde — Beta" (skill `whatsapp-community`).
 - [ ] Escrever a **página da Play Store** (skill `aso-app-store`): título com a palavra que as pessoas buscam ("tempo de espera hospital"), descrição curta, 4–5 capturas de tela mostrando mapa, detalhe do hospital e formulário de 45 s.
 - [ ] Escolher **3 regiões do DF** para concentrar esforço (ex.: onde você e seus conhecidos moram ou trabalham, e onde há hospitais cadastrados com mais movimento).
 - [ ] Preparar uma **planilha simples de métricas** (colunas do §7).
@@ -176,7 +176,7 @@ Das ~1.850 skills do repositório [kursku/skills](https://github.com/kursku/skil
 | Base | `launch-strategy` | Estrutura das fases e checklist de lançamento (base deste plano). | *"Revise o Plano-Divulgacao-v1.0 e me diga o que falta para a Fase 2."* |
 | Base | `healthcare-marketing` | Ética e regras de divulgação em saúde. | *"Revise este post do Instagram contra as regras de marketing de saúde."* |
 | 0 | `lgpd-compliance-check` | Revisar a política de privacidade e os consentimentos. | *"Revise a política de privacidade do app considerando localização + dado de saúde."* |
-| 0 | `aso-app-store` | Título, descrição e capturas da Play Store. | *"Escreva o título, a descrição curta e a longa do Radar Saúde para a Play Store."* |
+| 0 | `aso-app-store` | Título, descrição e capturas da Play Store. | *"Escreva o título, a descrição curta e a longa da Pulseira Verde para a Play Store."* |
 | 0–1 | `whatsapp-community` | Montar e moderar a comunidade do beta. | *"Monte a estrutura da comunidade WhatsApp do beta e a mensagem de boas-vindas."* |
 | 1 | `beta-launch-plan` | Recrutar, integrar e ouvir os beta testers. | *"Crie o roteiro das entrevistas de 15 minutos com beta testers."* |
 | 2 | `press-outreach` | Pauta para jornalistas e follow-up. | *"Escreva a pauta para jornalistas de saúde do DF com estes números do beta: …"* |
@@ -184,7 +184,7 @@ Das ~1.850 skills do repositório [kursku/skills](https://github.com/kursku/skil
 | 3 | `partnership-growth` | Parcerias com associações e universidades. | *"Liste 15 associações de pacientes e moradores do DF e escreva o convite de parceria."* |
 | Qualquer | `marketing-ideas` | Banco de 140 ideias com nota de viabilidade por fase. | *"Sugira 5 ideias de marketing para um app pré-lançamento com R$ 0."* |
 
-**Skills que avaliei e deixei de fora:** as de tráfego pago (Google/Meta Ads), funis de venda, e-mail marketing, precificação e Product Hunt. Servem para produto pago ou para público de tecnologia, e o Radar Saúde é gratuito e voltado ao cidadão comum. Voltam a fazer sentido se o painel para hospitais (fase 2 do negócio) sair do papel.
+**Skills que avaliei e deixei de fora:** as de tráfego pago (Google/Meta Ads), funis de venda, e-mail marketing, precificação e Product Hunt. Servem para produto pago ou para público de tecnologia, e a Pulseira Verde é gratuita e voltada ao cidadão comum. Voltam a fazer sentido se o painel para hospitais (fase 2 do negócio) sair do papel.
 
 ---
 
@@ -195,7 +195,7 @@ Das ~1.850 skills do repositório [kursku/skills](https://github.com/kursku/skil
 ```
 Oi, [nome]! Tudo bem?
 
-Estou terminando um app chamado Radar Saúde: ele mostra quanto tempo
+Estou terminando um app chamado Pulseira Verde: ele mostra quanto tempo
 se espera e como é o atendimento nos hospitais do DF, com base em
 quem esteve lá.
 
@@ -225,7 +225,7 @@ Assunto: App criado no DF mede tempo real de espera em hospitais
 
 Olá, [nome]. Vi sua matéria sobre [tema recente de saúde no DF].
 
-O Radar Saúde é um aplicativo gratuito, criado aqui no DF, que usa
+A Pulseira Verde é um aplicativo gratuito, criado aqui no DF, que usa
 a localização do celular para medir quanto tempo as pessoas realmente
 ficam em cada hospital, e pede uma avaliação de 45 segundos na saída.
 As médias só aparecem com pelo menos 5 avaliações, e a metodologia

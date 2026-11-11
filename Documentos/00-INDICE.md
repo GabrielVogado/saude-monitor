@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 10/11/2026 · Responsável: Gabriel Vogado
+> Última atualização: 11/11/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 11/11/2026 — Homologação v1.0.0-rc.14
+
+**O que entrou:** registro da rc que leva o refresh do Painel Admin em cookie `HttpOnly` (PR #250, M-073, backend e painel; o app sai igual ao da rc.13). Como o painel não tem hospedagem e a API está em `run.app`, o roteiro confere a regressão do login do app e as rotas do painel no backend HML por `curl`; o fluxo completo no navegador depende do domínio próprio da API. Remete ao roteiro da rc.13 inteiro, que não foi feito. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.14.md`](./10-git-flow/homologacoes/v1.0.0-rc.14.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
 
 ---
 

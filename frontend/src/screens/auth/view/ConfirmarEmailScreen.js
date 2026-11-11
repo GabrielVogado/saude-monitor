@@ -6,11 +6,11 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import {KeyRound, Mail, ShieldCheck} from "lucide-react-native";
+import {KeyRound, Mail} from "lucide-react-native";
 import LoginService from "../service/LoginService";
 import {colors} from "../../../theme";
 import styles from "./css/LoginStyle";
-import TelaAuth from "./TelaAuth";
+import TelaAuth, {AvisoCodigoDeUsoUnico, BotaoVoltarAoLogin} from "./TelaAuth";
 
 /**
  * Confirmação obrigatória de e-mail no cadastro (10/09/2026): sem confirmar, o login é
@@ -131,24 +131,10 @@ export default function ConfirmarEmailScreen({navigation, route}) {
                         </Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={styles.semContaButton}
-                        onPress={() => navigation?.navigate?.("Login")}
-                        accessibilityRole="button"
-                        accessibilityLabel="Voltar para o login"
-                    >
-                        <Text style={styles.semContaText}>Voltar para o login</Text>
-                    </TouchableOpacity>
+                    <BotaoVoltarAoLogin navigation={navigation} />
                 </View>
 
-                <View style={styles.complianceBox}>
-                    <View style={styles.complianceIcon}>
-                        <ShieldCheck size={18} color={colors.primary} />
-                    </View>
-                    <Text style={styles.complianceText}>
-                        Por segurança, o código expira em 15 minutos e só pode ser usado uma vez.
-                    </Text>
-                </View>
+                <AvisoCodigoDeUsoUnico />
             </View>
 
         </TelaAuth>

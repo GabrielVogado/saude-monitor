@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 11/11/2026 — Fila offline enviada com o app fechado
+
+**O que mudou:** o app ganha uma tarefa de segundo plano (`expo-background-task`, WorkManager no Android) que envia a fila offline a cada ~15 min mesmo com o app fechado. Antes, a saída guardada sem internet só saía com o app aberto ou num evento do geofencing. Só app. Registro em `Historico-Melhorias.md` (M-075).
+**Também:** `De-Para-Backlog-Features.md`, E2-05.
+
+---
+
 ## 📌 Revisão 11/11/2026 — Projeto passa a se chamar Pulseira Verde
 
 **O que mudou:** "Radar Saúde" é marca registrada de terceiro no INPI (nº 928495230, classe 42). A pedido do PO, o nome de exibição passa a ser **Pulseira Verde** no app, no painel admin, na mensagem de manutenção do backend, no site `saudemonitor.dev`, nos títulos das GitHub Releases, no Sonar, no `perf/` e na documentação ativa. Identificadores técnicos (pacote Android, pacote Java, banco, serviços do Cloud Run, domínio, Worker do site) não mudam. Registros históricos ficam com o nome da época. Registro em `Historico-Melhorias.md` (M-074).

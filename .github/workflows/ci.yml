@@ -93,6 +93,7 @@ jobs:
 
       - name: Análise SonarQube Cloud (backend)
         if: env.TEM_SONAR == 'true'
+        timeout-minutes: 10
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         # Reaproveita as classes e o XML do JaCoCo gerados pelo `build` acima.
@@ -195,6 +196,9 @@ jobs:
 
       - name: Análise SonarQube Cloud (frontend)
         if: env.TEM_SONAR == 'true'
+        # Teto de 10 min: em 11/11/2026 o gpg da action travou 1h15 buscando a chave
+        # do scanner em keyserver.ubuntu.com, e o job sem teto ficaria até 6 h parado.
+        timeout-minutes: 10
         uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -278,6 +282,7 @@ jobs:
 
       - name: Análise SonarQube Cloud (admin)
         if: env.TEM_SONAR == 'true'
+        timeout-minutes: 10
         uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

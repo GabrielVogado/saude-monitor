@@ -30,7 +30,7 @@ class RateLimitFilterTest {
 
     /** Assina tokens de verdade: o filtro só conta por usuário quando o token é válido. */
     static final JwtService JWT = new JwtService(new JwtProperties(
-            "segredo-de-teste-do-rate-limit-com-32-bytes-ou-mais", 900_000L, 2_592_000_000L));
+            "segredo-de-teste-do-rate-limit-com-32-bytes-ou-mais", 900_000L, 2_592_000_000L, null, null));
 
     /** Padroes de producao: os mesmos valores de application.properties. */
     static final RateLimitProperties PADRAO = new RateLimitProperties(10, 60, 1, 600);

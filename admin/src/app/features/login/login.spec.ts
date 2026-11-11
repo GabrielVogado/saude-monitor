@@ -44,6 +44,12 @@ describe('Login', () => {
     fixture.detectChanges();
   }
 
+  it('mostra o nome do produto, Pulseira Verde, e não a marca antiga', () => {
+    expect(el.textContent).toContain('Pulseira Verde — acesso restrito');
+    expect(el.querySelector('img')?.getAttribute('alt')).toBe('Pulseira Verde');
+    expect(el.textContent).not.toContain('Radar Saúde');
+  });
+
   it('não chama login com formulário inválido', () => {
     enviar();
     expect(auth.login).not.toHaveBeenCalled();

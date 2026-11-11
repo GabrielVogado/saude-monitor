@@ -38,6 +38,13 @@ describe("LoginScreen", () => {
     jest.spyOn(Alert, "alert").mockImplementation(() => {});
   });
 
+  test("o cabeçalho mostra o nome do app, Pulseira Verde", () => {
+    renderizar();
+
+    expect(screen.getByText("Pulseira Verde")).toBeTruthy();
+    expect(screen.queryByText(/Radar Saúde/)).toBeNull();
+  });
+
   test("campo vazio nem chega a chamar o serviço", async () => {
     renderizar();
 

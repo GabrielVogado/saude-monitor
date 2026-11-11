@@ -2,12 +2,11 @@ package br.com.saude_monitor.api.config.security;
 
 import br.com.saude_monitor.api.user.document.UserDocument;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtBuilder;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Optional;
@@ -25,7 +24,9 @@ import java.util.UUID;
  * <p>Todos os tokens carregam um claim {@code jti} (UUID). O {@code jti} dos tokens de
  * refresh alimenta a blacklist de tokens revogados no logout (F0-02/§3.1).</p>
  *
- * <p>Assinatura HS256 com chave simétrica derivada de {@link JwtProperties#secret()}.</p>
+ * <p>Assinatura HMAC com chave simétrica. Com rotação de chave (SEG-04), o token novo leva no
+ * cabeçalho o {@code kid} da chave ativa e a validação escolhe a chave pelo {@code kid}, aceitando
+ * as chaves antigas ainda publicadas; regras em {@link ChavesJwt}.</p>
  */
 @Service
 public class JwtService {
@@ -35,11 +36,13 @@ public class JwtService {
     private static final String TYPE_REFRESH = "refresh";
 
     private final JwtProperties properties;
-    private final SecretKey key;
+    private final ChavesJwt chaves;
+    private final JwtParser parser;
 
     public JwtService(JwtProperties properties) {
         this.properties = properties;
-        this.key = Keys.hmacShaKeyFor(properties.secret().getBytes(StandardCharsets.UTF_8));
+        this.chaves = ChavesJwt.de(properties);
+        this.parser = Jwts.parser().keyLocator(chaves).build();
     }
 
     /** Gera um access token (15 min) para o usuário. */
@@ -128,20 +131,22 @@ public class JwtService {
 
     private String buildToken(UserDocument user, long expirationMs, String type) {
         Instant now = Instant.now();
-        return Jwts.builder()
+        JwtBuilder builder = Jwts.builder();
+        if (chaves.kidAtivo() != null) {
+            builder.header().keyId(chaves.kidAtivo());
+        }
+        return builder
                 .id(UUID.randomUUID().toString())
                 .subject(user.getEmail())
                 .claim(CLAIM_TYPE, type)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(expirationMs)))
-                .signWith(key)
+                .signWith(chaves.chaveDeAssinatura())
                 .compact();
     }
 
     private Claims extractAllClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(key)
-                .build()
+        return parser
                 .parseSignedClaims(token)
                 .getPayload();
     }

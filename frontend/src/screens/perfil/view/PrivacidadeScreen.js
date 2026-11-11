@@ -44,7 +44,7 @@ export default function PrivacidadeScreen({ navigation }) {
 
         <Text style={styles.sectionTitle}>1. Quem cuida dos seus dados</Text>
         <Text style={styles.paragraph}>
-          O responsável (controlador) é Gabriel Vogado, desenvolvedor do Radar Saúde. Para
+          O responsável (controlador) é Gabriel Vogado, desenvolvedor da Pulseira Verde. Para
           qualquer assunto sobre seus dados, escreva para {EMAIL_PRIVACIDADE}.
         </Text>
 

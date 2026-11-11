@@ -29,7 +29,7 @@ public class ModoSomenteLeituraFilter extends OncePerRequestFilter {
 
     static final String CODIGO = "MODO_SOMENTE_LEITURA";
     static final String MENSAGEM_PADRAO =
-            "O Radar Saúde está em manutenção e só aceita consultas agora. Tente de novo em alguns minutos.";
+            "A Pulseira Verde está em manutenção e só aceita consultas agora. Tente de novo em alguns minutos.";
 
     private static final Set<String> GRAVACOES = Set.of("POST", "PUT", "PATCH", "DELETE");
 

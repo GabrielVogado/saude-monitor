@@ -1,33 +1,39 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 import { Usuario } from './auth.models';
 
-const CHAVE = {
-  access: 'admin.accessToken',
-  refresh: 'admin.refreshToken',
-  usuario: 'admin.usuario',
-} as const;
+const CHAVE_USUARIO = 'admin.usuario';
+/** Onde versões anteriores do painel guardavam os tokens; apagadas ao abrir. */
+const CHAVES_DE_TOKEN_ANTIGAS = ['admin.accessToken', 'admin.refreshToken'];
 
 /**
- * Persistência da sessão do painel em `sessionStorage` (escopo da aba; limpa ao
- * fechar). Todo acesso é protegido por try/catch — em janela privada ou com storage
- * bloqueado, os métodos degradam para "sem sessão" em vez de lançar.
+ * Sessão do painel (ADR-013). O access token fica só em memória, num signal: some ao
+ * recarregar ou fechar a aba e nunca vai para o web storage, onde um XSS o leria. O refresh
+ * token nem passa pelo JavaScript: o backend o guarda no cookie `HttpOnly`
+ * `__Host-painel_refresh`, e a sessão volta ao abrir a aba por `POST /auth/painel/refresh`.
  *
- * NOTA DE SEGURANÇA (ver ADR-012): guardar JWT em web storage é exposto a XSS. É uma
- * escolha consciente de primeira fatia; endurecer (refresh em cookie httpOnly) exige
- * mudança no backend e fica para estória de hardening do E7.
+ * No `sessionStorage` fica só o usuário (nome, e-mail e papel, que não dão acesso a nada).
+ * Todo acesso ao storage é protegido por try/catch — em janela privada ou com storage
+ * bloqueado, os métodos degradam em vez de lançar.
  */
 @Injectable({ providedIn: 'root' })
 export class TokenStorage {
-  getAccessToken(): string | null {
-    return this.ler(CHAVE.access);
+  private readonly accessTokenSig = signal<string | null>(null);
+
+  /** Access token da sessão, em memória (`null` sem sessão). */
+  readonly accessToken = this.accessTokenSig.asReadonly();
+
+  constructor() {
+    for (const chave of CHAVES_DE_TOKEN_ANTIGAS) {
+      this.remover(chave);
+    }
   }
 
-  getRefreshToken(): string | null {
-    return this.ler(CHAVE.refresh);
+  getAccessToken(): string | null {
+    return this.accessTokenSig();
   }
 
   getUsuario(): Usuario | null {
-    const bruto = this.ler(CHAVE.usuario);
+    const bruto = this.ler(CHAVE_USUARIO);
     if (!bruto) {
       return null;
     }
@@ -38,16 +44,14 @@ export class TokenStorage {
     }
   }
 
-  salvar(accessToken: string, refreshToken: string, usuario: Usuario): void {
-    this.escrever(CHAVE.access, accessToken);
-    this.escrever(CHAVE.refresh, refreshToken);
-    this.escrever(CHAVE.usuario, JSON.stringify(usuario));
+  salvar(accessToken: string, usuario: Usuario): void {
+    this.accessTokenSig.set(accessToken);
+    this.escrever(CHAVE_USUARIO, JSON.stringify(usuario));
   }
 
   limpar(): void {
-    for (const chave of Object.values(CHAVE)) {
-      this.remover(chave);
-    }
+    this.accessTokenSig.set(null);
+    this.remover(CHAVE_USUARIO);
   }
 
   private ler(chave: string): string | null {
@@ -62,7 +66,7 @@ export class TokenStorage {
     try {
       sessionStorage.setItem(chave, valor);
     } catch {
-      /* storage indisponível: sessão vira apenas em memória nesta aba */
+      /* storage indisponível: o nome do usuário não sobrevive ao recarregar */
     }
   }
 

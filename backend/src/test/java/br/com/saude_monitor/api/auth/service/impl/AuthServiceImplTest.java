@@ -643,4 +643,92 @@ class AuthServiceImplTest {
 
         verify(userRepository, never()).save(any(UserDocument.class));
     }
+
+    // ---------------------------------------------------------------------
+    // Sessão do Painel Admin (ADR-013): login e refresh só para ADMIN
+    // ---------------------------------------------------------------------
+
+    private UserDocument contaComSenha(Papel papel) {
+        UserDocument conta = usuarioAtivo("admin@email.com");
+        conta.setSenhaHash(passwordEncoder.encode("S3nh@Forte!"));
+        conta.setPapel(papel);
+        return conta;
+    }
+
+    @Test
+    void loginPainelDeAdminEmiteTokens() {
+        when(userRepository.findByEmail("admin@email.com")).thenReturn(Optional.of(contaComSenha(Papel.ADMIN)));
+
+        AuthResponse response = authService.loginPainel(new LoginRequest("admin@email.com", "S3nh@Forte!", false));
+
+        assertNotNull(response.accessToken());
+        assertTrue(jwtService.isRefreshTokenValid(response.refreshToken()));
+        assertEquals("ADMIN", response.usuario().papel());
+    }
+
+    @Test
+    void loginPainelDeContaNaoAdminRecebeOMesmoErroDeSenhaErrada() {
+        when(userRepository.findByEmail("admin@email.com")).thenReturn(Optional.of(contaComSenha(Papel.USER)));
+
+        LoginRequest senhaCerta = new LoginRequest("admin@email.com", "S3nh@Forte!", false);
+        LoginRequest senhaErrada = new LoginRequest("admin@email.com", "outra-senha", false);
+
+        NaoAutorizadoException comSenhaCerta = assertThrows(NaoAutorizadoException.class,
+                () -> authService.loginPainel(senhaCerta));
+        NaoAutorizadoException comSenhaErrada = assertThrows(NaoAutorizadoException.class,
+                () -> authService.loginPainel(senhaErrada));
+
+        assertEquals(comSenhaErrada.getMessage(), comSenhaCerta.getMessage());
+    }
+
+    @Test
+    void loginPainelDeContaSemPapelEhRecusado() {
+        when(userRepository.findByEmail("admin@email.com")).thenReturn(Optional.of(contaComSenha(null)));
+        LoginRequest request = new LoginRequest("admin@email.com", "S3nh@Forte!", false);
+
+        assertThrows(NaoAutorizadoException.class, () -> authService.loginPainel(request));
+    }
+
+    @Test
+    void loginDoAppContinuaAceitandoQualquerPapel() {
+        when(userRepository.findByEmail("admin@email.com")).thenReturn(Optional.of(contaComSenha(Papel.USER)));
+
+        AuthResponse response = authService.login(new LoginRequest("admin@email.com", "S3nh@Forte!", false));
+
+        assertEquals("USER", response.usuario().papel());
+    }
+
+    @Test
+    void refreshPainelSemTokenEhRecusado() {
+        assertThrows(NaoAutorizadoException.class, () -> authService.refreshPainel(null));
+        verify(revogadoRepository, never()).insert(any(RefreshTokenRevogadoDocument.class));
+    }
+
+    @Test
+    void refreshPainelDeAdminRotacionaORefresh() {
+        UserDocument admin = contaComSenha(Papel.ADMIN);
+        when(userRepository.findByEmail("admin@email.com")).thenReturn(Optional.of(admin));
+        String refresh = jwtService.generateRefreshToken(admin);
+
+        AuthResponse response = authService.refreshPainel(refresh);
+
+        assertNotNull(response.accessToken());
+        verify(revogadoRepository).insert(argThat((RefreshTokenRevogadoDocument d) ->
+                d.getId().equals(jwtService.extractJti(refresh))));
+    }
+
+    @Test
+    void refreshPainelDeContaQuePerdeuOPapelAdminEhRecusadoSemRevogar() {
+        UserDocument rebaixado = contaComSenha(Papel.USER);
+        when(userRepository.findByEmail("admin@email.com")).thenReturn(Optional.of(rebaixado));
+        String refresh = jwtService.generateRefreshToken(rebaixado);
+
+        assertThrows(NaoAutorizadoException.class, () -> authService.refreshPainel(refresh));
+        verify(revogadoRepository, never()).insert(any(RefreshTokenRevogadoDocument.class));
+    }
+
+    @Test
+    void validadeDoRefreshEmSegundosAcompanhaAPropriedade() {
+        assertEquals(2_592_000L, jwtService.refreshExpirationSeconds());
+    }
 }

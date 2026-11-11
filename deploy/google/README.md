@@ -60,6 +60,15 @@ Duas identidades, de proposito:
 
 Nao-sensivel, via `env_vars` do workflow: `MONGO_DATABASE`, `MONGO_AUTH_DB`.
 
+CORS do navegador (nao-sensivel, `env_vars`): `APP_CORS_ALLOWED_ORIGINS` (lista de origens
+exatas, sem credenciais) e `APP_CORS_PAINEL_ORIGIN` (ADR-013, 05/11/2026): a origem exata do
+Painel Admin, a unica com CORS com credenciais e so em `/api/v1/auth/painel/**`, onde o refresh vai
+no cookie `__Host-painel_refresh`. Uma origem so, sem `*` nem caminho, ou a aplicacao nao sobe.
+Hoje nenhum workflow define as duas e vale o padrao de desenvolvimento (`http://localhost:4200`
+para o painel). Com o dominio proprio, definir `APP_CORS_PAINEL_ORIGIN` com a origem do painel
+publicada no mesmo site da API: com `SameSite=Strict`, o cookie nao funciona entre dois servicos
+`run.app` (sufixo publico), e o painel perde a sessao ao recarregar a aba.
+
 Sensivel, via Secret Manager (`secrets` do workflow): `MONGO_URI` e `JWT_SECRET`
 -- os nomes conforme existem no projeto, sem sufixo em `dev`, `_HOM` em homologacao e
 `_PROD` em producao. `RESEND_API_KEY` segue o mesmo padrao. Nunca em `env_vars`: valores ali ficam legiveis em texto claro na

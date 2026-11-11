@@ -1,7 +1,22 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 09/11/2026 · Responsável: Gabriel Vogado
+> Última atualização: 11/11/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 11/11/2026 — Homologação v1.0.0-rc.14
+
+**O que entrou:** registro da rc que leva o refresh do Painel Admin em cookie `HttpOnly` (PR #250, M-073, backend e painel; o app sai igual ao da rc.13). Como o painel não tem hospedagem e a API está em `run.app`, o roteiro confere a regressão do login do app e as rotas do painel no backend HML por `curl`; o fluxo completo no navegador depende do domínio próprio da API. Remete ao roteiro da rc.13 inteiro, que não foi feito. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.14.md`](./10-git-flow/homologacoes/v1.0.0-rc.14.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
+
+---
+
+## 📌 Revisão 10/11/2026 — Refresh do painel admin em cookie HttpOnly (ADR-013, SEG-05)
+
+**O que mudou:** o painel deixa de guardar token no `sessionStorage`. O backend ganha `POST /api/v1/auth/painel/login`, `/refresh` e `/logout`, só para ADMIN, com o refresh no cookie `__Host-painel_refresh` (`HttpOnly`, `Secure`, `SameSite=Strict`), `Origin` e `X-Requested-With` exigidos e CORS com credenciais só para a origem do painel (nova `APP_CORS_PAINEL_ORIGIN`). O painel guarda o access só em memória e recupera a sessão pelo cookie ao recarregar. O app não muda. ADR-013 passa a "Implementado", com a dependência do domínio próprio da API para valer em produção. Atualizados a §3.1 e a §5 da `Especificacao-API-v2.4.md` e o `deploy/google/README.md`. Registro em `Historico-Melhorias.md` (M-073).
+**Também:** `De-Para-Backlog-Features.md` ganha o SEG-05 (parcial: falta o domínio).
+**Novo:** [`02-arquitetura-tecnica/Necessidades-Refresh-Painel-Cookie-v1.0.md`](./02-arquitetura-tecnica/Necessidades-Refresh-Painel-Cookie-v1.0.md) lista o que falta fora do código para o cookie valer em cada ambiente (domínio da API, painel publicado no mesmo site, variáveis, borda, conta ADMIN), as decisões pendentes e o critério de aceite.
 
 ---
 

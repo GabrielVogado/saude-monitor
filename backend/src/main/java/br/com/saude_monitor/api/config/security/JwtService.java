@@ -57,6 +57,11 @@ public class JwtService {
         return properties.accessExpirationMs() / 1000;
     }
 
+    /** Validade do refresh token em segundos (Max-Age do cookie do painel, ADR-013). */
+    public long refreshExpirationSeconds() {
+        return properties.refreshExpirationMs() / 1000;
+    }
+
     /** Extrai o subject (e-mail) do token, sem validar assinatura/expiracao. */
     public String extractEmail(String token) {
         return extractAllClaims(token).getSubject();

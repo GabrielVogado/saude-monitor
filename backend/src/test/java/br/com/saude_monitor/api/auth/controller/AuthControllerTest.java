@@ -48,6 +48,16 @@ class AuthControllerTest {
         }
 
         @Override
+        public AuthResponse loginPainel(LoginRequest request) {
+            throw new UnsupportedOperationException("rota do painel: PainelAuthController");
+        }
+
+        @Override
+        public AuthResponse refreshPainel(String refreshToken) {
+            throw new UnsupportedOperationException("rota do painel: PainelAuthController");
+        }
+
+        @Override
         public Map<String, Object> logout(RefreshRequest request) {
             return Map.of("success", true, "message", "Sessão encerrada. Refresh token revogado.");
         }

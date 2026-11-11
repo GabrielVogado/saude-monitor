@@ -1,9 +1,25 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable, finalize, map, shareReplay, throwError } from 'rxjs';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Observable, catchError, finalize, map, of, shareReplay } from 'rxjs';
 import { API_BASE_URL } from '../config/api.config';
-import { AuthResponse, LoginRequest, RefreshRequest, Usuario } from './auth.models';
+import { AuthResponse, LoginRequest, Usuario } from './auth.models';
 import { TokenStorage } from './token-storage';
+
+/** Rotas de sessão do painel (ADR-013): o refresh vai e volta no cookie `HttpOnly`. */
+export const ROTAS_SESSAO_PAINEL = {
+  login: '/api/v1/auth/painel/login',
+  refresh: '/api/v1/auth/painel/refresh',
+  logout: '/api/v1/auth/painel/logout',
+} as const;
+
+/**
+ * `withCredentials` para o navegador mandar e aceitar o cookie de refresh, e o cabeçalho
+ * que o backend exige nessas rotas como defesa CSRF.
+ */
+const OPCOES_SESSAO = {
+  withCredentials: true,
+  headers: new HttpHeaders({ 'X-Requested-With': 'painel' }),
+};
 
 /**
  * Erro de domínio: credenciais válidas, mas a conta não é ADMIN. O painel é
@@ -23,45 +39,35 @@ export class Auth {
   private readonly apiBaseUrl = inject(API_BASE_URL);
   private readonly storage = inject(TokenStorage);
 
-  private readonly accessTokenSig = signal<string | null>(this.storage.getAccessToken());
   private readonly usuarioSig = signal<Usuario | null>(this.storage.getUsuario());
   /** Renovação em voo, compartilhada entre as chamadas que receberam 401 juntas. */
   private renovacaoEmCurso: Observable<string> | null = null;
 
   /** Usuário autenticado (ou `null`). */
   readonly usuario = this.usuarioSig.asReadonly();
-  /** `true` enquanto houver access token em sessão. */
-  readonly isAuthenticated = computed(() => this.accessTokenSig() !== null);
+  /** `true` enquanto houver access token em memória. */
+  readonly isAuthenticated = computed(() => this.storage.accessToken() !== null);
 
   /** Token para o interceptor anexar no cabeçalho `Authorization`. */
   get accessToken(): string | null {
-    return this.accessTokenSig();
+    return this.storage.getAccessToken();
   }
 
   /**
-   * Autentica no backend e — só se o usuário for ADMIN — persiste a sessão.
-   * Um usuário válido porém não-ADMIN faz o fluxo lançar `AcessoNaoAdminError`
-   * e **nenhum** token é guardado.
+   * Autentica no backend e — só se o usuário for ADMIN — guarda a sessão. O backend já
+   * recusa conta de outro papel com 401; a conferência aqui é a segunda barreira.
    */
   login(email: string, password: string): Observable<Usuario> {
     const corpo: LoginRequest = { email: email.trim(), password, rememberDevice: false };
     return this.http
-      .post<AuthResponse>(`${this.apiBaseUrl}/api/v1/auth/login`, corpo)
-      .pipe(
-        map((resposta) => {
-          if (resposta.usuario?.papel !== 'ADMIN') {
-            throw new AcessoNaoAdminError();
-          }
-          this.persistir(resposta);
-          return resposta.usuario;
-        }),
-      );
+      .post<AuthResponse>(`${this.apiBaseUrl}${ROTAS_SESSAO_PAINEL.login}`, corpo, OPCOES_SESSAO)
+      .pipe(map((resposta) => this.aceitar(resposta).usuario));
   }
 
   /**
-   * Troca o refresh token por um novo par (o backend rotaciona e revoga o anterior) e
-   * devolve o novo access token. O access token vive 15 min: sem isto, passado esse
-   * tempo toda chamada recebia 401 e as telas ficavam vazias sem aviso.
+   * Troca o refresh do cookie por um access token novo (o backend rotaciona o cookie e
+   * revoga o anterior). O access token vive 15 min: sem isto, passado esse tempo toda
+   * chamada recebia 401 e as telas ficavam vazias sem aviso.
    *
    * Chamadas simultâneas compartilham a mesma renovação: como o refresh anterior é
    * revogado na rotação, um segundo `POST /refresh` com ele seria recusado e derrubaria
@@ -71,37 +77,62 @@ export class Auth {
     if (this.renovacaoEmCurso) {
       return this.renovacaoEmCurso;
     }
-    const refreshToken = this.storage.getRefreshToken();
-    if (!refreshToken) {
-      return throwError(() => new Error('Sessão sem refresh token.'));
-    }
-    const corpo: RefreshRequest = { refreshToken };
     this.renovacaoEmCurso = this.http
-      .post<AuthResponse>(`${this.apiBaseUrl}/api/v1/auth/refresh`, corpo)
+      .post<AuthResponse>(`${this.apiBaseUrl}${ROTAS_SESSAO_PAINEL.refresh}`, null, OPCOES_SESSAO)
       .pipe(
-        map((resposta) => {
-          if (resposta.usuario?.papel !== 'ADMIN') {
-            throw new AcessoNaoAdminError();
-          }
-          this.persistir(resposta);
-          return resposta.accessToken;
-        }),
+        map((resposta) => this.aceitar(resposta).accessToken),
         finalize(() => (this.renovacaoEmCurso = null)),
         shareReplay({ bufferSize: 1, refCount: false }),
       );
     return this.renovacaoEmCurso;
   }
 
-  /** Encerra a sessão local. (Revogação do refresh no servidor entra em estória futura.) */
-  logout(): void {
-    this.storage.limpar();
-    this.accessTokenSig.set(null);
-    this.usuarioSig.set(null);
+  /**
+   * Recupera a sessão ao abrir ou recarregar a aba: o access token estava só em memória,
+   * mas o cookie de refresh continua no navegador. Emite `true` com a sessão de volta e
+   * `false` sem ela (sem cookie, cookie vencido ou backend fora do ar).
+   */
+  restaurarSessao(): Observable<boolean> {
+    if (this.isAuthenticated()) {
+      return of(true);
+    }
+    return this.renovar().pipe(
+      map(() => true),
+      catchError(() => {
+        this.encerrarSessaoLocal();
+        return of(false);
+      }),
+    );
   }
 
-  private persistir(resposta: AuthResponse): void {
-    this.storage.salvar(resposta.accessToken, resposta.refreshToken, resposta.usuario);
-    this.accessTokenSig.set(resposta.accessToken);
+  /**
+   * Encerra a sessão: limpa a memória na hora e pede ao backend que revogue o refresh e
+   * apague o cookie. A chamada é best-effort: sem rede, a sessão local já acabou e o
+   * refresh vence sozinho.
+   */
+  logout(): void {
+    this.encerrarSessaoLocal();
+    this.http
+      .post(`${this.apiBaseUrl}${ROTAS_SESSAO_PAINEL.logout}`, null, OPCOES_SESSAO)
+      .subscribe({ error: () => undefined });
+  }
+
+  private aceitar(resposta: AuthResponse): AuthResponse {
+    if (resposta.usuario?.papel !== 'ADMIN') {
+      throw new AcessoNaoAdminError();
+    }
+    this.storage.salvar(resposta.accessToken, resposta.usuario);
     this.usuarioSig.set(resposta.usuario);
+    return resposta;
+  }
+
+  /**
+   * Encerra a sessão só nesta aba, sem chamar o backend. É o que se usa quando a renovação
+   * falha: as abas dividem o cookie, e um logout no servidor revogaria o refresh que outra aba
+   * acabou de renovar, derrubando as duas.
+   */
+  encerrarSessaoLocal(): void {
+    this.storage.limpar();
+    this.usuarioSig.set(null);
   }
 }

@@ -6,7 +6,7 @@
 > |---|---|
 > | **Versão** | 2.4 |
 > | **Status** | Contrato em validação — endpoints já implementados na `develop`; alterações refletidas neste documento e registradas por PR |
-> | **Data** | 07/08/2026 (última atualização: 18/10/2026) |
+> | **Data** | 07/08/2026 (última atualização: 05/11/2026) |
 > | **Base** | Árvore Tecnológica v2.1 (ADRs) · Documento Negocial v2.1 (RN) · Backlog v2.2 (Fase 0 + E1–E8) |
 > | **Padrão** | REST + JSON · OpenAPI 3.1 (geração automática a partir do código — E8-09 entregue) |
 > | **O que mudou na v2.4** | Novo `GET /api/v1/contas/feedbacks/pendentes` 🔒 (visitas do titular que ainda aceitam feedback). `POST /api/v1/feedbacks` passa a aceitar visita `GPS_INTERROMPIDO` (celular descarregado dentro do hospital) e recusa com 404 a visita cuja janela de 24h após a saída já fechou (RN-09). Versão anterior (2.3) preservada em `_historico/Especificacao-API-v2.3.md`. Ver [M-029](../09-melhoria-continua/Historico-Melhorias.md). |
@@ -305,6 +305,19 @@ Rotação de refresh token (revoga o anterior).
 Revoga o refresh token na blacklist (`refresh_tokens_revogados`, TTL até a expiração do token), impedindo novos refreshes. Idempotente: token já expirado/malformado/revogado também responde 200.
 
 > ✅ **Situação atual (30/08/2026):** **implementado** (PR `feature/logout-server-revogacao-refresh`). `POST /api/v1/auth/logout` insere o `jti` do refresh na blacklist; `POST /api/v1/auth/refresh` rejeita tokens revogados (401 `NAO_AUTORIZADO`) e, na rotação, também revoga o refresh anterior. O app chama o endpoint best-effort e sempre limpa os tokens locais (`TokenStorage.limparTokens`).
+
+#### Sessão do Painel Admin — `POST /api/v1/auth/painel/{login,refresh,logout}` 🔓 (ADR-013, SEG-05, 05/11/2026)
+Rotas só do Painel Admin Web, com o refresh em cookie `HttpOnly`. O contrato do app (os três endpoints acima, com o refresh no corpo) não muda.
+
+**Exigido nas três rotas (defesa CSRF):** cabeçalho `Origin` exatamente igual à origem configurada do painel (`APP_CORS_PAINEL_ORIGIN`) e `X-Requested-With: painel`. Sem um deles, ou com outra origem: **403** `ACESSO_NEGADO`. O cliente manda `withCredentials` (o CORS dessas rotas tem `Access-Control-Allow-Credentials: true`, só para a origem do painel).
+
+- **`/painel/login`** — mesmo corpo do `POST /api/v1/auth/login`. Só papel `ADMIN`; conta de outro papel recebe o mesmo **401** de senha errada. **200** `{ "accessToken": "...", "expiraEm": 900, "usuario": { ... "papel": "ADMIN" } }` (sem `refreshToken`) e `Set-Cookie: __Host-painel_refresh=<refresh>; Path=/; Max-Age=2592000; Secure; HttpOnly; SameSite=Strict`.
+- **`/painel/refresh`** — sem corpo; lê o refresh do cookie. Mesma rotação e blacklist do `/auth/refresh`, e a conta precisa continuar `ADMIN`. **200** com o mesmo corpo do login e o cookie rotacionado. Sem cookie, refresh vencido, revogado ou já usado: **401** `NAO_AUTORIZADO`.
+- **`/painel/logout`** — sem corpo; revoga o refresh do cookie na blacklist e apaga o cookie (`Max-Age=0`). **200** `{ "success": true, ... }`, também sem cookie (idempotente).
+
+**Rate limit:** as três rotas contam no grupo `AUTH` (10/min/IP); o login também conta 10/min por conta, como o do app.
+
+> ⚠️ **Em produção** o cookie só funciona com o painel e a API no mesmo site registrável (`SameSite=Strict`). Com a API em `…run.app`, o painel faz login, mas não recupera a sessão ao recarregar nem renova o access token. Depende do domínio próprio da API (ver ADR-013).
 
 #### `DELETE /api/v1/contas/exclusao` 🔒
 Exclui conta e dados pessoais (LGPD). **200** com resumo do que foi removido/anonimizado.
@@ -627,8 +640,8 @@ sequenceDiagram
 | Item | Política |
 |---|---|
 | **TLS** | HTTPS obrigatório; HSTS; certificados gerenciados |
-| **JWT** | Access 15min (curto) + Refresh 30d (rotação, SecureStore no app) |
-| **CORS** | Restrito a domínios do app web (dev) |
+| **JWT** | Access 15min (curto) + Refresh 30d (rotação, SecureStore no app; no Painel Admin, cookie `__Host-painel_refresh` `HttpOnly`/`Secure`/`SameSite=Strict` e access só em memória — ADR-013) |
+| **CORS** | Origens exatas por ambiente (`APP_CORS_ALLOWED_ORIGINS`), sem credenciais. Exceção: `/api/v1/auth/painel/**` com credenciais só para a origem do painel (`APP_CORS_PAINEL_ORIGIN`), com `Origin` e `X-Requested-With: painel` exigidos (ADR-013) |
 | **Rate limit** | Desde 18/10/2026 (ARQ-02): público 60/min por identidade (`PUBLICO`: usuário do access token válido, senão a instalação do app no cabeçalho `X-Cliente-Id`, senão o IP) · cadastro, confirmação e senha 10/min/IP (`AUTH`) · login 10/min/IP e 10/min por conta · refresh 10/min por token, sem limite por IP · teto de abuso de 600/min por IP somando todo o tráfego limitado. Resposta `429 LIMITE_EXCEDIDO` no envelope padrão. Implementado no PR #24, revisto no ARQ-02 |
 | **Validação** | Bean Validation em todos os DTOs; mensagens pt-BR |
 | **Logs** | Sem dados pessoais (nunca logar e-mail/senha/posição bruta); `traceId` em todas as respostas |

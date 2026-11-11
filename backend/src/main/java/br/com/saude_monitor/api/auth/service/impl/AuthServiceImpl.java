@@ -20,6 +20,7 @@ import br.com.saude_monitor.api.auth.service.TempoMinimoResposta;
 import br.com.saude_monitor.api.config.exception.EmailNaoConfirmadoException;
 import br.com.saude_monitor.api.config.exception.NaoAutorizadoException;
 import br.com.saude_monitor.api.config.security.JwtService;
+import br.com.saude_monitor.api.user.document.Papel;
 import br.com.saude_monitor.api.user.document.UserDocument;
 import br.com.saude_monitor.api.user.repository.UserRepository;
 import br.com.saude_monitor.api.user.util.EmailNormalizer;
@@ -40,6 +41,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * Implementação de autenticação (F0-01/F0-02).
@@ -76,8 +78,27 @@ public class AuthServiceImpl implements AuthService {
     /** Hash BCrypt descartável, calculado uma vez, para o login de e-mail inexistente (SEG-03). */
     private volatile String hashDescartavel;
 
+    /** Qualquer papel: o login e a renovação do app. */
+    private static final Predicate<UserDocument> QUALQUER_PAPEL = u -> true;
+    /** Só o papel ADMIN: as rotas de sessão do Painel Admin (ADR-013). */
+    private static final Predicate<UserDocument> SO_ADMIN = u -> u.getPapel() == Papel.ADMIN;
+
     @Override
     public AuthResponse login(LoginRequest request) {
+        return emitirTokens(autenticar(request, QUALQUER_PAPEL));
+    }
+
+    @Override
+    public AuthResponse loginPainel(LoginRequest request) {
+        return emitirTokens(autenticar(request, SO_ADMIN));
+    }
+
+    /**
+     * Confere as credenciais e devolve a conta. A conta fora de {@code papelPermitido} é
+     * recusada logo depois da senha, com a mesma mensagem de senha errada: no login do
+     * painel, uma conta de usuário comum não se distingue de um e-mail sem cadastro.
+     */
+    private UserDocument autenticar(LoginRequest request, Predicate<UserDocument> papelPermitido) {
         Optional<UserDocument> conta = userRepository.findByEmail(normalizeEmail(request.email()))
                 .filter(u -> u.getSenhaHash() != null);
         if (conta.isEmpty()) {
@@ -89,6 +110,10 @@ public class AuthServiceImpl implements AuthService {
         UserDocument user = conta
                 .filter(u -> passwordEncoder.matches(request.password(), u.getSenhaHash()))
                 .orElseThrow(() -> new NaoAutorizadoException(CREDENCIAIS_INVALIDAS));
+
+        if (!papelPermitido.test(user)) {
+            throw new NaoAutorizadoException(CREDENCIAIS_INVALIDAS);
+        }
 
         if (!user.isActive()) {
             throw new NaoAutorizadoException("Conta desativada.");
@@ -103,13 +128,21 @@ public class AuthServiceImpl implements AuthService {
                     "E-mail ainda não confirmado. Verifique sua caixa de entrada ou peça um novo código.");
         }
 
-        return emitirTokens(user);
+        return user;
     }
 
     @Override
     public AuthResponse refresh(RefreshRequest request) {
-        String token = request.refreshToken();
-        if (!jwtService.isRefreshTokenValid(token)) {
+        return renovar(request.refreshToken(), QUALQUER_PAPEL);
+    }
+
+    @Override
+    public AuthResponse refreshPainel(String refreshToken) {
+        return renovar(refreshToken, SO_ADMIN);
+    }
+
+    private AuthResponse renovar(String token, Predicate<UserDocument> papelPermitido) {
+        if (token == null || !jwtService.isRefreshTokenValid(token)) {
             throw new NaoAutorizadoException(REFRESH_INVALIDO);
         }
 
@@ -139,6 +172,11 @@ public class AuthServiceImpl implements AuthService {
         // perto do bug de falso-negativo que isto substitui.
         if (user.getSenhaAlteradaEm() != null
                 && jwtService.extractIssuedAt(token).isBefore(user.getSenhaAlteradaEm().truncatedTo(ChronoUnit.SECONDS))) {
+            throw new NaoAutorizadoException(REFRESH_INVALIDO);
+        }
+
+        // Painel (ADR-013): a conta que perdeu o papel ADMIN não renova mais a sessão do painel.
+        if (!papelPermitido.test(user)) {
             throw new NaoAutorizadoException(REFRESH_INVALIDO);
         }
 

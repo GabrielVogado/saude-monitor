@@ -1,6 +1,8 @@
 package br.com.saude_monitor.api.config.security;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -24,12 +26,21 @@ import java.util.List;
  * do workflow) deixaria o painel inteiro sem acesso à API sem nenhum erro no backend —
  * melhor a aplicação não subir.</p>
  *
+ * <p>{@code painelOrigin} ({@code APP_CORS_PAINEL_ORIGIN}, ADR-013) é a única origem que
+ * recebe CORS com credenciais, e só nas rotas {@code /api/v1/auth/painel/**}, onde o
+ * refresh do painel vai em cookie {@code HttpOnly}. É também a origem exigida no cabeçalho
+ * {@code Origin} dessas rotas ({@link PainelCsrfFilter}). Uma origem só, exata, sem
+ * curinga nem caminho: o formato é conferido no startup.</p>
+ *
  * <p>Registrada automaticamente pelo {@code @ConfigurationPropertiesScan}.</p>
  */
 @Validated
 @ConfigurationProperties(prefix = "app.cors")
 public record CorsProperties(
         /** Origens exatas (esquema://host:porta) autorizadas a chamar a API pelo navegador. */
-        @NotEmpty List<String> allowedOrigins
+        @NotEmpty List<String> allowedOrigins,
+
+        /** Origem exata (esquema://host[:porta]) do Painel Admin, a única com credenciais. */
+        @NotBlank @Pattern(regexp = "https?://[^/*\\s,]+") String painelOrigin
 ) {
 }

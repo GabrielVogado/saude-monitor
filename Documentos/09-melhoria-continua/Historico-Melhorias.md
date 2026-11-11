@@ -3842,3 +3842,41 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
 - O `RateLimitFilterTest` inteiro usa um relógio parado (`RELOGIO_PARADO`): os outros testes com 60 a 100 chamadas pelo MockMvc tinham o mesmo risco.
 - Novo teste `contadorRecomecaQuandoAJanelaDeUmMinutoVira`: com o relógio no último milissegundo da
   janela, a 11ª chamada de autenticação é barrada; um milissegundo depois, volta a passar.
+## M-073 — Painel admin sem token no `sessionStorage`: refresh em cookie `HttpOnly` (ADR-013, SEG-05)
+
+**Data:** 05/11/2026 · **PR:** (este PR) · **Origem:** ADR-013 (aceito pelo PO em 25/09/2026) e gap SEG-05 da Análise de Escalabilidade e Segurança
+
+### Como era
+
+- O painel guardava access e refresh token no `sessionStorage` (`token-storage.ts`). Um XSS no
+  painel lia os dois e, com o refresh de 30 dias, mantinha a sessão de um administrador, que edita
+  hospitais e geofences.
+- O painel usava o login e o refresh do app, com o refresh no corpo, e o logout do painel só
+  limpava a aba: o refresh não era revogado no servidor.
+
+### O que mudou
+
+- **Backend:** rotas novas só do painel, `POST /api/v1/auth/painel/login`, `/refresh` e `/logout`.
+  O login aceita só `ADMIN` (conta de outro papel recebe o mesmo 401 de senha errada). O refresh
+  sai só no cookie `__Host-painel_refresh` (`Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`,
+  `Max-Age` de 30 dias), com a mesma rotação e blacklist por `jti` do app; o logout revoga e apaga
+  o cookie. Contrato do app sem mudança.
+- **CSRF:** o `PainelCsrfFilter` exige nessas rotas o `Origin` exatamente igual ao do painel e
+  `X-Requested-With: painel` (403 sem eles). Antes não havia rota que lesse cookie, e o comentário
+  do `SecurityConfig` já avisava que a defesa CSRF seria obrigatória quando houvesse.
+- **CORS:** credenciais só em `/api/v1/auth/painel/**` e só para a origem do painel, nova
+  propriedade `app.cors.painel-origin` (`APP_CORS_PAINEL_ORIGIN`), conferida no startup (uma
+  origem exata, sem `*`).
+- **Painel:** access token só em memória (signal), só o usuário no `sessionStorage`, as chaves de
+  token antigas apagadas ao abrir; o guard recupera a sessão pelo cookie ao abrir ou recarregar a
+  aba; o interceptor deixa de ler refresh do storage e renova uma vez em 401; o logout revoga no
+  servidor.
+
+### O que ficou de fora
+
+- **Funcionamento em produção depende do domínio próprio da API** e do painel publicado no mesmo
+  site. `run.app` é sufixo público: com `SameSite=Strict`, o navegador não guarda o cookie entre
+  dois serviços do Cloud Run, nem entre `localhost:4200` e a API de dev. Até lá o painel faz login,
+  mas volta ao login ao recarregar a aba e quando o access token de 15 min vence.
+- CSP estrita no painel (citada no SEG-05) não entrou: o painel ainda não tem hospedagem onde
+  definir os cabeçalhos.

@@ -57,7 +57,7 @@ Este documento cobre apenas a camada de apresentação (frontend web) e a forma 
 | **Ícones** | `lucide-react` | Mesma família de ícones já usada no mobile (`lucide-react-native`) — consistência visual entre os dois produtos. |
 | **Formulários** | `react-hook-form` + `zod` | Validação do formulário de hospital (nome, geofence, CNPJ) espelhando as regras já aplicadas no backend. |
 | **Cliente HTTP** | `axios` (com interceptor de refresh token) | Mesmo padrão de interceptor já usado no `HospitalService.js` do app mobile. |
-| **Autenticação** | JWT (reaproveita `POST /auth/login`) em `localStorage`/`sessionStorage` (nunca em cookie sem `httpOnly` server-side, que não existe aqui) | Não introduz mecanismo novo de auth — mesmo contrato do backend (ADR-001 da Árvore Tecnológica). |
+| **Autenticação** | JWT (reaproveita `POST /auth/login`) em `localStorage`/`sessionStorage` (nunca em cookie sem `httpOnly` server-side, que não existe aqui) | Não introduz mecanismo novo de auth — mesmo contrato do backend (ADR-001 da Árvore Tecnológica). **Substituído em 05/11/2026 pelo ADR-013:** rotas `/auth/painel/*`, refresh em cookie `HttpOnly` e access só em memória. |
 | **Build/deploy** | Vite build → arquivos estáticos servidos via Nginx (container próprio) ou hospedagem estática (ex.: bucket + CDN) | Painel é uma SPA; não precisa de servidor Node em produção. |
 
 ---

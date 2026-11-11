@@ -35,7 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 37; as avaliações pendentes do titular (M-029 — `GET /api/v1/contas/feedbacks/pendentes`)
  * somam 38; o catálogo público (ARQ-01 — `GET /api/v1/catalogo`) soma 39; a configuração remota
  * (ARQ-09 — `GET /api/v1/configuracao` e `PUT /api/v1/admin/configuracao`) soma 41; os indicadores do catálogo
- * (`GET /api/v1/catalogo/indicadores`) somam **42**. Este teste mede o total de operações que o springdoc realmente gera, não
+ * (`GET /api/v1/catalogo/indicadores`) somam 42; a sessão do Painel Admin com o refresh em cookie
+ * (ADR-013 — `/auth/painel/login`, `/auth/painel/refresh` e `/auth/painel/logout`) soma **45**. Este teste mede o total de operações que o springdoc realmente gera, não
  * presume que bateu.</p>
  */
 @Testcontainers
@@ -83,7 +84,7 @@ class OpenApiContratoTest {
             }
         }
 
-        assertThat(operacoes).isEqualTo(42);
+        assertThat(operacoes).isEqualTo(45);
     }
 
     /**
@@ -109,6 +110,9 @@ class OpenApiContratoTest {
                 "POST /api/v1/auth/redefinir-senha",
                 "POST /api/v1/auth/confirmar-email",
                 "POST /api/v1/auth/reenviar-confirmacao",
+                "POST /api/v1/auth/painel/login",
+                "POST /api/v1/auth/painel/refresh",
+                "POST /api/v1/auth/painel/logout",
                 "POST /api/v1/visitas/checkin",
                 "POST /api/v1/visitas/{id}/checkout",
                 "POST /api/v1/visitas/{id}/heartbeat",

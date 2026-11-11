@@ -209,7 +209,7 @@ const HospitalRegisterScreen = ({navigation}) => {
                                     >
                                         Política de Privacidade
                                     </Text>{" "}
-                                    do Radar Saúde.
+                                    da Pulseira Verde.
                                 </Text>
                             </View>
 

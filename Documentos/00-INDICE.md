@@ -5,6 +5,13 @@
 
 ---
 
+## 📌 Revisão 11/11/2026 — Projeto passa a se chamar Pulseira Verde
+
+**O que mudou:** "Radar Saúde" é marca registrada de terceiro no INPI (nº 928495230, classe 42). A pedido do PO, o nome de exibição passa a ser **Pulseira Verde** no app, no painel admin, na mensagem de manutenção do backend, no site `saudemonitor.dev`, nos títulos das GitHub Releases, no Sonar, no `perf/` e na documentação ativa. Identificadores técnicos (pacote Android, pacote Java, banco, serviços do Cloud Run, domínio, Worker do site) não mudam. Registros históricos ficam com o nome da época. Registro em `Historico-Melhorias.md` (M-074).
+**Sem mudança:** `De-Para-Backlog-Features.md` (troca de nome, sem estória; só a menção ao nome foi atualizada).
+
+---
+
 ## 📌 Revisão 11/11/2026 — Homologação v1.0.0-rc.14
 
 **O que entrou:** registro da rc que leva o refresh do Painel Admin em cookie `HttpOnly` (PR #250, M-073, backend e painel; o app sai igual ao da rc.13). Como o painel não tem hospedagem e a API está em `run.app`, o roteiro confere a regressão do login do app e as rotas do painel no backend HML por `curl`; o fluxo completo no navegador depende do domínio próprio da API. Remete ao roteiro da rc.13 inteiro, que não foi feito. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.14.md`](./10-git-flow/homologacoes/v1.0.0-rc.14.md).

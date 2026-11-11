@@ -18,9 +18,9 @@ de `frontend/android/app/build.gradle`:
 
 | Ambiente | Pacote | Nome no celular | versionName | versionCode |
 |---|---|---|---|---|
-| dev | `com.gabrielvogado.saudemonitor.dev` | Radar Saúde DEV | `X.Y.Z-dev.<run>` | número da execução do workflow |
-| hom | `com.gabrielvogado.saudemonitor.hom` | Radar Saúde HML | `X.Y.Z-rc.N` | derivado da tag |
-| prod | `com.gabrielvogado.saudemonitor` | Radar Saúde | `X.Y.Z` | `X*1000000 + Y*10000 + Z*100`, do nome da `release/X.Y.Z` |
+| dev | `com.gabrielvogado.saudemonitor.dev` | Pulseira Verde DEV | `X.Y.Z-dev.<run>` | número da execução do workflow |
+| hom | `com.gabrielvogado.saudemonitor.hom` | Pulseira Verde HML | `X.Y.Z-rc.N` | derivado da tag |
+| prod | `com.gabrielvogado.saudemonitor` | Pulseira Verde | `X.Y.Z` | `X*1000000 + Y*10000 + Z*100`, do nome da `release/X.Y.Z` |
 
 Pacotes diferentes = apps diferentes: DEV e HML ficam instalados lado a lado.
 `X.Y.Z` é o `expo.version` de `frontend/app.json`. Build local sem as propriedades
@@ -61,7 +61,7 @@ Os dois últimos pedem o valor no terminal (a mesma senha, no formato PKCS12). N
 ## Primeira instalação depois da troca
 
 Os APKs antigos foram assinados com outras chaves e usam o pacote sem sufixo. Depois
-da chave de release, **desinstale uma última vez** o "Radar Saúde" antigo; dali em
+da chave de release, **desinstale uma última vez** a "Pulseira Verde" antiga; dali em
 diante DEV e HML atualizam por cima.
 
 ## Play Store (AAB de produção)

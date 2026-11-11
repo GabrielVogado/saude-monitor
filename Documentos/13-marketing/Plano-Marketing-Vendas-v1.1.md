@@ -1,4 +1,4 @@
-# 💼 Plano de Marketing e Vendas — Radar Saúde v1.1
+# 💼 Plano de Marketing e Vendas — Pulseira Verde v1.1
 
 > | Campo | Valor |
 > |---|---|
@@ -22,7 +22,7 @@
 ## 2. Ponto de partida
 
 - Contas da Dev Point: Instagram com ~42 seguidores e LinkedIn com ~18. É um público de TI e empresas, não de pacientes do DF, e não serve para lançar o app ao cidadão.
-- O que o Radar Saúde tem de mais forte é a **densidade local** (poucos hospitais com nota antes de ter muita gente, regra central do Plano de Divulgação v1.0) e a rede pessoal do PO.
+- O que a Pulseira Verde tem de mais forte é a **densidade local** (poucos hospitais com nota antes de ter muita gente, regra central do Plano de Divulgação v1.0) e a rede pessoal do PO.
 - Sem anúncio pago antes de ter app estável e hospitais com nota. Sem número inflado em nenhum material.
 
 ## 3. Duas frentes
@@ -66,7 +66,7 @@ Precisam estar valendo **antes** de vender qualquer cupom ou anúncio.
 | Comunidade de WhatsApp do beta | Retenção e feedback semanal | Baixo |
 | Grupos de bairro, condomínio, igreja e associações (via testadores) | Chegar a 300 a 500 pessoas no DF | Médio |
 | Imprensa local do DF (só com números reais do beta) | Credibilidade | Médio |
-| Perfil novo do Radar Saúde no Instagram | Prova social e explicação, sem meta de seguidores no começo | Baixo |
+| Perfil novo da Pulseira Verde no Instagram | Prova social e explicação, sem meta de seguidores no começo | Baixo |
 | LinkedIn do PO e da Dev Point | Só para abrir conversa com gestores e conselhos | Baixo |
 | Anúncio pago | Adiado até o custo por instalação ser testável (R$ 100 a 300) | — |
 

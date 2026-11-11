@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="doc/assets/readme/icone.png" alt="Ícone do Radar Saúde" width="96" height="96">
+<img src="doc/assets/readme/icone.png" alt="Ícone da Pulseira Verde" width="96" height="96">
 
-# Radar Saúde
+# Pulseira Verde
 
 **Quanto tempo se espera em cada hospital do DF, medido por quem esteve lá.**
 
@@ -20,7 +20,7 @@ Quem precisa de um pronto-socorro decide no escuro. Não dá para saber, antes d
 
 ## Como funciona
 
-O Radar Saúde transforma o celular de quem vai ao hospital num termômetro do atendimento, com o mínimo de esforço.
+A Pulseira Verde transforma o celular de quem vai ao hospital num termômetro do atendimento, com o mínimo de esforço.
 
 | 1. Você chega | 2. Você sai | 3. Todo mundo vê |
 |---|---|---|
@@ -29,7 +29,7 @@ O Radar Saúde transforma o celular de quem vai ao hospital num termômetro do a
 Consultar hospitais, ver notas e usar o mapa não exige conta. A conta é opcional e serve só para guardar o seu histórico.
 
 > [!IMPORTANT]
-> O Radar Saúde não substitui atendimento de emergência. Em caso de urgência, ligue **192 (SAMU)**.
+> A Pulseira Verde não substitui atendimento de emergência. Em caso de urgência, ligue **192 (SAMU)**.
 
 ---
 
@@ -39,7 +39,7 @@ Consultar hospitais, ver notas e usar o mapa não exige conta. A conta é opcion
 
 <table>
 <tr>
-<td width="290" valign="top"><img src="doc/assets/readme/01-inicio.gif" alt="Tela inicial do Radar Saúde explicando detecção automática, feedback rápido e avaliação pública" width="270"></td>
+<td width="290" valign="top"><img src="doc/assets/readme/01-inicio.gif" alt="Tela inicial da Pulseira Verde explicando detecção automática, feedback rápido e avaliação pública" width="270"></td>
 <td valign="top">
 
 ### 1. Início
@@ -141,7 +141,7 @@ Quer o passo a passo completo, com cadastro, confirmação de e-mail e recupera�
 
 ### A oportunidade
 
-Não existe hoje um dado contínuo e público sobre quanto se espera e como o paciente percebe o atendimento em cada unidade de saúde. O Radar Saúde gera esse dado de baixo para cima: cada visita registrada vira um ponto de medição, e quanto mais gente usa, mais útil o app fica para quem vem depois.
+Não existe hoje um dado contínuo e público sobre quanto se espera e como o paciente percebe o atendimento em cada unidade de saúde. A Pulseira Verde gera esse dado de baixo para cima: cada visita registrada vira um ponto de medição, e quanto mais gente usa, mais útil o app fica para quem vem depois.
 
 ### Modelo
 
@@ -161,7 +161,7 @@ O lançamento público só acontece quando o beta atingir pelo menos **3 hospita
 
 ### Quer conversar?
 
-Gestores públicos, conselhos de saúde e investidores interessados em um piloto ou em acompanhar o projeto podem falar com [Gabriel Vogado](https://github.com/GabrielVogado), criador do Radar Saúde.
+Gestores públicos, conselhos de saúde e investidores interessados em um piloto ou em acompanhar o projeto podem falar com [Gabriel Vogado](https://github.com/GabrielVogado), criador da Pulseira Verde.
 
 ---
 

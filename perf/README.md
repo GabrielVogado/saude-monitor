@@ -1,6 +1,6 @@
 # Testes de desempenho — homologação
 
-Estrutura local para medir o desempenho do Radar Saúde **como um usuário final**, contra o
+Estrutura local para medir o desempenho da Pulseira Verde **como um usuário final**, contra o
 ambiente de **homologação** (Cloud Run `saude-monitor-backend-hom` + MongoDB Atlas M0),
 com painel **ao vivo** e **relatório** de análise — sem sair dos limites gratuitos.
 
@@ -66,7 +66,7 @@ bash perf/scripts/limpar.sh                        # remove visitas/feedbacks de
 
 ## Acompanhar ao vivo
 
-`http://localhost:3000` → painel **Radar Saúde — Desempenho (homologação)**, atualizado a
+`http://localhost:3000` → painel **Pulseira Verde — Desempenho (homologação)**, atualizado a
 cada 5 s:
 
 - **Limites gratuitos:** op/s no Mongo com as faixas de 80/100, conexões em uso, requisições.

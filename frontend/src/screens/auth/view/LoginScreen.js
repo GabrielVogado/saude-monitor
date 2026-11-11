@@ -67,7 +67,7 @@ export default function LoginScreen({navigation}) {
 
                     {/* Header */}
                     <View style={styles.header}>
-                        <Text style={styles.headerTitle}>Radar Saúde</Text>
+                        <Text style={styles.headerTitle}>Pulseira Verde</Text>
                     </View>
 
                     {/* Main Card */}

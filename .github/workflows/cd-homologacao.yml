@@ -247,7 +247,7 @@ jobs:
           MUDANCAS=$(gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" "${ARGS[@]}" --jq .body)
 
           {
-            echo "## Radar Saúde HML $VERSION_NAME"
+            echo "## Pulseira Verde HML $VERSION_NAME"
             echo ""
             echo "- **Instalar:** baixe \`$ARQUIVO\` abaixo e abra no Android. Se já houver uma versão HML instalada, ela é **atualizada** (sem desinstalar, dados mantidos)."
             echo "- **Backend de homologação:** $API_URL_HOM"
@@ -260,7 +260,7 @@ jobs:
             -R "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --prerelease \
-            --title "Radar Saúde HML $VERSION_NAME" \
+            --title "Pulseira Verde HML $VERSION_NAME" \
             --notes-file notas.md
 
           URL="https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"

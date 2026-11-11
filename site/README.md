@@ -1,4 +1,4 @@
-# Site público do Radar Saúde
+# Site público da Pulseira Verde
 
 Páginas estáticas exigidas pela Play Store, publicadas em `https://saudemonitor.dev`:
 

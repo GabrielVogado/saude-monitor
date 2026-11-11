@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" font-family="Inter, 'DejaVu Sans', Arial, sans-serif" role="img" aria-labelledby="t d">
-  <title id="t">Arquitetura-alvo do Radar Saúde para a meta de 60–70% do DF</title>
+  <title id="t">Arquitetura-alvo da Pulseira Verde para a meta de 60–70% do DF</title>
   <desc id="d">Clientes falam com a borda (Cloudflare), que serve o público em cache e repassa à origem no GCP São Paulo só o que é pessoal ou escrita. A origem roda no Cloud Run, com jobs no Cloud Scheduler, seed num Cloud Run Job e banco Atlas de produção dedicado.</desc>
   <defs>
     <marker id="seta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -15,7 +15,7 @@
   <!-- Coluna 1: clientes -->
   <text x="20" y="34" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1">CLIENTES</text>
   <rect x="20" y="50" width="200" height="200" rx="10" fill="#eef2f7" stroke="#1f3a5f" stroke-width="1.5"/>
-  <text x="36" y="76" font-size="15" font-weight="700" fill="#1f3a5f">App Radar Saúde</text>
+  <text x="36" y="76" font-size="15" font-weight="700" fill="#1f3a5f">App Pulseira Verde</text>
   <text x="36" y="94" font-size="12" fill="#334155">Android · iOS (Expo)</text>
   <text x="36" y="120" font-size="12" fill="#0f172a">• Catálogo local versionado</text>
   <text x="46" y="136" font-size="12" fill="#0f172a">(ETag, filtro no aparelho)</text>

@@ -4,7 +4,7 @@ Manual operacional do sistema de monitoramento hospitalar por geolocalização, 
 
 > **Revisão 22/09/2026 — ambiente de homologação.** `master` deixou de ser produção e
 > passou a ser **homologação (HML)**: cada push nela publica o backend
-> `saude-monitor-backend-hom`, gera o APK "Radar Saúde HML" e cria a tag
+> `saude-monitor-backend-hom`, gera o APK "Pulseira Verde HML" e cria a tag
 > `vX.Y.Z-rc.N` com uma GitHub Release. Produção fica para `release/<tag>`. O backend
 > está no **Google Cloud Run** desde 04/09/2026; o Render, que ficou como rollback, foi
 > aposentado em 22/10/2026 (M-060), com o keep-alive. Versão anterior
@@ -28,9 +28,9 @@ Cada ambiente tem backend, banco, `JWT_SECRET` e APK próprios.
 
 | Ambiente | Branch | Backend (Cloud Run) | Banco (Atlas) | APK |
 |----------|--------|---------------------|---------------|-----|
-| **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | `saude_monitor_dev` | "Radar Saúde DEV" (`…saudemonitor.dev`), artefato do Actions (30 dias) |
-| **hom** (homologação) | `master` | `saude-monitor-backend-hom` | `saude_monitor_hom` | "Radar Saúde HML" (`…saudemonitor.hom`), **GitHub Release** por tag `vX.Y.Z-rc.N` |
-| **prod** (produção) | `release/<tag>` | `saude-monitor-backend` ⚠️ *não criado* | `saude_monitor_prod` ⚠️ *não criado* | "Radar Saúde" (`…saudemonitor`) — loja, a definir |
+| **dev** (desenvolvimento) | `develop` | `saude-monitor-backend-dev` | `saude_monitor_dev` | "Pulseira Verde DEV" (`…saudemonitor.dev`), artefato do Actions (30 dias) |
+| **hom** (homologação) | `master` | `saude-monitor-backend-hom` | `saude_monitor_hom` | "Pulseira Verde HML" (`…saudemonitor.hom`), **GitHub Release** por tag `vX.Y.Z-rc.N` |
+| **prod** (produção) | `release/<tag>` | `saude-monitor-backend` ⚠️ *não criado* | `saude_monitor_prod` ⚠️ *não criado* | "Pulseira Verde" (`…saudemonitor`) — loja, a definir |
 
 > **Regra de ouro:** cada ambiente usa **banco de dados separado** e **JWT_SECRET diferente**. Nunca compartilhe dados entre ambientes.
 

@@ -466,7 +466,7 @@ describe("segundo plano com o app fechado", () => {
     expect(Location.startLocationUpdatesAsync).toHaveBeenCalledWith(
       ACOMPANHAMENTO_TASK,
       expect.objectContaining({
-        foregroundService: expect.objectContaining({ notificationTitle: "Radar Saúde" }),
+        foregroundService: expect.objectContaining({ notificationTitle: "Pulseira Verde" }),
       })
     );
     expect(VisitaService.checkin).not.toHaveBeenCalled();
@@ -920,7 +920,7 @@ describe("sinal da visita em segundo plano (RN-06)", () => {
   });
 
   it("a notificação da visita não diz que o hospital é avisado", async () => {
-    // O sinal vai só para o Radar Saúde; dizer que "o hospital" é avisado prometia um
+    // O sinal vai só para a Pulseira Verde; dizer que "o hospital" é avisado prometia um
     // compartilhamento que não existe e que a política de privacidade não descreve.
     const { sincronizarVisitaAtiva } = carregarServico();
 

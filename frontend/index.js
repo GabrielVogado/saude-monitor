@@ -11,6 +11,9 @@ import './src/core/api/sessaoApi';
 // fechado para entregar uma entrada/saída de hospital, o evento só é tratado se a
 // tarefa já estiver definida no carregamento do bundle.
 import './src/screens/visitas/service/GeofencingTaskService';
+// Envio periódico da fila offline com o app fechado (M-075). Depois do geofencing, que
+// registra o observador avisado quando uma entrada ou saída guardada chega ao servidor.
+import './src/services/EnvioFilaSegundoPlano';
 
 import App from './App';
 

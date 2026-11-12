@@ -1,7 +1,21 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 11/11/2026 · Responsável: Gabriel Vogado
+> Última atualização: 12/11/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 12/11/2026 — Homologação v1.0.0-rc.16
+
+**O que entrou:** registro da rc que leva a fila offline enviada com o app fechado (PR #255, M-075, só app; o backend sai igual ao da rc.15). O roteiro começa pelo teste de campo da saída sem internet com o app fechado e remete aos roteiros da rc.15, da rc.14 e da rc.13, que não foram feitos. Passa a ser a candidata à `release/1.0.0`. Em [`10-git-flow/homologacoes/v1.0.0-rc.16.md`](./10-git-flow/homologacoes/v1.0.0-rc.16.md).
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (promoção de versão, sem estória nem melhoria nova).
+
+---
+
+## 📌 Revisão 11/11/2026 — Fila offline enviada com o app fechado
+
+**O que mudou:** o app ganha uma tarefa de segundo plano (`expo-background-task`, WorkManager no Android) que envia a fila offline a cada ~15 min mesmo com o app fechado. Antes, a saída guardada sem internet só saía com o app aberto ou num evento do geofencing. Só app. Registro em `Historico-Melhorias.md` (M-075).
+**Também:** `De-Para-Backlog-Features.md`, E2-05.
 
 ---
 

@@ -3921,6 +3921,45 @@ avaliação continua bem dentro dos 90 dias em que fica ligada à conta (DAD-01 
 
 ---
 
+## M-075 — Fila offline enviada com o app fechado, a cada ~15 min
+
+**Data:** 11/11/2026 · **PR:** (este PR) · **Origem:** decisão do PO em 04/11/2026 (PR separado do
+M-070, depois do teste de campo), liberada em 11/11/2026 com o teste de campo do M-070 positivo
+
+### Como era
+
+- A fila offline (check-in e checkout guardados sem internet) só saía com o app aberto, na volta da
+  conexão com o app em uso, ou quando o SO acordava o app para o geofencing (entrada, saída ou
+  leitura do acompanhamento, M-068).
+- Depois que a visita termina, o acompanhamento desliga. Quem saía do hospital sem internet e não
+  passava perto de outro ponto monitorado ficava com a saída guardada no aparelho até abrir o app; a
+  visita aparecia como GPS interrompido até lá.
+
+### O que mudou (só app)
+
+- Nova tarefa de segundo plano `saude-monitor-envio-fila` (`services/EnvioFilaSegundoPlano.js`,
+  dependência `expo-background-task`, que usa o WorkManager no Android e o BGTaskScheduler no iOS).
+  O SO a executa a cada ~15 min (o mínimo do Android), podendo atrasar para poupar bateria.
+- Com a fila vazia, a rodada só lê o armazenamento local e termina, sem rede. Com itens, chama a
+  mesma sincronização do app aberto (`SincronizacaoOffline`), então a renovação do token (M-070), a
+  ordem entrada antes da saída e o aviso ao geofencing valem igual.
+- A tarefa é definida no carregamento do bundle (`index.js`, depois do geofencing) e registrada uma
+  vez; as aberturas seguintes não a registram de novo, para não reiniciar o intervalo. No navegador
+  não existe. Falhas vão para o Sentry com `fila.segundoPlano` e `fila.registroSegundoPlano`.
+- **Nativo sem prebuild:** o APK é gerado do `frontend/android/` versionado. O módulo entra pelo
+  autolinking do Expo no build do Gradle, e o manifesto do WorkManager é fundido pela própria
+  biblioteca; nada foi editado à mão no `AndroidManifest.xml`. O plugin no `app.json` só vale para o
+  iOS (modo `processing` no `Info.plist`) quando houver build iOS.
+
+### O que ficou de fora
+
+- Sinal da visita sem internet continua sem fila (ver M-070).
+- Precisa de teste no aparelho com o APK de desenvolvimento: sair do hospital sem internet, fechar o
+  app, recuperar a internet longe de outro hospital e, sem abrir o app, conferir no painel ou no
+  banco que a visita fechou com o horário real em até ~15 a 30 min.
+
+---
+
 ## M-076 — Chave do JWT com rotação por `kid` (SEG-04)
 
 **Data:** 11/11/2026 · **PR:** (este PR) · **Origem:** SEG-04 da Análise de Escalabilidade, Segurança e Custo (item 8 das pendências do guia técnico de 25/10/2026)

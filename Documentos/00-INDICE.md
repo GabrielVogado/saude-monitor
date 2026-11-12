@@ -1,7 +1,14 @@
 # 📚 Índice Central da Documentação — saude-monitor
 
 > **Sistema de Monitoramento Hospitalar por Geolocalização (Clinical Sanctuary)**
-> Última atualização: 11/11/2026 · Responsável: Gabriel Vogado
+> Última atualização: 12/11/2026 · Responsável: Gabriel Vogado
+
+---
+
+## 📌 Revisão 12/11/2026 — Roteiro de testes de campo
+
+**O que entrou:** novo [`10-git-flow/Roteiro-Testes-Campo-v1.0.md`](./10-git-flow/Roteiro-Testes-Campo-v1.0.md), checklist de 33 testes para o PO executar no aparelho (pré-condição, passos, resultado esperado e campo de anotação): check-in e saída automáticos, GPS e rede sem internet, fila offline (inclusive o envio com o app fechado do PR #255, marcado como N/A até entrar numa build), mapa MapLibre, avaliações (pendência de 24h e edição em 15 dias) e notificações. Complementa o §3 das rcs.
+**Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (documento de processo, sem estória nem melhoria).
 
 ---
 

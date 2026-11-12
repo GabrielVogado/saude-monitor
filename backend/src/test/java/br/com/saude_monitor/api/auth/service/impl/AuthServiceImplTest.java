@@ -82,7 +82,9 @@ class AuthServiceImplTest {
         JwtProperties properties = new JwtProperties(
                 "teste-secret-key-com-mais-de-32-bytes-para-hs256",
                 900_000L,
-                2_592_000_000L
+                2_592_000_000L,
+                null,
+                null
         );
         jwtService = new JwtService(properties);
 

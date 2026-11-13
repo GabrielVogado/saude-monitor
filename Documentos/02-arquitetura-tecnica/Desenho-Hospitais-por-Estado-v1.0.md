@@ -1,11 +1,11 @@
 # Desenho — Hospitais por estado (UF) para o lançamento nacional
 
-> **Versão:** 1.0 · **Data:** 13/11/2026 · **Status:** 🟡 Proposta (D1 decidida em 13/11/2026: UBS entram; aguarda D2 a D7 da §9)
+> **Versão:** 1.0 · **Data:** 13/11/2026 · **Status:** 🟢 Desenho aprovado pelo PO em 13/11/2026 (decisões na §9); implementação não iniciada
 > **Base de código:** `develop` em `472c208` (merge do PR #260)
 > **Base de dados medida:** arquivo público `cnes_estabelecimentos.zip` do DATASUS
 > (`s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/CNES/`, publicado em 11/06/2025, 574.006 linhas).
 > É o retrato mais recente que o ambiente conseguiu baixar; serve para ordem de grandeza, não para a carga.
-> **Sem código neste documento.** ADR correspondente: ADR-017 (proposto) em `08-analise tecnica/adrs.md`.
+> **Sem código neste documento.** ADR correspondente: ADR-017 (aceito) em `08-analise tecnica/adrs.md`.
 
 ---
 
@@ -33,7 +33,7 @@ Este documento responde três perguntas:
 
 - Estabelecimentos privados e filantrópicos. A base hoje é só pública, por decisão do PO de 09/09/2026
   (`07-dados/relatorio-importacao-CNES_PUBLICOS_COMPLEMENTARES_20260909.md`). Os números da §3
-  já seguem esse corte. Se mudar, é a decisão D2.
+  já seguem esse corte, confirmado pelo PO em 13/11/2026 (D2).
 - Bloquear o uso fora do estado. A UF escolhe o que aparece; não é cerca.
 - Geocodificar endereços com serviço pago (ver §4.4: o problema é de 23 registros).
 
@@ -174,7 +174,8 @@ visível antes de cada liberação.
 - Quem liga e desliga é o ADMIN pelo painel (§6). Ligar uma UF não exige deploy nem APK novo.
 - Estabelecimentos de UF não liberada podem estar no banco (importados, em revisão) e não aparecem em
   nenhuma rota pública, **exceto o check-in**: se alguém fizer visita num hospital de UF ainda
-  fechada, ela não registra porque o app não tem o geofence. Isso é aceitável e vira D5.
+  fechada, ela não registra porque o app não tem o geofence (D5, decidida em 13/11/2026: a UF não
+  liberada ainda não teve as coordenadas revisadas, e a pessoa avaliaria um hospital que não vê).
 
 ### 4.3 Importação do CNES por estado
 
@@ -215,7 +216,7 @@ O importador atual serve de base; muda o que ele lê e quando roda.
   ponto no polígono. Funciona sem rede e a coordenada não sai do aparelho.
   Alternativa mais barata de construir: `Location.reverseGeocodeAsync` do expo-location, que já
   está instalado; depende de rede e manda a posição ao serviço do sistema (Google, no Android).
-  Recomendo a malha, pelos dois motivos; vira D4.
+  Decidido pelo PO em 13/11/2026 (D4): a malha.
 - Sem permissão de localização: a pessoa escolhe o estado numa lista.
 - A UF escolhida fica guardada **só no aparelho** e pode ser trocada em Perfil.
 - Se a posição atual for de outra UF liberada, o app oferece uma vez: "Você está em Goiás. Ver os
@@ -283,8 +284,7 @@ O importador atual serve de base; muda o que ele lê e quando roda.
 - A UF é descoberta no aparelho e fica no aparelho. O servidor só recebe `?uf=BA` no pedido do
   catálogo, igual para todo mundo daquele estado, e não grava isso por pessoa.
 - A política de privacidade (`site/`, versão 1.2) precisa de uma linha: a localização também é
-  usada, no aparelho, para escolher o estado. Se a D4 for o `reverseGeocodeAsync`, a linha precisa
-  dizer que a posição vai ao serviço de geocodificação do sistema.
+  usada, no aparelho, para escolher o estado.
 - Dados do CNES são públicos e de estabelecimentos, não de pessoas. O e-mail e o telefone do CNES
   não entram no catálogo público (o `HospitalResumoResponse` já não leva contato).
 
@@ -300,19 +300,19 @@ O importador atual serve de base; muda o que ele lê e quando roda.
 
 ---
 
-## 9. Decisões abertas para o PO
+## 9. Decisões do PO
 
-Em ordem do que mais muda o trabalho:
+Todas tomadas em 13/11/2026. Não há decisão aberta que segure a Fase 1.
 
 | # | Pergunta | Opções | Recomendação |
 |---|---|---|---|
 | **D1** | Quais tipos entram fora do DF? | (a) só hospitais e urgência/UPA: 5 mil no país; (b) + UBS, policlínicas e CAPS, como no DF: 60 mil | ✅ **Decidido pelo PO em 13/11/2026: (b), as UBS entram.** Consequências: caminho A, catálogo em arquivo por UF, agrupamento no mapa e revisão de coordenadas maior por estado |
-| **D2** | Privados e filantrópicos continuam fora? | Sim / não | Sim, como decidido em 09/09; a contagem muda se entrarem |
-| **D3** | Por que liberar estado a estado: qualidade da base, parcerias com o poder público, ou foco de divulgação? | — | Com a D1, não muda mais o desenho (o tamanho já exige o catálogo por UF); orienta só a ordem dos estados |
-| **D4** | Como descobrir a UF | malha do IBGE no app / `reverseGeocodeAsync` | Malha no app (offline e sem mandar posição) |
-| **D5** | Visita em UF ainda não liberada | não registra / registra sem mostrar o hospital | Não registra no lançamento |
-| **D6** | Segunda UF depois do DF | GO / outra | **GO**: o Entorno é onde o morador do DF já é atendido, e testa a divisa logo |
-| **D7** | A UF escolhida vai para a conta? | só no aparelho / também na conta | Só no aparelho (menos dado pessoal; troca de aparelho só pergunta de novo) |
+| **D2** | Privados e filantrópicos continuam fora? | Sim / não | ✅ **Decidido pelo PO em 13/11/2026:** continuam fora, como em 09/09 |
+| **D3** | Por que liberar estado a estado: qualidade da base, parcerias com o poder público, ou foco de divulgação? | — | Não segura o desenho: com a D1, o tamanho já exige o catálogo por UF. Orienta só a ordem dos estados depois de GO, a combinar na Fase 5 |
+| **D4** | Como descobrir a UF | malha do IBGE no app / `reverseGeocodeAsync` | ✅ **Decidido pelo PO em 13/11/2026:** malha do IBGE no app (offline e sem mandar posição) |
+| **D5** | Visita em UF ainda não liberada | não registra / registra sem mostrar o hospital | ✅ **Decidido pelo PO em 13/11/2026:** não registra |
+| **D6** | Segunda UF depois do DF | GO / outra | ✅ **Decidido pelo PO em 13/11/2026:** GO. O Entorno é onde o morador do DF já é atendido, e testa a divisa logo |
+| **D7** | A UF escolhida vai para a conta? | só no aparelho / também na conta | ✅ **Decidido pelo PO em 13/11/2026:** só no aparelho (menos dado pessoal; troca de aparelho só pergunta de novo) |
 
 ---
 
@@ -322,7 +322,7 @@ Estimativas em dias de desenvolvimento, com testes e Sonar, para o escopo decidi
 
 | Fase | Entrega | Áreas | Esforço |
 |---|---|---|---|
-| 0 | Respostas D2–D7; teste no aparelho da leitura de um catálogo de 3 MB em segundo plano (§3.2) | — | — |
+| 0 | Teste no aparelho da leitura de um catálogo de 3 MB em segundo plano (§3.2) | — | — |
 | 1 | `uf` em catálogo, indicadores e ranking; índice; `ufsLiberadas` e `versoesCatalogo`; DF como padrão sem `uf` | backend | 3 |
 | 2 | Importador do CSV nacional por UF, fora do startup; relatório com pontos suspeitos; atualização mensal | backend, docs | 4 |
 | 3 | UF no app (malha IBGE, escolha, troca); catálogo em arquivo por UF; união no geofencing; agrupamento no mapa; filtro por tipo como recorte padrão da lista; tela de UF não liberada; ranking por UF | app | 9 a 11 |

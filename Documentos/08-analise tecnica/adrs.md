@@ -1385,7 +1385,7 @@ carga), com o banco subindo de plano (Flex → M10 → M20) só quando a mediç�
 ## ADR-017: Catálogo de estabelecimentos por estado (UF) para o lançamento nacional
 
 **Data:** 2026-11-13
-**Status:** Proposto — D1 decidida em 13/11/2026 (UBS entram); aguarda D2–D7 do PO
+**Status:** Aceito — desenho e decisões D1–D7 aprovados pelo PO em 13/11/2026; implementação não iniciada
 **Área:** Backend, App e Painel Admin
 **Desenho completo:** [`02-arquitetura-tecnica/Desenho-Hospitais-por-Estado-v1.0.md`](../02-arquitetura-tecnica/Desenho-Hospitais-por-Estado-v1.0.md)
 
@@ -1412,9 +1412,10 @@ liberado estado a estado.
 - Descartada: volta um pedido por deslocamento, sem cache, com a posição exata no servidor (o
   que o ARQ-01 eliminou).
 
-### Decisão proposta
+### Decisão
 
-Opção 1, em cinco fases, com GO como segunda UF. Sem `uf`, as rotas continuam devolvendo só o DF,
+Opção 1, em cinco fases, com GO como segunda UF, UBS no escopo, privados fora, UF descoberta pela
+malha do IBGE no aparelho e guardada só nele, e sem registro de visita em UF não liberada. Sem `uf`, as rotas continuam devolvendo só o DF,
 para os APKs já instalados.
 
 ### Consequências
@@ -1445,7 +1446,7 @@ para os APKs já instalados.
 | ADR-013 | Refresh token em cookie HttpOnly (Painel Web) | Alta | Implementado (05/11/2026; produção depende do domínio próprio) | Alto |
 | ADR-014 | Leaflet para o mapa do Painel Admin | Média | Em andamento (25/09/2026) | Médio |
 | ADR-015 | Escala da infraestrutura para a população do DF | Alta | Proposto (08/10/2026) | Alto |
-| ADR-017 | Catálogo de estabelecimentos por UF (lançamento nacional) | Alta | Proposto (13/11/2026) | Alto |
+| ADR-017 | Catálogo de estabelecimentos por UF (lançamento nacional) | Alta | Aceito (13/11/2026), não iniciado | Alto |
 
 > Os ADR-001 a ADR-010 continuam `Proposto`. **`Aceito`: ADR-011** (infraestrutura,
 > backend), **ADR-012** (frontend do painel admin) e **ADR-014** (biblioteca de mapa do

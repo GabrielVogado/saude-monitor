@@ -1382,6 +1382,48 @@ carga), com o banco subindo de plano (Flex → M10 → M20) só quando a mediç�
 
 ---
 
+## ADR-017: Catálogo de estabelecimentos por estado (UF) para o lançamento nacional
+
+**Data:** 2026-11-13
+**Status:** Proposto — aguarda as decisões D1–D7 do PO
+**Área:** Backend, App e Painel Admin
+**Desenho completo:** [`02-arquitetura-tecnica/Desenho-Hospitais-por-Estado-v1.0.md`](../02-arquitetura-tecnica/Desenho-Hospitais-por-Estado-v1.0.md)
+
+### Contexto e Problema
+
+O lançamento fora do DF usa o CNES/DATASUS. Só os públicos e ativos, nos tipos que o app já
+trata, são 60.086 estabelecimentos (26,5 MB em JSON); só hospitais e urgência, 5.002 (2,2 MB).
+Hoje o catálogo, os indicadores e o ranking leem todos os ativos, e o app guarda o catálogo
+numa única chave do AsyncStorage. O PO quer que cada pessoa veja o seu estado e que o app seja
+liberado estado a estado.
+
+### Opções Avaliadas
+
+**Opção 1 — Catálogo por UF** ← Proposta
+- O servidor filtra catálogo, indicadores e ranking por `uf`; a configuração remota lista as UFs
+  liberadas e a versão de cada catálogo; o app guarda a UF escolhida, a UF onde está e a vizinha
+  perto da divisa, e o geofencing usa a união delas.
+
+**Opção 2 — Catálogo nacional único, filtro só na tela**
+- Viável só sem UBS e sem liberação por UF; com UBS não cabe no aparelho.
+
+**Opção 3 — Catálogo por proximidade**
+- Descartada: volta um pedido por deslocamento, sem cache, com a posição exata no servidor (o
+  que o ARQ-01 eliminou).
+
+### Decisão proposta
+
+Opção 1, em cinco fases, com GO como segunda UF. Sem `uf`, as rotas continuam devolvendo só o DF,
+para os APKs já instalados.
+
+### Consequências
+
+- O check-in não muda: continua por `$geoIntersects` em qualquer UF.
+- O ranking deixa de carregar todos os ativos a cada pedido.
+- O catálogo no app sai do AsyncStorage para arquivo quando o tamanho pedir.
+
+---
+
 ## Resumo de Status
 
 | ADR | Título | Prioridade | Esforço | Impacto |
@@ -1401,6 +1443,7 @@ carga), com o banco subindo de plano (Flex → M10 → M20) só quando a mediç�
 | ADR-013 | Refresh token em cookie HttpOnly (Painel Web) | Alta | Implementado (05/11/2026; produção depende do domínio próprio) | Alto |
 | ADR-014 | Leaflet para o mapa do Painel Admin | Média | Em andamento (25/09/2026) | Médio |
 | ADR-015 | Escala da infraestrutura para a população do DF | Alta | Proposto (08/10/2026) | Alto |
+| ADR-017 | Catálogo de estabelecimentos por UF (lançamento nacional) | Alta | Proposto (13/11/2026) | Alto |
 
 > Os ADR-001 a ADR-010 continuam `Proposto`. **`Aceito`: ADR-011** (infraestrutura,
 > backend), **ADR-012** (frontend do painel admin) e **ADR-014** (biblioteca de mapa do

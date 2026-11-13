@@ -7,7 +7,7 @@
 
 ## 📌 Revisão 13/11/2026 — Desenho de hospitais por estado
 
-**O que entrou:** a pedido do PO, o [`Desenho-Hospitais-por-Estado-v1.0.md`](./02-arquitetura-tecnica/Desenho-Hospitais-por-Estado-v1.0.md) prepara o lançamento fora do DF com o CNES/DATASUS: cada pessoa vê o seu estado e o app é liberado estado a estado. Mede a base por UF (60.086 públicos ativos nos tipos do app, 5.002 só hospitais e urgência), aponta o limite do catálogo numa chave só do AsyncStorage, descreve backend, app, painel, escala e LGPD, compara três caminhos, lista as decisões D1–D7 para o PO e propõe cinco fases (~18 a 20 dias até a segunda UF). Registrado como proposta no ADR-017 (`08-analise tecnica/adrs.md`). Sem código.
+**O que entrou:** a pedido do PO, o [`Desenho-Hospitais-por-Estado-v1.0.md`](./02-arquitetura-tecnica/Desenho-Hospitais-por-Estado-v1.0.md) prepara o lançamento fora do DF com o CNES/DATASUS: cada pessoa vê o seu estado e o app é liberado estado a estado. Mede a base por UF (60.086 públicos ativos nos tipos do app, 5.002 só hospitais e urgência), aponta o limite do catálogo numa chave só do AsyncStorage, descreve backend, app, painel, escala e LGPD, compara três caminhos, lista as decisões D1–D7 para o PO e propõe cinco fases (21 a 23 dias até a segunda UF). O PO decidiu a D1 em 13/11/2026: as UBS entram fora do DF, o que fixa o catálogo por UF, o catálogo em arquivo no app e o agrupamento no mapa. Registrado como proposta no ADR-017 (`08-analise tecnica/adrs.md`). Sem código.
 **Sem mudança:** `De-Para-Backlog-Features.md` e `Historico-Melhorias.md` (desenho, sem entrega).
 
 ---

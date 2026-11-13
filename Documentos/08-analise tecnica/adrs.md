@@ -1385,7 +1385,7 @@ carga), com o banco subindo de plano (Flex → M10 → M20) só quando a mediç�
 ## ADR-017: Catálogo de estabelecimentos por estado (UF) para o lançamento nacional
 
 **Data:** 2026-11-13
-**Status:** Proposto — aguarda as decisões D1–D7 do PO
+**Status:** Proposto — D1 decidida em 13/11/2026 (UBS entram); aguarda D2–D7 do PO
 **Área:** Backend, App e Painel Admin
 **Desenho completo:** [`02-arquitetura-tecnica/Desenho-Hospitais-por-Estado-v1.0.md`](../02-arquitetura-tecnica/Desenho-Hospitais-por-Estado-v1.0.md)
 
@@ -1405,7 +1405,8 @@ liberado estado a estado.
   perto da divisa, e o geofencing usa a união delas.
 
 **Opção 2 — Catálogo nacional único, filtro só na tela**
-- Viável só sem UBS e sem liberação por UF; com UBS não cabe no aparelho.
+- Descartada: o PO decidiu em 13/11/2026 que as UBS entram, e com elas o catálogo nacional (26,5 MB)
+  não cabe no aparelho.
 
 **Opção 3 — Catálogo por proximidade**
 - Descartada: volta um pedido por deslocamento, sem cache, com a posição exata no servidor (o
@@ -1420,7 +1421,8 @@ para os APKs já instalados.
 
 - O check-in não muda: continua por `$geoIntersects` em qualquer UF.
 - O ranking deixa de carregar todos os ativos a cada pedido.
-- O catálogo no app sai do AsyncStorage para arquivo quando o tamanho pedir.
+- O catálogo no app sai do AsyncStorage para um arquivo por UF, e o mapa ganha agrupamento de
+  marcadores (SP e MG passam de 7 mil pontos).
 
 ---
 

@@ -1,6 +1,6 @@
 # Desenho — Hospitais por estado (UF) para o lançamento nacional
 
-> **Versão:** 1.0 · **Data:** 13/11/2026 · **Status:** 🟡 Proposta (aguarda as decisões da §9)
+> **Versão:** 1.0 · **Data:** 13/11/2026 · **Status:** 🟡 Proposta (D1 decidida em 13/11/2026: UBS entram; aguarda D2 a D7 da §9)
 > **Base de código:** `develop` em `472c208` (merge do PR #260)
 > **Base de dados medida:** arquivo público `cnes_estabelecimentos.zip` do DATASUS
 > (`s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/CNES/`, publicado em 11/06/2025, 574.006 linhas).
@@ -119,7 +119,8 @@ Para comparar: o CNES inteiro tem 574.006 linhas, 457.334 ativas, e 115 mil de n
 
 **Leituras:**
 
-- **UBS são 83% do escopo.** A decisão de incluir ou não UBS (D1) muda o tamanho em 12 vezes.
+- **UBS são 83% do escopo.** O PO decidiu em 13/11/2026 que elas entram (D1): o desenho passa a
+  valer para os 60.086, e não para os 5.002.
 - **DF no CNES tem 257, a nossa base tem 341.** A base do DF veio do InfoSaúde, que tem camadas que
   o CNES não cobre do mesmo jeito (população de rua, indígena, prisional). O DF não deve ser
   substituído pelo CNES; o importador só complementa o DF.
@@ -133,15 +134,17 @@ Para comparar: o CNES inteiro tem 574.006 linhas, 457.334 ativas, e 115 mil de n
 O catálogo hoje é **uma** chave do AsyncStorage 2.2.0. No Android ele é guardado em SQLite, e uma
 linha acima de ~2 MB não volta na leitura (`CursorWindow`), além do teto padrão de 6 MB do banco
 inteiro. SP (3,2 MB), MG (3,2 MB) e BA (2,6 MB) passam disso com UBS; o Brasil inteiro (26,5 MB)
-passa de tudo. **A verificar no aparelho antes de decidir**, mas o risco é concreto o bastante para
-o desenho tratar: o catálogo sai do AsyncStorage e vai para arquivo (`expo-file-system`, que o app
-já tem), um arquivo por UF.
+passa de tudo. Com as UBS no escopo (D1), isso deixa de ser risco e vira requisito: o catálogo sai
+do AsyncStorage e vai para arquivo (`expo-file-system`, que o app já tem), um arquivo por UF. O
+teste no aparelho da Fase 0 mede o tempo de leitura de um arquivo de 3 MB no recálculo em segundo
+plano, que é o caminho mais sensível.
 
 ### 3.3 O banco
 
 Cada documento de `hospitais` leva o polígono do geofence (33 vértices) e fica na casa de 2 KB.
-60 mil documentos ≈ 120 MB com índices; 5 mil ≈ 10 MB. O Atlas M0 (512 MB, compartilhado com o dev,
-ADR-015) aguenta os dois, mas o escopo com UBS consome uma fatia relevante dele.
+60 mil documentos ≈ 120 MB com índices. O Atlas M0 (512 MB, compartilhado com o dev, ADR-015)
+aguenta, mas é perto de um quarto dele só com o cadastro; importar estado a estado mantém essa conta
+visível antes de cada liberação.
 
 ---
 
@@ -242,9 +245,12 @@ O importador atual serve de base; muda o que ele lê e quando roda.
 
 - **Hospitais e Mapa:** mostram a UF escolhida, com o nome dela no topo e o atalho para trocar.
   O mapa abre enquadrado na UF.
-- **Mapa:** com milhares de pontos (SP e MG com UBS passam de 7 mil), os marcadores precisam de
-  agrupamento (`cluster` da fonte GeoJSON do MapLibre). Sem isso o mapa fica ilegível e pesado.
-  Com o escopo só de hospitais e urgência, o maior estado tem 715 pontos e dá para adiar.
+- **Mapa:** com milhares de pontos (SP e MG passam de 7 mil, BA de 5 mil), os marcadores precisam
+  de agrupamento (`cluster` da fonte GeoJSON do MapLibre, no aparelho e na Web). Sem isso o mapa fica
+  ilegível e pesado. Com as UBS no escopo, entra na Fase 3.
+- **Lista:** a busca e a ordenação por distância passam a rodar sobre milhares de itens no aparelho;
+  o filtro por tipo (hospital, UPA, UBS) vira o recorte padrão da tela para a lista não abrir com
+  5 mil UBS na frente dos hospitais.
 - **Ranking:** da UF escolhida.
 - **UF não liberada:** tela "O Pulseira Verde ainda não chegou em <estado>", com a lista das UFs
   liberadas. Sem cadastro de "avise-me" nesta versão.
@@ -288,8 +294,8 @@ O importador atual serve de base; muda o que ele lê e quando roda.
 
 | Caminho | Como | Prós | Contras | Veredito |
 |---|---|---|---|---|
-| **A. Catálogo por UF** | Servidor filtra por `uf`; app guarda as UFs que importam | Tamanho sob controle em qualquer escopo; liberação UF a UF natural; cache na borda por URL | Mais peças no app (escolha de UF, vários arquivos, união no geofencing) | **Recomendado** |
-| B. Catálogo nacional único, filtro só na tela | Um arquivo com o país; a tela filtra por UF | O mais simples; geofence nunca falha na divisa | Só cabe se o escopo for hospitais + urgência (2,2 MB, já no limite da §3.2); com UBS são 26,5 MB; a liberação UF a UF vira só `ativo` | Vale **só** se D1 = sem UBS e D3 = não precisa liberar por UF |
+| **A. Catálogo por UF** | Servidor filtra por `uf`; app guarda as UFs que importam | Tamanho sob controle em qualquer escopo; liberação UF a UF natural; cache na borda por URL | Mais peças no app (escolha de UF, vários arquivos, união no geofencing) | **Escolhido** (único que cabe com UBS) |
+| B. Catálogo nacional único, filtro só na tela | Um arquivo com o país; a tela filtra por UF | O mais simples; geofence nunca falha na divisa | Só cabe se o escopo for hospitais + urgência (2,2 MB, já no limite da §3.2); com UBS são 26,5 MB; a liberação UF a UF vira só `ativo` | Descartado pela D1: com UBS são 26,5 MB no aparelho |
 | C. Catálogo por proximidade | Servidor responde pelo raio da posição | Pouco dado no aparelho | Volta o problema que o ARQ-01 resolveu: um pedido por deslocamento, sem cache, com a posição exata indo ao servidor | Descartado |
 
 ---
@@ -300,9 +306,9 @@ Em ordem do que mais muda o trabalho:
 
 | # | Pergunta | Opções | Recomendação |
 |---|---|---|---|
-| **D1** | Quais tipos entram fora do DF? | (a) só hospitais e urgência/UPA: 5 mil no país; (b) + UBS, policlínicas e CAPS, como no DF: 60 mil | **(a) no lançamento**, UBS por estado depois. 12 vezes menos dado, mapa sem agrupamento, revisão de coordenadas viável à mão |
+| **D1** | Quais tipos entram fora do DF? | (a) só hospitais e urgência/UPA: 5 mil no país; (b) + UBS, policlínicas e CAPS, como no DF: 60 mil | ✅ **Decidido pelo PO em 13/11/2026: (b), as UBS entram.** Consequências: caminho A, catálogo em arquivo por UF, agrupamento no mapa e revisão de coordenadas maior por estado |
 | **D2** | Privados e filantrópicos continuam fora? | Sim / não | Sim, como decidido em 09/09; a contagem muda se entrarem |
-| **D3** | Por que liberar estado a estado: tamanho do dado, qualidade da base, parcerias com o poder público, ou foco de divulgação? | — | A resposta escolhe entre os caminhos A e B da §8 |
+| **D3** | Por que liberar estado a estado: qualidade da base, parcerias com o poder público, ou foco de divulgação? | — | Com a D1, não muda mais o desenho (o tamanho já exige o catálogo por UF); orienta só a ordem dos estados |
 | **D4** | Como descobrir a UF | malha do IBGE no app / `reverseGeocodeAsync` | Malha no app (offline e sem mandar posição) |
 | **D5** | Visita em UF ainda não liberada | não registra / registra sem mostrar o hospital | Não registra no lançamento |
 | **D6** | Segunda UF depois do DF | GO / outra | **GO**: o Entorno é onde o morador do DF já é atendido, e testa a divisa logo |
@@ -312,20 +318,20 @@ Em ordem do que mais muda o trabalho:
 
 ## 10. Fases e esforço
 
-Estimativas em dias de desenvolvimento, com testes e Sonar, para o escopo recomendado (D1 = a).
-Com UBS, somar ~3 dias (agrupamento no mapa, revisão de coordenadas maior).
+Estimativas em dias de desenvolvimento, com testes e Sonar, para o escopo decidido (D1 = b, com UBS).
 
 | Fase | Entrega | Áreas | Esforço |
 |---|---|---|---|
-| 0 | Respostas D1–D7; teste no aparelho do limite da §3.2 com um catálogo de 3 MB | — | — |
+| 0 | Respostas D2–D7; teste no aparelho da leitura de um catálogo de 3 MB em segundo plano (§3.2) | — | — |
 | 1 | `uf` em catálogo, indicadores e ranking; índice; `ufsLiberadas` e `versoesCatalogo`; DF como padrão sem `uf` | backend | 3 |
 | 2 | Importador do CSV nacional por UF, fora do startup; relatório com pontos suspeitos; atualização mensal | backend, docs | 4 |
-| 3 | UF no app (malha IBGE, escolha, troca); catálogo em arquivo por UF; união no geofencing; tela de UF não liberada; ranking por UF | app | 6 a 8 |
+| 3 | UF no app (malha IBGE, escolha, troca); catálogo em arquivo por UF; união no geofencing; agrupamento no mapa; filtro por tipo como recorte padrão da lista; tela de UF não liberada; ranking por UF | app | 9 a 11 |
 | 4 | Painel: filtro por UF/município, tela de liberação, dashboard por UF | admin | 3 |
-| 5 | Importar GO, revisar pontos suspeitos, liberar GO na homologação e testar a divisa DF/GO em campo | dados, homologação | 2 + campo |
+| 5 | Importar GO (1.947 unidades, 46 pontos repetidos), revisar pontos suspeitos, liberar GO na homologação e testar a divisa DF/GO em campo | dados, homologação | 2 + campo |
 
-Total: **18 a 20 dias** de desenvolvimento até a segunda UF. Cada UF seguinte custa a importação e
-a revisão dos pontos suspeitos (de meio dia a 2 dias, conforme o tamanho).
+Total: **21 a 23 dias** de desenvolvimento até a segunda UF. Cada UF seguinte custa a importação e
+a revisão dos pontos suspeitos: de meio dia nos estados pequenos a 3 ou 4 dias nos maiores (BA tem
+440 pontos repetidos, MA 250, MG 252, SP 248).
 
 **Critério para liberar uma UF:** importação sem erro, relatório publicado, pontos suspeitos
 revisados, check-in testado em pelo menos um hospital da UF.
@@ -337,5 +343,3 @@ revisados, check-in testado em pelo menos um hospital da UF.
 - Nome exato das rotas e dos campos novos, desde que mantenham a compatibilidade da §4.1.
 - Formato da malha do IBGE no app (GeoJSON simplificado ou outro), desde que caiba em ~200 KB.
 - Se a liberação mora na coleção da configuração remota ou numa coleção própria.
-- O teste do limite do AsyncStorage pode mostrar que dá para manter a chave única no escopo (a);
-  o arquivo por UF continua sendo o caminho se UBS entrar.

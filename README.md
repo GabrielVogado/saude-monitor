@@ -1,3 +1,11 @@
+> [!WARNING]
+> **Este repositório foi arquivado em 16/11/2026 e não recebe mais commits.** O projeto continua na organização [devpointinnovations](https://github.com/devpointinnovations), com o histórico preservado, um repositório por área:
+> [radar-saude-mobile](https://github.com/devpointinnovations/radar-saude-mobile) (app) ·
+> [painel-admin-frontend](https://github.com/devpointinnovations/painel-admin-frontend) (painel) ·
+> [radar-saude-backend](https://github.com/devpointinnovations/radar-saude-backend) (API) ·
+> [radar-saude-docs](https://github.com/devpointinnovations/radar-saude-docs) (documentação e site).
+> Issues, PRs e as Releases com os APKs da rc.1 à rc.16 continuam consultáveis aqui.
+
 <div align="center">
 
 <img src="doc/assets/readme/icone.png" alt="Ícone da Pulseira Verde" width="96" height="96">
